@@ -13,7 +13,7 @@ import { buildBrachio, BRACHIO_ANIM } from '../models/dino/brachio.js';
 
 /** Species registry: model builder + animation tuning. Phase 6 adds more. */
 export const SPECIES = {
-  brachio: { build: buildBrachio, anim: BRACHIO_ANIM, barHeight: 12.5 },
+  brachio: { build: buildBrachio, anim: BRACHIO_ANIM, barHeight: 12.5, heavy: true },
 };
 
 export function registerSpecies(type, def) { SPECIES[type] = def; }
@@ -107,6 +107,12 @@ class DinoView {
       pose,
     });
     if (this.flinch > 0) this.rig.body.rotation.z += Math.sin(this.flinch * 30) * 0.05 * this.flinch;
+    // heavy footfalls for the big ones
+    if (this.sp.heavy && this.alive) {
+      const half = Math.floor(this.anim.phase * 2);
+      if (half !== this.lastHalf && dist > 0.005) this.ctx.onStep?.(this);
+      this.lastHalf = half;
+    }
     this.sp.extraUpdate?.(this, dt);
     this.updateBar(dt);
   }
@@ -157,7 +163,7 @@ export class DinoViews {
   constructor(game) {
     this.game = game;
     this.map = new Map();
-    this.ctx = { scene: game.gfx.scene, terrain: game.terrain, overlay: game.overlay, camera: game.gfx.camera };
+    this.ctx = { scene: game.gfx.scene, terrain: game.terrain, overlay: game.overlay, camera: game.gfx.camera, onStep: (v) => game.onDinoStep?.(v) };
     const net = game.net;
     net.on(`ev:${EV.DINO_ADD}`, (m) => this.add(m.dino));
     net.on(`ev:${EV.DINO_REMOVE}`, (m) => this.remove(m.id));
@@ -172,7 +178,7 @@ export class DinoViews {
       const v = this.map.get(m.id);
       if (v) { v.alive = false; v.st = DS.DEAD; v.bar.hidden = true; }
     });
-    net.on(`ev:${EV.ATTACK}`, (m) => { const v = this.map.get(m.id); if (v) v.attackT = 0.45; });
+    net.on(`ev:${EV.ATTACK}`, (m) => { const v = this.map.get(m.id); if (v) { v.attackT = 0.45; game.onDinoAttack?.(v); } });
     net.on(`ev:${EV.ROAR}`, (m) => { const v = this.map.get(m.id); if (v) { v.roarT = 1.6; game.onRoar?.(v); } });
   }
 

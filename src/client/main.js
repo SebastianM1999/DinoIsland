@@ -84,7 +84,11 @@ $('btn-resume').addEventListener('click', () => game?.input.requestLock());
 paused.addEventListener('click', (e) => {
   if (e.target === paused) game?.input.requestLock();
 });
-canvas.addEventListener('click', () => game?.running && game.input.requestLock());
+canvas.addEventListener('click', () => {
+  if (!game?.running) return;
+  game.audio.resume();
+  game.input.requestLock();
+});
 $('btn-leave').addEventListener('click', () => {
   game?.net.close();
   backToMenu('');

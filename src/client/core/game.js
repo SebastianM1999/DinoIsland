@@ -24,6 +24,7 @@ import { Tracks } from '../entities/tracks.js';
 import { Items } from '../entities/items.js';
 import { Projectiles } from '../entities/projectiles.js';
 import { PlayerActions } from '../player/actions.js';
+import { GameAudio } from '../audio/audio.js';
 
 export class Game {
   /**
@@ -50,6 +51,8 @@ export class Game {
     this.overlay.className = 'world-overlay';
     document.body.appendChild(this.overlay);
 
+    this.audio = new GameAudio();
+    this.stepDist = 0;
     this.hud = new Hud(document.getElementById('hud'));
     this.hud.initMinimap(this.terrain, this.layout);
 
@@ -149,7 +152,13 @@ export class Game {
       this.fruitPlants.setRipe(m.spot, m.ripe);
     });
     net.on(`ev:${EV.TOAST}`, (m) => this.hud.toast(m.text, m.icon));
+    net.on(`ev:${EV.ITEM_REMOVE}`, (m) => { if (m.by === this.me.id) this.audio.play('pickup'); });
+    net.on(`ev:${EV.TRAP_SNAP}`, (m) => {
+      const tr = this.items.traps.get(m.id)?.data;
+      this.audio.play('trapSnap', tr ? { pos: { x: tr.x, y: tr.y + 0.5, z: tr.z } } : {});
+    });
     net.on(`ev:${EV.MISSION}`, (m) => {
+      if (m.mission.step !== this.mission.step) this.audio.play(m.mission.complete ? 'complete' : 'quest');
       this.mission = m.mission;
       this.hud.setMission(m.mission);
       this.hud.missionComplete(m.mission.complete, { completedIn: m.mission.completedIn, store: this.store });
@@ -159,6 +168,7 @@ export class Game {
       if (m.id === this.me.id) {
         this.me.hp = m.hp;
         this.hud.damageFlash(m.dmg);
+        this.audio.play('hurt');
         if (m.kx || m.kz) this.player.knock(m.kx, m.kz, m.down ? 5 : 3, m.down ? CONFIG.player.knockdownTime : 0.15);
       }
     });
@@ -166,6 +176,7 @@ export class Game {
       if (m.id === this.me.id) {
         this.me.alive = false;
         this.me.deathT = CONFIG.player.respawnDelay;
+        this.audio.play('death');
         this.player.frozen = true;
       }
     });
@@ -200,6 +211,8 @@ export class Game {
   // ------------------------------------------------------------------ loop
 
   start() {
+    this.audio.resume();
+    this.audio.startAmbient();
     this.running = true;
     this.input.enabled = true;
     this.hud.show(true);
@@ -270,7 +283,32 @@ export class Game {
     for (const u of this.worldUpdaters) u.update?.(dt, this.time, cam);
     for (const sys of this.systems) sys.update?.(dt, renderTime);
     this.#updateHud(dt);
+    this.#updateAudio(dt);
   }
+
+  #updateAudio(dt) {
+    const cam = this.gfx.camera;
+    const fwd = new THREE.Vector3(0, 0, -1).applyQuaternion(cam.quaternion);
+    const up = new THREE.Vector3(0, 1, 0).applyQuaternion(cam.quaternion);
+    this.audio.setListener(cam.position, fwd, up);
+    const p = this.player;
+    // footsteps
+    this.stepDist += p.moveSpeed * dt * (p.onGround ? 1 : 0);
+    if (this.stepDist > (p.sprinting ? 2.2 : 1.7)) {
+      this.stepDist = 0;
+      this.audio.play(p.inWater > 0.2 ? 'splash' : 'step', { vol: p.sprinting ? 1.3 : 1 });
+    }
+    // surf gets louder toward the coast
+    const g = this.terrain.heightAt(p.pos.x, p.pos.z);
+    const coast = Math.max(0, Math.min(1, (Math.hypot(p.pos.x, p.pos.z) - 110) / 70)) * (g < 6 ? 1 : 0.3);
+    this.audio.update(dt, { coast, height: g });
+  }
+
+  /** Sound hooks called by the dinosaur views. */
+  onRoar(v) { this.audio.play(`roar_${v.type}`, { pos: v.pos }); }
+  onDinoAttack(v) { if (v.type === 'raptor' || v.type === 'trex' || v.type === 'ptera') this.audio.play('bite', { pos: v.pos }); }
+  onDinoHit(v, m) { if (m.by !== this.me.id) this.audio.play('hit', { pos: v.pos, vol: 0.7 }); }
+  onDinoStep(v) { this.audio.play('bigStep', { pos: v.pos, vol: v.type === 'trex' ? 1.2 : 0.7 }); }
 
   #updateHud(dt) {
     const hud = this.hud;
