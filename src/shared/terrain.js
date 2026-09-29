@@ -49,7 +49,8 @@ export function islandHeight(x, z) {
   const inland = (R - d) / 45;
   let h;
   if (inland < 0) {
-    h = inland * 45 * 0.16;                                    // sea floor slope
+    const out = -inland * 45;                                  // meters past the coastline
+    h = -out * 0.045 - Math.max(0, out - 22) * 0.16;           // wide turquoise shelf, then drop-off
     h = Math.max(h, -16);
     h += fbm(x * 0.02, z * 0.02, 2, S + 3) * 1.2;
   } else {
@@ -58,8 +59,6 @@ export function islandHeight(x, z) {
     h += fbm(x * 0.018, z * 0.018, 4, S + 4) * 3.2 * smoothstep(0.3, 1, t);
     h += fbm(x * 0.07, z * 0.07, 2, S + 5) * 0.5 * t;
   }
-  // Very gentle coastal shelf so the shallows are turquoise.
-  if (inland < 0 && inland > -0.5) h = lerp(h, -0.9 + inland * 3, 0.4);
 
   // Mountain massif and the waterfall spur: terraced mesas with cliff risers.
   const m = mesa(x, z, FEATURES.mountain, 12, 0.84);

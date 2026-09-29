@@ -17,9 +17,9 @@ const PAL = {
   grassDark: C('#5ea83a'),
   jungle: C('#4c9434'),
   mesaTop: C('#86c650'),
-  rock: C('#9c8fa3'),
-  rockDark: C('#7f7390'),
-  rockWarm: C('#a88f86'),
+  rock: C('#aa9fb4'),
+  rockDark: C('#8d82a0'),
+  rockWarm: C('#b59c90'),
   dirt: C('#c9985c'),
   dirtDark: C('#b0814c'),
 };
@@ -118,17 +118,4 @@ export function buildTerrainMesh(terrain, layout) {
   mesh.receiveShadow = true;
   mesh.name = 'terrain';
   return mesh;
-}
-
-/** Height texture for shaders (water depth, foam). Red channel = height. */
-export function buildHeightTexture(terrain) {
-  const n1 = terrain.n + 1;
-  const data = new Float32Array(n1 * n1);
-  data.set(terrain.heights);
-  const tex = new THREE.DataTexture(data, n1, n1, THREE.RedFormat, THREE.FloatType);
-  tex.magFilter = THREE.LinearFilter;
-  tex.minFilter = THREE.LinearFilter;
-  tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping;
-  tex.needsUpdate = true;
-  return tex;
 }

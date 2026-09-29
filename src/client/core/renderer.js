@@ -51,7 +51,7 @@ export class Renderer {
     this.scene.add(sun, sun.target);
 
     // Blue sky from above, warm sand/grass bounce from below.
-    this.hemi = new THREE.HemisphereLight(0xb4e2ff, 0xc9a66b, 1.25);
+    this.hemi = new THREE.HemisphereLight(0xbfe6ff, 0xd8bb80, 1.6);
     this.scene.add(this.hemi);
 
     // Viewmodel lights (separate scene).

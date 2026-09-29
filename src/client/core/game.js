@@ -9,6 +9,9 @@ import { Renderer } from './renderer.js';
 import { Input } from '../input/input.js';
 import { PlayerController } from '../player/controller.js';
 import { buildTerrainMesh } from '../world/terrainMesh.js';
+import { buildSky } from '../world/sky.js';
+import { buildWater } from '../world/water.js';
+import { WIND } from '../models/kit.js';
 
 export class Game {
   constructor(canvas) {
@@ -34,12 +37,10 @@ export class Game {
     const scene = this.gfx.scene;
     scene.add(buildTerrainMesh(this.terrain, this.layout));
 
-    // Placeholder sea (replaced by the shader water in Phase 2).
-    const sea = new THREE.Mesh(
-      new THREE.PlaneGeometry(2000, 2000).rotateX(-Math.PI / 2),
-      new THREE.MeshStandardMaterial({ color: 0x2bb5d8, transparent: true, opacity: 0.8, roughness: 0.3 }),
-    );
-    scene.add(sea);
+    this.sky = buildSky(this.gfx);
+    this.water = buildWater(this.terrain, this.layout, this.gfx.sunDir);
+    scene.add(this.sky.group, this.water.group);
+    this.worldUpdaters = [this.sky, this.water];
 
     // Debug view of colliders (F3).
     this.debugGroup = new THREE.Group();
@@ -98,6 +99,9 @@ export class Game {
       sprint: input.isHeld('sprint'),
     });
     this.#updateCamera(dt);
+    WIND.uTime.value = this.time;
+    const cam = this.gfx.camera.position;
+    for (const u of this.worldUpdaters) u.update?.(dt, this.time, cam);
   }
 
   #updateCamera(dt) {
