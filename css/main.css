@@ -49,6 +49,18 @@ html, body {
 
 [hidden] { display: none !important; }
 
+/* Custom game cursors (hidden anyway while the mouse is captured for looking). */
+html, body, #game, .screen, .hud-panel {
+  cursor: url('../assets/cursor.svg') 3 2, auto;
+}
+button, summary, a, label[for], select,
+.hud-panel [data-tip], .hud-panel button, .board-card, .board-tab {
+  cursor: url('../assets/cursor-hand.svg') 12 3, pointer;
+}
+input[type="text"], input:not([type]) {
+  cursor: text;
+}
+
 /* Brush-stroke panel: the background lives on a pseudo element that is
    roughened by an SVG displacement filter (defined in main.js). */
 .brush {

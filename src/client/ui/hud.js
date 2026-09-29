@@ -8,6 +8,8 @@
 import { CONFIG } from '../../shared/config.js';
 import { icon, portraitSvg } from './icons.js';
 import { buildMapBase, drawMap } from './minimap.js';
+import { ITEM_INFO } from './itemInfo.js';
+import { CONTRACTS as BOARD_CONTRACTS } from '../../shared/missions.js';
 
 const TAU = Math.PI * 2;
 const DEG = 180 / Math.PI;
@@ -199,7 +201,44 @@ export class Hud {
       <li><i class="lg-you"></i>You</li><li><i class="lg-hut"></i>Hut</li><li><i class="lg-dino"></i>Spotted dinosaur</li>
       <li><i class="lg-track"></i>Tracks</li><li><i class="lg-obj"></i>Objective</li></ul>`);
 
-    r.append(this.$flash, tl, tc, tr, cc, bl, bc, br, this.$toasts, this.$death, this.$win, this.$invPanel, this.$mapPanel);
+    // mission board (opened with E at the signpost)
+    this.$board = el('section', 'hud-panel hud-board brush');
+    this.$board.setAttribute('aria-label', 'Mission board');
+    this.$board.hidden = true;
+    this._boardOpen = false;
+    this.$board.addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-track]');
+      if (!btn) return;
+      const id = btn.dataset.track;
+      this.trackedContract = this.trackedContract === id ? null : id;
+      this._c.boardSig = null;
+      this._renderBoard();
+      this.onTrackContract?.(this.trackedContract);
+    });
+
+    // hover tooltip for inventory items
+    this.$tip = el('div', 'hud-tip brush');
+    this.$tip.setAttribute('role', 'tooltip');
+    this.$tip.hidden = true;
+    const showTip = (target, x, y) => {
+      const info = target && ITEM_INFO[target.dataset.tip];
+      if (!info) { this.$tip.hidden = true; return; }
+      if (this.$tip.dataset.key !== target.dataset.tip) {
+        this.$tip.dataset.key = target.dataset.tip;
+        this.$tip.innerHTML = `<span class="hud-tip-head"><span class="hud-tip-ic">${icon(target.dataset.tip === 'bait' ? 'meat' : target.dataset.tip)}</span><b>${esc(info.name)}</b><em>${esc(info.kind)}</em></span>
+          <span class="hud-tip-text">${esc(info.text)}</span>${info.use ? `<span class="hud-tip-use">${esc(info.use)}</span>` : ''}`;
+      }
+      this.$tip.hidden = false;
+      // keep the tooltip on screen: flip left/up near the edges
+      const w = this.$tip.offsetWidth, h = this.$tip.offsetHeight;
+      const px = x + 18 + w > innerWidth ? x - w - 12 : x + 18;
+      const py = y + 18 + h > innerHeight ? y - h - 12 : y + 18;
+      this.$tip.style.transform = `translate(${px}px, ${py}px)`;
+    };
+    this.$invPanel.addEventListener('pointermove', (e) => showTip(e.target.closest('[data-tip]'), e.clientX, e.clientY));
+    this.$invPanel.addEventListener('pointerleave', () => { this.$tip.hidden = true; });
+
+    r.append(this.$flash, tl, tc, tr, cc, bl, bc, br, this.$toasts, this.$death, this.$win, this.$invPanel, this.$mapPanel, this.$board, this.$tip);
 
     // Canvas backing-store sizes follow their CSS size (no per-frame layout reads).
     this._mm = { w: 0, h: 0, dpr: 1 };
@@ -415,14 +454,20 @@ export class Hud {
   _renderInventory() {
     const inv = this._inv || {};
     this._invDirty = false;
-    const cell = (ic, n, name, extra = '') => `<li class="hud-cell${n ? '' : ' is-zero'}${extra}" title="${esc(name)}"><span class="hud-cell-ic">${icon(ic)}</span><span class="hud-cell-n">${n ?? ''}</span><span class="sr">${esc(name)}</span></li>`;
+    // Only rebuild when the contents change – rebuilding every frame would
+    // break hover tooltips.
+    const maxCarry = inv.maxCarry ?? CONFIG.player.maxCarryWeight;
+    const sig = JSON.stringify([inv.arrows, inv.maxArrows, inv.maxFruit, maxCarry, inv.traps, inv.baits, inv.fruit, inv.loot, inv.store, Math.round((inv.carryWeight || 0) * 10), Math.round((inv.speedFactor ?? 1) * 100)]);
+    if (this._c.invSig === sig) return;
+    this._c.invSig = sig;
+    const cell = (ic, n, name, tip = ic) => `<li class="hud-cell${n ? '' : ' is-zero'}" data-tip="${tip}" tabindex="-1"><span class="hud-cell-ic">${icon(ic)}</span><span class="hud-cell-n">${n ?? ''}</span><span class="sr">${esc(name)}</span></li>`;
     const fruitCounts = {};
     for (const f of inv.fruit || []) fruitCounts[f] = (fruitCounts[f] || 0) + 1;
     const loot = inv.loot || {}, store = inv.store || {};
     const gear = [
       cell('arrow', `${inv.arrows ?? 0}/${inv.maxArrows ?? CONFIG.weapons.bow.maxArrows}`, 'Arrows'),
       cell('trap', inv.traps ?? 0, 'Traps'),
-      cell('meat', inv.baits ?? 0, 'Bait'),
+      cell('meat', inv.baits ?? 0, 'Bait', 'bait'),
       ...FRUIT_KEYS.map((k) => cell(k, fruitCounts[k] || 0, fruitName(k))),
     ].join('');
     const carried = LOOT_KEYS.map((k) => cell(k, loot[k] || 0, lootName(k))).join('');
@@ -435,7 +480,8 @@ export class Hud {
         <div>
           <h3>Gear &amp; fruit</h3><ul class="hud-grid">${gear}</ul>
           <h3>Carried loot</h3><ul class="hud-grid">${carried}</ul>
-          <p class="hud-inv-stat">${icon('weight')} Load <b>${Math.round((inv.carryWeight || 0) * 10) / 10}</b> · Speed <b class="${sf < 0.95 ? 'is-slow' : ''}">${Math.round(sf * 100)}%</b></p>
+          <p class="hud-inv-stat">${icon('weight')} Load <b class="${(inv.carryWeight || 0) >= maxCarry ? 'is-slow' : ''}">${Math.round((inv.carryWeight || 0) * 10) / 10} / ${maxCarry}</b> · Speed <b class="${sf < 0.95 ? 'is-slow' : ''}">${Math.round(sf * 100)}%</b></p>
+          <p class="hud-inv-note">Hover an item to see what it is for.</p>
         </div>
         <div class="hud-inv-store">
           <h3>${icon('home')} Hut store</h3><ul class="hud-grid">${stored}</ul>
@@ -488,24 +534,65 @@ export class Hud {
   }
 
   toast(text, iconId = 'info') {
+    // "Meat +1" toasts from auto-looting merge into one counting toast ("Meat +4")
+    const gain = /^(.+) \+(\d+)$/.exec(text);
+    if (gain) {
+      const prev = [...this.$toasts.children].find((c) => c.dataset.gain === gain[1] && !c.classList.contains('is-out'));
+      if (prev) {
+        prev.dataset.n = String(Number(prev.dataset.n) + Number(gain[2]));
+        prev.querySelector('.hud-toast-t').textContent = `${gain[1]} +${prev.dataset.n}`;
+        this._scheduleToastOut(prev, 3000);
+        prev.animate([{ transform: 'scale(1.06)' }, { transform: 'scale(1)' }], { duration: 160 });
+        return;
+      }
+    }
     const t = el('div', 'hud-toast brush');
-    t.innerHTML = `<span class="hud-toast-ic">${icon(iconId)}</span><span>${esc(text)}</span>`;
-    this.$toasts.appendChild(t);
-    const all = this.$toasts.children;
-    while (all.length > 4) all[0].remove();
-    setTimeout(() => {
-      t.classList.add('is-out');
-      setTimeout(() => t.remove(), 320);
-    }, 3000);
+    t.innerHTML = `<span class="hud-toast-ic">${icon(iconId)}</span><span class="hud-toast-t">${esc(text)}</span>`;
+    if (gain) { t.dataset.gain = gain[1]; t.dataset.n = gain[2]; }
+    this._pushToast(t, 3000);
   }
 
+  /** Add a toast; when there are too many, drop the oldest normal toast (alerts stay). */
+  _pushToast(t, ms) {
+    this.$toasts.appendChild(t);
+    const all = [...this.$toasts.children];
+    let extra = all.length - 4;
+    for (const c of all) {
+      if (extra <= 0) break;
+      if (c !== t && !c.classList.contains('hud-alert')) { c.remove(); extra--; }
+    }
+    this._scheduleToastOut(t, ms);
+  }
+
+  _scheduleToastOut(t, ms) {
+    clearTimeout(t._timer);
+    t._timer = setTimeout(() => {
+      t.classList.add('is-out');
+      setTimeout(() => t.remove(), 320);
+    }, ms);
+  }
+
+  /** Tracking hint. The bubble is built once; a changing distance only updates the number. */
   hint(text, meters = null) {
-    const sig = text == null ? null : `${text}|${meters == null ? '' : Math.round(meters)}`;
-    if (this._c.hint === sig) return;
-    this._c.hint = sig;
-    if (sig == null) { this.$hint.hidden = true; return; }
-    this.$hint.hidden = false;
-    this.$hint.innerHTML = `<span class="hud-hint-bubble brush"><span class="hud-hint-ic">${icon('track')}</span><span>${esc(text)}</span>${meters == null ? '' : `<b class="hud-hint-m">${Math.round(meters)} m</b>`}</span>`;
+    if (text == null) {
+      if (this._c.hintText !== null) { this._c.hintText = null; this.$hint.hidden = true; }
+      return;
+    }
+    if (!this._hintEls) {
+      this.$hint.innerHTML = `<span class="hud-hint-bubble brush"><span class="hud-hint-ic">${icon('track')}</span><span class="hud-hint-t"></span><b class="hud-hint-m"></b></span>`;
+      this._hintEls = { text: this.$hint.querySelector('.hud-hint-t'), m: this.$hint.querySelector('.hud-hint-m') };
+    }
+    if (this._c.hintText !== text) {
+      this._c.hintText = text;
+      this._hintEls.text.textContent = text;
+    }
+    const m = meters == null ? '' : `${Math.round(meters)} m`;
+    if (this._c.hintM !== m) {
+      this._c.hintM = m;
+      this._hintEls.m.textContent = m;
+      this._hintEls.m.hidden = !m;
+    }
+    if (this.$hint.hidden) this.$hint.hidden = false;
   }
 
   setCrosshair({ draw = 0, mode = 'default' } = {}) {
@@ -584,9 +671,25 @@ export class Hud {
     if (p != null) this.$eatFg.style.strokeDashoffset = String(100 - p);
   }
 
+  /** Prominent warning (e.g. inventory full): red-rimmed toast that also pulses the load pill. */
+  alert(text, iconId = 'weight') {
+    const t = el('div', 'hud-toast hud-alert brush');
+    t.setAttribute('role', 'alert');
+    t.innerHTML = `<span class="hud-toast-ic">${icon(iconId)}</span><span class="hud-toast-t">${esc(text)}</span>`;
+    this._pushToast(t, 3600);
+    this.$carry.animate([{ transform: 'translateX(0)' }, { transform: 'translateX(-0.4em)' }, { transform: 'translateX(0.4em)' }, { transform: 'translateX(0)' }], { duration: 300, iterations: 2 });
+  }
+
+  _closePanels(except) {
+    if (except !== 'inv' && this._invOpen) { this._invOpen = false; this.$invPanel.hidden = true; }
+    if (except !== 'map' && this._mapOpen) { this._mapOpen = false; this.$mapPanel.hidden = true; }
+    if (except !== 'board' && this._boardOpen) { this._boardOpen = false; this.$board.hidden = true; }
+    this.$tip.hidden = true;
+  }
+
   toggleInventory(force) {
     const open = force === undefined ? !this._invOpen : !!force;
-    if (open && this._mapOpen) this.toggleMap(false);
+    this._closePanels(open ? 'inv' : null);
     this._invOpen = open;
     if (open) this._renderInventory();
     this.$invPanel.hidden = !open;
@@ -596,7 +699,7 @@ export class Hud {
 
   toggleMap(force) {
     const open = force === undefined ? !this._mapOpen : !!force;
-    if (open && this._invOpen) this.toggleInventory(false);
+    this._closePanels(open ? 'map' : null);
     this._mapOpen = open;
     this.$mapPanel.hidden = !open;
     this.root.classList.toggle('has-panel', this.isPanelOpen());
@@ -604,5 +707,70 @@ export class Hud {
     return open;
   }
 
-  isPanelOpen() { return this._invOpen || this._mapOpen; }
+  /** Mission board data (the full mission state from the server). */
+  setBoard(mission) {
+    this._boardMission = mission;
+    if (this._boardOpen) this._renderBoard();
+  }
+
+  toggleBoard(force) {
+    const open = force === undefined ? !this._boardOpen : !!force;
+    this._closePanels(open ? 'board' : null);
+    this._boardOpen = open;
+    if (open) { this._c.boardSig = null; this._renderBoard(); }
+    this.$board.hidden = !open;
+    this.root.classList.toggle('has-panel', this.isPanelOpen());
+    return open;
+  }
+
+  _renderBoard() {
+    const m = this._boardMission;
+    if (!m) return;
+    const sig = JSON.stringify([m.step, m.objectives, m.contracts, m.expeditionsDone, this.trackedContract]);
+    if (this._c.boardSig === sig) return;
+    this._c.boardSig = sig;
+    const contracts = m.contracts || [];
+    const defs = BOARD_CONTRACTS;
+    const doneCount = contracts.filter((c) => c.done).length;
+    const objDone = m.objectives.filter((o) => o.done).length;
+    const pin = (c) => `<i class="board-pin" style="--pin:${c}"></i>`;
+    const bar = (p, goal) => `<span class="board-bar" role="progressbar" aria-valuemin="0" aria-valuemax="${goal}" aria-valuenow="${p}"><i style="width:${Math.round((p / goal) * 100)}%"></i></span>`;
+    const main = `
+      <article class="board-note board-main">
+        ${pin('#ee4d5f')}
+        <p class="board-kicker">${m.complete ? 'Completed' : 'Current expedition'}</p>
+        <h3>${esc(m.title)}</h3>
+        <ul class="board-checks">
+          ${m.objectives.map((o) => `<li class="${o.done ? 'is-done' : ''}"><span class="board-box">${o.done ? icon('check') : ''}</span>${esc(o.text)}</li>`).join('')}
+        </ul>
+        <div class="board-progress">${bar(objDone, m.objectives.length)}<b>${objDone}/${m.objectives.length}</b></div>
+        <p class="board-foot">${icon('trophy')} Expeditions completed: <b>${m.expeditionsDone ?? 0}</b></p>
+      </article>`;
+    const cards = defs.map((d, i) => {
+      const c = contracts[i] || { progress: 0, done: false };
+      const tracked = this.trackedContract === d.id;
+      const tilt = ((i * 37) % 5 - 2) * 0.6;
+      return `
+      <article class="board-note board-card${c.done ? ' is-done' : ''}${tracked ? ' is-tracked' : ''}" style="--tilt:${tilt}deg">
+        ${pin(['#3fb3ff', '#7ccb45', '#ffc933', '#ff9a2e'][i % 4])}
+        <header><span class="board-ic">${icon(d.icon)}</span><h4>${esc(d.title)}</h4></header>
+        <p>${esc(d.text)}</p>
+        <div class="board-progress">${bar(c.progress, d.goal)}<b>${c.progress}/${d.goal}</b></div>
+        <p class="board-reward">${icon('trophy')} ${esc(d.reward.text)}</p>
+        ${c.done ? '<span class="board-stamp">Done</span>' : `<button type="button" class="board-track" data-track="${d.id}" aria-pressed="${tracked}">${tracked ? 'Tracking' : 'Track'}</button>`}
+      </article>`;
+    }).join('');
+    this.$board.innerHTML = `
+      <header class="board-head">
+        <h2>${icon('quest')} Mission Board</h2>
+        <p>Team contracts · <b>${doneCount}/${defs.length}</b> done · rewards upgrade the whole team</p>
+        <span class="hud-panel-close"><kbd>E</kbd> / <kbd>Esc</kbd> Close</span>
+      </header>
+      <div class="board-body">
+        ${main}
+        <div class="board-grid">${cards}</div>
+      </div>`;
+  }
+
+  isPanelOpen() { return this._invOpen || this._mapOpen || this._boardOpen; }
 }

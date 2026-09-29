@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
+  <!-- Game cursor: chunky yellow arrow with a navy outline (matches the compass pointer). Hotspot 3,2. -->
+  <path d="M4 3 L4 24 L9.5 19 L13.5 28 L17.5 26.2 L13.6 17.6 L21 17.2 Z" fill="#1f2a44" stroke="#1f2a44" stroke-width="4" stroke-linejoin="round"/>
+  <path d="M4 3 L4 24 L9.5 19 L13.5 28 L17.5 26.2 L13.6 17.6 L21 17.2 Z" fill="#ffc933"/>
+  <path d="M4 3 L4 24 L9.5 19 L11 22.4 L7 11 Z" fill="#fff1c2" opacity="0.8"/>
+  <path d="M13.6 17.6 L21 17.2 L4 3 Z" fill="#f0a91a" opacity="0.7"/>
+</svg>

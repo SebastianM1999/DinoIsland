@@ -27,6 +27,9 @@ export class PlayerActions {
     this.drawing = false;
     this.eatingT = 0;
     this.autoPickT = 0;
+    this.pickRequested = new Map();   // item id -> time until we may ask again
+    this.nextFullAlert = 0;
+    this.lastFullText = '';
     this.lastLoot = 0;
     this.promptAction = null;
 
@@ -168,14 +171,11 @@ export class PlayerActions {
     // --- interactions (E) + prompt
     this.updateInteraction(alive && !panel, input.wasPressed('interact'));
 
-    // auto-collect arrows and your spear when walking over them
+    // --- automatic looting: walk over items to collect them
     this.autoPickT -= dt;
     if (alive && this.autoPickT <= 0) {
-      this.autoPickT = 0.25;
-      const it = g.items.nearestItem(g.player.pos, 1.7);
-      if (it && ((it.kind === 'arrow' && this.inv.arrows < W.bow.maxArrows) || (it.kind === 'spear' && !this.inv.spear))) {
-        net.act(ACT.PICKUP, { item: it.id });
-      }
+      this.autoPickT = 0.15;
+      this.autoLoot();
     }
 
     // --- flags for remote animation
@@ -293,13 +293,8 @@ export class PlayerActions {
     const inv = this.inv;
     const near = (o, r) => Math.hypot(o.x - pos.x, o.z - pos.z) < r;
 
-    // 1. items on the ground
-    const it = g.items.nearestItem(pos, CONFIG.pickupRange);
-    if (it) {
-      const name = CONFIG.loot[it.kind]?.name || (it.kind === 'arrow' ? `Arrow${it.n > 1 ? `s (${it.n})` : ''}` : 'Spear');
-      return { text: `Pick up ${name}`, run: () => net.act(ACT.PICKUP, { item: it.id }) };
-    }
-    // 2. ripe fruit
+    // (items on the ground are looted automatically – see autoLoot())
+    // 1. ripe fruit
     let best = null, bd = Infinity;
     for (const s of g.layout.fruitSpots) {
       const r = s.type === 'mango' ? 3.4 : P.interactRange;
@@ -308,7 +303,7 @@ export class PlayerActions {
     }
     if (best) {
       const name = CONFIG.fruit.types[best.type].name;
-      if (inv.fruit.length >= CONFIG.fruit.maxCarried) return { text: `Fruit pouch full (${CONFIG.fruit.maxCarried})`, run: null };
+      if (inv.fruit.length >= this.caps.fruit) return { text: `Fruit pouch full (${this.caps.fruit})`, run: null };
       return { text: `Pick ${name} (${g.fruitCounts[best.id]} left)`, run: () => net.act(ACT.HARVEST, { spot: best.id }) };
     }
     // 3. hut
@@ -321,7 +316,7 @@ export class PlayerActions {
       return { text: 'Refill arrows, traps and bait', run: () => net.act(ACT.REFILL) };
     }
     if (near(h.missionBoard, 3.5)) {
-      return { text: 'Read the mission board', run: () => this.readBoard() };
+      return { text: 'Open the mission board', run: () => g.openBoard() };
     }
     // 4. give fruit
     const mate = inv.fruit.length ? this.lookedAtTeammate(P.giveRange) : null;
@@ -329,10 +324,58 @@ export class PlayerActions {
     return null;
   }
 
-  readBoard() {
-    const m = this.game.mission;
-    const next = m.objectives.find((o) => !o.done);
-    this.game.hud.toast(next ? `${m.title}: ${next.text}` : m.title, 'quest');
+  /** Current inventory limits from the server (base + contract rewards). */
+  get caps() {
+    return this.inv.caps || {
+      arrows: W.bow.maxArrows, fruit: CONFIG.fruit.maxCarried, carry: P.maxCarryWeight,
+      traps: W.trap.startCount, baits: W.bait.startCount,
+    };
+  }
+
+  /**
+   * Collect every item within reach. Capacity is checked here first so a full
+   * pack shows one clear alert instead of hammering the server; the server
+   * still validates every pickup.
+   */
+  autoLoot() {
+    const g = this.game;
+    const pos = g.player.pos;
+    const R = P.autoLootRadius;
+    const now = g.time;
+    const caps = this.caps;
+    let weight = this.carryWeight();
+    for (const { data: it } of g.items.items.values()) {
+      if (Math.abs(it.x - pos.x) > R || Math.abs(it.z - pos.z) > R || Math.hypot(it.x - pos.x, it.z - pos.z) > R) continue;
+      if (now < (this.pickRequested.get(it.id) ?? 0)) continue;   // already asked, wait for the server
+      let full = null;
+      if (it.kind === 'arrow') {
+        if (this.inv.arrows >= caps.arrows) full = ['Your quiver is full', 'arrow'];
+      } else if (it.kind === 'spear') {
+        if (this.inv.spear) continue;
+      } else if (CONFIG.loot[it.kind]) {
+        const w = CONFIG.loot[it.kind].weight * it.n;
+        if (weight + w > caps.carry + 1e-6) full = [`Your pack is full (${Math.round(weight * 10) / 10}/${caps.carry}) – drop off loot at the hut`, 'weight'];
+        else weight += w;
+      }
+      if (full) {
+        this.fullAlert(full[0], full[1]);
+        continue;
+      }
+      this.pickRequested.set(it.id, now + 1.5);
+      g.net.act(ACT.PICKUP, { item: it.id });
+    }
+    if (this.pickRequested.size > 64) {
+      for (const [id, t] of this.pickRequested) if (t < now) this.pickRequested.delete(id);
+    }
+  }
+
+  fullAlert(text, iconId) {
+    const g = this.game;
+    if (g.time < this.nextFullAlert && text === this.lastFullText) return;
+    this.nextFullAlert = g.time + 4;
+    this.lastFullText = text;
+    g.hud.alert(text, iconId);
+    g.audio?.play('full');
   }
 
   // ------------------------------------------------------------------ HUD
@@ -348,11 +391,13 @@ export class PlayerActions {
       { id: 'bait', label: SLOT_LABEL.bait, count: inv.baits, enabled: inv.baits > 0 },
       { id: 'fruit', label: SLOT_LABEL.fruit, count: inv.fruit.length, enabled: inv.fruit.length > 0, sub: fruitType || undefined },
     ], g.eq);
+    const caps = this.caps;
     hud.setInventory({
       arrows: inv.arrows,
-      maxArrows: W.bow.maxArrows,
+      maxArrows: caps.arrows,
       fruit: inv.fruit,
-      maxFruit: CONFIG.fruit.maxCarried,
+      maxFruit: caps.fruit,
+      maxCarry: caps.carry,
       loot: inv.loot,
       carryWeight: weight,
       speedFactor: g.player.speedFactor,

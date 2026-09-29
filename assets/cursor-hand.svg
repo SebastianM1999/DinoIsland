@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
+  <!-- Pointer cursor for clickable things: chunky yellow pointing hand. Hotspot 12,3. -->
+  <path id="h" d="M10 17 L10 5.5 Q10 3 12 3 Q14 3 14 5.5 L14 12.5 Q14 11 16 11 Q18 11 18 12.8 Q18 11.8 20 11.8 Q22 11.8 22 13.8 Q22.2 13 24 13 Q26 13 26 15.5 L26 21 Q26 29 18.5 29 L16 29 Q12 29 9.5 25.5 L5 19.5 Q4 17.8 5.6 16.8 Q7.2 16 8.6 17.4 Z"
+    fill="#1f2a44" stroke="#1f2a44" stroke-width="3.6" stroke-linejoin="round"/>
+  <path d="M10 17 L10 5.5 Q10 3 12 3 Q14 3 14 5.5 L14 12.5 Q14 11 16 11 Q18 11 18 12.8 Q18 11.8 20 11.8 Q22 11.8 22 13.8 Q22.2 13 24 13 Q26 13 26 15.5 L26 21 Q26 29 18.5 29 L16 29 Q12 29 9.5 25.5 L5 19.5 Q4 17.8 5.6 16.8 Q7.2 16 8.6 17.4 Z" fill="#ffc933"/>
+  <path d="M14 12.5 L14 17 M18 12.8 L18 17 M22 13.8 L22 17.5" stroke="#d99a1a" stroke-width="1.4" stroke-linecap="round"/>
+  <path d="M11 5 Q11 4 12 4 L12 14 L11 14 Z" fill="#fff1c2" opacity="0.8"/>
+</svg>

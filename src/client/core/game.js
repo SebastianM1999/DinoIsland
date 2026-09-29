@@ -6,6 +6,7 @@ import { CONFIG } from '../../shared/config.js';
 import { Terrain } from '../../shared/terrain.js';
 import { buildLayout } from '../../shared/layout.js';
 import { MSG, EV, PF, DS } from '../../shared/protocol.js';
+import { CONTRACTS } from '../../shared/missions.js';
 import { Renderer } from './renderer.js';
 import { Input } from '../input/input.js';
 import { PlayerController } from '../player/controller.js';
@@ -55,14 +56,21 @@ export class Game {
     this.stepDist = 0;
     this.hud = new Hud(document.getElementById('hud'));
     this.hud.initMinimap(this.terrain, this.layout);
+    try { this.hud.trackedContract = localStorage.getItem('di.tracked') || null; } catch { /* storage blocked */ }
+    this.hud.onTrackContract = (id) => {
+      try { if (id) localStorage.setItem('di.tracked', id); else localStorage.removeItem('di.tracked'); } catch { /* ignore */ }
+      this.#showMission();
+    };
     this.input.onPanelToggle = (action) => {
       if (action === 'close' && !this.hud.isPanelOpen()) return false;
       let open;
       if (action === 'inventory') open = this.hud.toggleInventory();
       else if (action === 'map') open = this.hud.toggleMap();
+      else if (action === 'board') open = this.hud.toggleBoard();
       else {
         this.hud.toggleInventory(false);
         this.hud.toggleMap(false);
+        this.hud.toggleBoard(false);
         open = false;
       }
       this.onPanelChange?.(open);
@@ -143,8 +151,27 @@ export class Game {
     this.fruitCounts = world.fruit.slice();
     world.fruit.forEach((count, id) => this.fruitPlants.setCount(id, count));
     this.hud.setPlayer({ name: this.me.name, slot: this.me.slot });
-    this.hud.setMission(this.mission);
+    this.#showMission();
     for (const sys of this.systems) sys.onWelcome?.(world);
+  }
+
+  /** Quest log = main expedition + the contract pinned on the mission board. */
+  #showMission() {
+    const m = this.mission;
+    if (!m) return;
+    this.hud.setBoard(m);
+    const id = this.hud.trackedContract;
+    const i = CONTRACTS.findIndex((c) => c.id === id);
+    const c = i >= 0 ? m.contracts?.[i] : null;
+    const objectives = c
+      ? [...m.objectives, { text: `${CONTRACTS[i].title}: ${c.progress}/${CONTRACTS[i].goal}`, done: c.done }]
+      : m.objectives;
+    this.hud.setMission({ ...m, objectives });
+  }
+
+  /** E at the mission board. */
+  openBoard() {
+    if (!this.hud.isPanelOpen()) this.input.onPanelToggle('board');
   }
 
   #bindNet() {
@@ -173,6 +200,7 @@ export class Game {
       this.fruitPlants.setCount(m.spot, m.count);
     });
     net.on(`ev:${EV.TOAST}`, (m) => this.hud.toast(m.text, m.icon));
+    net.on(`ev:${EV.FULL}`, (m) => this.actions.fullAlert(m.text, m.icon));
     net.on(`ev:${EV.ITEM_REMOVE}`, (m) => { if (m.by === this.me.id) this.audio.play('pickup'); });
     net.on(`ev:${EV.TRAP_SNAP}`, (m) => {
       const tr = this.items.traps.get(m.id)?.data;
@@ -181,7 +209,7 @@ export class Game {
     net.on(`ev:${EV.MISSION}`, (m) => {
       if (m.mission.step !== this.mission.step) this.audio.play(m.mission.complete ? 'complete' : 'quest');
       this.mission = m.mission;
-      this.hud.setMission(m.mission);
+      this.#showMission();
       this.hud.missionComplete(m.mission.complete, { completedIn: m.mission.completedIn, store: this.store });
     });
     net.on(`ev:${EV.STORE}`, (m) => { this.store = m.store; });
@@ -290,6 +318,8 @@ export class Game {
       this.debug = !this.debug;
       this.debugGroup.visible = this.debug;
     }
+    // E toggles the mission board closed again (opening is an interaction)
+    if (this.hud._boardOpen && input.wasPressed('interact')) this.input.onPanelToggle('close');
     const canMove = this.me.alive && !this.hud.isPanelOpen();
     p.update(dt, {
       forward: canMove && input.isHeld('forward'),
