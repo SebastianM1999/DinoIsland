@@ -19,6 +19,8 @@ import { buildHut } from '../world/hut.js';
 import { WIND } from '../models/kit.js';
 import { RemotePlayers } from '../entities/remotePlayers.js';
 import { Hud } from '../ui/hud.js';
+import { DinoViews } from '../entities/dinoViews.js';
+import { Tracks } from '../entities/tracks.js';
 
 export class Game {
   /**
@@ -57,6 +59,12 @@ export class Game {
     this.store = w.world.store;
     this.flags = 0;           // PF flags for animation sync (attack pulse etc.)
     this.eq = 0;              // selected hotbar slot
+
+    // Gameplay systems. Each may implement onWelcome(world), onSnapshot(msg),
+    // update(dt, renderTime), minimapMarkers(out), compassMarkers(bearing, out).
+    this.dinos = new DinoViews(this);
+    this.tracks = new Tracks(this);
+    this.systems = [this.dinos, this.tracks];
 
     this.#applyWelcome(w);
     this.#bindNet();
@@ -111,7 +119,7 @@ export class Game {
     world.fruit.forEach((ripe, id) => this.fruitPlants.setRipe(id, ripe));
     this.hud.setPlayer({ name: this.me.name, slot: this.me.slot });
     this.hud.setMission(this.mission);
-    this.systemsWelcome = world; // later systems (dinos, items) read this on init
+    for (const sys of this.systems) sys.onWelcome?.(world);
   }
 
   #bindNet() {
@@ -124,7 +132,7 @@ export class Game {
         }
         this.remotes.onRow(m.now, row);
       }
-      this.onSnapshot?.(m);
+      for (const sys of this.systems) sys.onSnapshot?.(m);
     });
     net.on(MSG.INV, (m) => { this.me.inv = m.inv; });
     net.on(`ev:${EV.PLAYER_JOIN}`, (m) => this.remotes.add(m.player));
@@ -227,7 +235,6 @@ export class Game {
       jump: canMove && input.isHeld('jump'),
       sprint: canMove && input.isHeld('sprint'),
     });
-    this.beforeCamera?.(dt);
     this.#updateCamera(dt);
 
     // network
@@ -248,7 +255,7 @@ export class Game {
     WIND.uTime.value = this.time;
     const cam = this.gfx.camera.position;
     for (const u of this.worldUpdaters) u.update?.(dt, this.time, cam);
-    this.afterUpdate?.(dt, renderTime);
+    for (const sys of this.systems) sys.update?.(dt, renderTime);
     this.#updateHud(dt);
   }
 
@@ -266,7 +273,7 @@ export class Game {
       x: p.pos.x, z: p.pos.z, yaw: p.yaw,
       players: [...this.remotes.map.values()].map((rp) => ({ x: rp.pos.x, z: rp.pos.z, yaw: rp.yaw, color: CONFIG.playerColors[rp.slot % 4] })),
       hut: { x: this.layout.hut.x, z: this.layout.hut.z },
-      markers: this.minimapMarkers?.() || [],
+      markers: this.#collect('minimapMarkers'),
     });
     if (!this.me.alive) {
       this.me.deathT = Math.max(0, this.me.deathT - dt);
@@ -282,8 +289,14 @@ export class Game {
     for (const rp of this.remotes.map.values()) {
       list.push({ bearing: bearing(rp.pos.x, rp.pos.z), kind: 'player', color: CONFIG.playerColors[rp.slot % 4] });
     }
-    if (this.extraCompassMarkers) list.push(...this.extraCompassMarkers(bearing));
+    for (const sys of this.systems) sys.compassMarkers?.(bearing, list);
     return list;
+  }
+
+  #collect(method) {
+    const out = [];
+    for (const sys of this.systems) sys[method]?.(out);
+    return out;
   }
 
   #updateCamera(dt) {

@@ -240,3 +240,33 @@ html, body {
 }
 .nameplate.dead { opacity: 0.55; }
 .nameplate.dead .np-name::before { content: '✖ '; }
+
+/* Health bar over a dinosaur after it was hit */
+.dino-bar {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: grid;
+  justify-items: center;
+  gap: 3px;
+  padding: 3px 10px 5px;
+  border-radius: 8px;
+  background: rgba(var(--navy-rgb), 0.72);
+  font-weight: 700;
+  font-size: 14px;
+  line-height: 1;
+  white-space: nowrap;
+  will-change: transform;
+}
+.dino-bar .db-hp {
+  width: 90px;
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.2);
+  overflow: hidden;
+}
+.dino-bar .db-hp i {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, #ff8a2a, var(--red));
+}
