@@ -5,6 +5,7 @@
 
 import { CONFIG } from '../../shared/config.js';
 import { resolveCircle } from '../../shared/collision.js';
+import { settings } from '../core/settings.js';
 
 const P = CONFIG.player;
 const tmp = { x: 0, z: 0, hit: false };
@@ -61,7 +62,7 @@ export class PlayerController {
   }
 
   look(dx, dy) {
-    const s = P.mouseSensitivity;
+    const s = P.mouseSensitivity * settings.sens / 100;
     this.yaw -= dx * s;
     this.pitch -= dy * s;
     const lim = Math.PI / 2 - 0.02;

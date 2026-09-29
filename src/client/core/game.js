@@ -26,6 +26,7 @@ import { Items } from '../entities/items.js';
 import { Projectiles } from '../entities/projectiles.js';
 import { PlayerActions } from '../player/actions.js';
 import { GameAudio } from '../audio/audio.js';
+import { settings } from './settings.js';
 
 export class Game {
   /**
@@ -412,6 +413,7 @@ export class Game {
     const team = [{ id: this.me.id, name: this.me.name, slot: this.me.slot, hp: this.me.hp, alive: this.me.alive, isYou: true }];
     for (const rp of this.remotes.map.values()) team.push({ id: rp.id, name: rp.name, slot: rp.slot, hp: rp.hp, alive: rp.alive, isYou: false });
     team.sort((a, b) => a.slot - b.slot);
+    this.team = team;
     hud.setTeam(team);
     hud.setMinimap({
       x: p.pos.x, z: p.pos.z, yaw: p.yaw,
@@ -460,7 +462,7 @@ export class Game {
     );
     const roll = this.me.alive ? (p.knockTimer > 0 ? Math.sin(this.time * 20) * 0.05 : 0) : 0.5;
     cam.rotation.set(p.pitch, p.yaw, roll, 'YXZ');
-    const targetFov = CONFIG.player.fov + (p.sprinting ? 6 : 0);
+    const targetFov = settings.fov + (p.sprinting ? 6 : 0);
     cam.fov += (targetFov - cam.fov) * Math.min(1, dt * 6);
     cam.updateProjectionMatrix();
     this.gfx.followSun(p.pos.x, p.pos.y, p.pos.z);
