@@ -206,7 +206,7 @@ export class PlayerActions {
     g.flags |= PF.ATTACK;
     g.audio?.play('swing');
     const hit = g.dinos.raycast(origin, dir, W.spear.range);
-    if (hit) g.net.act(ACT.MELEE, { dino: hit.view.id, zone: hit.zone });
+    if (hit) g.net.act(ACT.MELEE, { dino: hit.view.id, zone: hit.zone, p: hit.point.toArray().map((n) => +n.toFixed(2)) });
   }
 
   throwSpear() {

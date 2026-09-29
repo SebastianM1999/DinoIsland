@@ -1,5 +1,5 @@
-// Dinosaur Island server: serves the web client and (from Phase 3) runs the
-// authoritative co-op simulation over WebSocket.
+// Dinosaur Island server: serves the web client and runs the authoritative
+// co-op simulation over WebSocket. Also used by the desktop launcher.
 //
 //   node server/index.js [--port 8080]
 
@@ -11,8 +11,6 @@ import { CONFIG } from '../src/shared/config.js';
 import { startGameHost } from './gameHost.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const argPort = process.argv.indexOf('--port');
-const PORT = Number(process.env.PORT || (argPort > 0 ? process.argv[argPort + 1] : CONFIG.net.port));
 
 const MIME = {
   '.html': 'text/html; charset=utf-8',
@@ -32,25 +30,31 @@ const MIME = {
 const PUBLIC_DIRS = new Set(['src', 'css', 'assets']);
 
 function resolvePath(urlPath) {
-  const clean = decodeURIComponent(urlPath.split('?')[0]);
+  let clean;
+  try { clean = decodeURIComponent(urlPath.split('?')[0]); } catch { return null; }
   if (clean === '/' || clean === '/index.html') return path.join(ROOT, 'index.html');
   if (clean.startsWith('/vendor/three/')) {
-    return path.join(ROOT, 'node_modules', 'three', clean.slice('/vendor/three/'.length));
+    const vendorRoot = path.join(ROOT, 'node_modules', 'three');
+    const file = path.resolve(vendorRoot, clean.slice('/vendor/three/'.length));
+    return path.relative(vendorRoot, file).startsWith('..') ? null : file;
   }
   const first = clean.split('/')[1];
   if (!PUBLIC_DIRS.has(first)) return null;
-  return path.join(ROOT, clean);
+  const file = path.resolve(ROOT, clean.slice(1));
+  const relative = path.relative(ROOT, file);
+  return relative.startsWith('..') || path.isAbsolute(relative) ? null : file;
 }
 
-const httpServer = http.createServer((req, res) => {
+export function createGameServer() {
+  let host;
+  const httpServer = http.createServer((req, res) => {
   if (req.url === '/status') {
     res.writeHead(200, { 'Content-Type': MIME['.json'], 'Cache-Control': 'no-store' });
-    res.end(JSON.stringify(statusProvider()));
+    res.end(JSON.stringify(host.status()));
     return;
   }
   const file = resolvePath(req.url);
-  // Refuse anything that escapes the project root.
-  if (!file || !file.startsWith(ROOT)) {
+  if (!file) {
     res.writeHead(404).end('Not found');
     return;
   }
@@ -66,11 +70,16 @@ const httpServer = http.createServer((req, res) => {
     });
     fs.createReadStream(file).pipe(res);
   });
-});
+  });
+  host = startGameHost(httpServer);
+  return { httpServer, host };
+}
 
-const host = startGameHost(httpServer);
-const statusProvider = () => host.status();
-
-httpServer.listen(PORT, () => {
-  console.log(`Dinosaur Island server running at http://localhost:${PORT}`);
-});
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  const argPort = process.argv.indexOf('--port');
+  const port = Number(process.env.PORT || (argPort > 0 ? process.argv[argPort + 1] : CONFIG.net.port));
+  const { httpServer } = createGameServer();
+  httpServer.listen(port, () => {
+    console.log(`Dinosaur Island server running at http://localhost:${port}`);
+  });
+}

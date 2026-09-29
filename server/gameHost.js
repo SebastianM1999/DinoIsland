@@ -69,7 +69,7 @@ export function startGameHost(httpServer) {
   let last = performance.now();
   let acc = 0;
   let ticks = 0;
-  setInterval(() => {
+  const interval = setInterval(() => {
     const now = performance.now();
     acc += Math.min(250, now - last);
     last = now;
@@ -93,6 +93,11 @@ export function startGameHost(httpServer) {
 
   return {
     world,
+    stop() {
+      clearInterval(interval);
+      for (const ws of sockets.values()) ws.terminate();
+      wss.close();
+    },
     status() {
       return {
         maxPlayers: NET.maxPlayers,

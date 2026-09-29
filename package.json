@@ -4,9 +4,32 @@
   "description": "Dinosaur Island – a small 1–4 player co-op first-person dinosaur hunting demo (Three.js + Node.js WebSocket server).",
   "type": "module",
   "private": true,
+  "main": "desktop/main.cjs",
   "scripts": {
     "start": "node server/index.js",
-    "dev": "node --watch server/index.js"
+    "dev": "node --watch server/index.js",
+    "test": "node --test",
+    "desktop": "electron .",
+    "build:win": "electron-builder --win dir"
+  },
+  "build": {
+    "appId": "com.dinosaurisland.game",
+    "productName": "Dinosaur Island",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "desktop/**/*",
+      "server/**/*",
+      "src/**/*",
+      "css/**/*",
+      "assets/**/*",
+      "index.html",
+      "package.json"
+    ],
+    "win": {
+      "target": "dir"
+    }
   },
   "engines": {
     "node": ">=18"
@@ -14,5 +37,9 @@
   "dependencies": {
     "three": "^0.180.0",
     "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "electron": "^44.4.5",
+    "electron-builder": "^26.15.3"
   }
 }

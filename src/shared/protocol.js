@@ -19,6 +19,7 @@
 //   pong    { c, now }
 //   snap    { now, p: [...PLAYER_FIELDS], d: [...DINO_FIELDS] }
 //   inv     { inv }                                     your private inventory changed
+//   correct { x, y, z }                                 rejected movement; reset prediction
 //   ev      { e: <event>, ...fields }                   see EV below
 
 export const MSG = {
@@ -31,6 +32,7 @@ export const MSG = {
   PONG: 'pong',
   SNAP: 'snap',
   INV: 'inv',
+  CORRECT: 'correct',
   EV: 'ev',
 };
 

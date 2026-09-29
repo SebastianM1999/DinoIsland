@@ -15,6 +15,7 @@ import { buildLayout } from '../shared/layout.js';
 import { MSG, ACT, EV, EQUIP } from '../shared/protocol.js';
 import { DinoSystem } from './dinos.js';
 import { Mission } from './mission.js';
+import { resolveCircle } from '../shared/collision.js';
 
 const P = CONFIG.player;
 const W = CONFIG.weapons;
@@ -22,6 +23,8 @@ const LOOT_KEYS = Object.keys(CONFIG.loot);
 const r2 = (v) => Math.round(v * 100) / 100;
 const r3 = (v) => Math.round(v * 1000) / 1000;
 const dist2 = (ax, az, bx, bz) => (ax - bx) ** 2 + (az - bz) ** 2;
+const validVec = (v) => Array.isArray(v) && v.length === 3 && v.every((n) => Number.isFinite(n));
+const collisionResult = { x: 0, z: 0, hit: false };
 
 export class ServerWorld {
   /** @param {{ send:(to:number|'*', msg:object, except?:number)=>void, log?:(...a:any[])=>void }} host */
@@ -75,6 +78,11 @@ export class ServerWorld {
       hot: null,
       inv: this.freshInventory(),
       lastInput: this.now,
+      lastMoveAt: this.now,
+      moveBudget: 3.5,
+      knockBudgetUntil: 0,
+      nextMeleeAt: 0,
+      nextFireAt: 0,
     };
     this.players.set(p.id, p);
     attach?.(p.id);
@@ -129,6 +137,11 @@ export class ServerWorld {
     if (!p.alive || dmg <= 0) return;
     p.hp = Math.max(0, p.hp - dmg);
     if (p.eating) p.eating = null;   // getting hit interrupts eating
+    // A dinosaur's knockback can briefly exceed normal sprint speed.
+    if (kx || kz) {
+      p.knockBudgetUntil = this.now + 1;
+      p.moveBudget = Math.max(p.moveBudget, Math.min(7, Math.hypot(kx, kz) * 0.5));
+    }
     this.event(EV.HURT, { id: p.id, dmg: Math.round(dmg), hp: Math.ceil(p.hp), kx: r2(kx), kz: r2(kz), down, src });
     if (p.hp <= 0) this.killPlayer(p, src);
   }
@@ -153,6 +166,9 @@ export class ServerWorld {
     p.hp = P.maxHealth;
     p.x = sp.x; p.z = sp.z; p.y = this.terrain.heightAt(sp.x, sp.z);
     p.yaw = sp.yaw;
+    p.lastMoveAt = this.now;
+    p.moveBudget = 3.5;
+    p.knockBudgetUntil = 0;
     p.inv.arrows = Math.max(p.inv.arrows, W.bow.startArrows);
     p.inv.spear = true;
     this.sendInv(p);
@@ -175,15 +191,31 @@ export class ServerWorld {
   onState(p, m) {
     if (!p.alive) return;
     const num = (v, d) => (Number.isFinite(v) ? v : d);
-    const lim = CONFIG.world.size / 2;
-    p.x = Math.max(-lim, Math.min(lim, num(m.x, p.x)));
-    p.z = Math.max(-lim, Math.min(lim, num(m.z, p.z)));
-    p.y = num(m.y, p.y);
+    const x = num(m.x, p.x), z = num(m.z, p.z);
+    const y = num(m.y, p.y);
+    // A small distance reserve accommodates packet bunching without allowing
+    // repeated state packets to move faster than the player's sprint.
+    p.moveBudget = Math.min(this.now < p.knockBudgetUntil ? 7 : 3.5,
+      p.moveBudget + Math.max(0, this.now - p.lastMoveAt) * 11);
+    p.lastMoveAt = this.now;
+    const distance = Math.hypot(x - p.x, z - p.z);
+    const lim = CONFIG.world.size / 2 - 5;
+    const ground = this.terrain.heightAt(x, z);
+    resolveCircle(x, z, P.radius, this.layout.colliders, collisionResult);
+    const blocked = Math.hypot(collisionResult.x - x, collisionResult.z - z) > 0.6;
+    if (distance > p.moveBudget + 0.05 || Math.abs(x) > lim || Math.abs(z) > lim ||
+        !Number.isFinite(ground) || y < ground - 2 || y > ground + 20 ||
+        this.terrain.waterDepthAt(x, z) > CONFIG.world.maxWadeDepth + 0.2 || blocked) {
+      this.send(p.id, { t: MSG.CORRECT, x: r2(p.x), y: r2(p.y), z: r2(p.z) });
+      return;
+    }
+    p.moveBudget -= distance;
+    p.x = x; p.z = z; p.y = y;
     p.yaw = num(m.yaw, p.yaw);
-    p.pitch = num(m.pitch, p.pitch);
-    p.spd = num(m.spd, 0);
-    p.eq = (m.eq | 0) % EQUIP.length;
-    p.fl = m.fl | 0;
+    p.pitch = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, num(m.pitch, p.pitch)));
+    p.spd = Math.max(0, Math.min(20, num(m.spd, 0)));
+    p.eq = Math.max(0, Math.min(EQUIP.length - 1, m.eq | 0));
+    p.fl = (m.fl | 0) & 63;
   }
 
   near(p, x, z, range) { return dist2(p.x, p.z, x, z) <= range * range; }
@@ -192,16 +224,24 @@ export class ServerWorld {
     const inv = p.inv;
     switch (m.a) {
       case ACT.MELEE: {
-        if (!p.alive || p.eating) return;
+        if (!p.alive || p.eating || !inv.spear || this.now < p.nextMeleeAt) return;
         const d = this.dinos.get(m.dino);
         if (!d || !d.alive) return;
-        if (!this.near(p, d.x, d.z, W.spear.range + d.radius + 3)) return;
+        if (!validVec(m.p) || !this.validMeleeHit(p, d, m.p)) return;
+        p.nextMeleeAt = this.now + W.spear.cooldown;
         this.dinos.damage(d, W.spear.damage, m.zone, p.id, 'spear');
         return;
       }
       case ACT.FIRE: {
-        if (!p.alive || p.eating) return;
+        if (!p.alive || p.eating || this.now < p.nextFireAt) return;
         const kind = m.kind === 'spear' ? 'spear' : 'arrow';
+        if (!Number.isSafeInteger(m.pid) || m.pid < 0 || !validVec(m.o) || !validVec(m.v)) return;
+        if (this.projectiles.has(`${p.id}:${m.pid}`)) return;
+        const originDistance = Math.hypot(m.o[0] - p.x, m.o[2] - p.z);
+        const speed = Math.hypot(...m.v);
+        const maxSpeed = kind === 'spear' ? W.spear.throwSpeed + 5 : W.bow.maxSpeed + 5;
+        if (originDistance > 2.5 || Math.abs(m.o[1] - (p.y + P.eyeHeight)) > 2.5 ||
+            speed < 5 || speed > maxSpeed) return;
         if (kind === 'arrow') {
           if (inv.arrows <= 0) return;
           inv.arrows--;
@@ -209,7 +249,8 @@ export class ServerWorld {
           if (!inv.spear) return;
           inv.spear = false;
         }
-        this.projectiles.set(`${p.id}:${m.pid}`, { kind, t: this.now, pw: Number(m.pw) || 1 });
+        p.nextFireAt = this.now + (kind === 'spear' ? W.spear.throwCooldown : W.bow.cooldown);
+        this.projectiles.set(`${p.id}:${m.pid}`, { kind, t: this.now, pw: Math.max(0, Math.min(1, Number(m.pw) || 0)), o: m.o.slice(), v: m.v.slice() });
         this.sendInv(p);
         this.event(EV.FIRE, { by: p.id, kind, o: m.o, v: m.v, pid: m.pid }, p.id);
         return;
@@ -218,11 +259,14 @@ export class ServerWorld {
         const key = `${p.id}:${m.pid}`;
         const proj = this.projectiles.get(key);
         if (!proj) return;
+        if (!validVec(m.p) || !this.validProjectileLanding(proj, m.p)) return;
         this.projectiles.delete(key);
-        const [x, y, z] = Array.isArray(m.p) ? m.p.map(Number) : [p.x, p.y, p.z];
-        if (![x, y, z].every(Number.isFinite)) return;
+        const [x, y, z] = m.p;
         const d = m.dino != null ? this.dinos.get(m.dino) : null;
         if (d && d.alive) {
+          const reach = d.type === 'ptera' ? 9 : d.radius + 4;
+          const maxHeight = { brachio: 17, trex: 12, stego: 7, raptor: 5, ptera: 6 }[d.type];
+          if (dist2(x, z, d.x, d.z) > reach * reach || Math.abs(y - d.y) > maxHeight) return;
           if (proj.kind === 'arrow') {
             const dmg = W.bow.damage * (0.45 + 0.55 * Math.min(1, proj.pw));
             d.arrowsStuck = (d.arrowsStuck || 0) + 1;
@@ -233,7 +277,7 @@ export class ServerWorld {
           }
           return;
         }
-        this.spawnItem(proj.kind, x, z, 1, y);
+        if (Math.abs(y - this.terrain.heightAt(x, z)) <= 2) this.spawnItem(proj.kind, x, z, 1, y);
         return;
       }
       case ACT.PICKUP: {
@@ -351,6 +395,33 @@ export class ServerWorld {
         return;
       }
     }
+  }
+
+  validMeleeHit(p, d, point) {
+    const [x, y, z] = point;
+    const vx = x - p.x, vy = y - p.y - P.eyeHeight, vz = z - p.z;
+    const distance = Math.hypot(vx, vy, vz);
+    if (distance > W.spear.range + 0.8 || distance < 0.1) return false;
+    const fx = -Math.sin(p.yaw) * Math.cos(p.pitch);
+    const fy = Math.sin(p.pitch);
+    const fz = -Math.cos(p.yaw) * Math.cos(p.pitch);
+    if ((vx * fx + vy * fy + vz * fz) / distance < 0.4) return false;
+    const reach = d.type === 'ptera' ? 8 : d.radius + 3;
+    return dist2(x, z, d.x, d.z) <= reach * reach && Math.abs(y - d.y) < 17;
+  }
+
+  validProjectileLanding(proj, point) {
+    const [x, y, z] = point;
+    const [ox, oy, oz] = proj.o;
+    const [vx, vy, vz] = proj.v;
+    const horizontalSpeed = Math.hypot(vx, vz);
+    if (horizontalSpeed < 1) return false;
+    const flight = Math.hypot(x - ox, z - oz) / horizontalSpeed;
+    if (flight > 8.5 || flight > this.now - proj.t + 0.4) return false;
+    const expectedX = ox + vx * flight, expectedZ = oz + vz * flight;
+    const gravity = proj.kind === 'spear' ? W.spear.throwGravity : W.bow.arrowGravity;
+    const expectedY = oy + vy * flight - gravity * flight * flight / 2;
+    return Math.hypot(x - expectedX, z - expectedZ) < 2.5 && Math.abs(y - expectedY) < 3.5;
   }
 
   bestFruitIndex(p) {

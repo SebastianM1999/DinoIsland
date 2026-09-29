@@ -145,6 +145,12 @@ export class Game {
       for (const sys of this.systems) sys.onSnapshot?.(m);
     });
     net.on(MSG.INV, (m) => { this.me.inv = m.inv; });
+    net.on(MSG.CORRECT, (m) => {
+      this.player.pos.x = m.x;
+      this.player.pos.y = m.y;
+      this.player.pos.z = m.z;
+      this.player.vel.x = this.player.vel.z = 0;
+    });
     net.on(`ev:${EV.PLAYER_JOIN}`, (m) => this.remotes.add(m.player));
     net.on(`ev:${EV.PLAYER_LEAVE}`, (m) => this.remotes.remove(m.id));
     net.on(`ev:${EV.FRUIT}`, (m) => {
