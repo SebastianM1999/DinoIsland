@@ -3,9 +3,9 @@
 // See inspiration/model-art.png and inspiration/3-dino-models.png.
 
 import * as THREE from 'three';
-import { MAT, paint, place, part, merge, mesh, tube, blob } from '../kit.js';
+import { MAT, paint, place, part, merge, mesh, blob } from '../kit.js';
 import { Rig } from './rig.js';
-import { countershade, chain, sideEyes, teethRow, pillarFoot, V } from './parts.js';
+import { countershade, chain, sideEyes, teethRow, pillarFoot, tube, V } from './parts.js';
 
 const COL = {
   main: '#8089dc',
@@ -96,8 +96,8 @@ export function buildBrachio() {
   // shoulder + hip muscle bulges
   const bulges = [];
   for (const s of [-1, 1]) {
-    bulges.push(part(blob(0.55, 0.9, 0.9, COL.main, { w: 8, h: 6 }), [s * 1.05, 0.2, -2.1]));
-    bulges.push(part(blob(0.55, 0.85, 1.0, COL.main, { w: 8, h: 6 }), [s * 1.0, -0.05, 1.7]));
+    bulges.push(place(blob(0.5, 0.85, 0.85, COL.main, { w: 8, h: 6 }), [s * 0.95, 0.25, -2.1]));
+    bulges.push(place(blob(0.55, 0.85, 1.0, COL.main, { w: 8, h: 6 }), [s * 1.0, -0.05, 1.7]));
   }
   chest.add(mesh(merge([torso, ...bulges])));
 
@@ -107,7 +107,7 @@ export function buildBrachio() {
     hip.position.set(x, y, z);
     body.add(hip);
     const thighGeo = tube([V(0, 0.55, 0), V(0, -l1 * 0.5, 0), V(0, -l1 - r2 * 0.6, 0)], (t) => [r1 * (1.1 - t * 0.35), r1 * 1.15 * (1.1 - t * 0.35)], {
-      radial: 9, up: V(0, 0, -1), color: (t, a) => (Math.abs(((a + Math.PI) % (Math.PI * 2)) - Math.PI) > 2.4 && t < 0.4 ? COL.belly : COL.leg),
+      radial: 9, up: V(0, 0, -1), color: (t, a) => (Math.abs(((a + Math.PI) % (Math.PI * 2)) - Math.PI) > 2.4 && t > 0.15 && t < 0.4 ? COL.belly : COL.leg),
     });
     hip.add(mesh(thighGeo));
     const knee = new THREE.Group();
@@ -116,7 +116,8 @@ export function buildBrachio() {
     const shinGeo = tube([V(0, r2 * 0.5, 0), V(0, -l2 * 0.5, 0), V(0, -l2 + 0.05, 0)], (t) => r2 * (1.05 - t * 0.1), {
       radial: 9, up: V(0, 0, -1), color: (t) => (t > 0.75 ? COL.legDark : COL.leg),
     });
-    knee.add(mesh(shinGeo));
+    // knee ball keeps the bent joint rounded
+    knee.add(mesh(merge([shinGeo, place(blob(r2 * 1.1, r2 * 1.12, r2 * 1.1, COL.leg), [0, 0, 0])])));
     const foot = new THREE.Group();
     foot.position.y = -l2;
     knee.add(foot);
@@ -155,16 +156,16 @@ export function buildBrachio() {
   const headColor = countershade({ main: COL.main, back: COL.back, belly: COL.belly, bellyFrom: 2.0, backTo: 0.8 });
   const skull = tube([V(0, 0.02, 0.28), V(0, 0.04, -0.3), V(0, -0.02, -0.75), V(0, -0.06, -1.02)],
     (t) => [0.34 - t * 0.14, 0.34 - t * 0.17], { radial: 10, color: headColor });
-  const dome = part(blob(0.22, 0.2, 0.34, COL.main, { w: 8, h: 6 }), [0, 0.3, -0.38]);   // nostril arch
+  const dome = place(blob(0.22, 0.17, 0.4, COL.main, { w: 10, h: 8 }), [0, 0.22, -0.38]);   // nostril arch
   const nostrils = merge([
-    part(blob(0.05, 0.03, 0.07, '#2a2440'), [-0.08, 0.47, -0.52]),
-    part(blob(0.05, 0.03, 0.07, '#2a2440'), [0.08, 0.47, -0.52]),
+    place(blob(0.05, 0.03, 0.07, '#2a2440'), [-0.08, 0.36, -0.52]),
+    place(blob(0.05, 0.03, 0.07, '#2a2440'), [0.08, 0.36, -0.52]),
   ]);
   const cheeks = merge([
-    part(blob(0.12, 0.13, 0.2, COL.main), [-0.24, -0.1, -0.2]),
-    part(blob(0.12, 0.13, 0.2, COL.main), [0.24, -0.1, -0.2]),
+    place(blob(0.12, 0.13, 0.2, COL.main), [-0.24, -0.1, -0.2]),
+    place(blob(0.12, 0.13, 0.2, COL.main), [0.24, -0.1, -0.2]),
   ]);
-  const mouthLine = part(new THREE.BoxGeometry(0.5, 0.02, 0.62), '#3b3470', [0, -0.13, -0.66]);
+  const mouthLine = place(blob(0.25, 0.014, 0.31, '#3b3470'), [0, -0.13, -0.66]);
   head.add(mesh(merge([skull, dome, nostrils, cheeks, mouthLine])));
   rig.eyelids.push(sideEyes(head, { x: 0.27, y: 0.12, z: -0.12, size: 0.085, iris: '#3d2715', lid: COL.back, yaw: 0.35 }));
 

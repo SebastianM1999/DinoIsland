@@ -4,9 +4,9 @@
 // Species files (raptor.js, trex.js) only provide measurements + colors.
 
 import * as THREE from 'three';
-import { MAT, paint, place, part, merge, mesh, tube, blob, spike, deform } from '../kit.js';
+import { MAT, paint, place, part, merge, mesh, blob, deform } from '../kit.js';
 import { Rig, DinoAnimator } from './rig.js';
-import { countershade, chain, sideEyes, teethRow, V } from './parts.js';
+import { countershade, chain, sideEyes, teethRow, tube, spike, V } from './parts.js';
 import { DS } from '../../../shared/protocol.js';
 
 const lerp = (a, b, t) => a + (b - a) * t;
@@ -49,13 +49,13 @@ export function theroFoot({ toeLen, r, h, color, pad, clawColor = '#efe4cc', cla
     parts.push(place(merge([toe, c]), [0, 0, 0], [0, ang, 0]));
   }
   // heel / ankle pad
-  parts.push(part(blob(r * 1.5, h * 0.55, r * 1.7, color, { w: 7, h: 5 }), [0, -h * 0.45, -r * 0.2]));
+  parts.push(place(blob(r * 1.5, h * 0.55, r * 1.7, color, { w: 7, h: 5 }), [0, -h * 0.45, -r * 0.2]));
   // small back toe (hallux)
   parts.push(place(talon(r * 0.9, r * 0.35, clawColor, clawTip), [-side * r * 0.9, -h * 0.55, r * 0.9], [0, Math.PI + side * 0.6, 0]));
   if (sickle) {
     // raised killing claw on the inner toe: stands up, curving forward
     const sx = -side * r * 1.25;
-    parts.push(part(blob(r * 0.75, r * 0.9, r * 1.1, color, { w: 6, h: 4 }), [sx, -h * 0.35, -r * 1.2]));
+    parts.push(place(blob(r * 0.75, r * 0.9, r * 1.1, color, { w: 6, h: 4 }), [sx, -h * 0.35, -r * 1.2]));
     parts.push(place(talon(r * 3.4, r * 0.6, '#f3ead6', clawTip, 6), [sx, -h * 0.1, -r * 1.5], [1.25, 0, 0]));
   }
   return merge(parts);
@@ -81,14 +81,19 @@ export function buildTheropod(S) {
   });
   const torsoParts = [torso];
   // hip + shoulder muscle bulges hide the thigh tops
+  const cMain = new THREE.Color(C.main), cStripe = new THREE.Color(C.stripe), cOut = new THREE.Color();
+  const soft = (e0, e1, v) => { const k = clamp01((v - e0) / (e1 - e0)); return k * k * (3 - 2 * k); };
   for (const s of [-1, 1]) {
-    torsoParts.push(part(blob(...T.hipBulge.r, C.main, { w: 8, h: 6 }), [s * T.hipBulge.x, T.hipBulge.y, T.hipBulge.z]));
-    // a few dark stripes over the hips
-    for (let i = 0; i < 2; i++) {
-      const b = T.hipBulge.r;
-      torsoParts.push(part(new THREE.BoxGeometry(b[0] * 0.25, b[1] * 0.9, b[2] * 0.22), C.stripe,
-        [s * (T.hipBulge.x + b[0] * 0.72), T.hipBulge.y + b[1] * 0.25, T.hipBulge.z - b[2] * 0.25 + i * b[2] * 0.55], [0.35, 0, s * 0.45]));
-    }
+    // hip muscle bulge with two soft, slanted dark stripes painted on its outer side
+    const b = T.hipBulge.r;
+    const hip = blob(b[0], b[1], b[2], (c) => {
+      const out = soft(0.1, 0.55, (c.x * s) / b[0]);
+      const u = c.z / b[2] + c.y / b[1] * 0.55 + 0.25;
+      const band = Math.max(1 - soft(0.08, 0.2, Math.abs(u + 0.05)), 1 - soft(0.08, 0.2, Math.abs(u - 0.6)));
+      const k = band * out * soft(-0.7, -0.2, c.y / b[1]) * 0.85;
+      return cOut.copy(cMain).lerp(cStripe, k);
+    }, { w: 14, h: 10 });
+    torsoParts.push(place(hip, [s * T.hipBulge.x, T.hipBulge.y, T.hipBulge.z]));
   }
   chest.add(mesh(merge(torsoParts)));
 
@@ -196,23 +201,30 @@ function buildHead(head, P, C) {
     if (P.flatTop && top > 0) v.y = mY + top * (1 - P.flatTop * Math.max(0, top / (P.H * 2) - 0.6));
   });
   const parts = [skull];
+  /** skull surface height at t for a point at lateral fraction xk (0 centre .. 1 side), capped at `up`. */
+  const flat = (y) => {
+    const top = y - mY;
+    return P.flatTop && top > 0 ? mY + top * (1 - P.flatTop * Math.max(0, top / (P.H * 2) - 0.6)) : y;
+  };
+  const surfY = (t, xk, up) => flat(cyAt(t) + ryAt(t) * Math.min(up, Math.sqrt(Math.max(0, 1 - xk * xk))));
 
   // nostrils
   const tn = 0.93;
   for (const s of [-1, 1]) {
-    parts.push(part(blob(P.nostril, P.nostril * 0.55, P.nostril * 1.2, '#3a1f18', { w: 6, h: 4 }),
+    parts.push(place(blob(P.nostril, P.nostril * 0.55, P.nostril * 1.2, '#3a1f18', { w: 6, h: 4 }),
       [s * rxAt(tn) * 0.55, cyAt(tn) + ryAt(tn) * 0.72, zAt(tn)], [0.3, 0, 0]));
   }
   // cheek bumps (jugal) behind/below the eye
   for (const s of [-1, 1]) {
     const tc = P.cheek.t;
-    parts.push(part(blob(...P.cheek.r, C.main, { w: 7, h: 5 }), [s * rxAt(tc) * 0.92, mY + ryAt(tc) * P.cheek.up, zAt(tc)]));
+    parts.push(place(blob(...P.cheek.r, C.main, { w: 10, h: 7 }), [s * rxAt(tc) * 0.88, mY + ryAt(tc) * P.cheek.up, zAt(tc)]));
   }
   // horns / brow bosses above the eyes and bumps along the snout
   const te = P.eye.t;
   for (const s of [-1, 1]) {
-    if (P.horn) parts.push(part(blob(...P.horn.r, C.back, { w: 6, h: 4 }), [s * rxAt(P.horn.t) * P.horn.x, cyAt(P.horn.t) + ryAt(P.horn.t) * P.horn.up, zAt(P.horn.t)], [0.2, 0, s * 0.3]));
-    for (const b of P.bumps || []) parts.push(part(blob(b.r, b.r * 0.7, b.r * 1.3, C.back, { w: 5, h: 4 }), [s * rxAt(b.t) * b.x, cyAt(b.t) + ryAt(b.t) * 0.9, zAt(b.t)]));
+    // sit on the (flattened) skull surface so nothing floats above the head
+    if (P.horn) parts.push(place(blob(...P.horn.r, C.back, { w: 8, h: 6 }), [s * rxAt(P.horn.t) * P.horn.x, surfY(P.horn.t, P.horn.x, P.horn.up) - P.horn.r[1] * 0.35, zAt(P.horn.t)], [0.2, 0, s * 0.3]));
+    for (const b of P.bumps || []) parts.push(place(blob(b.r, b.r * 0.7, b.r * 1.3, C.back), [s * rxAt(b.t) * b.x, surfY(b.t, b.x, 1) - b.r * 0.3, zAt(b.t)]));
   }
 
   // upper teeth: rows along both lip edges + a few across the tip
@@ -225,7 +237,7 @@ function buildHead(head, P, C) {
   const tf = 0.975;
   parts.push(teethRow(V(-rxAt(tf) * 0.55, ty, zAt(tf)), V(rxAt(tf) * 0.55, ty, zAt(tf)), TE.front, TE.size * 0.75, -1, C.tooth));
   // dark throat backing so the open mouth doesn't look hollow
-  parts.push(part(blob(P.W * 0.7, P.H * 0.55, P.H * 0.6, C.throat ?? '#5a2226', { w: 7, h: 5 }), [0, mY - P.H * 0.25, zAt(0.1)]));
+  parts.push(place(blob(P.W * 0.7, P.H * 0.55, P.H * 0.6, C.throat ?? '#5a2226', { w: 7, h: 5 }), [0, mY - P.H * 0.25, zAt(0.1)]));
   head.add(mesh(merge(parts)));
 
   // eyes, lids, brow ridges
@@ -264,7 +276,7 @@ function buildHead(head, P, C) {
   }
   jparts.push(teethRow(V(-jrx(0.97) * 0.45, -TE.size * 0.1, -0.97 * jLen), V(jrx(0.97) * 0.45, -TE.size * 0.1, -0.97 * jLen), 2, TE.size * 0.7, 1, C.tooth));
   // chin / throat pouch in cream
-  jparts.push(part(blob(jrx(0.2) * 0.85, P.jawDepth * 0.7, jLen * 0.3, C.belly, { w: 8, h: 5 }), [0, -P.jawDepth * 0.75, -jLen * 0.22]));
+  jparts.push(place(blob(jrx(0.2) * 0.85, P.jawDepth * 0.7, jLen * 0.3, C.belly, { w: 8, h: 5 }), [0, -P.jawDepth * 0.75, -jLen * 0.22]));
   jaw.add(mesh(merge(jparts)));
   return { jaw, lids };
 }
@@ -291,7 +303,7 @@ function buildLeg(body, L, side, C) {
   const shin = tube([V(0, L.shinR * 0.9, 0), V(0, -L.l2 * 0.35, L.shinR * 0.15), V(0, -L.l2, 0)],
     (t) => [L.shinR * (1.05 - t * 0.45), L.shinR * (1.15 - t * 0.5)],
     { radial: L.radial ?? 9, up: V(0, 0, -1), color: legColor(0) });
-  const kneeCap = part(blob(L.shinR * 0.95, L.shinR * 1.0, L.shinR * 1.05, C.leg, { w: 7, h: 5 }), [0, 0, -L.shinR * 0.2]);
+  const kneeCap = place(blob(L.shinR * 0.95, L.shinR * 1.0, L.shinR * 1.05, C.leg, { w: 7, h: 5 }), [0, 0, -L.shinR * 0.2]);
   knee.add(mesh(merge([shin, kneeCap])));
 
   const ankle = new THREE.Group();
@@ -300,7 +312,7 @@ function buildLeg(body, L, side, C) {
   const meta = tube([V(0, L.metaR * 0.6, 0), V(0, -L.l3 * 0.5, 0), V(0, -L.l3 + L.metaR * 0.3, 0)],
     (t) => [L.metaR * (1.05 - t * 0.15), L.metaR * (1.2 - t * 0.25)],
     { radial: 7, up: V(0, 0, -1), color: () => C.legDark });
-  const ankleKnob = part(blob(L.metaR * 1.3, L.metaR * 1.3, L.metaR * 1.4, C.legDark, { w: 6, h: 5 }), [0, 0, L.metaR * 0.1]);
+  const ankleKnob = place(blob(L.metaR * 1.3, L.metaR * 1.3, L.metaR * 1.4, C.legDark, { w: 6, h: 5 }), [0, 0, L.metaR * 0.1]);
   ankle.add(mesh(merge([meta, ankleKnob])));
 
   const foot = new THREE.Group();

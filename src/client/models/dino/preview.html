@@ -65,7 +65,10 @@
     const box = new THREE.Box3().setFromObject(rig.root);
     const size = box.getSize(new THREE.Vector3());
     const camera = new THREE.PerspectiveCamera(45, innerWidth / innerHeight, 0.1, 500);
-    const R = Math.max(size.x, size.y, size.z) * 1.6 + 2;
+    const zoom = parseFloat(qs.get('zoom') || '1');
+    const focus = qs.get('focus') || 'body';   // body | head
+    const R = (focus === 'head' ? Math.max(size.x, size.y, size.z) * 0.5 + 1 : Math.max(size.x, size.y, size.z) * 1.6 + 2) / zoom;
+    const _fp = new THREE.Vector3();
 
     const STATES = ['idle', 'walk', 'run', 'attack', 'roar', 'graze', 'alert', 'charge', 'tail', 'trapped', 'dead', 'fly', 'dive', 'landed'];
     let state = qs.get('state') || 'walk';
@@ -121,8 +124,14 @@
       extra?.(fakeView, dt);
       const a = orbit ? t * 0.4 : { side: Math.PI / 2, front: 0, back: Math.PI, top: 0.001, 'three-quarter': Math.PI / 4 }[view];
       const cy = view === 'top' ? R : size.y * 0.55;
-      camera.position.set(Math.sin(a) * R, cy + (view === 'top' ? 0 : size.y * 0.15), -Math.cos(a) * R);
-      camera.lookAt(0, size.y * 0.45, 0);
+      if (focus === 'head' && rig.head) {
+        rig.head.getWorldPosition(_fp);
+        camera.position.set(_fp.x + Math.sin(a) * R, _fp.y + (view === 'top' ? R : R * 0.25), _fp.z - Math.cos(a) * R);
+      } else {
+        _fp.set(0, size.y * 0.45, 0);
+        camera.position.set(Math.sin(a) * R, cy + (view === 'top' ? 0 : size.y * 0.15), -Math.cos(a) * R);
+      }
+      camera.lookAt(_fp);
       renderer.render(scene, camera);
     }
     loop();

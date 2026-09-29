@@ -4,9 +4,9 @@
 // Same structure as brachio.js; styled after inspiration/3-dino-models.png.
 
 import * as THREE from 'three';
-import { paint, place, part, merge, mesh, tube, blob, spike, deform } from '../kit.js';
+import { paint, place, part, merge, mesh, blob, deform } from '../kit.js';
 import { Rig } from './rig.js';
-import { countershade, chain, sideEyes, teethRow, V } from './parts.js';
+import { countershade, chain, sideEyes, teethRow, tube, spike, roundFoot, V } from './parts.js';
 import { DS } from '../../../shared/protocol.js';
 
 const COL = {
@@ -68,9 +68,9 @@ function prof(z) {
   return TORSO[TORSO.length - 1];
 }
 
-/** Faceted, slightly back-leaning bony plate, base at y=0 (bury it a little). */
+/** Rounded, slightly back-leaning bony plate with a soft rim, base at y=0 (bury it a little). */
 function plateGeo(h, w, lean = 0.18) {
-  let g = new THREE.SphereGeometry(1, 8, 5);
+  let g = new THREE.SphereGeometry(1, 18, 12);
   g = deform(g, (v) => {
     const k = (v.y + 1) / 2;                 // 0 bottom .. 1 top
     v.x *= 0.035 + h * 0.03;
@@ -88,7 +88,7 @@ function plateGeo(h, w, lean = 0.18) {
 
 /** Curved tail spike pointing along `dir` (joint space). */
 function tailSpike(len, base, dir) {
-  let g = spike(base, len, COL.plate, COL.plateTip, 6);
+  let g = spike(base, len, COL.plate, COL.plateTip, 7, 8);
   g = deform(g, (v) => { const k = v.y / len; v.z += k * k * len * 0.12; });
   const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.clone().normalize());
   const e = new THREE.Euler().setFromQuaternion(q);
@@ -97,14 +97,14 @@ function tailSpike(len, base, dir) {
 
 /** Stubby elephant-like foot with separate toes and nails, ankle at y=0, sole at y=-h. */
 function stubbyFoot(r, h, toes, color, nail) {
-  let g = new THREE.CylinderGeometry(r * 0.85, r * 1.1, h, 8, 1);
+  let g = roundFoot(r * 0.85, r * 1.1, h, color);
   g = deform(g, (v) => { if (v.z < 0) v.z *= 1.15; });
-  const parts = [part(g, color, [0, -h / 2, -r * 0.1])];
+  const parts = [place(g, [0, 0, -r * 0.1])];
   for (let i = 0; i < toes; i++) {
     const a = (i / (toes - 1) - 0.5) * (toes > 3 ? 1.5 : 1.1);
     const x = Math.sin(a) * r * 0.95, z = -Math.cos(a) * r * 0.95 - r * 0.12;
-    parts.push(part(blob(r * 0.3, r * 0.26, r * 0.36, color, { w: 6, h: 4 }), [x, -h + r * 0.22, z]));
-    parts.push(part(blob(r * 0.2, r * 0.16, r * 0.2, nail, { w: 6, h: 4 }), [x * 1.12, -h + r * 0.15, z - r * 0.26]));
+    parts.push(place(blob(r * 0.3, r * 0.26, r * 0.36, color), [x, -h + r * 0.22, z]));
+    parts.push(place(blob(r * 0.2, r * 0.16, r * 0.2, nail), [x * 1.12, -h + r * 0.15, z - r * 0.26]));
   }
   return merge(parts);
 }
@@ -126,8 +126,8 @@ export function buildStego() {
   }, { radial: 12, color: bodyColor, smoothColors: true });
   const bulges = [];
   for (const s of [-1, 1]) {
-    bulges.push(part(blob(0.36, 0.62, 0.72, COL.main, { w: 8, h: 6 }), [s * 0.66, -0.02, 0.62]));   // thigh muscle
-    bulges.push(part(blob(0.32, 0.5, 0.5, COL.main, { w: 8, h: 6 }), [s * 0.6, -0.3, -1.1]));      // shoulder
+    bulges.push(place(blob(0.36, 0.62, 0.72, COL.main, { w: 8, h: 6 }), [s * 0.66, -0.02, 0.62]));   // thigh muscle
+    bulges.push(place(blob(0.27, 0.48, 0.48, COL.main, { w: 8, h: 6 }), [s * 0.55, -0.22, -1.1]));      // shoulder
   }
   chest.add(mesh(merge([torso, ...bulges])));
 
@@ -151,7 +151,7 @@ export function buildStego() {
     hip.position.set(x, y, z);
     body.add(hip);
     const thighGeo = tube([V(0, 0.4, 0), V(0, -l1 * 0.5, 0), V(0, -l1 - r2 * 0.5, 0)], (t) => [r1 * (1.1 - t * 0.4), r1 * 1.2 * (1.1 - t * 0.4)], {
-      radial: 9, up: V(0, 0, -1), color: (t, a) => (Math.abs(((a + Math.PI) % (Math.PI * 2)) - Math.PI) > 2.4 && t < 0.4 ? COL.belly : COL.leg),
+      radial: 9, up: V(0, 0, -1), color: (t, a) => (Math.abs(((a + Math.PI) % (Math.PI * 2)) - Math.PI) > 2.4 && t > 0.15 && t < 0.4 ? COL.belly : COL.leg),
     });
     hip.add(mesh(thighGeo));
     const knee = new THREE.Group();
@@ -160,7 +160,8 @@ export function buildStego() {
     const shinGeo = tube([V(0, r2 * 0.5, 0), V(0, -l2 * 0.5, 0), V(0, -l2 + 0.04, 0)], (t) => r2 * (1.05 - t * 0.15), {
       radial: 8, up: V(0, 0, -1), color: (t) => (t > 0.7 ? COL.legDark : COL.leg),
     });
-    knee.add(mesh(shinGeo));
+    // knee ball keeps the bent joint rounded
+    knee.add(mesh(merge([shinGeo, place(blob(r2 * 1.12, r2 * 1.15, r2 * 1.12, COL.leg), [0, 0, 0])])));
     const foot = new THREE.Group();
     foot.position.y = -l2;
     knee.add(foot);
@@ -198,17 +199,17 @@ export function buildStego() {
   const headColor = countershade({ main: COL.main, back: COL.back, belly: COL.belly, bellyFrom: 2.0, backTo: 0.8 });
   const skull = tube([V(0, 0.02, 0.2), V(0, 0.04, -0.18), V(0, -0.0, -0.48), V(0, -0.05, -0.64)],
     (t) => [0.22 - t * 0.11, 0.22 - t * 0.12], { radial: 10, color: headColor });
-  const beak = place(deform(spike(0.12, 0.2, COL.beak, COL.beakTip, 6), (v) => { v.x *= 0.9; v.z *= 0.6; }), [0, -0.07, -0.6], [-Math.PI / 2 - 0.25, 0, 0]);
+  const beak = place(deform(spike(0.12, 0.2, COL.beak, COL.beakTip, 7), (v) => { v.x *= 0.9; v.z *= 0.6; }), [0, -0.07, -0.6], [-Math.PI / 2 - 0.25, 0, 0]);
   const nostrils = merge([
-    part(blob(0.035, 0.025, 0.05, '#2c3614'), [-0.07, 0.04, -0.55]),
-    part(blob(0.035, 0.025, 0.05, '#2c3614'), [0.07, 0.04, -0.55]),
+    place(blob(0.035, 0.025, 0.05, '#2c3614'), [-0.07, 0.04, -0.55]),
+    place(blob(0.035, 0.025, 0.05, '#2c3614'), [0.07, 0.04, -0.55]),
   ]);
   const cheeks = merge([
-    part(blob(0.09, 0.1, 0.14, COL.main), [-0.17, -0.07, -0.1]),
-    part(blob(0.09, 0.1, 0.14, COL.main), [0.17, -0.07, -0.1]),
+    place(blob(0.09, 0.1, 0.14, COL.main), [-0.17, -0.07, -0.1]),
+    place(blob(0.09, 0.1, 0.14, COL.main), [0.17, -0.07, -0.1]),
   ]);
-  const crown = part(blob(0.15, 0.1, 0.2, COL.back, { w: 8, h: 5 }), [0, 0.17, 0.02]);
-  const mouthLine = part(new THREE.BoxGeometry(0.28, 0.02, 0.4), COL.mouth, [0, -0.09, -0.36]);
+  const crown = place(blob(0.15, 0.1, 0.2, COL.back, { w: 8, h: 5 }), [0, 0.17, 0.02]);
+  const mouthLine = place(blob(0.14, 0.014, 0.2, COL.mouth), [0, -0.09, -0.36]);
   head.add(mesh(merge([skull, beak, nostrils, cheeks, crown, mouthLine])));
   rig.eyelids.push(sideEyes(head, { x: 0.165, y: 0.07, z: -0.1, size: 0.066, iris: '#8a4a16', lid: COL.back, yaw: 0.35 }));
 

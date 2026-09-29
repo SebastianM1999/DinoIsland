@@ -6,9 +6,9 @@
 // animator has no wing support. Same structure as brachio.js.
 
 import * as THREE from 'three';
-import { place, part, merge, mesh, tube, blob, spike, deform } from '../kit.js';
+import { place, part, merge, mesh, blob } from '../kit.js';
 import { Rig } from './rig.js';
-import { countershade, chain, sideEyes, claw, birdFoot, V } from './parts.js';
+import { countershade, chain, sideEyes, claw, birdFoot, tube, V } from './parts.js';
 import { DS } from '../../../shared/protocol.js';
 
 const COL = {
@@ -56,8 +56,13 @@ export const PTERA_ANIM = {
 // Wing joint lengths (right wing, pointing +X in the wing-base frame).
 const HUM = 0.5, FORE = 0.8, FIN1 = 0.95, FIN2 = 0.92;
 
-const MAT_TOP = new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 0.8, metalness: 0, side: THREE.FrontSide });
-const MAT_BOT = new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 0.8, metalness: 0, side: THREE.BackSide });
+// Smooth-shaded membrane (normals are recomputed every frame from the posed wing).
+const MAT_TOP = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.75, metalness: 0, side: THREE.FrontSide, shadowSide: THREE.DoubleSide });
+const MAT_BOT = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.8, metalness: 0, side: THREE.BackSide });
+
+// Membrane grid: SUB columns per bone span (4 spans) × ROWS rows from the leading to the trailing edge.
+const SUB = 6, ROWS = 7;
+const COLS = 4 * SUB + 1;
 
 const wingColor = (t, a) => (Math.abs(((a + Math.PI) % (Math.PI * 2)) - Math.PI) > 1.9 ? COL.under : COL.teal);
 
@@ -73,7 +78,7 @@ function buildWing(body, side) {
   base.add(S);
   S.add(mesh(merge([
     tube([V(-0.06, 0, 0), V(HUM * 0.5, 0.01, 0.01), V(HUM + 0.04, 0, 0)], (t) => [0.075 - t * 0.02, 0.065 - t * 0.02], { radial: 7, up: V(0, 1, 0), color: wingColor }),
-    part(blob(0.11, 0.09, 0.12, COL.back, { w: 7, h: 5 }), [0.02, 0.02, 0.02]),
+    place(blob(0.11, 0.09, 0.12, COL.back, { w: 7, h: 5 }), [0.02, 0.02, 0.02]),
   ])));
 
   const E = new THREE.Group();
@@ -82,7 +87,7 @@ function buildWing(body, side) {
   S.add(E);
   E.add(mesh(merge([
     tube([V(-0.03, 0, 0), V(FORE * 0.5, 0, 0), V(FORE + 0.02, 0, 0)], (t) => [0.055 - t * 0.012, 0.05 - t * 0.012], { radial: 7, color: wingColor }),
-    part(blob(0.06, 0.055, 0.06, COL.tealDark, { w: 6, h: 4 }), [0, 0, 0]),
+    place(blob(0.06, 0.055, 0.06, COL.tealDark, { w: 6, h: 4 }), [0, 0, 0]),
   ])));
 
   // wrist + the long wing finger
@@ -97,9 +102,9 @@ function buildWing(body, side) {
     fingers.push(place(merge([f, c]), [0.02, 0.01 - i * 0.02, -0.02], [0, -0.35 + i * 0.35, 0]));
   }
   W.add(mesh(merge([
-    part(blob(0.065, 0.055, 0.07, COL.tealDark, { w: 7, h: 5 }), [0, 0, 0]),
+    place(blob(0.065, 0.055, 0.07, COL.tealDark, { w: 7, h: 5 }), [0, 0, 0]),
     tube([V(0, 0.005, 0), V(FIN1 * 0.5, 0.012, 0.005), V(FIN1 + 0.02, 0.008, 0)], (t) => [0.04 - t * 0.01, 0.036 - t * 0.008], { radial: 6, color: () => COL.bone }),
-    part(blob(0.035, 0.03, 0.035, COL.main), [FIN1, 0.008, 0]),
+    place(blob(0.035, 0.03, 0.035, COL.main), [FIN1, 0.008, 0]),
     ...fingers,
   ])));
 
@@ -112,43 +117,65 @@ function buildWing(body, side) {
   // membrane anchor points: [joint, local offset] along the leading and trailing edges
   const L = [[S, V(0, 0, 0)], [E, V(0, 0, 0)], [W, V(0, 0, 0)], [F, V(0, 0, 0)], [F, V(FIN2, 0, 0.035)]];
   const T = [[base, V(0.02, -0.05, 0.5)], [S, V(0.4, 0, 0.62)], [E, V(0.6, 0, 0.6)], [W, V(0.65, 0, 0.42)], [F, V(0.62, 0, 0.18)]];
-  // triangles per span: leading strip + scalloped trailing strip (5 tris), mid row M, scallop C
-  const nSpan = 4;
-  const triCount = nSpan * 5;
-  const pos = new THREE.BufferAttribute(new Float32Array(triCount * 9), 3);
+  // smooth, subdivided membrane: shared position + normal buffers, rebuilt per frame
+  const nv = COLS * (ROWS + 1);
+  const pos = new THREE.BufferAttribute(new Float32Array(nv * 3), 3);
   pos.setUsage(THREE.DynamicDrawUsage);
+  const nrm = new THREE.BufferAttribute(new Float32Array(nv * 3), 3);
+  nrm.setUsage(THREE.DynamicDrawUsage);
+  const idx = [];
+  for (let j = 0; j < ROWS; j++) {
+    for (let i = 0; i < COLS - 1; i++) {
+      const a = j * COLS + i, b = a + 1, c = a + COLS, d = c + 1;
+      // wound so the front face is the top of the wing
+      idx.push(a, d, b, a, c, d);
+    }
+  }
+  const index = new THREE.BufferAttribute(new Uint16Array(idx), 1);
   const mkGeo = (colFn) => {
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', pos);
-    const col = new Float32Array(triCount * 9);
+    g.setAttribute('normal', nrm);
+    g.setIndex(index);
+    const col = new Float32Array(nv * 3);
     const c = new THREE.Color();
-    for (let s = 0; s < nSpan; s++) {
-      for (let k = 0; k < 5; k++) {
-        c.set(colFn(s, k));
-        for (let v = 0; v < 3; v++) col.set([c.r, c.g, c.b], ((s * 5 + k) * 3 + v) * 3);
+    for (let j = 0; j <= ROWS; j++) {
+      for (let i = 0; i < COLS; i++) {
+        colFn(i / (COLS - 1), j / ROWS, c);
+        col.set([c.r, c.g, c.b], (j * COLS + i) * 3);
       }
     }
     g.setAttribute('color', new THREE.BufferAttribute(col, 3));
     g.boundingSphere = new THREE.Sphere(new THREE.Vector3(1.5, 0, 0.3), 3.5);
     return g;
   };
-  // top: darker teal toward the leading edge, lighter band near the trailing edge
-  const top = new THREE.Mesh(mkGeo((s, k) => (k < 2 ? (s === 0 ? COL.teal : COL.tealDark) : (k === 2 ? COL.tealLight : COL.teal))), MAT_TOP);
-  const bot = new THREE.Mesh(mkGeo((s, k) => (k < 2 ? COL.under : COL.underCream)), MAT_BOT);
+  const cTeal = new THREE.Color(COL.teal), cDark = new THREE.Color(COL.tealDark), cLight = new THREE.Color(COL.tealLight);
+  const cUnder = new THREE.Color(COL.under), cUnderCream = new THREE.Color(COL.underCream);
+  const sm = (e0, e1, x) => { const k = Math.min(1, Math.max(0, (x - e0) / (e1 - e0))); return k * k * (3 - 2 * k); };
+  // top: darker teal along the bones, lighter band toward the trailing edge, soft gradients
+  const top = new THREE.Mesh(mkGeo((u, v, c) => {
+    c.copy(cDark).lerp(cTeal, sm(0.0, 0.35, v) * 0.85 + sm(0, 0.3, 1 - u) * 0.15);
+    c.lerp(cLight, sm(0.45, 0.8, v) * (1 - sm(0.9, 1.0, v) * 0.5));
+  }), MAT_TOP);
+  const bot = new THREE.Mesh(mkGeo((u, v, c) => { c.copy(cUnder).lerp(cUnderCream, sm(0.3, 0.85, v)); }), MAT_BOT);
+  // The two sides are coincident: only the top casts (both faces, see MAT_TOP.shadowSide) and
+  // neither receives, so the thin membrane never shadows itself (no acne).
   for (const m of [top, bot]) {
-    m.castShadow = true;
-    m.receiveShadow = true;
+    m.castShadow = m === top;
+    m.receiveShadow = false;
     m.frustumCulled = false;
     base.add(m);
   }
   return { base, joints: [S, E, W, F], L, T, pos, top, bot, side };
 }
 
-const _a = new THREE.Vector3(), _inv = new THREE.Matrix4(), _m = new THREE.Matrix4();
+const _inv = new THREE.Matrix4(), _m = new THREE.Matrix4();
 const _L = Array.from({ length: 5 }, () => new THREE.Vector3());
 const _T = Array.from({ length: 5 }, () => new THREE.Vector3());
-const _M = Array.from({ length: 5 }, () => new THREE.Vector3());
-const _C = new THREE.Vector3(), _n = new THREE.Vector3(), _e1 = new THREE.Vector3(), _e2 = new THREE.Vector3();
+const _lead = Array.from({ length: COLS }, () => new THREE.Vector3());
+const _trail = Array.from({ length: COLS }, () => new THREE.Vector3());
+const _n = new THREE.Vector3(), _e1 = new THREE.Vector3(), _e2 = new THREE.Vector3(), _p = new THREE.Vector3();
+const _trailCurve = new THREE.CatmullRomCurve3(_T, false, 'centripetal');
 
 /** Rebuild one membrane from the current joint transforms (matrixWorld must be current). */
 function updateMembrane(w) {
@@ -161,35 +188,36 @@ function updateMembrane(w) {
     toBase(w.L[i], _L[i]);
     toBase(w.T[i], _T[i]);
   }
-  // mid row with a slight billow below the surface
-  for (let i = 0; i < 5; i++) {
-    const i2 = Math.min(4, i + 1), i1 = i2 - 1;
-    _e1.subVectors(_L[i2], _L[i1]);
-    _e2.subVectors(_T[i], _L[i]);
+  for (let i = 0; i < COLS; i++) {
+    const span = Math.min(3, Math.floor(i / SUB)), f = i / SUB - span;
+    // leading edge follows the (straight) bones exactly
+    _lead[i].lerpVectors(_L[span], _L[span + 1], f);
+    // trailing edge: smooth curve through the anchors, scalloped in between them
+    const sf = span + f;
+    _trailCurve.getPoint(sf / 4, _trail[i]);
+    _trail[i].lerp(_lead[i], 0.2 * Math.sin(Math.PI * f));
+  }
+  const a = w.pos.array;
+  for (let i = 0; i < COLS; i++) {
+    // billow direction: below the local wing plane
+    const i0 = Math.max(0, i - 1), i1 = Math.min(COLS - 1, i + 1);
+    _e1.subVectors(_lead[i1], _lead[i0]);
+    _e2.subVectors(_trail[i], _lead[i]);
     _n.crossVectors(_e2, _e1);
     const len = _n.length();
     if (len > 1e-6) _n.multiplyScalar(1 / len); else _n.set(0, 1, 0);
-    _M[i].lerpVectors(_L[i], _T[i], 0.45).addScaledVector(_n, -0.035 * Math.min(1, _e2.length()));
-  }
-  const a = w.pos.array;
-  let o = 0;
-  const tri = (p, q, r) => {
-    a[o++] = p.x; a[o++] = p.y; a[o++] = p.z;
-    a[o++] = q.x; a[o++] = q.y; a[o++] = q.z;
-    a[o++] = r.x; a[o++] = r.y; a[o++] = r.z;
-  };
-  for (let i = 0; i < 4; i++) {
-    const L0 = _L[i], L1 = _L[i + 1], M0 = _M[i], M1 = _M[i + 1], T0 = _T[i], T1 = _T[i + 1];
-    // scallop: trailing edge between the anchors curves in toward the bones
-    _C.lerpVectors(T0, T1, 0.5).lerp(_a.lerpVectors(M0, M1, 0.5), 0.22);
-    // wound so the front face is the top of the wing
-    tri(L0, M1, L1);
-    tri(L0, M0, M1);
-    tri(M0, _C, M1);
-    tri(M0, T0, _C);
-    tri(M1, _C, T1);
+    const chord = _e2.length();
+    const tipFade = Math.min(1, (COLS - 1 - i) / SUB + 0.25);
+    for (let j = 0; j <= ROWS; j++) {
+      const v = j / ROWS;
+      _p.lerpVectors(_lead[i], _trail[i], v).addScaledVector(_n, -0.05 * Math.min(1, chord) * Math.sin(Math.PI * v) * (1 - v * 0.4) * tipFade);
+      const o = (j * COLS + i) * 3;
+      a[o] = _p.x; a[o + 1] = _p.y; a[o + 2] = _p.z;
+    }
   }
   w.pos.needsUpdate = true;
+  w.top.geometry.computeVertexNormals();   // writes into the shared normal buffer
+  w.top.geometry.attributes.normal.needsUpdate = true;
 }
 
 export function buildPtera() {
@@ -207,7 +235,7 @@ export function buildPtera() {
     const r = t < 0.35 ? 0.07 + t * 0.34 : t < 0.75 ? 0.19 + (t - 0.35) * 0.08 : 0.222 - (t - 0.75) * 0.3;
     return [r * 0.95, r * 1.08];
   }, { radial: 10, color: bodyColor, smoothColors: true });
-  const keel = part(blob(0.13, 0.12, 0.16, COL.belly, { w: 8, h: 5 }), [0, -0.1, -0.22]);
+  const keel = place(blob(0.13, 0.12, 0.16, COL.belly, { w: 8, h: 5 }), [0, -0.1, -0.22]);
   chest.add(mesh(merge([torso, keel])));
 
   // ---- legs (short, bird-like feet)
@@ -266,14 +294,14 @@ export function buildPtera() {
   const crest = tube([V(0, 0.07, 0.02), V(0, 0.14, 0.2), V(0, 0.22, 0.4), V(0, 0.3, 0.56)], (t) => [0.03 - t * 0.022, 0.085 - t * 0.07], {
     radial: 6, color: (t) => (t > 0.7 ? COL.crestTip : COL.crest),
   });
-  const crestBase = part(blob(0.06, 0.06, 0.1, COL.crest, { w: 6, h: 4 }), [0, 0.08, 0.02]);
+  const crestBase = place(blob(0.06, 0.06, 0.1, COL.crest, { w: 6, h: 4 }), [0, 0.08, 0.02]);
   const nostrils = merge([
-    part(blob(0.012, 0.01, 0.03, '#3a2a1a'), [-0.035, 0.03, -0.3]),
-    part(blob(0.012, 0.01, 0.03, '#3a2a1a'), [0.035, 0.03, -0.3]),
+    place(blob(0.012, 0.01, 0.03, '#3a2a1a'), [-0.035, 0.03, -0.3]),
+    place(blob(0.012, 0.01, 0.03, '#3a2a1a'), [0.035, 0.03, -0.3]),
   ]);
   const cheeks = merge([
-    part(blob(0.04, 0.035, 0.06, COL.main), [-0.07, -0.04, -0.02]),
-    part(blob(0.04, 0.035, 0.06, COL.main), [0.07, -0.04, -0.02]),
+    place(blob(0.04, 0.035, 0.06, COL.main), [-0.07, -0.04, -0.02]),
+    place(blob(0.04, 0.035, 0.06, COL.main), [0.07, -0.04, -0.02]),
   ]);
   head.add(mesh(merge([skull, upperBeak, crest, crestBase, nostrils, cheeks])));
   rig.eyelids.push(sideEyes(head, { x: 0.075, y: 0.035, z: 0.0, size: 0.04, iris: '#e3a21c', lid: COL.back, yaw: 0.3 }));
@@ -313,7 +341,12 @@ export function buildPtera() {
   foldedPose(pose, 0);
   applyWingPose(rig, pose, pose);
   rig.finalize();
-  for (const w of rig.wings.sides) updateMembrane(w);
+  for (const w of rig.wings.sides) {
+    // finalize() enables shadows on every mesh; the membrane must not shadow itself
+    w.bot.castShadow = false;
+    w.top.receiveShadow = w.bot.receiveShadow = false;
+    updateMembrane(w);
+  }
   return rig;
 }
 

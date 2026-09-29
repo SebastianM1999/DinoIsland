@@ -51,7 +51,7 @@ const SPEC = {
     eye: { t: 0.2, up: 0.44, size: 0.1, yaw: 0.25 },
     nostril: 0.04,
     cheek: { t: 0.2, r: [0.18, 0.2, 0.29], up: 0.2 },
-    horn: { t: 0.19, r: [0.16, 0.1, 0.26], x: 0.8, up: 0.9 },
+    horn: { t: 0.17, r: [0.15, 0.09, 0.24], x: 0.55, up: 0.9 },
     bumps: [{ t: 0.42, r: 0.06, x: 0.85 }, { t: 0.67, r: 0.045, x: 0.82 }],
     stripes: true,
     teeth: { from: 0.96, to: 0.36, upper: 11, lower: 10, front: 4,
