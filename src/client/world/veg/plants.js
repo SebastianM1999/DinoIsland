@@ -1,7 +1,9 @@
-// Small plant models: decorative bush, fern, grass tuft, flower, berry bush
-// and the exotic dragon-fruit plant. Built once, cached.
+// Small plant models: decorative bush, fern, big-leaf plant (elephant ear),
+// dry thorny shrub, grass tuft, flower, berry bush and the exotic dragon-fruit
+// plant. Built once, cached. BUSH_TYPES lists the instanced bush kinds with
+// their wind settings (same format as VEG_TUNING in vegetation.js).
 
-import { THREE, merge, place, paint, tube, blob } from '../../models/kit.js';
+import { THREE, merge, place, paint, tube, blob, spike, smoothNormals } from '../../models/kit.js';
 import { clump, leafStrip, arcPath } from './shapes.js';
 
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
@@ -85,9 +87,9 @@ export function grassGeometry() {
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
     g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
-    g.computeVertexNormals();
-    g.computeBoundingSphere();
-    return g;
+    const out = smoothNormals(g, Math.PI);      // soft, bent blades (no facets)
+    out.computeBoundingSphere();
+    return out;
   });
 }
 
@@ -193,3 +195,79 @@ export function dragonPlantGeometry() {
   });
 }
 
+
+/**
+ * Big tropical leaf plant (elephant ear / banana leaf), ~1.5–2.2 m: long
+ * stalks carrying large smooth heart-shaped leaves that droop at the tip.
+ */
+export function bigLeafGeometry() {
+  return cached('bigleaf', () => {
+    const parts = [];
+    const n = 7;
+    for (let k = 0; k < n; k++) {
+      const a = (k / n) * TAU + Math.sin(k * 2.3) * 0.25;
+      const dx = Math.cos(a), dz = Math.sin(a);
+      const h = 0.9 + 0.45 * ((k * 0.618) % 1);          // stalk height
+      const out = 0.25 + 0.2 * ((k * 0.37) % 1);
+      const top = V(dx * out, h, dz * out);
+      parts.push(tube([V(dx * 0.04, 0, dz * 0.04), V(dx * out * 0.5, h * 0.6, dz * out * 0.5), top], (t) => 0.035 - 0.012 * t, {
+        radial: 5, capStart: false, color: (t) => (t < 0.15 ? '#5a7a2e' : '#6fae3e'),
+      }));
+      // blade: broad heart shape, arching out and down from the stalk top
+      const L = 0.95 + 0.3 * ((k * 0.73) % 1);
+      const path = arcPath(top, dx, dz, L, 0.35, 1.05, 9);
+      const shade = k % 3;
+      parts.push(leafStrip(path, (t) => (t >= 1 ? 0.01 : 0.4 * L * Math.pow(Math.sin(Math.PI * Math.min(1, 0.18 + t * 0.9)), 0.55)), {
+        side: V(-dz, 0, dx), ridge: 0.22, serrate: 0,
+        color: (t, hh) => {
+          if (t < 0.08) return '#7cbf45';
+          const c = shade === 0 ? ['#4fa83e', '#6cc24a'] : shade === 1 ? ['#3f9a44', '#5bb85a'] : ['#5aa83a', '#86cc4c'];
+          return hh ? c[1] : c[0];
+        },
+      }));
+    }
+    parts.push(place(blob(0.14, 0.1, 0.14, '#4d7a2c', { w: 6, h: 4 }), [0, 0.05, 0]));
+    return merge(parts);
+  });
+}
+
+/** Dry thorny volcanic shrub, ~1 m: woody twigs, dull olive/brown leaf tufts, thorns. */
+export function shrubGeometry() {
+  return cached('shrub', () => {
+    const parts = [];
+    const col = { top: '#9a9656', mid: '#7a7a4a', mid2: '#6e6a40', bottom: '#554e34' };
+    const wood = (t) => (t < 0.2 ? '#4a3a2e' : '#6a5440');
+    for (let k = 0; k < 6; k++) {
+      const a = (k / 6) * TAU + Math.sin(k * 1.7) * 0.3;
+      const dx = Math.cos(a), dz = Math.sin(a);
+      const L = 0.55 + 0.25 * ((k * 0.618) % 1);
+      const pts = [V(0, 0, 0), V(dx * L * 0.3, L * 0.55, dz * L * 0.3), V(dx * L * 0.7, L * 0.95, dz * L * 0.7)];
+      parts.push(tube(pts, (t) => 0.035 * (1 - t * 0.7), { radial: 4, capStart: false, color: wood }));
+      const tip = pts[2];
+      if (k % 2 === 0) {
+        parts.push(place(clump(0.26 + 0.06 * Math.sin(k), { seed: 410 + k, ...col, squash: 0.7, rough: 0.3 }), [tip.x, tip.y + 0.05, tip.z]));
+      } else {
+        // bare forked tip with thorns
+        parts.push(place(spike(0.02, 0.28, '#5e4a38', '#8a7a60', 3), [tip.x, tip.y, tip.z], [dz * 0.6, 0, -dx * 0.6]));
+      }
+      for (let j = 0; j < 2; j++) {
+        const q = pts[1].clone().lerp(pts[2], 0.3 + j * 0.4);
+        parts.push(place(spike(0.012, 0.09, '#6a5a44', '#c9b890', 3), [q.x, q.y, q.z], [j ? 1.2 : -1.2, a, 0]));
+      }
+    }
+    parts.push(place(clump(0.34, { seed: 420, ...col, squash: 0.6, rough: 0.3 }), [0.05, 0.62, -0.05]));
+    parts.push(place(clump(0.22, { seed: 421, ...col, top: '#a8864a', squash: 0.7 }), [-0.25, 0.4, 0.2]));
+    return merge(parts);
+  });
+}
+
+/**
+ * Instanced bush kinds for vegetation.js: geometry builder + wind params
+ * ({ strength, pivotY, frequency, heightScale }, as in VEG_TUNING).
+ */
+export const BUSH_TYPES = {
+  bush: { geometry: bushGeometry, wind: { strength: 0.03, pivotY: 0.2, frequency: 1.8, heightScale: 0.6 } },
+  fern: { geometry: fernGeometry, wind: { strength: 0.035, pivotY: 0.05, frequency: 2.0, heightScale: 0.9 } },
+  bigleaf: { geometry: bigLeafGeometry, wind: { strength: 0.022, pivotY: 0.4, frequency: 1.4, heightScale: 0.5 } },
+  shrub: { geometry: shrubGeometry, wind: { strength: 0.018, pivotY: 0.1, frequency: 2.1, heightScale: 0.6 } },
+};

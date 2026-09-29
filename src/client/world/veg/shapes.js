@@ -1,37 +1,44 @@
 // Shared shape + material helpers for vegetation, rocks and fruit plants.
 // Everything builds on the model kit (vertex colors, smooth shading, no textures).
 
-import { THREE, MAT, deform, paint, jitter, windMaterial } from '../../models/kit.js';
+import { THREE, MAT, deform, paint, jitter, windMaterial, smoothNormals } from '../../models/kit.js';
+import { noise3 } from '../../models/props/common.js';
 
 const _col = new THREE.Color();
 
 /**
- * Faceted foliage clump: a jittered, squashed icosahedron with a flattened
+ * Foliage clump: a softly lumped, squashed icosphere with a flattened
  * underside. Color zones: light top, mid sides (two shades), dark underside.
  */
 export function clump(r, {
-  seed = 1, detail = 1, squash = 0.8, rough = 0.2, flatBottom = 0.45,
+  seed = 1, detail = 1, squash = 0.8, rough = 0.2, flatBottom = 0.45, maxDetail = 4,
   top = '#8fd14f', mid = '#6cb83e', mid2 = '#62ad3a', bottom = '#4a8f33',
 } = {}) {
-  let g = new THREE.IcosahedronGeometry(r, Math.max(1, detail) + (r > 1.1 ? 1 : 0));
+  // enough subdivisions that even big canopy masses keep a round silhouette
+  const sub = Math.min(maxDetail, Math.max(detail, r > 2.4 ? 4 : r > 1.0 ? 3 : r > 0.45 ? 2 : 1));
+  let g = new THREE.IcosahedronGeometry(r, sub);
   g = deform(g, (v) => {
-    const ox = jitter(v, r * rough, seed), oy = jitter(v, r * rough, seed + 1), oz = jitter(v, r * rough, seed + 2);
-    v.x += ox; v.y += oy; v.z += oz;
+    // smooth low-frequency lumps: soft leafy bulges, no per-vertex noise
+    const lump = noise3(v.x / r * 1.4 + seed * 1.7, v.y / r * 1.4, v.z / r * 1.4 - seed, seed)
+      + 0.45 * Math.sin((v.x * 2.3 + v.z * 1.7) / r + seed) * Math.cos((v.y * 2.9 - v.x) / r + seed * 0.7);
+    v.multiplyScalar(1 + rough * 1.2 * lump);
     v.y *= squash;
     const fb = -r * squash * flatBottom;
     if (v.y < fb) v.y = fb + (v.y - fb) * 0.3;
   });
+  g = smoothNormals(g, Math.PI);
   const low = new THREE.Color(bottom), lower = new THREE.Color(mid2);
   const upper = new THREE.Color(mid), high = new THREE.Color(top);
   const out = new THREE.Color();
   return paint(g, (v) => {
     const h = Math.max(0, Math.min(1, (v.y / (r * squash) + 1) * 0.5));
     const noise = jitter(v, 0.035, seed + 7);
-    const t = Math.max(0, Math.min(1, h + noise));
+    const blotch = noise3(v.x / r * 2.2, v.y / r * 2.2, v.z / r * 2.2, seed + 13);
+    const t = Math.max(0, Math.min(1, h + noise + blotch * 0.12));
     if (t < 0.32) out.copy(low).lerp(lower, t / 0.32);
     else if (t < 0.67) out.copy(lower).lerp(upper, (t - 0.32) / 0.35);
     else out.copy(upper).lerp(high, (t - 0.67) / 0.33);
-    return out;
+    return out.multiplyScalar(0.96 + 0.08 * blotch);
   });
 }
 
@@ -161,12 +168,16 @@ export function finishInstanced(m) {
 
 /** Soft tint (multiplied onto vertex colors) from a 0..1 hue value. */
 export function foliageTint(hue, out = new THREE.Color()) {
-  // 0 -> slightly blue-green/dark, 0.5 -> neutral, 1 -> warm yellow-green
+  // 0 -> blue-green/dark, 0.5 -> neutral, 1 -> warm yellow-green; a few trees get
+  // a stronger autumn-ish or teal accent so the canopy is never one flat green
   const t = hue;
-  const r = 0.86 + 0.16 * t;
-  const g = 0.93 + 0.07 * Math.sin(t * Math.PI);
-  const b = 0.95 - 0.2 * t;
-  return out.setRGB(Math.min(1, r), Math.min(1, g), Math.max(0.6, b));
+  let r = 0.8 + 0.26 * t;
+  let g = 0.9 + 0.1 * Math.sin(t * Math.PI);
+  let b = 0.98 - 0.3 * t;
+  const accent = (t * 7.31) % 1;
+  if (accent > 0.9) { r *= 1.12; g *= 0.97; b *= 0.8; }         // sunlit yellow-green
+  else if (accent < 0.08) { r *= 0.85; g *= 0.98; b *= 1.1; }  // cool teal
+  return out.setRGB(Math.min(1, r), Math.min(1, g), Math.max(0.55, Math.min(1, b)));
 }
 
 export { THREE };
