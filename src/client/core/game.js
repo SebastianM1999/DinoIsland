@@ -1,10 +1,11 @@
-// Client game shell: owns the renderer, the world view, the local player and
-// the main requestAnimationFrame loop.
+// Client game shell: owns the renderer, the world view, the local player,
+// the connection to the authoritative world, and the main rAF loop.
 
 import * as THREE from 'three';
 import { CONFIG } from '../../shared/config.js';
 import { Terrain } from '../../shared/terrain.js';
 import { buildLayout } from '../../shared/layout.js';
+import { MSG, EV, PF } from '../../shared/protocol.js';
 import { Renderer } from './renderer.js';
 import { Input } from '../input/input.js';
 import { PlayerController } from '../player/controller.js';
@@ -16,10 +17,17 @@ import { buildRocks } from '../world/rocks.js';
 import { buildFruitPlants } from '../world/fruitPlants.js';
 import { buildHut } from '../world/hut.js';
 import { WIND } from '../models/kit.js';
+import { RemotePlayers } from '../entities/remotePlayers.js';
+import { Hud } from '../ui/hud.js';
 
 export class Game {
-  constructor(canvas) {
+  /**
+   * @param {HTMLCanvasElement} canvas
+   * @param {import('../net/net.js').Net} net connected session (welcome received)
+   */
+  constructor(canvas, net) {
     this.canvas = canvas;
+    this.net = net;
     this.terrain = new Terrain();
     this.layout = buildLayout(this.terrain);
     this.gfx = new Renderer(canvas);
@@ -28,10 +36,30 @@ export class Game {
     this.time = 0;
     this.running = false;
     this.debug = false;
+    this.sendTimer = 0;
+    this.pingTimer = 0;
+    this.onLeave = null;
+
+    // Overlay for nameplates and other screen-space labels.
+    this.overlay = document.createElement('div');
+    this.overlay.className = 'world-overlay';
+    document.body.appendChild(this.overlay);
+
+    this.hud = new Hud(document.getElementById('hud'));
+    this.hud.initMinimap(this.terrain, this.layout);
 
     this.#buildWorld();
-    const sp = this.layout.spawnPoints[0];
-    this.player.teleport(sp.x, sp.z, sp.yaw);
+    this.remotes = new RemotePlayers(this.gfx.scene, this.gfx.camera, this.overlay);
+
+    const w = net.welcome;
+    this.me = { id: w.id, slot: w.slot, name: '', hp: CONFIG.player.maxHealth, alive: true, inv: w.inv, deathT: 0 };
+    this.mission = w.world.mission;
+    this.store = w.world.store;
+    this.flags = 0;           // PF flags for animation sync (attack pulse etc.)
+    this.eq = 0;              // selected hotbar slot
+
+    this.#applyWelcome(w);
+    this.#bindNet();
 
     this.clock = new THREE.Clock(false);
     this.loop = this.loop.bind(this);
@@ -68,11 +96,103 @@ export class Game {
     scene.add(this.debugGroup);
   }
 
+  // ------------------------------------------------------------------ network
+
+  #applyWelcome(w) {
+    const world = w.world;
+    for (const p of world.players) {
+      if (p.id === w.id) {
+        this.me.name = p.name;
+        this.player.teleport(p.x, p.z, p.yaw);
+      } else {
+        this.remotes.add(p);
+      }
+    }
+    world.fruit.forEach((ripe, id) => this.fruitPlants.setRipe(id, ripe));
+    this.hud.setPlayer({ name: this.me.name, slot: this.me.slot });
+    this.hud.setMission(this.mission);
+    this.systemsWelcome = world; // later systems (dinos, items) read this on init
+  }
+
+  #bindNet() {
+    const net = this.net;
+    net.on(MSG.SNAP, (m) => {
+      for (const row of m.p) {
+        if (row[0] === this.me.id) {
+          this.me.hp = row[9];
+          continue;
+        }
+        this.remotes.onRow(m.now, row);
+      }
+      this.onSnapshot?.(m);
+    });
+    net.on(MSG.INV, (m) => { this.me.inv = m.inv; });
+    net.on(`ev:${EV.PLAYER_JOIN}`, (m) => this.remotes.add(m.player));
+    net.on(`ev:${EV.PLAYER_LEAVE}`, (m) => this.remotes.remove(m.id));
+    net.on(`ev:${EV.FRUIT}`, (m) => this.fruitPlants.setRipe(m.spot, m.ripe));
+    net.on(`ev:${EV.TOAST}`, (m) => this.hud.toast(m.text, m.icon));
+    net.on(`ev:${EV.MISSION}`, (m) => {
+      this.mission = m.mission;
+      this.hud.setMission(m.mission);
+      this.hud.missionComplete(m.mission.complete, { completedIn: m.mission.completedIn, store: this.store });
+    });
+    net.on(`ev:${EV.STORE}`, (m) => { this.store = m.store; });
+    net.on(`ev:${EV.HURT}`, (m) => {
+      if (m.id === this.me.id) {
+        this.me.hp = m.hp;
+        this.hud.damageFlash(m.dmg);
+        if (m.kx || m.kz) this.player.knock(m.kx, m.kz, m.down ? 5 : 3, m.down ? CONFIG.player.knockdownTime : 0.15);
+      }
+    });
+    net.on(`ev:${EV.DEATH}`, (m) => {
+      if (m.id === this.me.id) {
+        this.me.alive = false;
+        this.me.deathT = CONFIG.player.respawnDelay;
+        this.player.frozen = true;
+      }
+    });
+    net.on(`ev:${EV.RESPAWN}`, (m) => {
+      if (m.id === this.me.id) {
+        this.me.alive = true;
+        this.me.hp = CONFIG.player.maxHealth;
+        this.player.frozen = false;
+        this.player.teleport(m.x, m.z, m.yaw);
+        this.hud.setDeath(false);
+      }
+    });
+    net.onClose = (reason) => {
+      this.stop();
+      this.onLeave?.(reason || 'Disconnected from the server');
+    };
+  }
+
+  #sendState() {
+    const p = this.player;
+    this.net.send({
+      t: MSG.STATE,
+      x: +p.pos.x.toFixed(2), y: +p.pos.y.toFixed(2), z: +p.pos.z.toFixed(2),
+      yaw: +p.yaw.toFixed(3), pitch: +p.pitch.toFixed(3),
+      spd: +p.moveSpeed.toFixed(2),
+      eq: this.eq,
+      fl: this.flags | (p.sprinting ? PF.SPRINT : 0) | (p.onGround ? PF.GROUND : 0) | (p.knockTimer > 0 ? PF.KNOCKED : 0),
+    });
+    this.flags &= ~PF.ATTACK; // one-shot animation pulse
+  }
+
+  // ------------------------------------------------------------------ loop
+
   start() {
     this.running = true;
     this.input.enabled = true;
+    this.hud.show(true);
     this.clock.start();
     requestAnimationFrame(this.loop);
+  }
+
+  stop() {
+    this.running = false;
+    this.input.enabled = false;
+    this.input.exitLock();
   }
 
   loop() {
@@ -88,45 +208,101 @@ export class Game {
   update(dt) {
     const input = this.input;
     const p = this.player;
-    if (input.locked) {
-      const m = input.takeMouse();
-      p.look(m.x, m.y);
-    } else {
-      input.takeMouse();
-    }
+    const mouse = input.takeMouse();
+    if (input.locked && !this.hud.isPanelOpen()) p.look(mouse.x, mouse.y);
+
     if (input.wasPressed('debug')) {
       this.debug = !this.debug;
       this.debugGroup.visible = this.debug;
     }
+    if (input.wasPressed('inventory')) this.hud.toggleInventory();
+    if (input.wasPressed('map')) this.hud.toggleMap();
+
+    const canMove = this.me.alive;
     p.update(dt, {
-      forward: input.isHeld('forward'),
-      back: input.isHeld('back'),
-      left: input.isHeld('left'),
-      right: input.isHeld('right'),
-      jump: input.isHeld('jump'),
-      sprint: input.isHeld('sprint'),
+      forward: canMove && input.isHeld('forward'),
+      back: canMove && input.isHeld('back'),
+      left: canMove && input.isHeld('left'),
+      right: canMove && input.isHeld('right'),
+      jump: canMove && input.isHeld('jump'),
+      sprint: canMove && input.isHeld('sprint'),
     });
+    this.beforeCamera?.(dt);
     this.#updateCamera(dt);
+
+    // network
+    this.sendTimer -= dt;
+    if (this.sendTimer <= 0) {
+      this.sendTimer = 1 / CONFIG.net.clientSendRate;
+      this.#sendState();
+    }
+    this.pingTimer -= dt;
+    if (this.pingTimer <= 0) {
+      this.pingTimer = 2;
+      this.net.send({ t: MSG.PING, c: performance.now() / 1000 });
+    }
+
+    const renderTime = this.net.serverNow() - CONFIG.net.interpDelay;
+    this.remotes.update(dt, renderTime);
+
     WIND.uTime.value = this.time;
     const cam = this.gfx.camera.position;
     for (const u of this.worldUpdaters) u.update?.(dt, this.time, cam);
+    this.afterUpdate?.(dt, renderTime);
+    this.#updateHud(dt);
+  }
+
+  #updateHud(dt) {
+    const hud = this.hud;
+    const p = this.player;
+    hud.setHealth(this.me.hp, CONFIG.player.maxHealth);
+    hud.setStamina(p.stamina, CONFIG.player.maxStamina);
+    hud.setCompass(p.yaw, this.compassMarkers());
+    const team = [{ id: this.me.id, name: this.me.name, slot: this.me.slot, hp: this.me.hp, alive: this.me.alive, isYou: true }];
+    for (const rp of this.remotes.map.values()) team.push({ id: rp.id, name: rp.name, slot: rp.slot, hp: rp.hp, alive: rp.alive, isYou: false });
+    team.sort((a, b) => a.slot - b.slot);
+    hud.setTeam(team);
+    hud.setMinimap({
+      x: p.pos.x, z: p.pos.z, yaw: p.yaw,
+      players: [...this.remotes.map.values()].map((rp) => ({ x: rp.pos.x, z: rp.pos.z, yaw: rp.yaw, color: CONFIG.playerColors[rp.slot % 4] })),
+      hut: { x: this.layout.hut.x, z: this.layout.hut.z },
+      markers: this.minimapMarkers?.() || [],
+    });
+    if (!this.me.alive) {
+      this.me.deathT = Math.max(0, this.me.deathT - dt);
+      hud.setDeath(true, Math.ceil(this.me.deathT));
+    }
+  }
+
+  /** Compass markers: the hut and teammates. */
+  compassMarkers() {
+    const p = this.player.pos;
+    const bearing = (x, z) => Math.atan2(-(x - p.x), -(z - p.z));
+    const list = [{ bearing: bearing(this.layout.hut.x, this.layout.hut.z), kind: 'hut' }];
+    for (const rp of this.remotes.map.values()) {
+      list.push({ bearing: bearing(rp.pos.x, rp.pos.z), kind: 'player', color: CONFIG.playerColors[rp.slot % 4] });
+    }
+    if (this.extraCompassMarkers) list.push(...this.extraCompassMarkers(bearing));
+    return list;
   }
 
   #updateCamera(dt) {
     const p = this.player;
     const cam = this.gfx.camera;
-    // Head bob scaled by speed; a small dip on landing.
+    // Head bob scaled by speed; a small dip on landing; lying down when dead.
     const bobAmt = p.onGround ? Math.min(1, p.moveSpeed / CONFIG.player.sprintSpeed) : 0;
     const phase = p.distance * (p.sprinting ? 1.25 : 1.6);
     const bobY = Math.abs(Math.sin(phase)) * 0.07 * bobAmt;
     const bobX = Math.cos(phase) * 0.035 * bobAmt;
     p.landImpact = Math.max(0, p.landImpact - dt * 3);
+    const deadDrop = this.me.alive ? 0 : 1.2;
     cam.position.set(
       p.pos.x + Math.cos(p.yaw) * bobX,
-      p.pos.y + CONFIG.player.eyeHeight + bobY - p.landImpact * 0.25,
+      p.pos.y + CONFIG.player.eyeHeight + bobY - p.landImpact * 0.25 - deadDrop,
       p.pos.z - Math.sin(p.yaw) * bobX,
     );
-    cam.rotation.set(p.pitch, p.yaw, 0, 'YXZ');
+    const roll = this.me.alive ? (p.knockTimer > 0 ? Math.sin(this.time * 20) * 0.05 : 0) : 0.5;
+    cam.rotation.set(p.pitch, p.yaw, roll, 'YXZ');
     const targetFov = CONFIG.player.fov + (p.sprinting ? 6 : 0);
     cam.fov += (targetFov - cam.fov) * Math.min(1, dt * 6);
     cam.updateProjectionMatrix();

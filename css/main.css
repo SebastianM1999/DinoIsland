@@ -200,3 +200,43 @@ html, body {
 @media (prefers-reduced-motion: reduce) {
   .btn { transition: none; }
 }
+
+/* Screen-space labels above co-op players */
+.world-overlay {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 5;
+}
+.nameplate {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: grid;
+  justify-items: center;
+  gap: 3px;
+  padding: 3px 10px 5px;
+  border-radius: 8px;
+  background: rgba(var(--navy-rgb), 0.78);
+  border-bottom: 3px solid var(--c, #fff);
+  font-weight: 700;
+  font-size: 15px;
+  line-height: 1;
+  white-space: nowrap;
+  will-change: transform;
+}
+.nameplate .np-hp {
+  width: 56px;
+  height: 5px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.2);
+  overflow: hidden;
+}
+.nameplate .np-hp i {
+  display: block;
+  height: 100%;
+  background: var(--red);
+}
+.nameplate.dead { opacity: 0.55; }
+.nameplate.dead .np-name::before { content: '✖ '; }
