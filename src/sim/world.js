@@ -86,6 +86,7 @@ export class ServerWorld {
       lastMoveAt: this.now,
       moveBudget: 3.5,
       knockBudgetUntil: 0,
+      creative: false,       // invincible, may fly (toggled by the player)
       nextMeleeAt: 0,
       nextFireAt: 0,
     };
@@ -167,7 +168,7 @@ export class ServerWorld {
   }
 
   hurtPlayer(p, dmg, { kx = 0, kz = 0, down = 0, src = null, from = null } = {}) {
-    if (!p.alive || dmg <= 0) return;
+    if (!p.alive || dmg <= 0 || p.creative) return;
     p.hp = Math.max(0, p.hp - dmg);
     if (p.eating) p.eating = null;   // getting hit interrupts eating
     // A dinosaur's knockback can briefly exceed normal sprint speed.
@@ -228,8 +229,9 @@ export class ServerWorld {
     const y = num(m.y, p.y);
     // A small distance reserve accommodates packet bunching without allowing
     // repeated state packets to move faster than the player's sprint.
-    p.moveBudget = Math.min(this.now < p.knockBudgetUntil ? 7 : 3.5,
-      p.moveBudget + Math.max(0, this.now - p.lastMoveAt) * 11);
+    const creative = p.creative;
+    p.moveBudget = Math.min(creative ? 10 : this.now < p.knockBudgetUntil ? 7 : 3.5,
+      p.moveBudget + Math.max(0, this.now - p.lastMoveAt) * (creative ? P.creative.flySpeed + 4 : 11));
     p.lastMoveAt = this.now;
     const distance = Math.hypot(x - p.x, z - p.z);
     const lim = CONFIG.world.size / 2 - 5;
@@ -237,8 +239,8 @@ export class ServerWorld {
     resolveCircle(x, z, P.radius, this.layout.playerColliders, collisionResult, y + 0.05, y + P.height);
     const blocked = Math.hypot(collisionResult.x - x, collisionResult.z - z) > 0.6;
     if (distance > p.moveBudget + 0.05 || Math.abs(x) > lim || Math.abs(z) > lim ||
-        !Number.isFinite(ground) || y < ground - 2 || y > ground + 20 ||
-        this.terrain.waterDepthAt(x, z) > CONFIG.world.maxWadeDepth + 0.2 || blocked) {
+        !Number.isFinite(ground) || y < ground - 2 || y > ground + (creative ? P.creative.maxHeight + 5 : 20) ||
+        (!creative && this.terrain.waterDepthAt(x, z) > CONFIG.world.maxWadeDepth + 0.2) || blocked) {
       this.send(p.id, { t: MSG.CORRECT, x: r2(p.x), y: r2(p.y), z: r2(p.z) });
       return;
     }
@@ -270,6 +272,14 @@ export class ServerWorld {
   onAct(p, m) {
     const inv = p.inv;
     switch (m.a) {
+      case ACT.CREATIVE: {
+        const on = !!m.on;
+        if (on === !!p.creative) return;
+        p.creative = on;
+        if (on && p.alive) p.hp = P.maxHealth;
+        this.toast(`${p.name} ${on ? 'switched to' : 'left'} creative mode`, 'bolt');
+        return;
+      }
       case ACT.SPOT: {
         if (!p.alive || !Number.isSafeInteger(m.dino) || this.spottedDinos.has(m.dino)) return;
         const d = this.dinos.get(m.dino);

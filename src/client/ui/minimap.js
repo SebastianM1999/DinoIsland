@@ -92,7 +92,7 @@ export function buildMapBase(terrain, layout, res = 640) {
     for (const r of layout.rocks) {
       if (r.scale < 1.6) continue;
       ctx.beginPath();
-      ctx.arc((r.x + half) / mpp, (r.z + half) / mpp, Math.max(1.2, r.scale * 0.9 / mpp), 0, TAU);
+      ctx.arc((r.x + half) / mpp, (r.z + half) / mpp, Math.max(1.2, r.R * 0.8 / mpp), 0, TAU);
       ctx.fill();
     }
   }

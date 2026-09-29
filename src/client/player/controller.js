@@ -11,19 +11,20 @@ const P = CONFIG.player;
 const tmp = { x: 0, z: 0, hit: false };
 /** Rock sides steeper than this (tan) can't be walked up once they are higher than a step. */
 const ROCK_WALK_SLOPE = 0.45;
+const C = P.creative;
 
 export class PlayerController {
   /**
    * @param {import('../../shared/terrain.js').Terrain} terrain
    * @param {{circles:Array, boxes:Array}} colliders
-   * @param {(x:number, z:number) => number} [rockHeightAt] top of a rock at (x, z) or -Infinity
+   * @param {(x:number, z:number) => {h:number, slope:number}} [rockSurfaceAt] rock top at (x, z) (h = -Infinity: none)
    */
-  constructor(terrain, colliders, rockHeightAt = () => -Infinity) {
+  constructor(terrain, colliders, rockSurfaceAt = () => ({ h: -Infinity, slope: 0, ledge: -Infinity })) {
     this.terrain = terrain;
     this.colliders = colliders;
-    this.rockHeightAt = rockHeightAt;
+    this.rockSurfaceAt = rockSurfaceAt;
     // rocks are ground: stand on them, jump over them
-    this.groundAt = (x, z) => Math.max(terrain.heightAt(x, z), rockHeightAt(x, z));
+    this.groundAt = (x, z) => Math.max(terrain.heightAt(x, z), rockSurfaceAt(x, z).h);
     this.pos = { x: 0, y: 0, z: 0 };   // feet position
     this.vel = { x: 0, y: 0, z: 0 };
     this.yaw = 0;                       // 0 = looking north (-z)
@@ -39,6 +40,16 @@ export class PlayerController {
     this.distance = 0;                  // distance walked, for footsteps/head bob
     this.landImpact = 0;
     this.inWater = 0;
+    this.creative = false;              // invincible (server) + may fly
+    this.flying = false;
+    this.clock = 0;
+    this.lastJumpTap = -Infinity;
+    this.prevJump = false;
+  }
+
+  setCreative(on) {
+    this.creative = on;
+    if (!on) this.flying = false;
   }
 
   teleport(x, z, yaw = 0) {
@@ -49,6 +60,7 @@ export class PlayerController {
     this.yaw = yaw;
     this.pitch = 0;
     this.onGround = true;
+    this.flying = false;
     this.stamina = P.maxStamina;
   }
 
@@ -79,6 +91,21 @@ export class PlayerController {
     if (this.knockTimer > 0) this.knockTimer -= dt;
     const controllable = !this.frozen && this.knockTimer <= 0;
 
+    // --- creative: double-tap Space toggles flying
+    this.clock += dt;
+    const jumpTap = !!intent.jump && !this.prevJump;
+    this.prevJump = !!intent.jump;
+    if (this.creative && controllable && jumpTap) {
+      if (this.clock - this.lastJumpTap < C.doubleTap) {
+        this.flying = !this.flying;
+        this.lastJumpTap = -Infinity;
+        if (this.flying) { this.onGround = false; this.vel.y = Math.max(this.vel.y, 0); }
+      } else {
+        this.lastJumpTap = this.clock;
+      }
+    }
+    const flying = this.flying && controllable;
+
     // --- desired horizontal velocity
     let ix = 0, iz = 0;
     if (controllable) {
@@ -89,7 +116,7 @@ export class PlayerController {
     }
     const ilen = Math.hypot(ix, iz);
     const moving = ilen > 0.01;
-    const wantsSprint = controllable && intent.sprint && intent.forward && moving;
+    const wantsSprint = controllable && !flying && intent.sprint && intent.forward && moving;
     this.sprinting = wantsSprint && this.stamina > 1 && this.onGround ? true : this.sprinting && wantsSprint && this.stamina > 1;
 
     if (this.sprinting) {
@@ -100,12 +127,12 @@ export class PlayerController {
     } else {
       this.stamina += P.staminaRegen * dt;
     }
-    this.stamina = Math.max(0, Math.min(P.maxStamina, this.stamina));
+    this.stamina = this.creative ? P.maxStamina : Math.max(0, Math.min(P.maxStamina, this.stamina));
 
     const depth = t.waterDepthAt(this.pos.x, this.pos.z);
     this.inWater = depth;
     const waterSlow = depth > 0.2 ? Math.max(0.55, 1 - depth * 0.35) : 1;
-    let speed = (this.sprinting ? P.sprintSpeed : P.walkSpeed) * this.speedFactor * waterSlow;
+    let speed = flying ? C.flySpeed : (this.sprinting ? P.sprintSpeed : P.walkSpeed) * this.speedFactor * waterSlow;
 
     let wx = 0, wz = 0;
     if (moving) {
@@ -116,11 +143,11 @@ export class PlayerController {
       wz = (-nx * sin + nz * cos) * speed;
     }
 
-    const accel = (this.onGround ? P.accel : P.accel * P.airControl) * dt;
+    const accel = (this.onGround || flying ? P.accel : P.accel * P.airControl) * dt;
     if (controllable || !this.onGround) {
       const ax = wx - this.vel.x, az = wz - this.vel.z;
       const al = Math.hypot(ax, az);
-      if (this.onGround || moving) {
+      if (this.onGround || flying || moving) {
         const k = al > accel ? accel / al : 1;
         this.vel.x += ax * k;
         this.vel.z += az * k;
@@ -133,15 +160,21 @@ export class PlayerController {
     }
 
     // --- jump
-    if (controllable && intent.jump && this.onGround && this.stamina > P.jumpStaminaCost) {
+    if (controllable && !flying && intent.jump && this.onGround && this.stamina > P.jumpStaminaCost) {
       this.vel.y = P.jumpSpeed * (depth > 0.8 ? 0.6 : 1);
       this.onGround = false;
       this.stamina -= P.jumpStaminaCost;
       this.staminaDelay = P.staminaRegenDelay;
     }
 
-    // --- gravity
-    this.vel.y -= P.gravity * dt;
+    // --- gravity (flying: Space up, Shift down, otherwise hover)
+    if (flying) {
+      const want = ((intent.jump ? 1 : 0) - (intent.sprint ? 1 : 0)) * C.flyVertical;
+      const dv = want - this.vel.y, max = P.accel * dt;
+      this.vel.y += Math.max(-max, Math.min(max, dv));
+    } else {
+      this.vel.y -= P.gravity * dt;
+    }
 
     // --- horizontal move with slope + water limits (axis separated so we slide)
     const oldX = this.pos.x, oldZ = this.pos.z;
@@ -166,6 +199,12 @@ export class PlayerController {
     // --- vertical
     this.pos.y += this.vel.y * dt;
     const ground = this.groundAt(this.pos.x, this.pos.z);
+    if (this.flying) {
+      this.pos.y = Math.min(this.pos.y, ground + C.maxHeight);
+      // touching the ground ends the flight
+      if (this.pos.y <= ground && this.vel.y <= 0) this.flying = false;
+      else if (this.pos.y > ground) { this.onGround = false; return; }
+    }
     // swimming-ish: water holds you up a little in deep spots
     if (this.pos.y <= ground) {
       if (!this.onGround && this.vel.y < -6) this.landImpact = Math.min(1, -this.vel.y / 16);
@@ -194,15 +233,16 @@ export class PlayerController {
       if (slope > P.maxWalkSlope && rise > 0.05) return;
       if (rise > P.stepHeight) return;
     }
-    // rocks: step onto low ones; higher up only their flat tops are walkable, the sides need a jump
-    const gRock = this.rockHeightAt(nx, nz);
-    const riseRock = gRock - base;
+    // rocks: step up to a step's height (ledges, low stones); higher up only flat
+    // ground is walkable – steep rock sides and tall ledges need a jump
+    const rock = this.rockSurfaceAt(nx, nz);
+    const riseRock = rock.ledge - base;
     if (riseRock > 0.02) {
       if (riseRock > P.stepHeight) return;
-      if (gRock - gTerrain > P.stepHeight && riseRock / Math.hypot(dx, dz) > ROCK_WALK_SLOPE) return;
+      if (rock.h - gTerrain > P.stepHeight && rock.slope > ROCK_WALK_SLOPE) return;
     }
     // do not walk out into deep water
-    if (t.waterDepthAt(nx, nz) > CONFIG.world.maxWadeDepth && t.waterDepthAt(nx, nz) > t.waterDepthAt(this.pos.x, this.pos.z)) return;
+    if (!this.creative && t.waterDepthAt(nx, nz) > CONFIG.world.maxWadeDepth && t.waterDepthAt(nx, nz) > t.waterDepthAt(this.pos.x, this.pos.z)) return;
     this.pos.x = nx;
     this.pos.z = nz;
   }

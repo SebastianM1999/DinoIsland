@@ -6,7 +6,7 @@ import { CONFIG } from './config.js';
 import { FEATURES } from './terrain.js';
 import { makeRng, fbm, smoothstep } from './rng.js';
 import { treeColliders } from './treeShapes.js';
-import { placeRock, rockHeightAt, PEBBLE_SCALE } from './rockShapes.js';
+import { placeRock, rockSurfaceAt, PEBBLE_SCALE } from './rockShapes.js';
 
 const TAU = Math.PI * 2;
 
@@ -176,6 +176,7 @@ export function buildLayout(terrain) {
     const y = terrain.heightAt(x, z);
     const rock = { id: rockId++, x, z, y, scale, rot: r() * TAU, sx: r.range(0.8, 1.4), sz: r.range(0.8, 1.3), variant: flags.variant ?? r.int(0, 2), mossy: flags.mossy ?? r() < 0.6 };
     if (flags.sy) rock.sy = flags.sy;   // extra height (boulders)
+    if (flags.sink) rock.sink = flags.sink;
     layout.rocks.push(placeRock(rock, terrain));
     occupied.push({ x, z, r: scale * 1.4 });
     // Players walk on rocks (see groundAt); dinosaurs can't climb, so for them a rock is a low post.
@@ -349,9 +350,78 @@ export function buildLayout(terrain) {
       }
     }
 
+    // T-Rex patrol lines stay open (formations are wide).
+    const patrolDist = (x, z) => {
+      let best = Infinity;
+      const P = layout.trexPatrol;
+      for (let i = 0; i < P.length; i++) {
+        const a = P[i], b = P[(i + 1) % P.length];
+        const vx = b.x - a.x, vz = b.z - a.z;
+        const t = Math.max(0, Math.min(1, ((x - a.x) * vx + (z - a.z) * vz) / (vx * vx + vz * vz)));
+        best = Math.min(best, Math.hypot(a.x + vx * t - x, a.z + vz * t - z));
+      }
+      return best;
+    };
+    const rf = makeRng(S ^ 0x5eb5);
+    // How much the ground rises and falls under a footprint of radius R.
+    const unevenness = (x, z, R) => {
+      let lo = Infinity, hi = -Infinity;
+      for (let k = 0; k < 12; k++) {
+        const a = (k / 12) * TAU;
+        for (const f of [0.5, 1]) {
+          const h = terrain.heightAt(x + Math.cos(a) * R * f, z + Math.sin(a) * R * f);
+          lo = Math.min(lo, h); hi = Math.max(hi, h);
+        }
+      }
+      return hi - lo;
+    };
+
+    // Rock formations: wide, five ledges high – climb them ledge by ledge.
+    let formations = 0;
+    for (let i = 0; i < 12000 && formations < 16; i++) {
+      const x = rf.range(-175, 175), z = rf.range(-175, 175);
+      const s = rf.range(4.5, 7.5);
+      const R = s * 1.2;
+      if (!dry(x, z, 1.8) || nearHut(x, z, R + 10) || distToPath(x, z) < R + 3 || patrolDist(x, z) < R + 5) continue;
+      if (lakeDist(x, z) < FEATURES.lake.radius + R + 4 || meadow(x, z, R) || terrain.slopeAt(x, z) > 0.3) continue;
+      if (unevenness(x, z, R) > 1.2 || !free(x, z, R) || !clear(x, z, R + 2)) continue;
+      // ledges about 0.6-1 m apart: each one is a jump (top ≈ 3.5-4.5 m)
+      addRock(x, z, s, { variant: 4, mossy: rf() < 0.85, sy: rf.range(3.4, 4.2) / s, sink: 0.5 }, rf);
+      formations++;
+      // loose boulders at the foot
+      for (let k = rf.int(2, 4); k > 0; k--) {
+        const a = rf() * TAU, d = R * rf.range(1.05, 1.35);
+        const cx = x + Math.cos(a) * d, cz = z + Math.sin(a) * d, cs = rf.range(0.6, 1.5);
+        if (dry(cx, cz, 1) && distToPath(cx, cz) > 2.5 && free(cx, cz, cs * 1.1) && clear(cx, cz, cs)) addRock(cx, cz, cs, {}, rf);
+      }
+    }
+
+    // Stepped rocks: three ledges, low enough to hop up.
+    let stepped = 0;
+    for (let i = 0; i < 12000 && stepped < 80; i++) {
+      const x = rf.range(-185, 185), z = rf.range(-185, 185);
+      const s = rf.range(1.4, 2.8);
+      if (!dry(x, z, 1.2) || nearHut(x, z, 8) || distToPath(x, z) < s * 1.3 + 2 || patrolDist(x, z) < s + 3) continue;
+      if (lakeDist(x, z) < FEATURES.lake.radius + 5 || meadow(x, z, s) || terrain.slopeAt(x, z) > 0.6) continue;
+      if (unevenness(x, z, s) > 0.9 || !free(x, z, s * 1.2) || !clear(x, z, s * 1.2)) continue;
+      addRock(x, z, s, { variant: 3, mossy: rf() < 0.7, sy: rf.range(0.9, 1.3) }, rf);
+      stepped++;
+    }
+
+    // More mid-sized rocks (knee to waist high) scattered over the island.
+    let mid = 0;
+    for (let i = 0; i < 12000 && mid < 220; i++) {
+      const x = rf.range(-190, 190), z = rf.range(-190, 190);
+      const s = rf.range(0.55, 1.5);
+      if (!dry(x, z, 0.8) || nearHut(x, z, 3) || distToPath(x, z) < s + 1.5 || terrain.slopeAt(x, z) > 0.9) continue;
+      if (!free(x, z, s * 1.1) || !clear(x, z, s)) continue;
+      addRock(x, z, s, { mossy: terrain.heightAt(x, z) > 2.4 && rf() < 0.6 }, rf);
+      mid++;
+    }
+
     // Little rocks: scattered pebbles and small clusters on land and in shallow water (walkable).
     let small = 0;
-    for (let i = 0; i < 14000 && small < 520; i++) {
+    for (let i = 0; i < 26000 && small < 1100; i++) {
       const x = rr.range(-195, 195), z = rr.range(-195, 195);
       const h = terrain.heightAt(x, z);
       if (h < -0.2 || nearHut(x, z, -2) || distToPath(x, z) < 1.2 || terrain.waterDepthAt(x, z) > 0.3) continue;
@@ -381,12 +451,17 @@ export function buildLayout(terrain) {
       }
     }
   }
-  /** Top of rock at (x, z), or -Infinity. */
-  layout.rockHeightAt = (x, z) => {
-    let h = -Infinity;
-    for (const rock of rockGrid.get(Math.floor(x / CELL) * 4096 + Math.floor(z / CELL)) || []) h = Math.max(h, rockHeightAt(rock, x, z));
-    return h;
+  /** Highest rock surface at (x, z): { h (or -Infinity), slope, ledge } (see rockSurfaceAt). */
+  layout.rockSurfaceAt = (x, z) => {
+    const best = { h: -Infinity, slope: 0, ledge: -Infinity };
+    for (const rock of rockGrid.get(Math.floor(x / CELL) * 4096 + Math.floor(z / CELL)) || []) {
+      const s = rockSurfaceAt(rock, x, z);
+      if (s.h > best.h) { best.h = s.h; best.slope = s.slope; best.ledge = s.ledge; }
+    }
+    return best;
   };
+  /** Top of rock at (x, z), or -Infinity. */
+  layout.rockHeightAt = (x, z) => layout.rockSurfaceAt(x, z).h;
   /** Ground a player stands on: terrain or the top of a rock. */
   layout.groundAt = (x, z) => Math.max(terrain.heightAt(x, z), layout.rockHeightAt(x, z));
   // Players collide with everything except rocks (those are ground, see above).

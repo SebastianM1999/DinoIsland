@@ -32,6 +32,7 @@ function setPaused(show) {
   if (show && paused.hidden) {
     renderPause(game);
     resetLeave();
+    syncCreative();
   }
   paused.hidden = !show;
   if (!show) settingsUi.close();
@@ -110,6 +111,18 @@ function resetLeave() {
   delete leaveBtn.dataset.confirm;
   leaveBtn.lastElementChild.textContent = 'Leave game';
 }
+// Creative mode toggle (invincible + flying); the label shows the current state.
+const creativeBtn = $('btn-creative');
+function syncCreative() {
+  const on = !!game?.player.creative;
+  creativeBtn.setAttribute('aria-pressed', String(on));
+  creativeBtn.lastElementChild.textContent = `Creative mode: ${on ? 'On' : 'Off'}`;
+}
+creativeBtn.addEventListener('click', () => {
+  if (!game) return;
+  game.setCreative(!game.player.creative);
+  syncCreative();
+});
 leaveBtn.addEventListener('click', () => {
   if (!leaveBtn.dataset.confirm) {
     leaveBtn.dataset.confirm = '1';

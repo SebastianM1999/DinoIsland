@@ -43,6 +43,13 @@ export const CONFIG = {
     staminaRegen: 18,
     staminaRegenDelay: 0.8,
     jumpStaminaCost: 8,
+    // Creative mode: invincible, endless stamina, double-tap Space to fly.
+    creative: {
+      flySpeed: 14,          // horizontal m/s while flying
+      flyVertical: 9,        // m/s up (Space) / down (Shift)
+      doubleTap: 0.3,        // max seconds between the two Space presses
+      maxHeight: 120,        // above the ground
+    },
     mouseSensitivity: 0.0022,
     fov: 74,
     respawnDelay: 5,

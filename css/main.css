@@ -168,6 +168,7 @@ input[type="text"], input:not([type]) {
 .btn-primary { background: #7ccb45; color: #17301a; box-shadow: 0 4px 0 #4a8a24; }
 .btn-primary:active { box-shadow: 0 2px 0 #4a8a24; }
 .btn:disabled { opacity: 0.55; cursor: default; }
+.btn[aria-pressed="true"] { background: #ffc933; color: #3a2a06; box-shadow: 0 4px 0 #c98f12; }
 
 
 .lobby-status { min-height: 1.4em; margin: 8px 0 0; color: var(--cream); font-size: 0.95rem; }

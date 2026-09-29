@@ -5,7 +5,7 @@ import * as THREE from 'three';
 import { CONFIG } from '../../shared/config.js';
 import { Terrain } from '../../shared/terrain.js';
 import { buildLayout } from '../../shared/layout.js';
-import { MSG, EV, PF, DS } from '../../shared/protocol.js';
+import { MSG, EV, PF, DS, ACT } from '../../shared/protocol.js';
 import { CONTRACTS } from '../../shared/missions.js';
 import { Renderer } from './renderer.js';
 import { Input } from '../input/input.js';
@@ -40,7 +40,7 @@ export class Game {
     this.layout = buildLayout(this.terrain);
     this.gfx = new Renderer(canvas);
     this.input = new Input(canvas);
-    this.player = new PlayerController(this.terrain, this.layout.playerColliders, this.layout.rockHeightAt);
+    this.player = new PlayerController(this.terrain, this.layout.playerColliders, this.layout.rockSurfaceAt);
     this.time = 0;
     this.running = false;
     this.debug = false;
@@ -309,6 +309,13 @@ export class Game {
     this.input.endFrame();
   }
 
+  /** Creative mode: invincible (server-side) and double-tap Space to fly. */
+  setCreative(on) {
+    this.player.setCreative(on);
+    this.net.act(ACT.CREATIVE, { on });
+    this.hud.toast(on ? 'Creative mode on – double-tap Space to fly' : 'Creative mode off', 'bolt');
+  }
+
   update(dt) {
     const input = this.input;
     const p = this.player;
@@ -318,6 +325,10 @@ export class Game {
     this.lastMouse = looking ? mouse : { x: 0, y: 0 };
     this.lastWheel = looking ? mouse.wheel : 0;
 
+    if (p.flying !== this.wasFlying) {
+      this.wasFlying = p.flying;
+      this.hud.toast(p.flying ? 'Flying – Space up, Shift down' : 'Landed', 'bolt');
+    }
     if (input.wasPressed('debug')) {
       this.debug = !this.debug;
       this.debugGroup.visible = this.debug;

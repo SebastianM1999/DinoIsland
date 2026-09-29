@@ -7,7 +7,7 @@ import { makeRng, hash2 } from '../../shared/rng.js';
 import { MAT, deform, paint, place, merge, jitter } from '../models/kit.js';
 import { treeGeometry, treeMatrix, TREE_WIND } from './veg/trees.js';
 import { clump, windPair, LEAF_MAT, instanced, finishInstanced, foliageTint } from './veg/shapes.js';
-import { ROCK_VARIANTS } from '../../shared/rockShapes.js';
+import { rockTable } from '../../shared/rockShapes.js';
 
 const TAU = Math.PI * 2;
 const ROCK_COLS = ['#9c93a8', '#8f86a0', '#a79c9a', '#958ba3'];
@@ -17,24 +17,42 @@ const MOSS = ['#7cc34a', '#69b53f'];
 const CLIFF = { rock: '#9c8fa3', rockDark: '#7f7390', rockWarm: '#a88f86', top: '#86c650', top2: '#79bb48', wet: '#6c6480' };
 
 const rockCache = new Map();
-/** Rock geometry: 0 = rounded boulder, 1 = chunky block, 2 = flat slab. Radius ≈1.1. */
+/**
+ * Rock geometry built from the shared ring table (see shared/rockShapes.js), so
+ * the walkable surface matches the mesh exactly. 0 = rounded boulder,
+ * 1 = chunky block, 2 = flat slab, 3 = stepped rock, 4 = rock formation.
+ */
 export function rockGeo(variant, mossy) {
   const key = `${variant}:${mossy ? 1 : 0}`;
   let g = rockCache.get(key);
   if (g) return g;
   const seed = 11 + variant * 7;
-  const { squash, topCut, stretch, base: size } = ROCK_VARIANTS[variant];
-  const base = variant === 1 ? new THREE.DodecahedronGeometry(size, 0) : new THREE.IcosahedronGeometry(size, 1);
-  g = deform(base, (v) => {
-    v.x += jitter(v, 0.2, seed);
-    v.y += jitter(v, 0.16, seed + 1);
-    v.z += jitter(v, 0.2, seed + 2);
-    v.x *= stretch;
-    v.z *= 2 - stretch;
-    v.y *= squash;
-    if (v.y > topCut) v.y = topCut + (v.y - topCut) * 0.2;          // flat-ish top
-    if (v.y < -0.2) v.y = -0.2 + (v.y + 0.2) * 0.2;                 // flat bottom sinks in
-  });
+  const t = rockTable(variant);
+  const P = (k, j) => {
+    const a = (j / t.sides) * TAU;
+    return [t.rad[k][j] * Math.cos(a), t.h[k][j], t.rad[k][j] * Math.sin(a)];
+  };
+  const pos = [];
+  const tri = (a, b, c) => {
+    // wind every face outward/upward
+    const ux = b[0] - a[0], uy = b[1] - a[1], uz = b[2] - a[2];
+    const vx = c[0] - a[0], vy = c[1] - a[1], vz = c[2] - a[2];
+    const nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
+    const mx = (a[0] + b[0] + c[0]) / 3, mz = (a[2] + b[2] + c[2]) / 3;
+    const flip = nx * mx + ny * (0.5 * Math.hypot(mx, mz) + 0.05) + nz * mz < 0;
+    pos.push(...a, ...(flip ? c : b), ...(flip ? b : c));
+  };
+  for (let k = 0; k < t.rad.length - 1; k++) {
+    for (let j = 0; j < t.sides; j++) {
+      const j1 = (j + 1) % t.sides;
+      const a = P(k, j), b = P(k, j1), c = P(k + 1, j1), d = P(k + 1, j);
+      if (k > 0) tri(a, b, c);
+      tri(a, c, d);
+    }
+  }
+  g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.computeVertexNormals();
   g = paint(g, (c, n) => {
     if (mossy && n.y > 0.72) return jitter(c, 1, seed + 4) > 0 ? MOSS[0] : MOSS[1];
     if (mossy && n.y > 0.5 && jitter(c, 1, seed + 6) > 0.1) return '#8db552';

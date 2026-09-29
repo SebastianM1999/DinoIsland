@@ -14,6 +14,7 @@ export const ICON_SPRITE = `
   <symbol id="i-keys" viewBox="0 0 24 24"><path fill="currentColor" d="M4 6h16a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2zm1 3v2h2V9zm4 0v2h2V9zm4 0v2h2V9zm4 0v2h2V9zM7 13v2h10v-2z"/></symbol>
   <symbol id="i-door" viewBox="0 0 24 24"><path fill="currentColor" d="M5 3h9a2 2 0 0 1 2 2v3h-2V5H5v14h9v-3h2v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2zm12.6 5.4L21.2 12l-3.6 3.6-1.4-1.4 1.2-1.2H9v-2h8.4l-1.2-1.2z"/></symbol>
   <symbol id="i-close" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" d="M6 6l12 12M18 6L6 18"/></symbol>
+  <symbol id="i-wing" viewBox="0 0 24 24"><path fill="currentColor" d="M3 17c3.5-.5 6-2 8-4.5C13 10 15.5 5.5 21 4c-.5 3-1.8 5.2-3.6 6.8 1 .1 1.9 0 2.8-.3-.9 2-2.5 3.3-4.6 3.9.8.3 1.6.4 2.5.3-1.5 1.8-3.8 2.8-6.6 2.8L7 20H4.5l1-2.4c-.9 0-1.7-.2-2.5-.6z"/></symbol>
   <symbol id="i-check" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" d="M5 12.5l4.5 4.5L19 7.5"/></symbol>
 </svg>`;
 

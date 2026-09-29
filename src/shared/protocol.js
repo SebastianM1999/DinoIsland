@@ -51,6 +51,7 @@ export const ACT = {
   REFILL: 'refill',     // {}                                  refill arrows/traps/bait at the hut
   RESPAWN: 'respawn',   // {}                                  request respawn when dead
   SPOT: 'spot',         // { dino }                            player saw a dinosaur
+  CREATIVE: 'creative', // { on }                              creative mode (invincible, flying)
 };
 
 /** Server events (msg.e). */
