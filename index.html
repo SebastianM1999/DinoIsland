@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Dinosaur Island</title>
+  <meta name="theme-color" content="#1f2a44">
+  <link rel="icon" href="assets/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="css/main.css">
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "./vendor/three/build/three.module.js",
+        "three/addons/": "./vendor/three/examples/jsm/"
+      }
+    }
+  </script>
+</head>
+<body>
+  <canvas id="game" tabindex="-1"></canvas>
+
+  <!-- In-game HUD (built by src/client/ui/hud.js) -->
+  <div id="hud" hidden></div>
+
+  <!-- Title / lobby screen -->
+  <main id="menu" class="screen">
+    <div class="menu-card brush">
+      <h1 class="logo">Dinosaur<br>Island <span class="logo-foot" aria-hidden="true"></span></h1>
+      <p class="tagline">Track. Hunt. Survive.</p>
+      <form id="join-form" autocomplete="off">
+        <label for="player-name">Your name</label>
+        <input id="player-name" name="name" maxlength="14" placeholder="Explorer" required>
+        <label for="server-url">Server</label>
+        <input id="server-url" name="server" spellcheck="false">
+        <div class="menu-buttons">
+          <button type="submit" class="btn btn-primary" id="btn-join">Join co-op</button>
+          <button type="button" class="btn" id="btn-solo">Play solo (offline)</button>
+        </div>
+        <p id="lobby-status" class="lobby-status" role="status" aria-live="polite"></p>
+        <ul id="lobby-players" class="lobby-players" aria-label="Players on the server"></ul>
+      </form>
+      <details class="controls-help">
+        <summary>Controls</summary>
+        <dl>
+          <dt>WASD</dt><dd>Move</dd>
+          <dt>Shift</dt><dd>Sprint</dd>
+          <dt>Space</dt><dd>Jump</dd>
+          <dt>Mouse</dt><dd>Look</dd>
+          <dt>Left click</dt><dd>Attack / hold to draw bow / place</dd>
+          <dt>Right click</dt><dd>Throw spear</dd>
+          <dt>1 – 5</dt><dd>Spear, bow, trap, bait, fruit</dd>
+          <dt>E</dt><dd>Interact / pick up</dd>
+          <dt>F</dt><dd>Eat fruit</dd>
+          <dt>G</dt><dd>Give fruit to teammate</dd>
+          <dt>Tab</dt><dd>Inventory</dd>
+          <dt>M</dt><dd>Map</dd>
+          <dt>Esc</dt><dd>Release mouse</dd>
+        </dl>
+      </details>
+    </div>
+  </main>
+
+  <!-- Shown while pointer lock is released during play -->
+  <div id="paused" class="screen" hidden>
+    <div class="menu-card brush">
+      <h2>Paused</h2>
+      <p>Click to continue</p>
+      <button type="button" class="btn btn-primary" id="btn-resume">Resume</button>
+      <button type="button" class="btn" id="btn-leave">Leave game</button>
+    </div>
+  </div>
+
+  <div id="loading" class="screen" hidden>
+    <p class="loading-text">Building the island…</p>
+  </div>
+
+  <script type="module" src="src/client/main.js"></script>
+</body>
+</html>

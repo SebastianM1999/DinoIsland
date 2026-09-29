@@ -1,0 +1,202 @@
+/* Dinosaur Island – shell + menu styles. HUD styles live in hud.css. */
+
+@font-face {
+  font-family: 'Baloo 2';
+  src: url('../assets/fonts/baloo2-latin.woff2') format('woff2');
+  font-weight: 400 800;
+  font-display: swap;
+}
+
+:root {
+  --font: 'Baloo 2', 'Segoe UI Rounded', 'Trebuchet MS', system-ui, sans-serif;
+  --navy: #1f2a44;
+  --navy-rgb: 31, 42, 68;
+  --panel: rgba(var(--navy-rgb), 0.86);
+  --panel-solid: #243150;
+  --panel-edge: #33446b;
+  --ink: #fff8ea;
+  --ink-dim: #b9c3dc;
+  --cream: #fff1d0;
+  --yellow: #ffc933;
+  --orange: #ff9a2e;
+  --red: #ee4d5f;
+  --green: #7ccb45;
+  --blue: #3fb3ff;
+  --focus: #ffd75e;
+  --radius: 12px;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: #7cc8f5;
+  color: var(--ink);
+  font-family: var(--font);
+  -webkit-font-smoothing: antialiased;
+}
+
+#game {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  outline: none;
+}
+
+[hidden] { display: none !important; }
+
+/* Brush-stroke panel: the background lives on a pseudo element that is
+   roughened by an SVG displacement filter (defined in main.js). */
+.brush {
+  position: relative;
+  isolation: isolate;
+}
+.brush::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: var(--panel);
+  border-radius: 10px;
+  filter: url(#brush-edge);
+}
+
+.screen {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background:
+    radial-gradient(ellipse at 50% 120%, rgba(255, 190, 90, 0.55), transparent 60%),
+    linear-gradient(180deg, #4fb0f0 0%, #9ad8f7 60%, #f5d9a0 100%);
+  z-index: 50;
+}
+#paused { background: rgba(20, 28, 48, 0.45); }
+#loading { background: rgba(20, 28, 48, 0.6); }
+.loading-text { font-size: 1.6rem; font-weight: 700; text-shadow: 0 2px 0 rgba(0,0,0,.35); }
+
+.menu-card {
+  width: min(460px, 100%);
+  padding: 30px 34px 26px;
+  text-align: center;
+}
+.menu-card h2 { margin: 0 0 4px; font-size: 2rem; }
+
+.logo {
+  margin: 0;
+  font-size: clamp(2.6rem, 8vw, 3.6rem);
+  line-height: 0.9;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  color: #fff;
+  text-shadow: 0 4px 0 rgba(0, 0, 0, 0.3);
+  text-transform: uppercase;
+}
+.logo-foot {
+  display: inline-block;
+  width: 0.7em;
+  height: 0.7em;
+  vertical-align: 0.05em;
+  background: url('../assets/icon.svg') center / contain no-repeat;
+  filter: brightness(0) invert(1);
+}
+.tagline {
+  margin: 8px 0 20px;
+  font-size: 1.2rem;
+  color: var(--cream);
+}
+
+#join-form {
+  display: grid;
+  gap: 6px;
+  text-align: left;
+}
+#join-form label {
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: var(--ink-dim);
+}
+#join-form input {
+  font: inherit;
+  font-size: 1.05rem;
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 2px solid var(--panel-edge);
+  background: #151d33;
+  color: var(--ink);
+}
+#join-form input:focus-visible { outline: 3px solid var(--focus); outline-offset: 1px; }
+
+.menu-buttons {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.btn {
+  font: inherit;
+  font-weight: 700;
+  font-size: 1.1rem;
+  padding: 10px 18px;
+  border-radius: 12px;
+  border: 0;
+  cursor: pointer;
+  color: var(--ink);
+  background: #3a4a72;
+  box-shadow: 0 4px 0 #1a233b;
+  transition: transform 0.08s ease, filter 0.15s ease;
+}
+.btn:hover { filter: brightness(1.12); }
+.btn:active { transform: translateY(2px); box-shadow: 0 2px 0 #1a233b; }
+.btn:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+.btn-primary { background: #7ccb45; color: #17301a; box-shadow: 0 4px 0 #4a8a24; }
+.btn-primary:active { box-shadow: 0 2px 0 #4a8a24; }
+.btn:disabled { opacity: 0.55; cursor: default; }
+
+#paused .btn { width: 100%; margin-top: 8px; }
+
+.lobby-status { min-height: 1.4em; margin: 8px 0 0; color: var(--cream); font-size: 0.95rem; }
+.lobby-players {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.lobby-players li {
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: #151d33;
+  font-size: 0.9rem;
+  border-left: 8px solid var(--c, #fff);
+}
+
+.controls-help {
+  margin-top: 14px;
+  text-align: left;
+  font-size: 0.92rem;
+  color: var(--ink-dim);
+}
+.controls-help summary { cursor: pointer; font-weight: 700; }
+.controls-help summary:focus-visible { outline: 3px solid var(--focus); }
+.controls-help dl {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 2px 14px;
+  margin: 8px 0 0;
+}
+.controls-help dt {
+  font-weight: 800;
+  color: var(--ink);
+}
+.controls-help dd { margin: 0; }
+
+@media (prefers-reduced-motion: reduce) {
+  .btn { transition: none; }
+}
