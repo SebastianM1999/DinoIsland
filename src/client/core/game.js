@@ -14,6 +14,7 @@ import { buildWater } from '../world/water.js';
 import { buildVegetation } from '../world/vegetation.js';
 import { buildRocks } from '../world/rocks.js';
 import { buildFruitPlants } from '../world/fruitPlants.js';
+import { buildHut } from '../world/hut.js';
 import { WIND } from '../models/kit.js';
 
 export class Game {
@@ -45,8 +46,9 @@ export class Game {
     this.vegetation = buildVegetation(this.terrain, this.layout);
     this.rocks = buildRocks(this.terrain, this.layout);
     this.fruitPlants = buildFruitPlants(this.terrain, this.layout);
-    scene.add(this.sky.group, this.water.group, this.vegetation.group, this.rocks.group, this.fruitPlants.group);
-    this.worldUpdaters = [this.sky, this.water, this.vegetation, this.fruitPlants];
+    this.hut = buildHut(this.terrain, this.layout);
+    scene.add(this.sky.group, this.water.group, this.vegetation.group, this.rocks.group, this.fruitPlants.group, this.hut.group);
+    this.worldUpdaters = [this.sky, this.water, this.vegetation, this.fruitPlants, this.hut];
 
     // Debug view of colliders (F3).
     this.debugGroup = new THREE.Group();
