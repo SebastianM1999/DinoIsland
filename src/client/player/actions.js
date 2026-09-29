@@ -380,7 +380,8 @@ export class PlayerActions {
     const near = g.dinos.nearest('brachio', pos);
     if (track && near && step <= 1) {
       hud.hint('Fresh Brachiosaurus tracks – follow them!', Math.round(near.dist));
-    } else if (near && near.dist < 90 && step <= 1) {
+    } else if (near && near.dist < 90 && step <= 1 && g.dinos.spotted.has(near.view.id)) {
+      // only animals the team has actually spotted – no hidden-dinosaur radar
       hud.hint('Brachiosaurus nearby', Math.round(near.dist));
     } else if (step === 3) {
       const h = g.layout.hut;

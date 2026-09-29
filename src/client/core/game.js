@@ -5,7 +5,7 @@ import * as THREE from 'three';
 import { CONFIG } from '../../shared/config.js';
 import { Terrain } from '../../shared/terrain.js';
 import { buildLayout } from '../../shared/layout.js';
-import { MSG, EV, PF } from '../../shared/protocol.js';
+import { MSG, EV, PF, DS } from '../../shared/protocol.js';
 import { Renderer } from './renderer.js';
 import { Input } from '../input/input.js';
 import { PlayerController } from '../player/controller.js';
@@ -188,6 +188,7 @@ export class Game {
     net.on(`ev:${EV.HURT}`, (m) => {
       if (m.id === this.me.id) {
         this.me.hp = m.hp;
+        this.lastHurtAt = this.time;
         this.hud.damageFlash(m.dmg);
         if (m.src) {
           const name = CONFIG.dinos[m.src]?.name || 'Dinosaur';
@@ -340,13 +341,27 @@ export class Game {
     const coast = Math.max(0, Math.min(1, (Math.hypot(p.pos.x, p.pos.z) - 110) / 70)) * (g < 6 ? 1 : 0.3);
     const fall = this.layout.waterfall?.bottom;
     const waterfallDistance = fall ? Math.hypot(p.pos.x - fall.x, p.pos.z - fall.z) : Infinity;
-    let danger = false;
+    this.audio.update(dt, { coast, waterfallDistance, danger: this.#inDanger() });
+  }
+
+  /**
+   * Danger music only for a real threat: a nearby dinosaur that is hostile
+   * (chasing / angry flag from the server), diving or attacking, or a recent
+   * hit. Calm grazers, circling Pteranodons and the safe hut stay friendly.
+   */
+  #inDanger() {
+    const p = this.player.pos;
+    const h = this.layout.hut.campfire;
+    if (Math.hypot(p.x - h.x, p.z - h.z) < CONFIG.player.hutHealRadius + 6) return false;
+    if (this.time - (this.lastHurtAt ?? -99) < 3) return true;
     for (const v of this.dinos.map.values()) {
       if (!v.alive || v.type === 'brachio') continue;
-      const range = v.type === 'trex' ? 75 : v.type === 'stego' ? 24 : v.type === 'ptera' ? 50 : 42;
-      if (Math.hypot(v.pos.x - p.pos.x, v.pos.z - p.pos.z) < range) { danger = true; break; }
+      const hostile = (v.fl & 1) !== 0 || v.st === DS.ATTACK || v.st === DS.CHARGE || v.st === DS.DIVE;
+      if (!hostile) continue;
+      const range = v.type === 'trex' ? 75 : v.type === 'ptera' ? 45 : 40;
+      if (Math.hypot(v.pos.x - p.x, v.pos.z - p.z) < range) return true;
     }
-    this.audio.update(dt, { coast, waterfallDistance, danger });
+    return false;
   }
 
   /** Sound hooks called by the dinosaur views. */
