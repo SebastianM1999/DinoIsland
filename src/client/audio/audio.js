@@ -108,35 +108,81 @@ export class GameAudio {
     s.stop(t + a + dur + 0.05);
   }
 
-  /** Growl/roar: detuned saws through a moving formant filter with noise breath. */
-  #roar(t, out, { base, dur, vol = 1, bright = 1 }) {
-    const f = this.ctx.createBiquadFilter();
-    f.type = 'bandpass';
-    f.Q.value = 2.5;
-    f.frequency.setValueAtTime(300 * bright, t);
-    f.frequency.linearRampToValueAtTime(900 * bright, t + dur * 0.3);
-    f.frequency.linearRampToValueAtTime(400 * bright, t + dur);
-    const g = this.ctx.createGain();
-    this.#env(g, t, dur * 0.15, dur * 0.85, vol);
-    f.connect(g).connect(out);
-    for (const det of [-7, 0, 6]) {
-      const o = this.ctx.createOscillator();
-      o.type = 'sawtooth';
-      o.frequency.setValueAtTime(base, t);
-      o.frequency.linearRampToValueAtTime(base * 1.25, t + dur * 0.3);
-      o.frequency.linearRampToValueAtTime(base * 0.8, t + dur);
-      o.detune.value = det * 3;
-      // vibrato for a rough throat
-      const lfo = this.ctx.createOscillator();
-      lfo.frequency.value = 24 + Math.random() * 8;
-      const lg = this.ctx.createGain();
-      lg.gain.value = base * 0.06;
-      lfo.connect(lg).connect(o.frequency);
-      o.connect(f);
-      o.start(t); lfo.start(t);
-      o.stop(t + dur + 0.1); lfo.stop(t + dur + 0.1);
+  /**
+   * Creature voice: a pitched source (glide through `pitch` points) shaped by
+   * two vocal-tract formants and a gentle lowpass, plus a little breath noise.
+   * Roughness (fast pitch wobble) is only for big, low voices – on small,
+   * high voices it produces a buzzy, broken sound.
+   * @param {{pitch:number[], dur:number, vol?:number, wave?:OscillatorType, formants:[number,number],
+   *          lowpass?:number, vibrato?:[number,number], rough?:[number,number], breath?:number, attack?:number}} v
+   */
+  #voice(t, out, v) {
+    const ctx = this.ctx;
+    const { pitch, dur, vol = 1, wave = 'sawtooth', formants, lowpass = 2400, vibrato = [5.5, 0.012], rough = null, breath = 0.1, attack = 0.08 } = v;
+    const lp = ctx.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.value = lowpass;
+    lp.Q.value = 0.5;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(vol, t + dur * attack);
+    g.gain.setValueAtTime(vol, t + dur * 0.6);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    lp.connect(g).connect(out);
+    // two parallel formants give the "throat" colour without harsh highs
+    const bands = formants.map((fq, i) => {
+      const bp = ctx.createBiquadFilter();
+      bp.type = 'bandpass';
+      bp.frequency.value = fq;
+      bp.Q.value = i === 0 ? 1.4 : 2.2;
+      const fg = ctx.createGain();
+      fg.gain.value = i === 0 ? 1 : 0.45;
+      bp.connect(fg).connect(lp);
+      return bp;
+    });
+    const o = ctx.createOscillator();
+    o.type = wave;
+    o.frequency.setValueAtTime(pitch[0], t);
+    for (let i = 1; i < pitch.length; i++) o.frequency.linearRampToValueAtTime(pitch[i], t + (dur * i) / (pitch.length - 1));
+    const mods = [];
+    const mod = ([rate, depth]) => {
+      const l = ctx.createOscillator();
+      l.frequency.value = rate;
+      const lg = ctx.createGain();
+      lg.gain.value = pitch[0] * depth;
+      l.connect(lg).connect(o.frequency);
+      mods.push(l);
+    };
+    if (vibrato) mod(vibrato);
+    if (rough) mod(rough);
+    for (const bp of bands) o.connect(bp);
+    o.start(t);
+    o.stop(t + dur + 0.05);
+    for (const l of mods) { l.start(t); l.stop(t + dur + 0.05); }
+    if (breath > 0) this.#noise(t, dur * 0.9, out, { vol: vol * breath, type: 'bandpass', f0: formants[0] * 1.2, f1: formants[0] * 0.8, q: 1, a: dur * 0.15 });
+  }
+
+  /** Species calls. Small animals get short chirps/screeches, big ones deep roars. */
+  #creature(type, t, out) {
+    switch (type) {
+      case 'trex':
+        this.#voice(t, out, { pitch: [62, 92, 80, 55], dur: 1.9, vol: 1.15, formants: [320, 820], lowpass: 1400, vibrato: [4, 0.02], rough: [27, 0.05], breath: 0.25, attack: 0.18 });
+        break;
+      case 'raptor':
+        // two quick bird-like screeches
+        this.#voice(t, out, { pitch: [620, 1150, 820], dur: 0.32, vol: 0.5, wave: 'triangle', formants: [1400, 2600], lowpass: 3600, vibrato: [11, 0.015], breath: 0.12, attack: 0.1 });
+        this.#voice(t + 0.36, out, { pitch: [700, 1050, 560], dur: 0.38, vol: 0.42, wave: 'triangle', formants: [1300, 2500], lowpass: 3400, vibrato: [11, 0.015], breath: 0.12, attack: 0.1 });
+        break;
+      case 'ptera':
+        this.#voice(t, out, { pitch: [900, 1150, 620], dur: 0.55, vol: 0.45, wave: 'triangle', formants: [1100, 2300], lowpass: 3000, vibrato: [7, 0.02], breath: 0.3, attack: 0.08 });
+        break;
+      case 'stego':
+        this.#voice(t, out, { pitch: [105, 130, 95], dur: 1.0, vol: 0.8, formants: [420, 1100], lowpass: 1600, vibrato: [5, 0.02], rough: [18, 0.02], breath: 0.15, attack: 0.15 });
+        break;
+      case 'brachio':
+        this.#voice(t, out, { pitch: [58, 74, 66, 48], dur: 2.4, vol: 0.85, wave: 'triangle', formants: [260, 640], lowpass: 900, vibrato: [3.5, 0.015], breath: 0.12, attack: 0.25 });
+        break;
     }
-    this.#noise(t, dur, out, { vol: vol * 0.16, f0: 600 * bright, f1: 300 * bright, q: 1.2, a: dur * 0.1 });
   }
 
   // ------------------------------------------------------------------ API
@@ -189,6 +235,11 @@ export class GameAudio {
         this.#osc('triangle', 660, 660, t, 0.08, out, 0.35);
         this.#osc('triangle', 990, 990, t + 0.07, 0.12, out, 0.35);
         break;
+      case 'full':
+        // soft "nope": two low descending blips
+        this.#osc('triangle', 330, 300, t, 0.09, out, 0.35);
+        this.#osc('triangle', 247, 220, t + 0.12, 0.14, out, 0.35);
+        break;
       case 'switch':
         this.#osc('square', 1200, 900, t, 0.03, out, 0.08);
         break;
@@ -205,11 +256,13 @@ export class GameAudio {
       case 'splash':
         this.#noise(t, 0.22, out, { vol: 0.15, f0: 1500, f1: 550, q: 1.6 });
         break;
-      case 'roar_trex': this.#roar(t, out, { base: 70, dur: 2.0, vol: 1.3, bright: 0.8 }); break;
-      case 'roar_raptor': this.#roar(t, out, { base: 330, dur: 0.6, vol: 0.6, bright: 2.2 }); break;
-      case 'roar_stego': this.#roar(t, out, { base: 95, dur: 1.1, vol: 0.9, bright: 0.9 }); break;
-      case 'roar_ptera': this.#roar(t, out, { base: 520, dur: 0.7, vol: 0.6, bright: 3 }); break;
-      case 'roar_brachio': this.#roar(t, out, { base: 60, dur: 2.4, vol: 0.9, bright: 0.6 }); break;
+      case 'roar_trex':
+      case 'roar_raptor':
+      case 'roar_stego':
+      case 'roar_ptera':
+      case 'roar_brachio':
+        this.#creature(name.slice(5), t, out);
+        break;
       case 'bite':
         this.#noise(t, 0.08, out, { vol: 0.24, f0: 900, q: 2.2 });
         this.#osc('sine', 120, 50, t + 0.03, 0.15, out, 0.7);
