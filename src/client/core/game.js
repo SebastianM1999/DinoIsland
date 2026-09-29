@@ -21,6 +21,9 @@ import { RemotePlayers } from '../entities/remotePlayers.js';
 import { Hud } from '../ui/hud.js';
 import { DinoViews } from '../entities/dinoViews.js';
 import { Tracks } from '../entities/tracks.js';
+import { Items } from '../entities/items.js';
+import { Projectiles } from '../entities/projectiles.js';
+import { PlayerActions } from '../player/actions.js';
 
 export class Game {
   /**
@@ -64,7 +67,10 @@ export class Game {
     // update(dt, renderTime), minimapMarkers(out), compassMarkers(bearing, out).
     this.dinos = new DinoViews(this);
     this.tracks = new Tracks(this);
-    this.systems = [this.dinos, this.tracks];
+    this.items = new Items(this);
+    this.projectiles = new Projectiles(this);
+    this.actions = new PlayerActions(this);
+    this.systems = [this.dinos, this.tracks, this.items, this.actions, this.projectiles];
 
     this.#applyWelcome(w);
     this.#bindNet();
@@ -116,6 +122,7 @@ export class Game {
         this.remotes.add(p);
       }
     }
+    this.fruitRipe = world.fruit.slice();
     world.fruit.forEach((ripe, id) => this.fruitPlants.setRipe(id, ripe));
     this.hud.setPlayer({ name: this.me.name, slot: this.me.slot });
     this.hud.setMission(this.mission);
@@ -137,7 +144,10 @@ export class Game {
     net.on(MSG.INV, (m) => { this.me.inv = m.inv; });
     net.on(`ev:${EV.PLAYER_JOIN}`, (m) => this.remotes.add(m.player));
     net.on(`ev:${EV.PLAYER_LEAVE}`, (m) => this.remotes.remove(m.id));
-    net.on(`ev:${EV.FRUIT}`, (m) => this.fruitPlants.setRipe(m.spot, m.ripe));
+    net.on(`ev:${EV.FRUIT}`, (m) => {
+      this.fruitRipe[m.spot] = m.ripe;
+      this.fruitPlants.setRipe(m.spot, m.ripe);
+    });
     net.on(`ev:${EV.TOAST}`, (m) => this.hud.toast(m.text, m.icon));
     net.on(`ev:${EV.MISSION}`, (m) => {
       this.mission = m.mission;
@@ -217,7 +227,10 @@ export class Game {
     const input = this.input;
     const p = this.player;
     const mouse = input.takeMouse();
-    if (input.locked && !this.hud.isPanelOpen()) p.look(mouse.x, mouse.y);
+    const looking = input.locked && !this.hud.isPanelOpen();
+    if (looking) p.look(mouse.x, mouse.y);
+    this.lastMouse = looking ? mouse : { x: 0, y: 0 };
+    this.lastWheel = looking ? mouse.wheel : 0;
 
     if (input.wasPressed('debug')) {
       this.debug = !this.debug;
@@ -320,5 +333,7 @@ export class Game {
     cam.fov += (targetFov - cam.fov) * Math.min(1, dt * 6);
     cam.updateProjectionMatrix();
     this.gfx.followSun(p.pos.x, p.pos.y, p.pos.z);
+    // light the viewmodel from the same sun direction, in camera space
+    this.gfx.viewSun.position.copy(this.gfx.sunDir).applyQuaternion(cam.quaternion.clone().invert());
   }
 }

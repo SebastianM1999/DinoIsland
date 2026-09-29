@@ -91,6 +91,7 @@ export class Rig {
     for (const hz of this.hitZones) {
       const s = out[i] || (out[i] = { zone: hz.zone, center: new THREE.Vector3(), radius: 0 });
       s.zone = hz.zone;
+      s.joint = hz.joint;
       s.center.copy(hz.offset);
       hz.joint.localToWorld(s.center);
       s.radius = hz.radius * this.root.scale.x;

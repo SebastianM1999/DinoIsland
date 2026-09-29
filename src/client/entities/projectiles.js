@@ -1,0 +1,166 @@
+// Arrows and thrown spears in flight. Own projectiles are simulated here
+// (simple ballistics) and their result is reported to the server; remote
+// players' projectiles are replayed from FIRE events for visuals only.
+// Arrows that hit a dinosaur stay stuck in it until it dies.
+
+import * as THREE from 'three';
+import { CONFIG } from '../../shared/config.js';
+import { EV, ACT } from '../../shared/protocol.js';
+import { segmentSphere } from '../../shared/collision.js';
+import { mesh } from '../models/kit.js';
+import { arrowGeometry, spearGeometry } from '../models/weapons.js';
+
+const UP = new THREE.Vector3(0, 1, 0);
+const _a = new THREE.Vector3();
+const _b = new THREE.Vector3();
+const _d = new THREE.Vector3();
+const _ta = new THREE.Vector3();
+const _tb = new THREE.Vector3();
+
+export class Projectiles {
+  constructor(game) {
+    this.game = game;
+    this.scene = game.gfx.scene;
+    this.list = [];
+    this.stuck = [];     // { obj, dinoId }
+    this.nextPid = 1;
+    game.net.on(`ev:${EV.FIRE}`, (m) => this.spawn(m.kind, m.o, m.v, false, m.pid));
+    game.net.on(`ev:${EV.DINO_DIE}`, (m) => this.clearStuck(m.id));
+    game.net.on(`ev:${EV.DINO_REMOVE}`, (m) => this.clearStuck(m.id));
+  }
+
+  /** Fire an own projectile. Returns its pid. */
+  fire(kind, origin, velocity, power = 1) {
+    const pid = this.nextPid++;
+    const o = [+origin.x.toFixed(2), +origin.y.toFixed(2), +origin.z.toFixed(2)];
+    const v = [+velocity.x.toFixed(2), +velocity.y.toFixed(2), +velocity.z.toFixed(2)];
+    this.game.net.act(ACT.FIRE, { kind, o, v, pid, pw: +power.toFixed(2) });
+    this.spawn(kind, o, v, true, pid);
+    return pid;
+  }
+
+  spawn(kind, o, v, own, pid) {
+    const obj = mesh(kind === 'spear' ? spearGeometry() : arrowGeometry());
+    obj.castShadow = true;
+    const p = { kind, own, pid, obj, pos: new THREE.Vector3(o[0], o[1], o[2]), vel: new THREE.Vector3(v[0], v[1], v[2]), t: 0, done: false, restT: 0 };
+    p.gravity = kind === 'spear' ? CONFIG.weapons.spear.throwGravity : CONFIG.weapons.bow.arrowGravity;
+    this.orient(p);
+    this.scene.add(obj);
+    this.list.push(p);
+  }
+
+  orient(p) {
+    _a.copy(p.vel).normalize();
+    p.obj.quaternion.setFromUnitVectors(UP, _a);
+    // spear geometry has its grip at the origin; offset so the tip leads
+    p.obj.position.copy(p.pos);
+  }
+
+  update(dt) {
+    const terrain = this.game.terrain;
+    const dinos = this.game.dinos;
+    const circles = this.game.layout.colliders.circles;
+    for (let i = this.list.length - 1; i >= 0; i--) {
+      const p = this.list[i];
+      if (p.done) {
+        p.restT += dt;
+        if (p.restT > (p.own ? 0.6 : 2)) {
+          this.scene.remove(p.obj);
+          this.list.splice(i, 1);
+        }
+        continue;
+      }
+      p.t += dt;
+      // sub-step for fast arrows
+      const steps = Math.ceil((p.vel.length() * dt) / 1.5) || 1;
+      const h = dt / steps;
+      for (let s = 0; s < steps && !p.done; s++) {
+        _a.copy(p.pos);
+        p.vel.y -= p.gravity * h;
+        p.pos.addScaledVector(p.vel, h);
+        _b.copy(p.pos);
+        // tip position leads the object origin
+        const lead = p.kind === 'spear' ? 1.25 : 0.8;
+        const dir = _d.copy(p.vel).normalize();
+        const ta = _ta.copy(_a).addScaledVector(dir, lead), tb = _tb.copy(_b).addScaledVector(dir, lead);
+
+        // dinosaurs
+        let hit = null;
+        for (const v of dinos.map.values()) {
+          if (!v.alive || v.pos.distanceToSquared(tb) > 40 * 40) continue;
+          for (const sph of v.hitSpheres()) {
+            const f = segmentSphere(ta.x, ta.y, ta.z, tb.x, tb.y, tb.z, sph.center.x, sph.center.y, sph.center.z, sph.radius);
+            if (f >= 0 && (!hit || f < hit.f)) hit = { f, view: v, sph };
+          }
+        }
+        if (hit) {
+          const hp = ta.clone().lerp(tb, hit.f);
+          p.pos.copy(hp).addScaledVector(dir, -lead * 0.6);
+          this.orient(p);
+          p.done = true;
+          if (p.own) {
+            this.game.net.act(ACT.LAND, { kind: p.kind, pid: p.pid, p: [+hp.x.toFixed(2), +hp.y.toFixed(2), +hp.z.toFixed(2)], dino: hit.view.id, zone: hit.sph.zone });
+            this.game.onProjectileHit?.(p, hit.view, hit.sph.zone);
+          }
+          if (p.kind === 'arrow') this.stick(p, hit.view, hit.sph.joint);
+          else p.restT = 10; // spear bounces off: the server drops it next to the dinosaur
+          break;
+        }
+        // terrain
+        const g = terrain.heightAt(tb.x, tb.z);
+        if (tb.y <= g + 0.02) {
+          p.pos.y = Math.max(p.pos.y, g + 0.05);
+          p.done = true;
+          if (p.own) this.land(p, tb, g);
+          break;
+        }
+        // tree trunks / rocks (only low obstacles)
+        for (const c of circles) {
+          if (c.r < 0.3) continue;
+          const dx = tb.x - c.x, dz = tb.z - c.z;
+          if (dx * dx + dz * dz < c.r * c.r && tb.y < terrain.heightAt(c.x, c.z) + (c.r > 0.9 ? c.r * 1.2 : 6)) {
+            p.done = true;
+            p.vel.set(0, -1, 0);
+            if (p.own) this.land(p, tb, terrain.heightAt(tb.x, tb.z));
+            break;
+          }
+        }
+        // out of the world / timeout
+        if (p.t > 8 || Math.abs(tb.x) > CONFIG.world.size / 2) {
+          p.done = true;
+          if (p.own) this.land(p, tb, terrain.heightAt(tb.x, tb.z));
+        }
+      }
+      if (!p.done) this.orient(p);
+      else if (!p.stuck) this.orient(p);
+    }
+  }
+
+  land(p, tip, ground) {
+    // come to rest on the ground at the tip position
+    const x = tip.x, z = tip.z;
+    this.game.net.act(ACT.LAND, { kind: p.kind, pid: p.pid, p: [+x.toFixed(2), +(ground + 0.05).toFixed(2), +z.toFixed(2)] });
+  }
+
+  /** Keep an arrow stuck in a dinosaur joint (visual). */
+  stick(p, view, joint) {
+    if (!joint) return;
+    p.stuck = true;
+    this.list.splice(this.list.indexOf(p), 1);
+    joint.updateMatrixWorld(true);
+    joint.attach(p.obj);   // keeps the world transform
+    this.stuck.push({ obj: p.obj, dinoId: view.id });
+    if (this.stuck.length > 60) {
+      const old = this.stuck.shift();
+      old.obj.removeFromParent();
+    }
+  }
+
+  clearStuck(dinoId) {
+    this.stuck = this.stuck.filter((s) => {
+      if (s.dinoId !== dinoId) return true;
+      s.obj.removeFromParent();
+      return false;
+    });
+  }
+}
