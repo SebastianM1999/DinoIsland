@@ -153,7 +153,7 @@ export function buildLayout(terrain) {
   }
 
   // Broadleaf / jungle trees inland.
-  for (let i = 0; i < 6000 && layout.trees.length < 330; i++) {
+  for (let i = 0; i < 9000 && layout.trees.length < 470; i++) {
     const x = rng.range(-190, 190), z = rng.range(-190, 190);
     const h = terrain.heightAt(x, z);
     if (!dry(x, z, 2.2) || nearHut(x, z, 4) || lakeDist(x, z) < FEATURES.lake.radius + 5) continue;
