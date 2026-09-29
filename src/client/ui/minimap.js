@@ -18,6 +18,8 @@ const C = {
   cliff: [140, 132, 118],
   rock: [168, 160, 146],
   path: [214, 178, 110],
+  lava: [255, 120, 30],
+  ash: [120, 112, 116],
 };
 
 const mix = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
@@ -37,6 +39,7 @@ export function buildMapBase(terrain, layout, res = 640) {
   const d = img.data;
   const mpp = size / res;
   const jungle = layout && typeof layout.jungleDensity === 'function' ? layout.jungleDensity : null;
+  const volcanic = layout?.biome?.id === 'volcano';
   // light from the north-west for a soft hillshade
   const lx = -0.7, lz = -0.7;
 
@@ -47,7 +50,9 @@ export function buildMapBase(terrain, layout, res = 640) {
       const h = terrain.heightAt(x, z);
       const w = terrain.waterLevelAt(x, z);
       let col;
-      if (w !== null && w - h > 0.05) {
+      if (terrain.lavaLevelAt?.(x, z) != null) {
+        col = C.lava;
+      } else if (w !== null && w - h > 0.05) {
         const depth = w - h;
         if (w > 1) col = mix(C.shallow, C.lake, clamp01(depth / 2.5));
         else col = depth < 2.2 ? mix(C.shallow, C.sea, clamp01(depth / 2.2)) : mix(C.sea, C.deep, clamp01((depth - 2.2) / 8));
@@ -57,6 +62,7 @@ export function buildMapBase(terrain, layout, res = 640) {
         else if (h < 2.4) col = mix(C.sand, C.grass, (h - 1.4) / 1.0);
         else {
           col = h > 30 ? mix(C.grass, C.meadow, clamp01((h - 30) / 20)) : C.grass;
+          if (volcanic) col = mix(col, C.ash, 0.55);
           if (jungle) {
             const j = clamp01((jungle(x, z) - 0.55) * 1.6);
             if (j > 0) col = mix(col, C.jungle, j * 0.85);
@@ -96,7 +102,9 @@ export function buildMapBase(terrain, layout, res = 640) {
       ctx.fill();
     }
   }
-  return { canvas: cv, size, half, res, mpp };
+  // island extent, so the big map can zoom to it
+  const island = layout?.plan ? { A: layout.plan.A, B: layout.plan.B } : null;
+  return { canvas: cv, size, half, res, mpp, island };
 }
 
 // ------------------------------------------------------------------ glyphs

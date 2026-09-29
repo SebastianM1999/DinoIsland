@@ -1,22 +1,18 @@
-// Island vegetation: trees (palm / round / tall / jungle / mango), decorative
-// bushes and ferns, grass tufts and flowers. All instanced; leaves, fronds and
-// grass sway through windMaterial (driven by WIND.uTime in Game.update).
+// Island vegetation: trees (per biome: palm / round / tall / jungle / bamboo /
+// mango / pine / dead), decorative bushes, ferns and big-leaf plants, grass
+// tufts and flowers. All instanced; leaves, fronds and grass sway through
+// windMaterial (driven by WIND.uTime in Game.update).
 
 import * as THREE from 'three';
 import { CONFIG } from '../../shared/config.js';
 import { makeRng, fbm, smoothstep } from '../../shared/rng.js';
 import { MAT } from '../models/kit.js';
 import { treeGeometry, treeMatrix, TREE_WIND, TREE_VARIANTS } from './veg/trees.js';
-import { bushGeometry, fernGeometry, grassGeometry, flowerGeometry } from './veg/plants.js';
+import * as plants from './veg/plants.js';
 import { windPair, LEAF_MAT, instanced, finishInstanced, foliageTint } from './veg/shapes.js';
 
 const TAU = Math.PI * 2;
 const C = (h) => new THREE.Color(h);
-// Terrain greens (see terrainMesh.js) so grass blends into the ground.
-const PAL = {
-  grass: C('#7cc34a'), grassLight: C('#95d256'), grassDark: C('#5ea83a'),
-  jungle: C('#4c9434'), mesaTop: C('#86c650'), dry: C('#b9c95a'),
-};
 const FLOWER_TINTS = ['#ff7fbf', '#ffe066', '#ffffff', '#b49cff', '#ff9a4a', '#ff5f6d'].map(C);
 
 /** Tuning. */
@@ -78,24 +74,46 @@ export function buildVegetation(terrain, layout) {
     });
     group.add(finishInstanced(m));
   };
-  addSmall(bushGeometry(), layout.bushes.filter((b) => b.type === 'bush'), VEG_TUNING.bushWind, 'bushes');
-  addSmall(fernGeometry(), layout.bushes.filter((b) => b.type === 'fern'), VEG_TUNING.fernWind, 'ferns');
+  // Bush types come from plants.js (BUSH_TYPES); unknown types fall back to a bush.
+  const types = plants.BUSH_TYPES || {
+    bush: { geometry: plants.bushGeometry, wind: VEG_TUNING.bushWind },
+    fern: { geometry: plants.fernGeometry, wind: VEG_TUNING.fernWind },
+  };
+  const byType = new Map();
+  for (const b of layout.bushes) {
+    const t = types[b.type] ? b.type : 'bush';
+    if (!byType.has(t)) byType.set(t, []);
+    byType.get(t).push(b);
+  }
+  for (const [t, list] of byType) addSmall(types[t].geometry(), list, types[t].wind || VEG_TUNING.bushWind, `bushes-${t}`);
 
   // --------------------------------------------------- grass + flowers
-  const S = CONFIG.world.seed;
+  const plan = layout.plan;
+  const S = plan.seed;
+  const T = layout.biome.terrain;
+  const PAL = {
+    grass: C(T.grass), grassLight: C(T.grassLight), grassDark: C(T.grassDark),
+    jungle: C(T.floor), mesaTop: C(T.high), dry: C(layout.biome.id === 'volcano' ? T.ash || '#8a8478' : '#b9c95a'),
+  };
   const rng = makeRng(S ^ 0x6a55e1);
   const camp = layout.hut.campfire;
-  const grassCount = CONFIG.render.grassCount | 0;
-  const flowerCount = Math.round(grassCount * VEG_TUNING.flowerRatio);
-  const R = CONFIG.world.islandRadius + 5;
+  const grassCount = Math.round((CONFIG.render.grassCount | 0) * layout.biome.vegetation.grass);
+  const flowerCount = Math.round((CONFIG.render.grassCount | 0) * VEG_TUNING.flowerRatio * layout.biome.vegetation.flowers);
+  // random point in the island ellipse
+  const inEllipse = () => {
+    const a = rng() * TAU, r = Math.sqrt(rng()) * 1.02;
+    return [Math.cos(a) * plan.A * r, Math.sin(a) * plan.B * r];
+  };
 
   /** Returns ground height if a small plant may grow here, else null. */
   const spotOk = (x, z) => {
-    if (terrain.waterLevelAt(x, z) !== null) return null;
+    if (terrain.waterLevelAt(x, z) !== null || terrain.lavaLevelAt(x, z) !== null) return null;
     const h = terrain.heightAt(x, z);
     if (h < 1.3) return null;
     if (h < 2.3 && rng() > 0.15 + (h - 1.3) * 0.25) return null;      // sparse on the beach
     if (Math.hypot(x - camp.x, z - camp.z) < 10) return null;
+    for (const c of layout.caves) if (Math.hypot(x - c.x, z - c.z) < 7.5) return null;
+    if (layout.ruins && Math.hypot(x - layout.ruins.x, z - layout.ruins.z) < 6) return null;
     if (terrain.slopeAt(x, z) > 0.7) return null;
     if (layout.distToPath(x, z) < 2.2) return null;
     return h;
@@ -104,18 +122,17 @@ export function buildVegetation(terrain, layout) {
     const g = fbm(x * 0.04, z * 0.04, 3, S + 91) * 0.5 + 0.5;
     out.copy(PAL.grass).lerp(PAL.grassLight, smoothstep(0.45, 0.8, g)).lerp(PAL.grassDark, smoothstep(0.5, 0.25, g) * 0.6);
     out.lerp(PAL.jungle, smoothstep(0.55, 1.0, layout.jungleDensity(x, z)) * 0.75);
-    if (h > 11) out.lerp(PAL.mesaTop, 0.6);
+    if (h > 18) out.lerp(PAL.mesaTop, 0.6);
     if (h < 2.6) out.lerp(PAL.dry, 0.45);
     return out;
   };
 
   const grassW = windPair(LEAF_MAT, VEG_TUNING.grassWind);
-  const grass = instanced(grassGeometry(), grassW.mat, grassCount, { cast: false, receive: true, name: 'grass' });
+  const grass = instanced(plants.grassGeometry(), grassW.mat, grassCount, { cast: false, receive: true, name: 'grass' });
   let gi = 0;
   for (let tries = 0; gi < grassCount && tries < grassCount * 8; tries++) {
     // cluster centres, masked by a noise field for meadow patches
-    const a = rng() * TAU, r = R * Math.sqrt(rng());
-    const cx = Math.cos(a) * r, cz = Math.sin(a) * r;
+    const [cx, cz] = inEllipse();
     const n = fbm(cx * 0.035, cz * 0.035, 2, S + 500) * 0.5 + 0.5;
     if (rng() > 0.12 + smoothstep(0.3, 0.62, n) * 0.88) continue;
     const k = 2 + Math.floor(rng() * 3);
@@ -136,11 +153,10 @@ export function buildVegetation(terrain, layout) {
   grass.count = gi;
   group.add(finishInstanced(grass));
 
-  const flowers = instanced(flowerGeometry(), grassW.mat, flowerCount, { cast: false, receive: true, name: 'flowers' });
+  const flowers = instanced(plants.flowerGeometry(), grassW.mat, Math.max(1, flowerCount), { cast: false, receive: true, name: 'flowers' });
   let fi = 0;
   for (let tries = 0; fi < flowerCount && tries < flowerCount * 30; tries++) {
-    const a = rng() * TAU, r = R * Math.sqrt(rng());
-    const cx = Math.cos(a) * r, cz = Math.sin(a) * r;
+    const [cx, cz] = inEllipse();
     if (layout.jungleDensity(cx, cz) > 0.85) continue;             // meadows and edges
     const n = fbm(cx * 0.05, cz * 0.05, 2, S + 510) * 0.5 + 0.5;
     if (n < 0.5) continue;

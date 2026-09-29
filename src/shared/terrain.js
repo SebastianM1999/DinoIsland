@@ -1,103 +1,16 @@
 // Deterministic island heightfield, shared by client (rendering, collision)
-// and server (dinosaur movement). The analytic function is sampled onto a grid
-// once; heightAt() interpolates exactly like the rendered triangles.
+// and server (dinosaur movement). The island plan (shared/island.js) is
+// sampled onto a grid once; heightAt() interpolates exactly like the
+// rendered triangles.
 
 import { CONFIG } from './config.js';
-import { fbm, valueNoise, clamp, smoothstep, lerp } from './rng.js';
-
-// Hand-placed landmark features. Coordinates: x = east, z = south (-z is north).
-export const FEATURES = {
-  hut: { x: 4, z: 92, radius: 20 },
-  mountain: { x: -18, z: -62, radius: 82, height: 56 },
-  spur: { x: 36, z: -30, radius: 33, height: 34 },          // mesa next to the lake (waterfall cliff)
-  lake: { x: 57, z: -7, radius: 16 },
-  westHills: { x: -112, z: 28, radius: 58, height: 17 },
-  eastMeadow: { x: 92, z: 52, radius: 60 },
-  stegoMeadow: { x: -70, z: -8, radius: 26 },
-  raptorJungle: { x: -62, z: 62, radius: 34 },
-};
-
-const S = CONFIG.world.seed;
-
-function mesa(x, z, f, terraceStep, sharp) {
-  const dx = x - f.x, dz = z - f.z;
-  const ang = Math.atan2(dz, dx);
-  const warp = 1 + 0.18 * valueNoise(Math.cos(ang) * 2.3 + f.x * 0.01, Math.sin(ang) * 2.3, S + 7)
-    + 0.08 * valueNoise(Math.cos(ang) * 6.1, Math.sin(ang) * 6.1 + f.z * 0.01, S + 8);
-  const r = Math.sqrt(dx * dx + dz * dz) / (f.radius * warp);
-  if (r >= 1) return 0;
-  let h = f.height * Math.pow(1 - smoothstep(0.12, 1.0, r), 0.75);
-  h += fbm(x * 0.03, z * 0.03, 3, S + 11) * 3 * (1 - r);
-  if (terraceStep > 0) {
-    const t = h / terraceStep;
-    const fl = Math.floor(t);
-    const fr = t - fl;
-    h = terraceStep * (fl + smoothstep(sharp, 1.0, fr)) + fr * 0.6;
-  }
-  return Math.max(0, h);
-}
-
-/** Raw analytic island height at (x, z). */
-export function islandHeight(x, z) {
-  const R = CONFIG.world.islandRadius;
-  const ang = Math.atan2(z, x);
-  const coastWarp = 1 + 0.13 * valueNoise(Math.cos(ang) * 1.7 + 3, Math.sin(ang) * 1.7, S + 1)
-    + 0.06 * valueNoise(Math.cos(ang) * 5 + 9, Math.sin(ang) * 5, S + 2);
-  const d = Math.sqrt(x * x + z * z) / coastWarp;
-
-  // Base land: beach ring rising into rolling lowland.
-  const inland = (R - d) / 45;
-  let h;
-  if (inland < 0) {
-    const out = -inland * 45;                                  // meters past the coastline
-    h = -out * 0.045 - Math.max(0, out - 22) * 0.16;           // wide turquoise shelf, then drop-off
-    h = Math.max(h, -16);
-    h += fbm(x * 0.02, z * 0.02, 2, S + 3) * 1.2;
-  } else {
-    const t = clamp(inland, 0, 1);
-    h = 0.35 + 1.6 * smoothstep(0, 0.45, t) + 2.2 * smoothstep(0.35, 1, t);
-    h += fbm(x * 0.018, z * 0.018, 4, S + 4) * 3.2 * smoothstep(0.3, 1, t);
-    h += fbm(x * 0.07, z * 0.07, 2, S + 5) * 0.5 * t;
-  }
-
-  // Mountain massif and the waterfall spur: terraced mesas with cliff risers.
-  const m = mesa(x, z, FEATURES.mountain, 12, 0.84);
-  const sp = mesa(x, z, FEATURES.spur, 11, 0.82);
-  h += Math.max(m, sp * 0.95);
-
-  // Gentle western hills.
-  {
-    const f = FEATURES.westHills;
-    const r = Math.hypot(x - f.x, z - f.z) / f.radius;
-    if (r < 1) h += f.height * Math.pow(1 - smoothstep(0, 1, r), 1.4) * (0.85 + 0.3 * fbm(x * 0.05, z * 0.05, 2, S + 12));
-  }
-
-  // Lake: raise surroundings to a small plateau, then carve a bowl.
-  {
-    const f = FEATURES.lake;
-    const lakeLevel = CONFIG.world.lakeLevel;
-    const dd = Math.hypot(x - f.x, z - f.z);
-    const rim = 1 - smoothstep(f.radius * 1.2, f.radius * 2.4, dd);
-    h = lerp(h, Math.max(h, lakeLevel + 0.9 + fbm(x * 0.1, z * 0.1, 2, S + 13) * 0.4), rim);
-    const bowl = 1 - smoothstep(f.radius * 0.55, f.radius * 1.05, dd);
-    h = lerp(h, lakeLevel - 3.2, bowl);
-  }
-
-  // Hut clearing: flatten.
-  {
-    const f = FEATURES.hut;
-    const dd = Math.hypot(x - f.x, z - f.z);
-    const w = 1 - smoothstep(f.radius * 0.75, f.radius * 1.5, dd);
-    h = lerp(h, HUT_GROUND, w);
-  }
-  return h;
-}
-
-const HUT_GROUND = 3.1;
+import { WORLD, HUT_GROUND, planIsland, islandHeight, riverQuery, poolAt } from './island.js';
 
 export class Terrain {
-  constructor() {
-    const { size, segments } = CONFIG.world;
+  /** @param {ReturnType<typeof planIsland>} [plan] defaults to level 1 */
+  constructor(plan = planIsland(0, 1)) {
+    this.plan = plan;
+    const size = WORLD.size, segments = WORLD.segments;
     this.size = size;
     this.n = segments;
     this.cell = size / segments;
@@ -106,7 +19,7 @@ export class Terrain {
     this.heights = new Float32Array(n1 * n1);
     for (let j = 0; j <= segments; j++) {
       for (let i = 0; i <= segments; i++) {
-        this.heights[j * n1 + i] = islandHeight(-this.half + i * this.cell, -this.half + j * this.cell);
+        this.heights[j * n1 + i] = islandHeight(plan, -this.half + i * this.cell, -this.half + j * this.cell);
       }
     }
     this.hutGround = HUT_GROUND;
@@ -144,13 +57,30 @@ export class Terrain {
     return Math.hypot(g.x, g.z);
   }
 
-  /** Water surface height at (x, z), or null when dry. */
+  /** Surface of a river/pool of `kind` above the ground at (x, z), or null. */
+  #flowLevelAt(x, z, g, kind) {
+    const pool = poolAt(this.plan, x, z, kind);
+    if (pool && g < pool.level) return pool.level;
+    const rv = this.plan.river;
+    if (rv && rv.kind === kind) {
+      const q = riverQuery(this.plan, x, z, 12);
+      if (q && q.d < q.width / 2 + 1.5 && g < q.surface) return q.surface;
+    }
+    return null;
+  }
+
+  /** Water surface height at (x, z), or null when dry (lava is not water). */
   waterLevelAt(x, z) {
     const g = this.heightAt(x, z);
-    const f = FEATURES.lake;
-    if (Math.hypot(x - f.x, z - f.z) < f.radius * 1.3 && g < CONFIG.world.lakeLevel) return CONFIG.world.lakeLevel;
+    const inland = this.#flowLevelAt(x, z, g, 'water');
+    if (inland !== null) return inland;
     if (g < CONFIG.world.seaLevel) return CONFIG.world.seaLevel;
     return null;
+  }
+
+  /** Lava surface height at (x, z), or null. */
+  lavaLevelAt(x, z) {
+    return this.#flowLevelAt(x, z, this.heightAt(x, z), 'lava');
   }
 
   /** Depth of water above the ground (0 when dry). */
@@ -159,9 +89,10 @@ export class Terrain {
     return w === null ? 0 : w - this.heightAt(x, z);
   }
 
-  /** True if a land creature may stand here. */
+  /** True if a land creature may stand here (no deep water, no lava, not too steep). */
   isWalkable(x, z, maxDepth = 0.3, maxSlope = 1.2) {
     if (this.waterDepthAt(x, z) > maxDepth) return false;
+    if (this.lavaLevelAt(x, z) !== null) return false;
     return this.slopeAt(x, z) <= maxSlope;
   }
 }

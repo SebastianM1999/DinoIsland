@@ -14,12 +14,9 @@ export const CONFIG = {
   },
 
   world: {
-    seed: 20240917,
-    size: 520,               // terrain square edge length
-    segments: 190,           // terrain grid resolution (cells per edge)
-    islandRadius: 190,
+    size: 760,               // terrain square edge length (the oblong island sits inside)
+    segments: 280,           // terrain grid resolution (cells per edge)
     seaLevel: 0,
-    lakeLevel: 5.2,
     maxWadeDepth: 1.4,       // players cannot walk into water deeper than this
     dayLengthSeconds: 0,     // 0 = fixed sunny afternoon (no day/night in the demo)
   },

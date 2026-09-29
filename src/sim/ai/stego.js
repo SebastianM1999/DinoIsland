@@ -13,18 +13,21 @@ const TAIL_TIME = 1.2;
 
 export const stegoBrain = {
   spawnInitial(sys) {
-    const z = sys.world.layout.dinoZones.stego;
-    const spawns = z.spawns.length ? z.spawns : [{ x: z.x, z: z.z }];
-    for (let i = 0; i < C.groupSize; i++) {
-      const s = spawns[i % spawns.length];
-      sys.spawn('stego', s.x + i * 5, s.z + i * 2, { group: 'stego', slot: i, home: { x: z.x, z: z.z } });
-    }
+    sys.world.layout.dinoZones.stego.forEach((z, zi) => {
+      const spawns = z.spawns.length ? z.spawns : [{ x: z.x, z: z.z }];
+      for (let i = 0; i < C.groupSize; i++) {
+        const s = spawns[i % spawns.length];
+        sys.spawn('stego', s.x + i * 5, s.z + i * 2, { group: `stego-${zi}`, slot: i, home: { x: z.x, z: z.z } });
+      }
+    });
   },
 
-  respawn(sys) {
-    const z = sys.world.layout.dinoZones.stego;
+  respawn(sys, r) {
+    const zones = sys.world.layout.dinoZones.stego;
+    const z = zones[Number(String(r.group).split('-')[1]) || 0] || zones[0];
+    if (!z) return;
     const p = sys.randomWalkablePoint({ type: 'stego', home: z }, z.x, z.z, 12);
-    sys.spawn('stego', p.x, p.z, { group: 'stego', slot: 0, home: { x: z.x, z: z.z } });
+    sys.spawn('stego', p.x, p.z, { group: r.group, slot: 0, home: { x: z.x, z: z.z } });
   },
 
   init(d) {

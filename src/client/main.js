@@ -19,6 +19,7 @@ const $ = (id) => document.getElementById(id);
 const menu = $('menu');
 const paused = $('paused');
 const loading = $('loading');
+const loadingText = loading.querySelector('.loading-text');
 const canvas = $('game');
 const status = $('lobby-status');
 const nameInput = $('player-name');
@@ -59,18 +60,28 @@ async function start(mode) {
     return;
   }
   menu.hidden = true;
+  if (await launch(net)) setBusy(false, '');
+}
+
+/**
+ * Build and start a Game for the island in net.welcome. `reuse` hands over the
+ * renderer, audio and input of the previous island's game.
+ */
+async function launch(net, reuse = null) {
+  const lv = net.welcome.world.level;
+  loadingText.textContent = reuse ? `Sailing to island ${lv.index + 1}…` : 'Building the island…';
   loading.hidden = false;
   // Let the loading screen paint before the heavy world build.
   await new Promise((r) => requestAnimationFrame(() => setTimeout(r, 30)));
   try {
-    game = new Game(canvas, net);
+    game = new Game(canvas, net, reuse);
   } catch (err) {
     console.error(err);
     net.close();
     loading.hidden = true;
     menu.hidden = false;
     setBusy(false, `Could not start the game: ${err.message}`);
-    return;
+    return false;
   }
   window.__game = game; // handy for debugging in the console
   game.input.onLockChange = (locked) => {
@@ -78,11 +89,17 @@ async function start(mode) {
   };
   game.onPanelChange = (open) => setPaused(!open && !game.input.locked);
   game.onLeave = (reason) => backToMenu(reason);
+  // The team set sail: the server sends a fresh welcome for the next island.
+  game.onNewIsland = (welcome) => {
+    const shared = game.dispose();
+    net.welcome = welcome;
+    launch(net, shared);
+  };
   loading.hidden = true;
   game.start();
   game.input.requestLock();
   setPaused(!game.input.locked);
-  setBusy(false, '');
+  return true;
 }
 
 function backToMenu(reason) {

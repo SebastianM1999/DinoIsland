@@ -77,8 +77,7 @@ function newHerd(sys, zone) {
   return herd;
 }
 
-function spawnHerd(sys) {
-  const zone = sys.world.layout.dinoZones.brachio;
+function spawnHerd(sys, zone) {
   const herd = newHerd(sys, zone);
   const spawns = zone.spawns.length ? zone.spawns : [{ x: zone.x, z: zone.z }];
   for (let i = 0; i < C.herdSize; i++) {
@@ -91,14 +90,15 @@ function spawnHerd(sys) {
 
 export const brachioBrain = {
   spawnInitial(sys) {
-    spawnHerd(sys);
+    for (const zone of sys.world.layout.dinoZones.brachio) spawnHerd(sys, zone);
   },
 
   respawn(sys, r) {
     // A new herd arrives once the whole previous herd is gone.
     const alive = sys.list.some((d) => d.type === 'brachio' && d.alive && d.group === r.group);
     const pending = sys.respawnQueue.some((q) => q.type === 'brachio' && q.group === r.group);
-    if (!alive && !pending) spawnHerd(sys);
+    const zone = sys.groups.get(r.group)?.zone || sys.world.layout.dinoZones.brachio[0];
+    if (!alive && !pending && zone) spawnHerd(sys, zone);
   },
 
   init(d) {

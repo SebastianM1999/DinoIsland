@@ -19,6 +19,8 @@ import { resolveCircle } from '../shared/collision.js';
 import { makeRng } from '../shared/rng.js';
 import { lineBlocked } from '../shared/visibility.js';
 import { sanitizeOutfit, sameOutfit } from '../shared/outfits.js';
+import { planIsland } from '../shared/island.js';
+import { levelDef } from '../shared/levels.js';
 
 const P = CONFIG.player;
 const W = CONFIG.weapons;
@@ -30,27 +32,63 @@ const validVec = (v) => Array.isArray(v) && v.length === 3 && v.every((n) => Num
 const collisionResult = { x: 0, z: 0, hit: false };
 
 export class ServerWorld {
-  /** @param {{ send:(to:number|'*', msg:object, except?:number)=>void, log?:(...a:any[])=>void }} host */
-  constructor(host) {
+  /**
+   * @param {{ send:(to:number|'*', msg:object, except?:number)=>void, log?:(...a:any[])=>void }} host
+   * @param {{ level?: number, variant?: number }} [opts] start island (variant = random layout seed)
+   */
+  constructor(host, opts = {}) {
     this.host = host;
     this.log = host.log || (() => {});
     this.now = 0;
-    this.terrain = new Terrain();
-    this.layout = buildLayout(this.terrain);
     this.players = new Map();
+    this.nextId = 1;
+    this.store = Object.fromEntries(LOOT_KEYS.map((k) => [k, 0]));
+    this.fruitRng = makeRng((Math.random() * 0xffffffff) >>> 0);
+    this.#loadLevel(opts.level ?? 0, opts.variant);
+    this.mission = new Mission(this);
+    this.dinos.spawnAll();
+  }
+
+  /** Build the island for `level` (everything that belongs to one island). */
+  #loadLevel(level, variant = 1 + Math.floor(Math.random() * 1e6)) {
+    this.levelIndex = level;
+    this.variant = variant;
+    this.terrain = new Terrain(planIsland(level, variant));
+    this.layout = buildLayout(this.terrain);
     this.items = new Map();
     this.traps = new Map();
     this.baits = new Map();
     this.projectiles = new Map();
     this.tracks = [];
-    this.nextId = 1;
-    this.store = Object.fromEntries(LOOT_KEYS.map((k) => [k, 0]));
-    this.fruitRng = makeRng((Math.random() * 0xffffffff) >>> 0);
     this.fruit = this.layout.fruitSpots.map((s) => ({ spot: s.id, count: this.rollFruitCount(), regrowAt: 0 }));
     this.spottedDinos = new Set();
+    this.relics = this.layout.relics.map((r) => ({ ...r, found: false, byName: null }));
     this.dinos = new DinoSystem(this);
-    this.mission = new Mission(this);
+    this.log(`island ${level + 1} "${levelDef(level).name}" variant ${variant}`);
+  }
+
+  /** The team set sail: build the next island and send everyone there. */
+  nextLevel() {
+    this.#loadLevel(this.levelIndex + 1);
+    this.mission.startIsland();
     this.dinos.spawnAll();
+    const caps = this.caps();
+    for (const p of this.players.values()) {
+      const sp = this.layout.spawnPoints[p.slot];
+      Object.assign(p, {
+        x: sp.x, y: this.terrain.heightAt(sp.x, sp.z), z: sp.z, yaw: sp.yaw, pitch: 0, spd: 0,
+        hp: P.maxHealth, alive: true, deadT: 0, eating: null, hot: null,
+        lastMoveAt: this.now, moveBudget: 3.5,
+      });
+      p.inv.arrows = caps.arrows;
+      p.inv.traps = Math.max(p.inv.traps, caps.traps);
+      p.inv.baits = Math.max(p.inv.baits, caps.baits);
+      p.inv.spear = true;
+      p.inv.caps = caps;
+    }
+    for (const p of this.players.values()) {
+      this.send(p.id, { t: MSG.WELCOME, id: p.id, slot: p.slot, now: r3(this.now), inv: p.inv, world: this.fullState() });
+    }
   }
 
   id() { return this.nextId++; }
@@ -466,6 +504,13 @@ export class ServerWorld {
         this.event(EV.OUTFIT, { id: p.id, outfit });
         return;
       }
+      case ACT.REPAIR: {
+        const b = this.layout.boat;
+        if (!p.alive || !this.near(p, b.x, b.z, 9)) return;
+        const reason = this.mission.repair(p);
+        if (reason) this.toast(reason, 'crate', p.id);
+        return;
+      }
       case ACT.REFILL: {
         const h = this.layout.hut.arrowRack;
         if (!p.alive || !this.near(p, h.x, h.z, 6)) return;
@@ -589,6 +634,24 @@ export class ServerWorld {
         p.hot.t -= dt;
         if (p.hot.t <= 0) p.hot = null;
       }
+      // lava burns (and sets you back on your feet only if you get out)
+      const lava = this.terrain.lavaLevelAt(p.x, p.z);
+      if (lava !== null && p.y < lava + 0.6 && !p.creative) {
+        p.lavaT = (p.lavaT ?? 0.4) + dt;
+        if (p.lavaT >= 0.4) {
+          p.lavaT = 0;
+          this.hurtPlayer(p, 14, { src: 'lava' });
+          if (!p.alive) continue;
+        }
+      } else p.lavaT = 0.4;             // the first touch burns right away
+      // boat parts: walk up to one to pick it up for the team
+      for (const r of this.relics) {
+        if (r.found || (r.x - p.x) ** 2 + (r.z - p.z) ** 2 > 2.4 * 2.4 || Math.abs(r.y - p.y) > 3) continue;
+        r.found = true;
+        r.byName = p.name;
+        this.event(EV.RELIC, { id: r.id, kind: r.kind, by: p.id });
+        this.mission.onRelicFound(r, p);
+      }
       // the hut is a safe, healing place
       const c = this.layout.hut.campfire;
       if (p.hp < P.maxHealth && this.near(p, c.x, c.z, P.hutHealRadius)) {
@@ -646,6 +709,9 @@ export class ServerWorld {
       tracks: this.tracks.slice(-200),
       mission: this.mission.state(),
       store: this.store,
+      level: { index: this.levelIndex, variant: this.variant },
+      relics: this.relics.map((r) => ({ id: r.id, kind: r.kind, x: r.x, y: r.y, z: r.z, found: r.found })),
+      boat: { repaired: this.mission.phase !== 'search' },
     };
   }
 }

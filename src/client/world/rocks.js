@@ -1,31 +1,32 @@
-// Rocks (faceted grey-violet boulders with moss) and the terraced sea stacks
-// standing in the water around the island (with a palm or two on top).
+// Rocks (smooth boulders in the biome's stone colors, with moss) and the
+// terraced sea stacks standing in the water around the island (with a palm
+// or two on top on green islands).
 
 import * as THREE from 'three';
-import { CONFIG } from '../../shared/config.js';
-import { makeRng, hash2 } from '../../shared/rng.js';
-import { MAT, deform, paint, place, merge, jitter } from '../models/kit.js';
+import { makeRng, hash2, fbm } from '../../shared/rng.js';
+import { MAT, deform, paint, place, merge, jitter, smoothNormals } from '../models/kit.js';
 import { treeGeometry, treeMatrix, TREE_WIND } from './veg/trees.js';
 import { clump, windPair, LEAF_MAT, instanced, finishInstanced, foliageTint } from './veg/shapes.js';
 import { rockTable } from '../../shared/rockShapes.js';
 
 const TAU = Math.PI * 2;
-const ROCK_COLS = ['#9c93a8', '#8f86a0', '#a79c9a', '#958ba3'];
-const ROCK_LOW = ['#7f7390', '#877b96'];
-const MOSS = ['#7cc34a', '#69b53f'];
-// terrain cliff palette
-const CLIFF = { rock: '#9c8fa3', rockDark: '#7f7390', rockWarm: '#a88f86', top: '#86c650', top2: '#79bb48', wet: '#6c6480' };
+const DEFAULT_ROCKS = { colors: ['#9c93a8', '#8a8199', '#a79c9a'], moss: '#6fa845' };
 
 const rockCache = new Map();
 /**
  * Rock geometry built from the shared ring table (see shared/rockShapes.js), so
  * the walkable surface matches the mesh exactly. 0 = rounded boulder,
  * 1 = chunky block, 2 = flat slab, 3 = stepped rock, 4 = rock formation.
+ * `palette` = biome.rocks ({ colors, moss }).
  */
-export function rockGeo(variant, mossy) {
-  const key = `${variant}:${mossy ? 1 : 0}`;
+export function rockGeo(variant, mossy, palette = DEFAULT_ROCKS) {
+  const key = `${variant}:${mossy ? 1 : 0}:${palette.colors.join()}`;
   let g = rockCache.get(key);
   if (g) return g;
+  const c0 = new THREE.Color(palette.colors[0]), c1 = new THREE.Color(palette.colors[1]), c2 = new THREE.Color(palette.colors[2]);
+  const low = c1.clone().multiplyScalar(0.82);
+  const moss = new THREE.Color(palette.moss), mossLight = moss.clone().offsetHSL(0, 0, 0.06);
+  const tmp = new THREE.Color();
   const seed = 11 + variant * 7;
   const t = rockTable(variant);
   const P = (k, j) => {
@@ -52,12 +53,17 @@ export function rockGeo(variant, mossy) {
   }
   g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-  g.computeVertexNormals();
+  g = smoothNormals(g, (60 * Math.PI) / 180);        // round flanks, crisp ledges
   g = paint(g, (c, n) => {
-    if (mossy && n.y > 0.72) return jitter(c, 1, seed + 4) > 0 ? MOSS[0] : MOSS[1];
-    if (mossy && n.y > 0.5 && jitter(c, 1, seed + 6) > 0.1) return '#8db552';
-    if (c.y < -0.02) return ROCK_LOW[Math.abs(Math.floor(jitter(c, 10, seed + 5))) % 2];
-    return ROCK_COLS[Math.abs(Math.floor(jitter(c, 10, seed + 3))) % ROCK_COLS.length];
+    // soft color drift over the stone, darker at the foot, moss on top
+    const t = fbm(c.x * 1.7 + seed, c.z * 1.7, 2, seed) * 0.5 + 0.5;
+    tmp.copy(c0).lerp(c2, t).lerp(c1, Math.max(0, Math.sin(c.y * 5 + c.x * 2) * 0.3));
+    tmp.lerp(low, Math.max(0, Math.min(1, (0.05 - c.y) * 6)));
+    if (mossy) {
+      const m = Math.max(0, Math.min(1, (n.y - 0.55) / 0.25 + jitter(c, 0.15, seed + 4)));
+      tmp.lerp(t > 0.5 ? mossLight : moss, m);
+    }
+    return tmp;
   });
   g.computeBoundingSphere();
   rockCache.set(key, g);
@@ -65,7 +71,7 @@ export function rockGeo(variant, mossy) {
 }
 
 /** One terraced sea stack in world space. */
-function stackGeometry(st, idx, rng) {
+function stackGeometry(st, idx, rng, CLIFF, seedBase, green) {
   const parts = [];
   const tiers = 3 + (idx % 2);
   const weights = tiers === 3 ? [0.46, 0.31, 0.23] : [0.38, 0.26, 0.2, 0.16];
@@ -81,30 +87,33 @@ function stackGeometry(st, idx, rng) {
     const hh = y1 - y0;
     const rB = st.radius * (1 - k * 0.19) * (k === 0 ? 1.08 : 1);
     const rT = rB * (k === 0 ? 0.86 : 0.9);
-    let g = new THREE.CylinderGeometry(rT, rB, hh, 11, 4);
+    let g = new THREE.CylinderGeometry(rT, rB, hh, 28, 6);
     g = deform(g, (v) => {
       const onTop = Math.abs(v.y - hh / 2) < 1e-4;
       const rad = Math.hypot(v.x, v.z);
       if (rad > 1e-4) {
-        const f = 1 + jitter(v, 0.13, seed + k);
+        // smooth lumpy outline (low-frequency), not per-vertex spikes
+        const a = Math.atan2(v.z, v.x);
+        const f = 1 + 0.08 * Math.sin(a * 3 + seed + k) + 0.05 * Math.sin(a * 7 - seed) + 0.03 * Math.sin(v.y * 0.8 + a * 2);
         v.x *= f; v.z *= f;
       }
-      if (!onTop && v.y > -hh / 2 + 1e-4) v.y += jitter(v, hh * 0.04, seed + k + 3);
+      if (onTop && rad > 1e-4) v.y -= 0.25 * (rad / rT) ** 2;   // rounded lip
     });
+    g = smoothNormals(g, (50 * Math.PI) / 180);
     const cx = st.x + ox * cs - oz * sn, cz = st.z + ox * sn + oz * cs;
     g = place(g, [cx, (y0 + y1) / 2, cz], [0, st.rot + k * 0.7, 0]);
     g = paint(g, (c, n) => {
       if (n.y > 0.72) return jitter(c, 1, seed) > 0 ? CLIFF.top : CLIFF.top2;
       if (c.y < 0.5) return CLIFF.wet;
       const band = Math.floor(c.y / 2.3);
-      const hsh = hash2(band, idx, CONFIG.world.seed);
+      const hsh = hash2(band, idx, seedBase);
       if (hsh > 0.64) return CLIFF.rockWarm;
       return jitter(c, 1, seed + 2) > 0.45 || hsh < 0.25 ? CLIFF.rockDark : CLIFF.rock;
     });
     parts.push(g);
     // bushy green overhangs along the tier lip
     const lipR = rT * 0.93;
-    const nb = 3 + Math.floor(rng() * 3);
+    const nb = green ? 3 + Math.floor(rng() * 3) : 0;
     for (let b = 0; b < nb; b++) {
       const a = rng() * TAU;
       const r = 0.7 + rng() * 0.8;
@@ -122,7 +131,7 @@ function stackGeometry(st, idx, rng) {
     const a = rng() * TAU;
     const r = st.radius * (1.0 + rng() * 0.25);
     const sc = 1.2 + rng() * 1.8;
-    parts.push(place(rockGeo(b % 3, false).clone(), [st.x + Math.cos(a) * r, -0.35 * sc, st.z + Math.sin(a) * r], [0, rng() * TAU, 0], [sc, sc * 0.9, sc]));
+    parts.push(place(rockGeo(b % 3, false, CLIFF.palette).clone(), [st.x + Math.cos(a) * r, -0.35 * sc, st.z + Math.sin(a) * r], [0, rng() * TAU, 0], [sc, sc * 0.9, sc]));
   }
   return { geo: merge(parts), top };
 }
@@ -137,6 +146,15 @@ export function buildRocks(terrain, layout) {
   const s = new THREE.Vector3();
   const col = new THREE.Color();
 
+  const palette = layout.biome?.rocks || DEFAULT_ROCKS;
+  const T = layout.biome?.terrain || {};
+  const green = layout.biome?.id !== 'volcano';
+  const CLIFF = {
+    rock: palette.colors[0], rockDark: palette.colors[1], rockWarm: T.rockWarm || '#a88f86',
+    top: green ? '#86c650' : (T.ash || '#6f686c'), top2: green ? '#79bb48' : (T.rockDark || '#35303b'),
+    wet: T.rockDark || '#6c6480', palette,
+  };
+
   // ------------------------------------------------------------- rocks
   const buckets = new Map();
   for (const r of layout.rocks) {
@@ -146,7 +164,7 @@ export function buildRocks(terrain, layout) {
   }
   for (const [key, list] of buckets) {
     const [variant, mossy] = key.split(':').map(Number);
-    const m = instanced(rockGeo(variant, !!mossy), MAT.standard, list.length, { name: `rocks-${key}` });
+    const m = instanced(rockGeo(variant, !!mossy, palette), MAT.standard, list.length, { name: `rocks-${key}` });
     list.forEach((r, i) => {
       // fx/fy/fz/by come from placeRock() in the layout (shared with the walkable surface)
       const { fx, fy, fz } = r;
@@ -160,13 +178,13 @@ export function buildRocks(terrain, layout) {
   }
 
   // --------------------------------------------------------- sea stacks
-  const rng = makeRng(CONFIG.world.seed ^ 0x57ac);
+  const rng = makeRng(layout.plan.seed ^ 0x57ac);
   const stackParts = [];
   const palms = [];
   layout.seaStacks.forEach((st, i) => {
-    const { geo, top } = stackGeometry(st, i, rng);
+    const { geo, top } = stackGeometry(st, i, rng, CLIFF, layout.plan.seed, green);
     stackParts.push(geo);
-    const n = 1 + (i % 2);
+    const n = green ? 1 + (i % 2) : 0;
     for (let k = 0; k < n; k++) {
       const a = rng() * TAU, r = top.r * (0.15 + rng() * 0.35);
       palms.push({ x: top.x + Math.cos(a) * r, z: top.z + Math.sin(a) * r, y: top.y, rot: rng() * TAU, lean: (rng() - 0.5) * 0.25, scale: 0.85 + rng() * 0.3, hue: rng() });

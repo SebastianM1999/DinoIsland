@@ -909,9 +909,94 @@
   transform: rotate(-12deg);
   opacity: 0.85;
 }
-@media (max-width: 900px) {
-  .board-body { grid-template-columns: 1fr; }
+/* main quest banner (boat parts) */
+.board-quest { --tilt: -0.4deg; margin: 0 0.3em 1.3em; }
+.board-quest-top { display: flex; gap: 1.2em; align-items: flex-end; justify-content: space-between; flex-wrap: wrap; }
+.board-quest .board-kicker { text-transform: uppercase; letter-spacing: 0.08em; font-size: 0.78em; font-weight: 800; color: #b5561f; }
+.board-quest h3 { display: flex; align-items: center; gap: 0.35em; font-size: 1.45em; margin: 0.1em 0 0.25em; }
+.board-quest h3 svg { width: 1.3em; height: 1.3em; }
+.board-quest-score { display: flex; align-items: center; gap: 0.6em; min-width: 14em; }
+.board-quest-score b { font-weight: 800; color: #3a2a1c; font-variant-numeric: tabular-nums; }
+.board-parts { list-style: none; padding: 0; margin: 0.8em 0 0.6em; display: grid; grid-template-columns: repeat(auto-fit, minmax(13em, 1fr)); gap: 0.6em; }
+.board-part {
+  display: flex; align-items: center; gap: 0.6em;
+  padding: 0.5em 0.7em;
+  border-radius: 0.5em;
+  background: rgba(90, 60, 30, 0.09);
+  border: 0.13em dashed rgba(90, 60, 30, 0.35);
 }
+.board-part.is-found { background: rgba(124, 203, 69, 0.18); border: 0.13em solid #6bb33c; }
+.board-part-ic { width: 2.2em; height: 2.2em; flex: none; filter: drop-shadow(0 0.1em 0 rgba(40, 20, 8, 0.25)); }
+.board-part:not(.is-found) .board-part-ic { filter: grayscale(0.6) opacity(0.7); }
+.board-part-txt { display: grid; flex: 1; line-height: 1.2; }
+.board-part-txt b { color: #2c1f14; font-weight: 800; }
+.board-part-txt small { color: #6a5540; font-weight: 700; }
+.board-part-state { width: 1.6em; height: 1.6em; display: grid; place-items: center; font-weight: 800; color: #8a6a48; flex: none; }
+.board-part.is-found .board-part-state { color: #3e8a2a; }
+.board-steps { margin: 0.2em 0 0 !important; }
+
+/* active (left) and done (right) columns */
+.board-cols { display: grid; grid-template-columns: 1.55fr 1fr; gap: 1.2em; align-items: start; }
+.board-col-title {
+  display: flex; align-items: center; gap: 0.5em;
+  margin: 0 0.3em 0.8em;
+  color: #fff4dc; font-size: 1.15em; font-weight: 800;
+  text-shadow: 0 0.1em 0 rgba(40, 20, 8, 0.6);
+}
+.board-col-title b {
+  min-width: 1.6em; padding: 0 0.45em; border-radius: 99em;
+  background: rgba(40, 20, 8, 0.45); text-align: center; font-size: 0.85em;
+}
+.board-col-done {
+  padding: 0.8em 0.7em 1em;
+  border-radius: 0.6em;
+  background: rgba(40, 20, 8, 0.28);
+  box-shadow: inset 0 0 0 0.12em rgba(255, 230, 190, 0.12);
+}
+.board-done-list { display: grid; gap: 0.8em; }
+.board-done {
+  --tilt: 0.6deg;
+  display: flex; align-items: center; gap: 0.7em;
+  padding: 0.8em 4.8em 0.8em 0.9em;
+  filter: saturate(0.9);
+}
+.board-done h4 { font-size: 1em; }
+.board-done .board-reward { margin: 0.15em 0 0; }
+.board-done .board-stamp { right: 0.6em; bottom: auto; top: 50%; margin-top: -0.8em; font-size: 1em; }
+.board-empty { color: #f3dcb5; font-weight: 700; margin: 0.4em 0.3em; }
+@media (max-width: 900px) {
+  .board-cols { grid-template-columns: 1fr; }
+}
+
+/* ---------------------------------------------------------------- boat dialog */
+.hud-boat { width: min(38em, 94vw); }
+.hud-boat .hud-panel-head h2 { display: flex; align-items: center; gap: 0.4em; }
+.hud-boat .hud-panel-head h2 svg { width: 1.2em; height: 1.2em; }
+.boat-status { margin: 0 0 0.8em; color: var(--ink-dim); font-weight: 700; }
+.boat-status.is-ready { color: var(--green); }
+.boat-progress { position: relative; height: 1.5em; border-radius: 99em; background: #151d33; overflow: hidden; margin-bottom: 1em; }
+.boat-progress i { position: absolute; inset: 0 auto 0 0; background: linear-gradient(90deg, #7ccb45, #4fa82f); border-radius: 99em; transition: width 0.4s ease; }
+.boat-progress b { position: relative; display: block; text-align: center; line-height: 1.5em; font-size: 0.9em; font-weight: 800; }
+.boat-parts { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.6em; }
+.boat-part {
+  display: flex; align-items: center; gap: 0.8em;
+  padding: 0.6em 0.8em;
+  border-radius: 0.7em;
+  background: rgba(10, 15, 28, 0.45);
+  border: 0.12em dashed rgba(255, 255, 255, 0.15);
+}
+.boat-part.is-found { border: 0.12em solid var(--c); background: rgba(124, 203, 69, 0.12); }
+.boat-part-ic { width: 2.6em; height: 2.6em; flex: none; }
+.boat-part:not(.is-found) .boat-part-ic { filter: grayscale(0.7) opacity(0.6); }
+.boat-part-txt { display: grid; flex: 1; line-height: 1.25; }
+.boat-part-txt b { font-weight: 800; }
+.boat-part-txt small { color: var(--ink-dim); font-weight: 700; }
+.boat-part-state { width: 1.8em; height: 1.8em; display: grid; place-items: center; font-weight: 800; color: var(--ink-dim); }
+.boat-part.is-found .boat-part-state { color: var(--green); }
+.hud-boat .wd-btn { display: inline-flex; align-items: center; gap: 0.4em; }
+.hud-boat .wd-btn svg { width: 1.3em; height: 1.3em; }
+.hud-boat .wd-btn:disabled { opacity: 0.5; cursor: default; }
+.hud-boat button { cursor: url('../assets/cursor-hand.svg') 12 3, pointer; }
 
 /* ---------------------------------------------------------------- wardrobe */
 .hud-wardrobe { width: min(60em, 96vw); }

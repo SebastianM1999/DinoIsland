@@ -18,22 +18,40 @@ export class Renderer {
     r.shadowMap.type = THREE.PCFSoftShadowMap;
     r.autoClear = false;
 
+    this.camera = new THREE.PerspectiveCamera(CONFIG.player.fov, 1, 0.1, R.viewDistance);
+    this.camera.rotation.order = 'YXZ';
+    this.reset();
+    addEventListener('resize', () => this.resize());
+  }
+
+  /** Fresh, empty scenes (a new island reuses the renderer). */
+  reset() {
     this.scene = new THREE.Scene();
     this.scene.fog = new THREE.Fog(0xa8dcf7, R.fogNear, R.fogFar);
     this.scene.background = new THREE.Color(0x7cc8f5);
-
-    this.camera = new THREE.PerspectiveCamera(CONFIG.player.fov, 1, 0.1, R.viewDistance);
-    this.camera.rotation.order = 'YXZ';
-
     // Viewmodel (hands + weapon) is drawn after the world with a cleared depth
     // buffer so it never clips into walls or dinosaurs.
     this.viewScene = new THREE.Scene();
     this.viewCamera = new THREE.PerspectiveCamera(62, 1, 0.01, 10);
     this.viewScene.add(this.viewCamera);
-
     this.#setupLights();
     this.resize();
-    addEventListener('resize', () => this.resize());
+    this.renderer.renderLists.dispose();
+  }
+
+  /** Biome look: fog, background, sun and sky light (biome.sky from shared/levels.js). */
+  applyBiome(sky) {
+    if (!sky) return;
+    this.scene.fog.color.set(sky.fog);
+    this.scene.fog.near = sky.fogNear ?? R.fogNear;
+    this.scene.fog.far = sky.fogFar ?? R.fogFar;
+    this.scene.background = new THREE.Color(sky.background);
+    this.sun.color.set(sky.sun);
+    this.sun.intensity = sky.sunIntensity ?? 2.6;
+    this.hemi.color.set(sky.hemiSky);
+    this.hemi.groundColor.set(sky.hemiGround);
+    this.hemi.intensity = sky.hemiIntensity ?? 1.6;
+    this.renderer.toneMappingExposure = sky.exposure ?? 1.05;
   }
 
   #setupLights() {

@@ -110,6 +110,12 @@ export class Net {
     return net;
   }
 
+  /** Forget every handler (the game for the next island registers its own). */
+  clearHandlers() {
+    this.handlers.clear();
+    this.onClose = null;
+  }
+
   on(type, fn) {
     if (!this.handlers.has(type)) this.handlers.set(type, []);
     this.handlers.get(type).push(fn);

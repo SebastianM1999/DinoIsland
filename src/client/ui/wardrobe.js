@@ -219,4 +219,12 @@ export class Wardrobe {
     cancelAnimationFrame(this.raf);
     this.raf = 0;
   }
+
+  /** Free the preview's WebGL context (a new island builds a new wardrobe). */
+  dispose() {
+    this.onClosed();
+    this.renderer?.dispose();
+    this.renderer?.forceContextLoss();
+    this.renderer = null;
+  }
 }

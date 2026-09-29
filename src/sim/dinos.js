@@ -35,6 +35,10 @@ export class DinoSystem {
     this.colliders = world.layout.colliders;
     this.bigColliders = bigColliders(world);
     this.hut = world.layout.hut.campfire;
+    // harder islands: tougher and harder-hitting dinosaurs
+    const diff = world.layout.level.difficulty;
+    this.hpMul = Math.pow(diff, 0.85);
+    this.dmgMul = 1 + (diff - 1) * 0.6;
   }
 
   get(id) { return this.byId.get(id); }
@@ -53,8 +57,8 @@ export class DinoSystem {
       yaw: Math.random() * Math.PI * 2,
       spd: 0,
       st: DS.IDLE,
-      hp: c.health,
-      maxHp: c.health,
+      hp: Math.round(c.health * this.hpMul),
+      maxHp: Math.round(c.health * this.hpMul),
       alive: true,
       radius: c.radius,
       fl: 0,
@@ -214,7 +218,7 @@ export class DinoSystem {
   hitPlayer(d, p, dmg, knock = 6, down = 0) {
     const dx = p.x - d.x, dz = p.z - d.z;
     const l = Math.hypot(dx, dz) || 1;
-    this.world.hurtPlayer(p, dmg, { kx: (dx / l) * knock, kz: (dz / l) * knock, down,
+    this.world.hurtPlayer(p, dmg * this.dmgMul, { kx: (dx / l) * knock, kz: (dz / l) * knock, down,
       src: d.type, from: { id: d.id, x: r2(d.x), y: r2(d.y), z: r2(d.z) } });
   }
 

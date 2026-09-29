@@ -12,7 +12,12 @@ const BITE_WINDUP = 0.45;
 export const trexBrain = {
   spawnInitial(sys) {
     const pts = sys.world.layout.trexPatrol;
-    sys.spawn('trex', pts[0].x, pts[0].z, { wp: 1 });
+    const count = sys.world.layout.level.dinos.trex;
+    if (pts.length < 3) return;
+    for (let i = 0; i < count; i++) {
+      const k = Math.floor((i / count) * pts.length);
+      sys.spawn('trex', pts[k].x, pts[k].z, { wp: (k + 1) % pts.length });
+    }
   },
 
   respawn(sys) {

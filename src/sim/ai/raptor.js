@@ -21,11 +21,8 @@ function spawnPack(sys, cx, cz, n, home) {
 
 export const raptorBrain = {
   spawnInitial(sys) {
-    const z = sys.world.layout.dinoZones.raptor;
-    spawnPack(sys, z.x, z.z, C.groupSize);
-    // a second, smaller pack roams the north-east lowlands
-    const p = sys.randomWalkablePoint({ type: 'raptor', home: { x: 95, z: -75 } }, 95, -75, 20);
-    spawnPack(sys, p.x, p.z, 2, p);
+    // one pack per zone (the first one guards the nest on jungle islands)
+    for (const z of sys.world.layout.dinoZones.raptor) spawnPack(sys, z.x, z.z, z.size || C.groupSize);
   },
 
   respawn(sys, r) {

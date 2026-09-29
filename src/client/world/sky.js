@@ -1,9 +1,18 @@
-// Stylized sky: gradient dome with a soft sun, drifting low-poly clouds and
-// distant hazy islands (incl. a smoking volcano) on the horizon.
+// Stylized sky: gradient dome with a soft sun, drifting soft rounded clouds
+// and distant hazy islands (incl. a smoking volcano) on the horizon.
+// Colors come from the level biome (layout.biome.sky / .terrain); everything
+// is smooth-shaded (no faceted low-poly look).
 
 import * as THREE from 'three';
 import { makeRng } from '../../shared/rng.js';
-import { deform, paint, place, merge, jitter } from '../models/kit.js';
+import { paint, place, merge, prep } from '../models/kit.js';
+
+// Fallback palette (= the jungle biome) when no layout/biome is given.
+const DEFAULT_SKY = {
+  background: '#7cc8f5', fog: '#a8dcf7',
+  top: '#4fb0f0', horizon: '#a8dcf7', cloud: '#ffffff', sun: '#fff0d6',
+};
+const DEFAULT_LAND = { grass: '#78b857', sand: '#e8c98a', rock: '#9a8fa6' };
 
 const SKY_VERT = /* glsl */`
 varying vec3 vDir;
@@ -32,36 +41,82 @@ void main() {
   #include <colorspace_fragment>
 }`;
 
-export function buildSky(gfx) {
+/** Smooth, low-frequency bump (unlike kit.jitter, which is per-vertex noise). */
+function bump(v, scale, seed) {
+  return Math.sin(v.x * scale + seed * 1.7) * Math.sin(v.y * scale * 1.3 + seed * 2.3) * Math.sin(v.z * scale * 0.9 + seed * 0.7)
+    + 0.5 * Math.sin(v.x * scale * 2.1 - seed) * Math.sin(v.z * scale * 1.9 + seed * 3.1);
+}
+
+/** Displace an (indexed) geometry per unique vertex, keeping it welded. */
+function smoothDeform(geo, fn) {
+  const g = prep(geo);
+  const p = g.attributes.position;
+  const cache = new Map();
+  const v = new THREE.Vector3();
+  for (let i = 0; i < p.count; i++) {
+    const key = `${p.getX(i).toFixed(4)},${p.getY(i).toFixed(4)},${p.getZ(i).toFixed(4)}`;
+    let out = cache.get(key);
+    if (!out) {
+      v.set(p.getX(i), p.getY(i), p.getZ(i));
+      fn(v);
+      out = [v.x, v.y, v.z];
+      cache.set(key, out);
+    }
+    p.setXYZ(i, out[0], out[1], out[2]);
+  }
+  p.needsUpdate = true;
+  g.computeVertexNormals();
+  return g;
+}
+
+export function buildSky(gfx, layout = null) {
   const group = new THREE.Group();
   group.name = 'sky';
   const rng = makeRng(777);
+  const biome = layout?.biome || {};
+  const sky = { ...DEFAULT_SKY, ...(biome.sky || {}) };
+  const land = biome.terrain || {};
+  const volcanic = biome.id === 'volcano';
+  const C = (hex, fb) => {
+    const c = new THREE.Color();
+    try { c.set(hex ?? fb); } catch { c.set(fb); }
+    return c;
+  };
+
+  const zenith = C(sky.top, DEFAULT_SKY.top);
+  const horizon = C(sky.horizon, DEFAULT_SKY.horizon);
+  const background = C(sky.background, DEFAULT_SKY.background);
+  const cloudCol = C(sky.cloud, DEFAULT_SKY.cloud);
+  const sunCol = C(sky.sun, DEFAULT_SKY.sun);
 
   // --- dome
   const skyMat = new THREE.ShaderMaterial({
     vertexShader: SKY_VERT,
     fragmentShader: SKY_FRAG,
     uniforms: {
-      uZenith: { value: new THREE.Color('#2f8fe6') },
-      uHorizon: { value: new THREE.Color('#b9e6fb') },
-      uGround: { value: new THREE.Color('#8fd0ef') },
-      uSunColor: { value: new THREE.Color('#fff2cf') },
+      uZenith: { value: zenith.clone() },
+      uHorizon: { value: horizon.clone() },
+      uGround: { value: horizon.clone().lerp(background, 0.5) },
+      uSunColor: { value: sunCol.clone() },
       uSunDir: { value: gfx.sunDir.clone() },
     },
     side: THREE.BackSide,
     depthWrite: false,
     fog: false,
   });
-  const dome = new THREE.Mesh(new THREE.SphereGeometry(800, 32, 16), skyMat);
+  const dome = new THREE.Mesh(new THREE.SphereGeometry(800, 48, 24), skyMat);
   dome.frustumCulled = false;
   dome.renderOrder = -10;
   group.add(dome);
   gfx.scene.background = null;
 
-  // --- clouds: puffy clusters of faceted blobs, white tops, soft blue-grey bellies
+  // --- clouds: soft rounded clusters, bright tops, bellies tinted toward the sky
+  const cloudTop = cloudCol.clone();
+  const cloudMid = cloudCol.clone().lerp(horizon, 0.12);
+  const cloudBelly = cloudCol.clone().lerp(volcanic ? zenith : horizon, 0.35).multiplyScalar(0.88);
   const cloudMat = new THREE.MeshStandardMaterial({
-    vertexColors: true, flatShading: true, roughness: 1, fog: false,
-    emissive: new THREE.Color('#e8f2fb'), emissiveIntensity: 0.95,
+    vertexColors: true, roughness: 1, fog: false,
+    emissive: cloudCol.clone().lerp(horizon, 0.15), emissiveIntensity: volcanic ? 0.7 : 0.9,
   });
   const cloudGeos = [];
   for (let v = 0; v < 4; v++) {
@@ -69,20 +124,30 @@ export function buildSky(gfx) {
     const n = 4 + v;
     for (let i = 0; i < n; i++) {
       const r = 9 + rng() * 9 * (1 - Math.abs(i - n / 2) / n);
-      let g = new THREE.IcosahedronGeometry(r, 1);
-      g = deform(g, (p) => {
-        p.x += jitter(p, r * 0.12, v * 10 + i);
-        p.y += jitter(p, r * 0.1, v * 10 + i + 3);
-        if (p.y < -r * 0.25) p.y = -r * 0.25 + (p.y + r * 0.25) * 0.15; // flat bottoms
+      const seed = v * 10 + i;
+      let g = new THREE.IcosahedronGeometry(r, 3);
+      g = smoothDeform(g, (p) => {
+        const k = 1 + bump(p, 2.2 / r, seed) * 0.08;
+        p.multiplyScalar(k);
+        // soft flattened belly (smooth blend instead of a hard cut)
+        const floor = -r * 0.3;
+        if (p.y < floor + r * 0.2) {
+          const t = Math.min(1, (floor + r * 0.2 - p.y) / (r * 0.9));
+          p.y = p.y + (floor - p.y) * t * t * (3 - 2 * t) * 0.85;
+        }
       });
       parts.push(place(g, [(i - n / 2) * 13 + rng() * 5, rng() * 5, rng() * 10 - 5], [0, rng() * 6, 0], [1.2, 0.75, 1]));
     }
-    const merged = paint(merge(parts), (c) => (c.y < -2 ? '#c9dcf0' : c.y < 3 ? '#eef5fc' : '#ffffff'));
+    const merged = paint(merge(parts, Math.PI), (c) => {
+      const t = THREE.MathUtils.smoothstep(c.y, -5, 6);
+      return t < 0.5 ? cloudBelly.clone().lerp(cloudMid, t * 2) : cloudMid.clone().lerp(cloudTop, (t - 0.5) * 2);
+    });
     cloudGeos.push(merged);
   }
   {
     const clouds = [];
-    for (let i = 0; i < 18; i++) {
+    const count = volcanic ? 22 : 18;
+    for (let i = 0; i < count; i++) {
       const a = rng() * Math.PI * 2;
       const r = 260 + rng() * 430;
       const m = new THREE.Mesh(cloudGeos[i % cloudGeos.length], cloudMat);
@@ -98,9 +163,12 @@ export function buildSky(gfx) {
   }
 
   // --- distant islands + volcano (fog-free, pre-tinted toward the haze)
-  const haze = new THREE.Color('#b9e6fb');
-  const farMat = new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 1, fog: false });
-  const tint = (hex, k) => new THREE.Color(hex).lerp(haze, k);
+  const haze = horizon.clone();
+  const farMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, fog: false });
+  const tint = (hex, fb, k) => C(hex, fb).lerp(haze, k);
+  const grassHex = land.grass || DEFAULT_LAND.grass;
+  const sandHex = land.sand || DEFAULT_LAND.sand;
+  const rockHex = land.rock || DEFAULT_LAND.rock;
   const farParts = [];
   const islands = [
     { a: -2.2, d: 640, w: 80, h: 38, k: 0.45 },
@@ -110,37 +178,59 @@ export function buildSky(gfx) {
     { a: 2.6, d: 600, w: 50, h: 34, k: 0.45 },
   ];
   for (const [idx, isl] of islands.entries()) {
-    let g = new THREE.CylinderGeometry(isl.w * 0.55, isl.w, isl.h, 9, 3);
-    g = deform(g, (p) => {
-      p.x += jitter(p, isl.w * 0.08, idx);
-      p.z += jitter(p, isl.w * 0.08, idx + 1);
-      if (p.y > isl.h * 0.3) p.y += jitter(p, 4, idx + 2);
+    // smooth dome (upper hemisphere) sinking a little below the sea line
+    let g = new THREE.SphereGeometry(1, 28, 10, 0, Math.PI * 2, 0, Math.PI / 2);
+    g = smoothDeform(g, (p) => {
+      const b = bump(p, 3.1, idx + 1);
+      p.set(p.x * isl.w * (1 + b * 0.06), p.y * isl.h * (1 + b * 0.12) - 4, p.z * isl.w * (1 + b * 0.06));
     });
-    g = paint(g, (c, n) => (n.y > 0.7 ? tint('#78b857', isl.k) : c.y < -isl.h * 0.35 ? tint('#e8c98a', isl.k) : tint('#9a8fa6', isl.k)));
-    farParts.push(place(g, [Math.cos(isl.a) * isl.d, isl.h / 2 - 3, Math.sin(isl.a) * isl.d], [0, idx, 0]));
+    g = paint(g, (c) => {
+      const t = (c.y + 4) / isl.h;
+      if (t < 0.12) return tint(sandHex, DEFAULT_LAND.sand, isl.k);
+      if (t > 0.78 && volcanic) return tint(rockHex, DEFAULT_LAND.rock, isl.k);
+      return tint(grassHex, DEFAULT_LAND.grass, isl.k).lerp(tint(rockHex, DEFAULT_LAND.rock, isl.k), THREE.MathUtils.smoothstep(t, 0.55, 0.95) * 0.6);
+    });
+    farParts.push(place(g, [Math.cos(isl.a) * isl.d, 0, Math.sin(isl.a) * isl.d], [0, idx, 0]));
   }
-  // Volcano to the north-west, like the reference backdrop.
+  // Volcano to the north-west: smooth concave cone with a crater lip.
   const vA = -2.0, vD = 720;
   const vx = Math.cos(vA) * vD, vz = Math.sin(vA) * vD;
   {
-    let g = new THREE.CylinderGeometry(14, 120, 95, 12, 4, true);
-    g = deform(g, (p) => {
-      p.x += jitter(p, 6, 41);
-      p.z += jitter(p, 6, 42);
+    const profile = [];
+    const H = 95;
+    for (let i = 0; i <= 14; i++) {
+      const t = i / 14;
+      // radius 120 at the base easing to 16 at the rim (concave flanks)
+      profile.push(new THREE.Vector2(16 + 104 * Math.pow(1 - t, 1.8), -H / 2 + t * H));
+    }
+    profile.push(new THREE.Vector2(13, H / 2 - 3));   // crater lip
+    let g = new THREE.LatheGeometry(profile, 32);
+    g = smoothDeform(g, (p) => {
+      const b = bump(p, 0.05, 41);
+      p.x *= 1 + b * 0.05;
+      p.z *= 1 + b * 0.05;
     });
+    const rockV = volcanic ? '#4b4452' : '#8a7f95';
+    const rockTop = volcanic ? '#35303b' : '#6f6680';
+    const foot = volcanic ? (land.floor || '#4f5a36') : '#6fae52';
     g = paint(g, (c) => {
       const lava = c.y > 20 && Math.abs(Math.atan2(c.z, c.x) - 0.9) < 0.12 + (c.y - 20) * 0.001;
-      if (lava) return tint('#ff6a2a', 0.2);
-      return c.y > 30 ? tint('#6f6680', 0.4) : c.y > -20 ? tint('#8a7f95', 0.45) : tint('#6fae52', 0.5);
+      if (lava) return tint('#ff6a2a', '#ff6a2a', 0.2);
+      const k = THREE.MathUtils.smoothstep(c.y, -30, 35);
+      return tint(foot, '#6fae52', 0.5).lerp(tint(rockV, rockV, 0.45), THREE.MathUtils.smoothstep(c.y, -35, -10))
+        .lerp(tint(rockTop, rockTop, 0.4), k * 0.8);
     });
     farParts.push(place(g, [vx, 44, vz]));
   }
-  const far = new THREE.Mesh(merge(farParts), farMat);
+  const far = new THREE.Mesh(merge(farParts, Math.PI * 0.55), farMat);
   group.add(far);
 
-  // Volcano smoke plume.
-  const smokeGeo = new THREE.IcosahedronGeometry(1, 0);
-  const smokeMat = new THREE.MeshStandardMaterial({ color: '#b3aeb8', emissive: '#6d6874', emissiveIntensity: 0.4, flatShading: true, transparent: true, opacity: 0.55, depthWrite: false, fog: false, roughness: 1 });
+  // Volcano smoke plume: soft smooth puffs.
+  const smokeGeo = new THREE.SphereGeometry(1, 16, 12);
+  const smokeMat = new THREE.MeshStandardMaterial({
+    color: volcanic ? '#6e6468' : '#b3aeb8', emissive: volcanic ? '#4a4044' : '#6d6874', emissiveIntensity: 0.4,
+    transparent: true, opacity: volcanic ? 0.6 : 0.5, depthWrite: false, fog: false, roughness: 1,
+  });
   const smoke = new THREE.InstancedMesh(smokeGeo, smokeMat, 14);
   smoke.frustumCulled = false;
   group.add(smoke);
@@ -150,8 +240,10 @@ export function buildSky(gfx) {
 
   return {
     group,
+    /** Colors this sky was built with (the integrator may reuse them for fog/background). */
+    colors: { zenith, horizon, background, cloud: cloudCol, sun: sunCol, fog: C(sky.fog, DEFAULT_SKY.fog) },
     update(dt, time, camPos) {
-      dome.position.copy(camPos);
+      if (camPos) dome.position.copy(camPos);
       for (const c of group.userData.clouds) {
         c.position.x += c.userData.speed * dt;
         if (c.position.x > 720) c.position.x = -720;

@@ -5,6 +5,8 @@ import * as THREE from 'three';
 import { CONFIG } from '../../shared/config.js';
 import { Terrain } from '../../shared/terrain.js';
 import { buildLayout } from '../../shared/layout.js';
+import { planIsland } from '../../shared/island.js';
+import { RELICS } from '../../shared/relics.js';
 import { MSG, EV, PF, DS, ACT } from '../../shared/protocol.js';
 import { CONTRACTS } from '../../shared/missions.js';
 import { Renderer } from './renderer.js';
@@ -28,21 +30,30 @@ import { PlayerActions } from '../player/actions.js';
 import { GameAudio } from '../audio/audio.js';
 import { settings } from './settings.js';
 import { Wardrobe } from '../ui/wardrobe.js';
+import { BoatPanel } from '../ui/boatPanel.js';
+import { Relics } from '../entities/relics.js';
+import { buildSites } from '../world/sites.js';
 
 export class Game {
   /**
    * @param {HTMLCanvasElement} canvas
    * @param {import('../net/net.js').Net} net connected session (welcome received)
+   * @param {{gfx, audio, input}|null} [reuse] renderer/audio/input of the previous island
    */
-  constructor(canvas, net) {
+  constructor(canvas, net, reuse = null) {
     this.canvas = canvas;
     this.net = net;
-    this.terrain = new Terrain();
+    const lv = net.welcome.world.level || { index: 0, variant: 1 };
+    this.level = lv;
+    this.terrain = new Terrain(planIsland(lv.index, lv.variant));
     this.layout = buildLayout(this.terrain);
-    this.gfx = new Renderer(canvas);
-    this.input = new Input(canvas);
+    this.gfx = reuse?.gfx ?? new Renderer(canvas);
+    if (reuse) this.gfx.reset();
+    this.gfx.applyBiome(this.layout.biome.sky);
+    this.input = reuse?.input ?? new Input(canvas);
     this.player = new PlayerController(this.terrain, this.layout.playerColliders, this.layout.rockSurfaceAt);
     this.time = 0;
+    this.wasFlying = false;
     this.running = false;
     this.debug = false;
     this.sendTimer = 0;
@@ -54,7 +65,7 @@ export class Game {
     this.overlay.className = 'world-overlay';
     document.body.appendChild(this.overlay);
 
-    this.audio = new GameAudio();
+    this.audio = reuse?.audio ?? new GameAudio();
     this.stepDist = 0;
     this.hud = new Hud(document.getElementById('hud'));
     this.hud.initMinimap(this.terrain, this.layout);
@@ -70,11 +81,13 @@ export class Game {
       else if (action === 'map') open = this.hud.toggleMap();
       else if (action === 'board') open = this.hud.toggleBoard();
       else if (action === 'wardrobe') open = this.hud.togglePanel('wardrobe');
+      else if (action === 'boat') open = this.hud.togglePanel('boat');
       else {
         this.hud.toggleInventory(false);
         this.hud.toggleMap(false);
         this.hud.toggleBoard(false);
         this.hud.togglePanel('wardrobe', false);
+        this.hud.togglePanel('boat', false);
         open = false;
       }
       this.onPanelChange?.(open);
@@ -100,7 +113,8 @@ export class Game {
     this.items = new Items(this);
     this.projectiles = new Projectiles(this);
     this.actions = new PlayerActions(this);
-    this.systems = [this.dinos, this.tracks, this.items, this.actions, this.projectiles];
+    this.relics = new Relics(this);
+    this.systems = [this.dinos, this.tracks, this.items, this.actions, this.projectiles, this.relics];
 
     this.#applyWelcome(w);
     this.wardrobe = new Wardrobe({
@@ -114,6 +128,14 @@ export class Game {
       onOpen: () => this.wardrobe.onOpen(),
       onClose: () => this.wardrobe.onClosed(),
     });
+    this.boatPanel = new BoatPanel({
+      onRepair: () => this.net.act(ACT.REPAIR),
+      onClose: () => this.input.onPanelToggle('close'),
+    });
+    this.hud.addPanel('boat', { el: this.boatPanel.el, onOpen: () => this.boatPanel.onOpen() });
+    this.boatPanel.setMission(this.mission);
+    this.sites.boat.setRepaired?.(!!w.world.boat?.repaired);
+    this.sites.boat.setParts?.((w.world.relics || []).filter((r) => r.found).map((r) => r.kind));
     this.#bindNet();
 
     this.clock = new THREE.Clock(false);
@@ -124,14 +146,15 @@ export class Game {
     const scene = this.gfx.scene;
     scene.add(buildTerrainMesh(this.terrain, this.layout));
 
-    this.sky = buildSky(this.gfx);
+    this.sky = buildSky(this.gfx, this.layout);
     this.water = buildWater(this.terrain, this.layout, this.gfx.sunDir);
     this.vegetation = buildVegetation(this.terrain, this.layout);
     this.rocks = buildRocks(this.terrain, this.layout);
     this.fruitPlants = buildFruitPlants(this.terrain, this.layout);
     this.hut = buildHut(this.terrain, this.layout);
-    scene.add(this.sky.group, this.water.group, this.vegetation.group, this.rocks.group, this.fruitPlants.group, this.hut.group);
-    this.worldUpdaters = [this.sky, this.water, this.vegetation, this.fruitPlants, this.hut];
+    this.sites = buildSites(this.terrain, this.layout);
+    scene.add(this.sky.group, this.water.group, this.vegetation.group, this.rocks.group, this.fruitPlants.group, this.hut.group, this.sites.group);
+    this.worldUpdaters = [this.sky, this.water, this.vegetation, this.fruitPlants, this.hut, this.sites];
 
     // Debug view of colliders (F3).
     this.debugGroup = new THREE.Group();
@@ -194,6 +217,11 @@ export class Game {
     if (!this.hud.isPanelOpen()) this.input.onPanelToggle('wardrobe');
   }
 
+  /** E at the wrecked boat. */
+  openBoat() {
+    if (!this.hud.isPanelOpen()) this.input.onPanelToggle('boat');
+  }
+
   /** E at the mission board. */
   openBoard() {
     if (!this.hud.isPanelOpen()) this.input.onPanelToggle('board');
@@ -201,6 +229,20 @@ export class Game {
 
   #bindNet() {
     const net = this.net;
+    // a second welcome means the team sailed on: main.js builds the next island
+    net.on(MSG.WELCOME, (m) => this.onNewIsland?.(m));
+    net.on(`ev:${EV.RELIC}`, (m) => {
+      this.relics.found(m.id);
+      this.audio.play('complete');
+      const r = this.mission?.relics?.find((q) => q.id === m.id);
+      const kinds = (this.mission?.relics || []).filter((q) => q.found || q.id === m.id).map((q) => q.kind);
+      this.sites.boat.setParts?.(kinds);
+      if (r && m.by === this.me.id) this.hud.toast(`${RELICS[r.kind].name} secured for the boat!`, r.kind);
+    });
+    net.on(`ev:${EV.BOAT}`, () => {
+      this.sites.boat.setRepaired?.(true);
+      this.audio.play('quest');
+    });
     net.on(MSG.SNAP, (m) => {
       for (const row of m.p) {
         if (row[0] === this.me.id) {
@@ -245,6 +287,7 @@ export class Game {
       if (m.mission.step !== this.mission.step) this.audio.play(m.mission.complete ? 'complete' : 'quest');
       this.mission = m.mission;
       this.#showMission();
+      this.boatPanel.setMission(m.mission);
       this.hud.missionComplete(m.mission.complete, { completedIn: m.mission.completedIn, store: this.store });
     });
     net.on(`ev:${EV.STORE}`, (m) => { this.store = m.store; });
@@ -254,7 +297,7 @@ export class Game {
         this.lastHurtAt = this.time;
         this.hud.damageFlash(m.dmg);
         if (m.src) {
-          const name = CONFIG.dinos[m.src]?.name || 'Dinosaur';
+          const name = CONFIG.dinos[m.src]?.name || (m.src === 'lava' ? 'Lava' : 'Dinosaur');
           let direction = 'nearby';
           if (m.from) {
             const dx = m.from.x - this.player.pos.x, dz = m.from.z - this.player.pos.z;
@@ -330,6 +373,22 @@ export class Game {
     this.input.exitLock();
   }
 
+  /**
+   * Tear this island down (the next one is built by main.js). Returns the
+   * renderer, audio and input so the next Game can reuse them.
+   */
+  dispose() {
+    this.stop();
+    this.overlay.remove();
+    this.wardrobe.dispose?.();
+    this.net.clearHandlers();
+    this.hud.show(false);
+    this.input.onPanelToggle = null;
+    this.input.onLockChange = null;
+    this.audio.update?.(0, { coast: 0, waterfallDistance: Infinity, danger: false });
+    return { gfx: this.gfx, audio: this.audio, input: this.input };
+  }
+
   loop() {
     if (!this.running) return;
     requestAnimationFrame(this.loop);
@@ -365,7 +424,7 @@ export class Game {
       this.debugGroup.visible = this.debug;
     }
     // E toggles the mission board closed again (opening is an interaction)
-    if ((this.hud._boardOpen || this.hud.isExtraOpen('wardrobe')) && input.wasPressed('interact')) this.input.onPanelToggle('close');
+    if ((this.hud._boardOpen || this.hud.isExtraOpen('wardrobe') || this.hud.isExtraOpen('boat')) && input.wasPressed('interact')) this.input.onPanelToggle('close');
     const canMove = this.me.alive && !this.hud.isPanelOpen();
     p.update(dt, {
       forward: canMove && input.isHeld('forward'),
@@ -414,7 +473,9 @@ export class Game {
     }
     // surf gets louder toward the coast
     const g = this.terrain.heightAt(p.pos.x, p.pos.z);
-    const coast = Math.max(0, Math.min(1, (Math.hypot(p.pos.x, p.pos.z) - 110) / 70)) * (g < 6 ? 1 : 0.3);
+    const plan = this.layout.plan;
+    const rim = Math.hypot(p.pos.x / plan.A, p.pos.z / plan.B);
+    const coast = Math.max(0, Math.min(1, (rim - 0.7) / 0.3)) * (g < 6 ? 1 : 0.3);
     const fall = this.layout.waterfall?.bottom;
     const waterfallDistance = fall ? Math.hypot(p.pos.x - fall.x, p.pos.z - fall.z) : Infinity;
     this.audio.update(dt, { coast, waterfallDistance, danger: this.#inDanger() });
@@ -469,11 +530,14 @@ export class Game {
     }
   }
 
-  /** Compass markers: the hut and teammates. */
+  /** Compass markers: the hut, the boat and teammates. */
   compassMarkers() {
     const p = this.player.pos;
     const bearing = (x, z) => Math.atan2(-(x - p.x), -(z - p.z));
-    const list = [{ bearing: bearing(this.layout.hut.x, this.layout.hut.z), kind: 'hut' }];
+    const list = [
+      { bearing: bearing(this.layout.hut.x, this.layout.hut.z), kind: 'hut' },
+      { bearing: bearing(this.layout.boat.x, this.layout.boat.z), kind: 'boat' },
+    ];
     for (const rp of this.remotes.map.values()) {
       list.push({ bearing: bearing(rp.pos.x, rp.pos.z), kind: 'player', color: CONFIG.playerColors[rp.slot % 4] });
     }

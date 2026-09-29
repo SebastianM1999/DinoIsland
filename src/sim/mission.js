@@ -1,22 +1,35 @@
-// Demo mission: "Find a Brachiosaurus. Track it. Hunt it. Collect the loot.
-// Return to the hut." Server-side state machine; clients only display it.
+// Main quest per island: "Find the boat parts hidden on the island, repair
+// the wrecked boat on the far beach, and set sail together to the next
+// island." Plus the team contracts from the mission board, whose progress
+// survives from island to island. Server-side; clients only display it.
 
-import { CONFIG } from '../shared/config.js';
 import { EV } from '../shared/protocol.js';
 import { CONTRACTS } from '../shared/missions.js';
+import { RELICS } from '../shared/relics.js';
 
-const STEPS = { TRACKS: 0, HUNT: 1, COLLECT: 2, RETURN: 3, DONE: 4 };
-const M = CONFIG.mission;
+const SAIL_RADIUS = 18;          // everyone alive must stand this close to the boat
+const SAIL_HOLD = 3;             // seconds the team has to stay there
+const SAIL_DELAY = 7;            // seconds of "island complete" before the next island loads
 
 export class Mission {
   constructor(world) {
     this.world = world;
-    this.expedition = 1;
-    this.expeditionsDone = 0;
-    // Team contracts (mission board): progress survives expeditions.
+    this.islandsDone = 0;
+    // Team contracts (mission board): progress survives islands.
     this.contracts = CONTRACTS.map((c) => ({ id: c.id, progress: 0, done: false }));
-    this.stats = { kills: {}, delivered: {}, fruit: 0, traps: 0 };
-    this.reset();
+    this.stats = { kills: {}, delivered: {}, fruit: 0, traps: 0, relics: 0 };
+    this.startIsland();
+  }
+
+  /** Called whenever a new island has been loaded. */
+  startIsland() {
+    this.phase = 'search';        // search -> repaired -> sailing
+    this.startedAt = this.world.now;
+    this.completedIn = 0;
+    this.sailT = 0;
+    this.doneTimer = 0;
+    this.atBoat = 0;
+    this.alive = 0;
   }
 
   /** A game event happened; advance matching contracts. */
@@ -43,49 +56,30 @@ export class Mission {
     return b;
   }
 
-  reset() {
-    this.step = STEPS.TRACKS;
-    this.deposited = { meat: 0, hide: 0 };
-    this.doneTimer = 0;
-    this.startedAt = this.world.now;
-    this.completedIn = 0;
-  }
-
-  /** Loot collected so far (carried by the team + already deposited), capped at the goal. */
-  progress() {
-    const w = this.world;
-    const carried = { meat: 0, hide: 0 };
-    for (const p of w.players.values()) {
-      carried.meat += p.inv.loot.meat;
-      carried.hide += p.inv.loot.hide;
-    }
-    const have = {
-      meat: Math.min(M.requiredMeat, carried.meat + this.deposited.meat),
-      hide: Math.min(M.requiredHide, carried.hide + this.deposited.hide),
-    };
-    const dep = {
-      meat: Math.min(M.requiredMeat, this.deposited.meat),
-      hide: Math.min(M.requiredHide, this.deposited.hide),
-    };
-    return { have, dep };
-  }
-
   state() {
-    const s = this.step;
-    const { have, dep } = this.progress();
+    const w = this.world;
+    const L = w.layout.level;
+    const relics = w.relics.map((r) => ({ id: r.id, kind: r.kind, site: r.site, found: r.found, by: r.byName || null }));
+    const found = relics.filter((r) => r.found).length;
+    const repaired = this.phase !== 'search';
+    const objectives = [
+      ...relics.map((r) => {
+        const def = RELICS[r.kind];
+        return { text: r.found ? `${def.name} found` : `Find the ${def.name} – ${def.hint}`, done: r.found, relic: r.kind };
+      }),
+      { text: `Repair the boat on the east beach (${found}/${relics.length} parts)`, done: repaired },
+      { text: `Set sail together (${this.atBoat}/${Math.max(1, this.alive)} at the boat)`, done: this.phase === 'sailing' },
+    ];
     return {
-      expedition: this.expedition,
-      step: s,
-      title: s === STEPS.DONE ? 'Expedition complete!' : `Expedition ${this.expedition}: The Gentle Giant`,
-      objectives: [
-        { text: 'Find Brachiosaurus tracks', done: s > STEPS.TRACKS },
-        { text: 'Hunt a Brachiosaurus', done: s > STEPS.HUNT },
-        { text: `Collect loot (meat ${have.meat}/${M.requiredMeat}, hide ${have.hide}/${M.requiredHide})`, done: s > STEPS.COLLECT },
-        { text: `Return to the hut together and drop it off (${dep.meat + dep.hide}/${M.requiredMeat + M.requiredHide})`, done: s > STEPS.RETURN },
-      ],
-      complete: s === STEPS.DONE,
+      level: { index: L.index, number: L.number, name: L.name, biome: L.biome.id },
+      step: this.phase,
+      title: this.phase === 'sailing' ? 'Island complete!' : `Island ${L.number}: ${L.name}`,
+      objectives,
+      relics,
+      boat: { repaired },
+      complete: this.phase === 'sailing',
       completedIn: this.completedIn,
-      expeditionsDone: this.expeditionsDone,
+      expeditionsDone: this.islandsDone,
       contracts: this.contracts.map((c) => ({ ...c })),
       stats: this.stats,
     };
@@ -95,35 +89,36 @@ export class Mission {
     this.world.event(EV.MISSION, { mission: this.state() });
   }
 
-  advance(to, toastText) {
-    if (to <= this.step) return;
-    this.step = to;
-    if (toastText) this.world.toast(toastText, 'quest');
+  // ------------------------------------------------------------------ hooks
+
+  onRelicFound(r, p) {
+    this.stats.relics++;
+    const left = this.world.relics.filter((q) => !q.found).length;
+    this.world.toast(`${p.name} found the ${RELICS[r.kind].name}! ${left ? `${left} boat part${left > 1 ? 's' : ''} left.` : 'All parts found – repair the boat!'}`, 'quest');
     this.broadcast();
+  }
+
+  /** Try to repair the boat; returns a reason string when it can't be done. */
+  repair(p) {
+    if (this.phase !== 'search') return null;
+    const missing = this.world.relics.filter((r) => !r.found);
+    if (missing.length) return `Still missing: ${missing.map((r) => RELICS[r.kind].name).join(', ')}`;
+    this.phase = 'repaired';
+    this.world.toast(`${p.name} repaired the boat! Gather the whole team at the boat to set sail.`, 'quest');
+    this.world.event(EV.BOAT, { repaired: true });
+    this.broadcast();
+    return null;
   }
 
   /** Called by the dinosaur system. */
   onDinoKilled(d) {
     this.stats.kills[d.type] = (this.stats.kills[d.type] || 0) + 1;
     this.onEvent(`kill:${d.type}`);
-    if (d.type === 'brachio' && this.step <= STEPS.HUNT) {
-      this.advance(STEPS.COLLECT, 'The Brachiosaurus is down! Collect the loot.');
-    }
   }
 
-  onLootChanged() {
-    if (this.step === STEPS.COLLECT) {
-      const { have } = this.progress();
-      if (have.meat >= M.requiredMeat && have.hide >= M.requiredHide) {
-        this.advance(STEPS.RETURN, 'Loot secured – bring it back to the hut together!');
-        return;
-      }
-    }
-    this.broadcast();
-  }
+  onLootChanged() {}
 
   onDeposit(kind, n) {
-    if (kind in this.deposited) this.deposited[kind] += n;
     this.stats.delivered[kind] = (this.stats.delivered[kind] || 0) + n;
     this.onEvent(`deliver:${kind}`, n);
   }
@@ -140,50 +135,32 @@ export class Mission {
 
   update(dt) {
     const w = this.world;
-    if (this.step === STEPS.TRACKS) {
-      // Any player close to a Brachiosaurus footprint (or the animal itself) finds the trail.
-      const R = CONFIG.tracks.discoverRadius;
-      for (const p of w.players.values()) {
-        if (!p.alive) continue;
-        for (let i = w.tracks.length - 1; i >= 0; i--) {
-          const t = w.tracks[i];
-          if (t.type === 'brachio' && (t.x - p.x) ** 2 + (t.z - p.z) ** 2 < R * R) {
-            this.advance(STEPS.HUNT, `${p.name} found Brachiosaurus tracks! Follow them.`);
-            return;
-          }
-        }
-        for (const d of w.dinos.list) {
-          if (d.type === 'brachio' && d.alive && (d.x - p.x) ** 2 + (d.z - p.z) ** 2 < 30 * 30) {
-            this.advance(STEPS.HUNT, `${p.name} spotted a Brachiosaurus herd!`);
-            return;
-          }
-        }
-      }
-    } else if (this.step === STEPS.RETURN) {
-      const done = this.deposited.meat >= M.requiredMeat && this.deposited.hide >= M.requiredHide;
-      if (!done) return;
-      const h = w.layout.hut.campfire;
-      let alive = 0, home = 0;
+    if (this.phase === 'repaired') {
+      const b = w.layout.boat;
+      let alive = 0, near = 0;
       for (const p of w.players.values()) {
         if (!p.alive) continue;
         alive++;
-        if ((p.x - h.x) ** 2 + (p.z - h.z) ** 2 < M.returnRadius ** 2) home++;
+        if ((p.x - b.x) ** 2 + (p.z - b.z) ** 2 < SAIL_RADIUS ** 2) near++;
       }
-      if (alive > 0 && home === alive) {
-        this.completedIn = Math.round(w.now - this.startedAt);
-        this.expeditionsDone++;
-        this.advance(STEPS.DONE, 'Expedition complete! The whole team made it home.');
-        this.onEvent('expedition');
-        this.doneTimer = 12;
-      }
-    } else if (this.step === STEPS.DONE) {
-      this.doneTimer -= dt;
-      if (this.doneTimer <= 0) {
-        this.expedition++;
-        this.reset();
-        w.toast(`Expedition ${this.expedition} begins – find another Brachiosaurus!`, 'quest');
+      if (near !== this.atBoat || alive !== this.alive) {
+        this.atBoat = near;
+        this.alive = alive;
         this.broadcast();
       }
+      this.sailT = alive > 0 && near === alive ? this.sailT + dt : 0;
+      if (this.sailT >= SAIL_HOLD) {
+        this.phase = 'sailing';
+        this.completedIn = Math.round(w.now - this.startedAt);
+        this.islandsDone++;
+        this.doneTimer = SAIL_DELAY;
+        w.toast('All aboard! Setting sail for the next island…', 'quest');
+        this.onEvent('island');
+        this.broadcast();
+      }
+    } else if (this.phase === 'sailing') {
+      this.doneTimer -= dt;
+      if (this.doneTimer <= 0) w.nextLevel();
     }
   }
 }

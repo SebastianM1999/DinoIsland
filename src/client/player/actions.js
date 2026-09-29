@@ -316,6 +316,13 @@ export class PlayerActions {
       const carrying = LOOT_KEYS.some((k) => inv.loot[k] > 0);
       return { text: carrying ? 'Drop off loot' : 'Loot drop-off (nothing to drop off)', run: carrying ? () => net.act(ACT.DEPOSIT) : null };
     }
+    const boat = g.layout.boat;
+    if (boat && Math.hypot(boat.interact.x - pos.x, boat.interact.z - pos.z) < 5.5) {
+      const m = g.mission;
+      const found = (m?.relics || []).filter((r) => r.found).length;
+      const text = m?.boat?.repaired ? 'Check the boat' : `Inspect the wreck (${found}/${m?.relics?.length ?? 3} parts)`;
+      return { text, run: () => g.openBoat() };
+    }
     if (near(h.wardrobe, 3)) {
       return { text: 'Change clothes', run: () => g.openWardrobe() };
     }

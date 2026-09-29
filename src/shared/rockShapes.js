@@ -4,10 +4,9 @@
 // exactly these vertices and the collision reads the same table, so the hitbox
 // is the visible rock – including the vertical walls of stepped rocks.
 
-import { hash2 } from './rng.js';
 
-/** Angles per ring (low-poly facets). */
-const SIDES = 11;
+/** Angles per ring (enough for a smooth outline; collision uses the same table). */
+const SIDES = 24;
 const TAU = Math.PI * 2;
 
 /** Pebbles up to this scale are decoration only (walk straight through). */
@@ -65,7 +64,8 @@ export function rockTable(variant) {
   const outline = [];
   for (let j = 0; j < SIDES; j++) {
     const a = (j / SIDES) * TAU;
-    outline.push(1 + v.wob * (Math.sin(2 * a + variant) * 0.6 + Math.sin(3 * a + variant * 2) * 0.4) + (hash2(j, 0, seed) - 0.5) * v.wob);
+    // smooth lobes only (no per-vertex noise) so the outline reads as a rounded stone
+    outline.push(1 + v.wob * (Math.sin(2 * a + variant) * 0.6 + Math.sin(3 * a + variant * 2) * 0.4 + Math.sin(5 * a + seed) * 0.22));
   }
   const rad = [], h = [], wall = [];
   v.rings.forEach(([r, y, isWall], k) => {
@@ -73,9 +73,10 @@ export function rockTable(variant) {
     for (let j = 0; j < SIDES; j++) {
       // walls keep the radius of the ledge above them so they stay vertical
       const key = isWall ? k - 1 : k;
-      const wobble = r === 0 ? 0 : (hash2(j, key * 7 + 3, seed) - 0.5) * v.tierWob * 2;
+      const a = (j / SIDES) * TAU;
+      const wobble = r === 0 ? 0 : (Math.sin(a * 3 + key * 1.7 + seed) * 0.6 + Math.sin(a * 5 - key * 2.3) * 0.4) * v.tierWob;
       rr.push(r * outline[j] * (1 + wobble));
-      hh.push(y + (r === 0 ? 0 : (hash2(j, k * 7 + 5, seed) - 0.5) * 0.04));
+      hh.push(y + (r === 0 ? 0 : Math.sin(a * 2 + k * 1.3 + seed) * 0.015));
     }
     if (isWall) for (let j = 0; j < SIDES; j++) rr[j] = Math.max(rr[j], rad[k - 1][j] + 0.004);
     else if (k > 0) for (let j = 0; j < SIDES; j++) rr[j] = Math.max(rr[j], rad[k - 1][j] + 0.02);

@@ -5,14 +5,18 @@
 
 import { CONFIG } from '../../shared/config.js';
 import { DS, EV, MSG } from '../../shared/protocol.js';
+import { WORLD } from '../../shared/island.js';
 
 const C = CONFIG.dinos.ptera;
-// Circling areas: over the eastern beach, the western hills and the south-west shore.
-const AREAS = [
-  { x: 150, z: 20 },
-  { x: -105, z: 25 },
-  { x: -95, z: 120 },
-];
+/** Circling areas spread along the island (west, middle, east, and the beaches). */
+function areasOf(plan) {
+  return [
+    { x: plan.A * 0.45, z: plan.B * 0.3 },
+    { x: -plan.A * 0.35, z: -plan.B * 0.25 },
+    { x: 0, z: plan.B * 0.55 },
+    { x: plan.A * 0.1, z: -plan.B * 0.5 },
+  ];
+}
 
 function flyTo(sys, d, tx, ty, tz, speed, dt, agility = 2.2) {
   const dx = tx - d.x, dy = ty - d.y, dz = tz - d.z;
@@ -24,7 +28,7 @@ function flyTo(sys, d, tx, ty, tz, speed, dt, agility = 2.2) {
   d.x += d.vx * dt;
   d.y += d.vy * dt;
   d.z += d.vz * dt;
-  const lim = CONFIG.world.size / 2 - 10;
+  const lim = WORLD.size / 2 - 10;
   d.x = Math.max(-lim, Math.min(lim, d.x));
   d.z = Math.max(-lim, Math.min(lim, d.z));
   const ground = sys.terrain.heightAt(d.x, d.z);
@@ -53,9 +57,12 @@ function pickTarget(sys, d) {
 export const pteraBrain = {
   spawnInitial(sys) {
     const nests = sys.world.layout.nests;
-    for (let i = 0; i < C.count; i++) {
+    const areas = areasOf(sys.world.layout.plan);
+    const count = sys.world.layout.level.dinos.ptera;
+    if (!nests.length) return;
+    for (let i = 0; i < count; i++) {
       const n = nests[i % nests.length];
-      const d = sys.spawn('ptera', n.x, n.z, { nest: n, area: AREAS[i % AREAS.length], slot: i });
+      const d = sys.spawn('ptera', n.x, n.z, { nest: n, area: areas[i % areas.length], slot: i });
       d.y = n.y + 2;
     }
   },
@@ -63,7 +70,8 @@ export const pteraBrain = {
   respawn(sys, r) {
     const nests = sys.world.layout.nests;
     const i = Math.floor(Math.random() * nests.length);
-    const d = sys.spawn('ptera', nests[i].x, nests[i].z, { nest: nests[i], area: AREAS[i % AREAS.length], slot: i });
+    const areas = areasOf(sys.world.layout.plan);
+    const d = sys.spawn('ptera', nests[i].x, nests[i].z, { nest: nests[i], area: areas[i % areas.length], slot: i });
     d.y = nests[i].y + 2;
   },
 

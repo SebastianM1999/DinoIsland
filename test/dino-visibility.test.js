@@ -7,8 +7,12 @@ import { SPECIES } from '../src/client/entities/dinoViews.js';
 import { DinoAnimator } from '../src/client/models/dino/rig.js';
 
 test('every dinosaur spawned by the server has a visible, animated client model', () => {
-  const world = new ServerWorld({ send() {} });
-  const spawned = new Set(world.dinos.list.map((dino) => dino.type));
+  // the jungle island has no T-Rex; the volcano island has every species
+  const spawned = new Set();
+  for (const level of [0, 1]) {
+    const world = new ServerWorld({ send() {} }, { level, variant: 7 });
+    for (const dino of world.dinos.list) spawned.add(dino.type);
+  }
   assert.deepEqual([...spawned].sort(), Object.keys(CONFIG.dinos).sort());
 
   for (const type of spawned) {

@@ -10,6 +10,7 @@ import { icon, portraitSvg } from './icons.js';
 import { buildMapBase, drawMap } from './minimap.js';
 import { ITEM_INFO } from './itemInfo.js';
 import { CONTRACTS as BOARD_CONTRACTS } from '../../shared/missions.js';
+import { RELICS } from '../../shared/relics.js';
 
 const TAU = Math.PI * 2;
 const DEG = 180 / Math.PI;
@@ -49,6 +50,7 @@ export class Hud {
   constructor(root) {
     ensureStylesheet();
     this.root = root;
+    root.replaceChildren();              // a new island builds a fresh HUD in the same element
     root.classList.add('hud');
     root.setAttribute('aria-label', 'Game HUD');
     this._c = {};                       // last written values (change detection)
@@ -354,7 +356,7 @@ export class Hud {
         item.kind = m.kind;
         item.color = color;
         item.wrap.dataset.kind = m.kind;
-        item.inner.innerHTML = m.kind === 'hut' ? icon('home') : m.kind === 'player' ? icon('person') : m.kind === 'dino' ? icon('track') : '';
+        item.inner.innerHTML = m.kind === 'hut' ? icon('home') : m.kind === 'boat' ? icon('boat') : m.kind === 'player' ? icon('person') : m.kind === 'dino' ? icon('track') : '';
         item.inner.style.color = color;
       }
       const x = Math.round((rel / COMPASS_SPAN) * 1000) / 10;
@@ -382,12 +384,23 @@ export class Hud {
     });
   }
 
+  /** Map radius that fits the whole (oblong) island into a w x h view. */
+  _fitRadius(size, w, h) {
+    const isl = this._mapBase?.island;
+    if (!isl) return size * 0.42;
+    const pad = 1.15;
+    // pxPerM = min(w, h) / (2 r): pick r so both island axes fit
+    const rx = (isl.A * pad * Math.min(w, h)) / w;
+    const rz = (isl.B * pad * Math.min(w, h)) / h;
+    return Math.max(rx, rz, 60);
+  }
+
   _drawBigMap() {
     const { w, h } = this._bigMap;
     if (!w || !this._mapOpen) return;
     const size = this._mapBase ? this._mapBase.size : CONFIG.world.size;
     drawMap(this._bigCtx, this._mapBase, this._mapState, {
-      cx: 0, cz: 0, radius: size * 0.42, w, h, round: false, clampHut: false, scale: Math.max(6, w / 90),
+      cx: 0, cz: 0, radius: this._fitRadius(size, w, h), w, h, round: false, clampHut: false, scale: Math.max(6, w / 90),
     });
   }
 
@@ -728,49 +741,86 @@ export class Hud {
   _renderBoard() {
     const m = this._boardMission;
     if (!m) return;
-    const sig = JSON.stringify([m.step, m.objectives, m.contracts, m.expeditionsDone, this.trackedContract]);
+    const sig = JSON.stringify([m.step, m.objectives, m.relics, m.contracts, m.expeditionsDone, this.trackedContract]);
     if (this._c.boardSig === sig) return;
     this._c.boardSig = sig;
     const contracts = m.contracts || [];
     const defs = BOARD_CONTRACTS;
-    const doneCount = contracts.filter((c) => c.done).length;
-    const objDone = m.objectives.filter((o) => o.done).length;
     const pin = (c) => `<i class="board-pin" style="--pin:${c}"></i>`;
     const bar = (p, goal) => `<span class="board-bar" role="progressbar" aria-valuemin="0" aria-valuemax="${goal}" aria-valuenow="${p}"><i style="width:${Math.round((p / goal) * 100)}%"></i></span>`;
-    const main = `
-      <article class="board-note board-main">
+
+    // --- main quest: the boat parts of this island
+    const relics = m.relics || [];
+    const found = relics.filter((r) => r.found).length;
+    const steps = (m.objectives || []).filter((o) => !o.relic);
+    const parts = relics.map((r) => {
+      const def = RELICS[r.kind];
+      return `<li class="board-part${r.found ? ' is-found' : ''}" style="--c:${def.color}">
+        <span class="board-part-ic">${icon(r.kind)}</span>
+        <span class="board-part-txt"><b>${esc(def.name)}</b><small>${r.found ? `Found${r.by ? ` by ${esc(r.by)}` : ''}` : esc(def.hint)}</small></span>
+        <span class="board-part-state">${r.found ? icon('check') : '?'}</span>
+      </li>`;
+    }).join('');
+    const quest = `
+      <article class="board-note board-quest">
         ${pin('#ee4d5f')}
-        <p class="board-kicker">${m.complete ? 'Completed' : 'Current expedition'}</p>
-        <h3>${esc(m.title)}</h3>
-        <ul class="board-checks">
-          ${m.objectives.map((o) => `<li class="${o.done ? 'is-done' : ''}"><span class="board-box">${o.done ? icon('check') : ''}</span>${esc(o.text)}</li>`).join('')}
+        <div class="board-quest-top">
+          <div>
+            <p class="board-kicker">Main quest${m.level ? ` · Island ${m.level.number}: ${esc(m.level.name)}` : ''}</p>
+            <h3>${icon('boat')} ${m.complete ? 'All aboard – next island!' : 'Repair the boat and sail on'}</h3>
+            <p>Find the ${relics.length} boat parts hidden on this island, fix the wreck on the east beach and set sail together.</p>
+          </div>
+          <div class="board-quest-score">${bar(found, Math.max(1, relics.length))}<b>${found}/${relics.length} parts</b></div>
+        </div>
+        <ul class="board-parts">${parts}</ul>
+        <ul class="board-checks board-steps">
+          ${steps.map((o) => `<li class="${o.done ? 'is-done' : ''}"><span class="board-box">${o.done ? icon('check') : ''}</span>${esc(o.text)}</li>`).join('')}
         </ul>
-        <div class="board-progress">${bar(objDone, m.objectives.length)}<b>${objDone}/${m.objectives.length}</b></div>
-        <p class="board-foot">${icon('trophy')} Expeditions completed: <b>${m.expeditionsDone ?? 0}</b></p>
+        <p class="board-foot">${icon('trophy')} Islands completed: <b>${m.expeditionsDone ?? 0}</b></p>
       </article>`;
-    const cards = defs.map((d, i) => {
+
+    // --- contracts: active on the left, done on the right
+    const active = [], done = [];
+    defs.forEach((d, i) => {
       const c = contracts[i] || { progress: 0, done: false };
+      (c.done ? done : active).push({ d, c, i });
+    });
+    const activeCards = active.map(({ d, c, i }) => {
       const tracked = this.trackedContract === d.id;
-      const tilt = ((i * 37) % 5 - 2) * 0.6;
+      const tilt = ((i * 37) % 5 - 2) * 0.5;
       return `
-      <article class="board-note board-card${c.done ? ' is-done' : ''}${tracked ? ' is-tracked' : ''}" style="--tilt:${tilt}deg">
+      <article class="board-note board-card${tracked ? ' is-tracked' : ''}" style="--tilt:${tilt}deg">
         ${pin(['#3fb3ff', '#7ccb45', '#ffc933', '#ff9a2e'][i % 4])}
         <header><span class="board-ic">${icon(d.icon)}</span><h4>${esc(d.title)}</h4></header>
         <p>${esc(d.text)}</p>
         <div class="board-progress">${bar(c.progress, d.goal)}<b>${c.progress}/${d.goal}</b></div>
         <p class="board-reward">${icon('trophy')} ${esc(d.reward.text)}</p>
-        ${c.done ? '<span class="board-stamp">Done</span>' : `<button type="button" class="board-track" data-track="${d.id}" aria-pressed="${tracked}">${tracked ? 'Tracking' : 'Track'}</button>`}
+        <button type="button" class="board-track" data-track="${d.id}" aria-pressed="${tracked}">${tracked ? 'Tracking' : 'Track'}</button>
       </article>`;
     }).join('');
+    const doneCards = done.map(({ d }) => `
+      <article class="board-note board-done">
+        <span class="board-ic">${icon(d.icon)}</span>
+        <div><h4>${esc(d.title)}</h4><p class="board-reward">${icon('trophy')} ${esc(d.reward.text)}</p></div>
+        <span class="board-stamp">Done</span>
+      </article>`).join('');
+
     this.$board.innerHTML = `
       <header class="board-head">
         <h2>${icon('quest')} Mission Board</h2>
-        <p>Team contracts · <b>${doneCount}/${defs.length}</b> done · rewards upgrade the whole team</p>
+        <p>Team contracts · rewards upgrade the whole team</p>
         <span class="hud-panel-close"><kbd>E</kbd> / <kbd>Esc</kbd> Close</span>
       </header>
-      <div class="board-body">
-        ${main}
-        <div class="board-grid">${cards}</div>
+      ${quest}
+      <div class="board-cols">
+        <section class="board-col" aria-label="Active tasks">
+          <h3 class="board-col-title">Active tasks <b>${active.length}</b></h3>
+          <div class="board-grid">${activeCards || '<p class="board-empty">Every contract is done – great work!</p>'}</div>
+        </section>
+        <section class="board-col board-col-done" aria-label="Done tasks">
+          <h3 class="board-col-title">Done <b>${done.length}</b></h3>
+          <div class="board-done-list">${doneCards || '<p class="board-empty">Nothing finished yet. Complete contracts to earn team upgrades.</p>'}</div>
+        </section>
       </div>`;
   }
 

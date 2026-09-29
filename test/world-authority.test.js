@@ -24,6 +24,7 @@ test('movement accepts normal updates and corrects teleports', () => {
 
 test('spear hits require a nearby, forward hit point and respect cooldown', () => {
   const { world, player } = setup();
+  player.yaw = 0; // facing north (-z)
   const d = world.dinos.list.find((dino) => dino.type === 'brachio');
   d.x = player.x; d.z = player.z - 3; d.y = player.y;
   const p = [player.x, player.y + CONFIG.player.eyeHeight, player.z - 3];

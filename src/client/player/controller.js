@@ -159,8 +159,26 @@ export class PlayerController {
       this.vel.z *= f;
     }
 
+    // --- steep terrain can't be stood on: slide down it (no climbing cliffs by hopping)
+    this.sliding = false;
+    if (this.onGround && !flying) {
+      const x = this.pos.x, z = this.pos.z;
+      const gT = this.terrain.heightAt(x, z);
+      if (this.pos.y - gT < 0.05 && this.rockSurfaceAt(x, z).h < gT + 0.05) {
+        const g = this.terrain.gradientAt(x, z, 0.6);
+        const s = Math.hypot(g.x, g.z);
+        if (s > P.maxWalkSlope) {
+          this.sliding = true;
+          const k = Math.min(1, dt * 7);
+          const slide = 4 + (s - P.maxWalkSlope) * 6;
+          this.vel.x += (-g.x / s * slide - this.vel.x) * k;
+          this.vel.z += (-g.z / s * slide - this.vel.z) * k;
+        }
+      }
+    }
+
     // --- jump
-    if (controllable && !flying && intent.jump && this.onGround && this.stamina > P.jumpStaminaCost) {
+    if (controllable && !flying && intent.jump && this.onGround && !this.sliding && this.stamina > P.jumpStaminaCost) {
       this.vel.y = P.jumpSpeed * (depth > 0.8 ? 0.6 : 1);
       this.onGround = false;
       this.stamina -= P.jumpStaminaCost;
@@ -227,6 +245,8 @@ export class PlayerController {
     const base = Math.max(groundNow, this.pos.y - 0.05);
     const gTerrain = t.heightAt(nx, nz);
     const rise = gTerrain - base;
+    // in the air you may not drift onto steep terrain that is higher than where you took off
+    if (!this.onGround && gTerrain > groundNow + 0.3 && t.slopeAt(nx, nz) > P.maxWalkSlope) return;
     // steep uphill is a wall (cliffs); small steps are fine
     if (rise > 0.02) {
       const slope = rise / Math.hypot(dx, dz);

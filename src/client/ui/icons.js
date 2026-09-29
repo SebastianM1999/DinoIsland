@@ -141,6 +141,46 @@ export const ICONS = {
   clock: svg(`<circle cx="16" cy="16" r="12.5" fill="none" stroke="currentColor" stroke-width="2.6"/><path d="M16 9v7.5l5 3" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" fill="none"/>`),
 
   weight: svg(`<path d="M9 11h14l4 17H5z" fill="currentColor"/><circle cx="16" cy="7" r="3.5" fill="none" stroke="currentColor" stroke-width="2.4"/>`),
+
+  // --- boat + boat parts (relics)
+  boat: svg(`<path d="M3 19h26l-4 7H8z" fill="#b77a45" stroke="${OUT}" stroke-width="1" stroke-linejoin="round"/>
+    <path d="M3 19h26" stroke="#e0b03a" stroke-width="1.4"/>
+    <path d="M16 3v16" stroke="#6b3f1e" stroke-width="1.8" stroke-linecap="round"/>
+    <path d="M17 4c6 3 8 8 8 13h-8z" fill="#f4ecd6" stroke="${OUT}" stroke-width="0.9" stroke-linejoin="round"/>
+    <path d="M15 6c-4 3-6 7-6 11h6z" fill="#e8dcc0" stroke="${OUT}" stroke-width="0.9" stroke-linejoin="round"/>`),
+
+  egg: svg(`<path d="M16 3c-6 0-10 9-10 15a10 10 0 0 0 20 0c0-6-4-15-10-15z" fill="#ffc933" stroke="#b07a10" stroke-width="1.2"/>
+    <ellipse cx="12" cy="12" rx="2.2" ry="3.6" fill="#fff2b0" transform="rotate(-20 12 12)"/>
+    <circle cx="19" cy="20" r="1.4" fill="#e0a21a"/><circle cx="14" cy="23" r="1" fill="#e0a21a"/>`),
+
+  crystal: svg(`<path d="M16 2 22 12 18 29h-4L10 12z" fill="#6fe3ff" stroke="#1f7fa8" stroke-width="1.1" stroke-linejoin="round"/>
+    <path d="M16 2v27M10 12h12" stroke="#bff5ff" stroke-width="0.9"/>
+    <path d="M8 16l-4 5 3 7h4z" fill="#48c4f0" stroke="#1f7fa8" stroke-width="1" stroke-linejoin="round"/>
+    <path d="M24 16l4 5-3 7h-4z" fill="#48c4f0" stroke="#1f7fa8" stroke-width="1" stroke-linejoin="round"/>`),
+
+  propeller: svg(`<g stroke="#8a5d14" stroke-width="1" stroke-linejoin="round" fill="#d9a441">
+    <path d="M16 16C12 9 12 4 16 3c4 1 4 6 0 13z"/>
+    <path d="M16 16c-8 1-12 4-10 8 3 3 7 0 10-8z"/>
+    <path d="M16 16c8 1 12 4 10 8-3 3-7 0-10-8z"/></g>
+    <circle cx="16" cy="16" r="3.2" fill="#f0c86a" stroke="#8a5d14" stroke-width="1.1"/>`),
+
+  wheel: svg(`<g stroke="#6b3f1e" stroke-width="2.4" stroke-linecap="round"><path d="M16 2v28M2 16h28M6 6l20 20M26 6 6 26"/></g>
+    <circle cx="16" cy="16" r="9" fill="none" stroke="#9a6632" stroke-width="3.4"/>
+    <circle cx="16" cy="16" r="3" fill="#c98a4f" stroke="#6b3f1e" stroke-width="1"/>`),
+
+  anchor: svg(`<circle cx="16" cy="6" r="3" fill="none" stroke="#5d6674" stroke-width="2.2"/>
+    <path d="M16 9v18M10 14h12" stroke="#7d8796" stroke-width="2.8" stroke-linecap="round"/>
+    <path d="M5 18c1 7 6 9 11 9s10-2 11-9" fill="none" stroke="#7d8796" stroke-width="2.8" stroke-linecap="round"/>
+    <path d="M3 20l2-3 3 2M29 20l-2-3-3 2" stroke="#5d6674" stroke-width="2" stroke-linecap="round" fill="none"/>`),
+
+  sail: svg(`<path d="M6 25 9 5c8 2 15 8 17 20z" fill="#f2e6c8" stroke="${OUT}" stroke-width="1" stroke-linejoin="round"/>
+    <path d="M12 11h5v5h-5z" fill="#d9c38e" stroke="#a88c52" stroke-width="0.8"/>
+    <path d="M4 27h24" stroke="#9a6632" stroke-width="2.4" stroke-linecap="round"/>
+    <path d="M10 21c3-1 6-1 10 0" stroke="#c9b582" stroke-width="1" fill="none"/>`),
+
+  rudder: svg(`<path d="M14 3h4v8h6c2 7 0 14-6 18h-4z" fill="#3b2f4a" stroke="#120c1a" stroke-width="1.1" stroke-linejoin="round"/>
+    <path d="M18 13c3 0 4 3 3 7" stroke="#9b7cc9" stroke-width="1.4" stroke-linecap="round" fill="none"/>
+    <rect x="12" y="2" width="8" height="3" rx="1" fill="#5a4a6a"/>`),
 };
 
 /** Resolve an icon id, falling back to `info`. */

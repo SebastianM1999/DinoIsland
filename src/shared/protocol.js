@@ -14,7 +14,8 @@
 //   ping    { c }                                       latency probe (server echoes pong)
 //
 // ---------------------------------------------------------------- server -> client
-//   welcome { id, slot, now, inv, world }               full state on join
+//   welcome { id, slot, now, inv, world }               full state on join – sent again when
+//                                                       the team sails to the next island
 //   reject  { reason }
 //   pong    { c, now }
 //   snap    { now, p: [...PLAYER_FIELDS], d: [...DINO_FIELDS] }
@@ -53,6 +54,7 @@ export const ACT = {
   SPOT: 'spot',         // { dino }                            player saw a dinosaur
   CREATIVE: 'creative', // { on }                              creative mode (invincible, flying)
   OUTFIT: 'outfit',     // { outfit }                          change clothes at the hut wardrobe
+  REPAIR: 'repair',     // {}                                  repair the boat with the found parts
 };
 
 /** Server events (msg.e). */
@@ -86,6 +88,8 @@ export const EV = {
   SPOT: 'spot',             // { id, type, by }                  share discovery with the team
   FULL: 'full',             // { text, icon }                    your inventory can't take an item
   OUTFIT: 'outfit',         // { id, outfit }                    a player changed clothes
+  RELIC: 'relic',           // { id, kind, by }                  a boat part was found
+  BOAT: 'boat',             // { repaired }                      the boat got repaired
 };
 
 /** Player snapshot tuple layout. */
