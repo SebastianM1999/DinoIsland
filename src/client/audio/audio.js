@@ -3,6 +3,7 @@
 // location-aware shore/waterfall details and adaptive melodic music.
 
 import { CONFIG } from '../../shared/config.js';
+import { onSettings, audioGains } from '../core/settings.js';
 
 const A = CONFIG.audio;
 
@@ -39,6 +40,13 @@ export class GameAudio {
     this.birdT = 3;
     this.musicMode = 'calm';
     this.dangerUntil = 0;
+    onSettings((st) => {
+      const g = audioGains(st);
+      const t = this.ctx.currentTime;
+      this.master.gain.setTargetAtTime(g.master, t, 0.03);
+      this.musicBus.gain.setTargetAtTime(g.music, t, 0.03);
+      this.sfx.gain.setTargetAtTime(g.sfx, t, 0.03);
+    });
   }
 
   resume() {

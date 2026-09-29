@@ -25,6 +25,9 @@
   <!-- Title / lobby screen -->
   <main id="menu" class="screen">
     <div class="menu-card brush">
+      <button type="button" class="icon-btn menu-gear" data-open-settings aria-label="Settings" title="Settings">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-gear"/></svg>
+      </button>
       <h1 class="logo">Dinosaur<br>Island <span class="logo-foot" aria-hidden="true"></span></h1>
       <p class="tagline">Track. Hunt. Survive.</p>
       <form id="join-form" autocomplete="off">
@@ -49,12 +52,12 @@
           <dt>Left click</dt><dd>Attack / hold to draw bow / place</dd>
           <dt>Right click</dt><dd>Throw spear</dd>
           <dt>1 – 5</dt><dd>Spear, bow, trap, bait, fruit</dd>
-          <dt>E</dt><dd>Interact / pick up</dd>
+          <dt>E</dt><dd>Interact</dd>
           <dt>F</dt><dd>Eat fruit</dd>
           <dt>G</dt><dd>Give fruit to teammate</dd>
           <dt>Tab</dt><dd>Inventory</dd>
           <dt>M</dt><dd>Map</dd>
-          <dt>Esc</dt><dd>Release mouse</dd>
+          <dt>Esc</dt><dd>Pause menu</dd>
         </dl>
       </details>
     </div>
@@ -62,12 +65,81 @@
 
   <!-- Shown while pointer lock is released during play -->
   <div id="paused" class="screen" hidden>
-    <div class="menu-card brush">
-      <h2>Paused</h2>
-      <p>Click to continue</p>
-      <button type="button" class="btn btn-primary" id="btn-resume">Resume</button>
-      <button type="button" class="btn" id="btn-leave">Leave game</button>
-    </div>
+    <section class="pause-card brush" role="dialog" aria-labelledby="pause-title">
+      <button type="button" class="icon-btn pause-gear" data-open-settings aria-label="Settings" title="Settings">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-gear"/></svg>
+      </button>
+      <header class="pause-head">
+        <h2 id="pause-title">Paused</h2>
+        <p class="pause-sub">The island keeps moving – your team is still out there.</p>
+      </header>
+      <div class="pause-grid">
+        <div class="pause-info">
+          <section class="pause-block">
+            <h3 id="pause-mission-title">Expedition</h3>
+            <ul id="pause-objectives" class="pause-objectives"></ul>
+          </section>
+          <section class="pause-block">
+            <h3>Team</h3>
+            <ul id="pause-team" class="pause-team"></ul>
+          </section>
+        </div>
+        <nav class="pause-actions" aria-label="Pause menu">
+          <button type="button" class="btn btn-primary btn-icon" id="btn-resume">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-play"/></svg>Resume
+          </button>
+          <button type="button" class="btn btn-icon" data-open-settings>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-gear"/></svg>Settings
+          </button>
+          <button type="button" class="btn btn-icon" data-open-settings="controls">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-keys"/></svg>Controls
+          </button>
+          <button type="button" class="btn btn-icon btn-danger" id="btn-leave">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-door"/></svg><span>Leave game</span>
+          </button>
+        </nav>
+      </div>
+      <p class="pause-hint">Click anywhere outside to jump back in</p>
+    </section>
+  </div>
+
+  <!-- Settings (opened from the title screen and the pause menu) -->
+  <div id="settings" class="screen" hidden>
+    <section class="settings-card brush" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+      <header class="settings-head">
+        <svg class="settings-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-gear"/></svg>
+        <h2 id="settings-title">Settings</h2>
+        <button type="button" class="icon-btn" id="btn-settings-close" aria-label="Close settings" title="Close (Esc)">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-close"/></svg>
+        </button>
+      </header>
+      <div class="settings-tabs" role="tablist">
+        <button type="button" role="tab" id="tab-general" aria-controls="settings-general" aria-selected="true">Sound &amp; view</button>
+        <button type="button" role="tab" id="tab-controls" aria-controls="settings-controls" aria-selected="false">Controls</button>
+      </div>
+      <div id="settings-general" role="tabpanel" aria-labelledby="tab-general" class="settings-panel"></div>
+      <div id="settings-controls" role="tabpanel" aria-labelledby="tab-controls" class="settings-panel" hidden>
+        <dl class="controls-list">
+          <dt><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd></dt><dd>Move</dd>
+          <dt><kbd>Shift</kbd></dt><dd>Sprint</dd>
+          <dt><kbd>Space</kbd></dt><dd>Jump</dd>
+          <dt><kbd>Mouse</kbd></dt><dd>Look around</dd>
+          <dt><kbd>Left click</kbd></dt><dd>Attack / hold to draw the bow / place</dd>
+          <dt><kbd>Right click</kbd></dt><dd>Throw spear</dd>
+          <dt><kbd>1</kbd>–<kbd>5</kbd></dt><dd>Spear, bow, trap, bait, fruit</dd>
+          <dt><kbd>E</kbd></dt><dd>Interact (loot is picked up automatically)</dd>
+          <dt><kbd>F</kbd></dt><dd>Eat fruit</dd>
+          <dt><kbd>G</kbd></dt><dd>Give fruit to a teammate</dd>
+          <dt><kbd>Tab</kbd></dt><dd>Inventory</dd>
+          <dt><kbd>M</kbd></dt><dd>Map</dd>
+          <dt><kbd>Esc</kbd></dt><dd>Pause menu</dd>
+        </dl>
+      </div>
+      <footer class="settings-foot">
+        <button type="button" class="btn" id="btn-settings-reset">Reset to defaults</button>
+        <button type="button" class="btn btn-primary" id="btn-settings-done">Done</button>
+      </footer>
+    </section>
   </div>
 
   <div id="loading" class="screen" hidden>

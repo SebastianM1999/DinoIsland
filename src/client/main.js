@@ -3,6 +3,7 @@
 import { Game } from './core/game.js';
 import { Net } from './net/net.js';
 import { CONFIG } from '../shared/config.js';
+import { ICON_SPRITE, initSettings, renderPause } from './ui/menus.js';
 
 // SVG filter that gives HUD and menu panels their brush-stroke edges.
 document.body.insertAdjacentHTML('beforeend', `
@@ -11,7 +12,7 @@ document.body.insertAdjacentHTML('beforeend', `
     <feTurbulence type="fractalNoise" baseFrequency="0.035 0.09" numOctaves="2" seed="4" result="noise"/>
     <feDisplacementMap in="SourceGraphic" in2="noise" scale="7" xChannelSelector="R" yChannelSelector="G"/>
   </filter>
-</svg>`);
+</svg>${ICON_SPRITE}`);
 
 const $ = (id) => document.getElementById(id);
 const menu = $('menu');
@@ -24,6 +25,17 @@ const serverInput = $('server-url');
 const buttons = [$('btn-join'), $('btn-solo')];
 
 let game = null;
+const settingsUi = initSettings();
+
+/** Show or hide the pause card; refresh its expedition/team info when shown. */
+function setPaused(show) {
+  if (show && paused.hidden) {
+    renderPause(game);
+    resetLeave();
+  }
+  paused.hidden = !show;
+  if (!show) settingsUi.close();
+}
 const served = location.protocol.startsWith('http');
 
 function setBusy(busy, text = '') {
@@ -59,14 +71,14 @@ async function start(mode) {
   }
   window.__game = game; // handy for debugging in the console
   game.input.onLockChange = (locked) => {
-    paused.hidden = locked || !game?.running || game.hud.isPanelOpen();
+    setPaused(!locked && game?.running && !game.hud.isPanelOpen());
   };
-  game.onPanelChange = (open) => { paused.hidden = open || game.input.locked; };
+  game.onPanelChange = (open) => setPaused(!open && !game.input.locked);
   game.onLeave = (reason) => backToMenu(reason);
   loading.hidden = true;
   game.start();
   game.input.requestLock();
-  paused.hidden = game.input.locked;
+  setPaused(!game.input.locked);
   setBusy(false, '');
 }
 
@@ -90,7 +102,21 @@ canvas.addEventListener('click', () => {
   game.audio.resume();
   game.input.requestLock();
 });
-$('btn-leave').addEventListener('click', () => {
+// Leaving needs a second click so a stray click can't end the expedition.
+const leaveBtn = $('btn-leave');
+let leaveTimer = 0;
+function resetLeave() {
+  clearTimeout(leaveTimer);
+  delete leaveBtn.dataset.confirm;
+  leaveBtn.lastElementChild.textContent = 'Leave game';
+}
+leaveBtn.addEventListener('click', () => {
+  if (!leaveBtn.dataset.confirm) {
+    leaveBtn.dataset.confirm = '1';
+    leaveBtn.lastElementChild.textContent = 'Click again to leave';
+    leaveTimer = setTimeout(resetLeave, 3000);
+    return;
+  }
   game?.net.close();
   backToMenu('');
 });
