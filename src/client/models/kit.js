@@ -238,8 +238,9 @@ export function tube(points, radius, { radial = 10, color = () => '#ffffff', cap
       let am = (r0[k].a + (k2 === 0 ? Math.PI * 2 : r0[k2].a)) / 2;
       const mid = a.clone().add(d).multiplyScalar(0.5);
       const colr = colAt(tm, am, mid);
-      pushTri(a, c, b, colr);
-      pushTri(b, c, d, colr);
+      // counter-clockwise seen from outside -> outward normals
+      pushTri(a, b, c, colr);
+      pushTri(b, d, c, colr);
     }
   }
   const cap = (rg, reverse) => {
