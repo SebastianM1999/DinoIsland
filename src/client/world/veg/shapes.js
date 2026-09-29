@@ -1,5 +1,5 @@
 // Shared shape + material helpers for vegetation, rocks and fruit plants.
-// Everything builds on the model kit (vertex colors, flat shading, no textures).
+// Everything builds on the model kit (vertex colors, smooth shading, no textures).
 
 import { THREE, MAT, deform, paint, jitter, windMaterial } from '../../models/kit.js';
 
@@ -13,7 +13,7 @@ export function clump(r, {
   seed = 1, detail = 1, squash = 0.8, rough = 0.2, flatBottom = 0.45,
   top = '#8fd14f', mid = '#6cb83e', mid2 = '#62ad3a', bottom = '#4a8f33',
 } = {}) {
-  let g = new THREE.IcosahedronGeometry(r, detail);
+  let g = new THREE.IcosahedronGeometry(r, Math.max(1, detail) + (r > 1.1 ? 1 : 0));
   g = deform(g, (v) => {
     const ox = jitter(v, r * rough, seed), oy = jitter(v, r * rough, seed + 1), oz = jitter(v, r * rough, seed + 2);
     v.x += ox; v.y += oy; v.z += oz;
@@ -125,7 +125,7 @@ export function windPair(base, params) {
 export function glowMaterial(intensity = 0.45, roughness = 0.35) {
   return sharedMat(`glow:${intensity}:${roughness}`, () => {
     const m = new THREE.MeshStandardMaterial({
-      vertexColors: true, flatShading: true, roughness, metalness: 0,
+      vertexColors: true, roughness, metalness: 0,
       emissive: 0xffffff, emissiveIntensity: intensity,
     });
     m.onBeforeCompile = (shader) => {

@@ -161,7 +161,7 @@ export class Wardrobe {
     // little wooden platform
     const disc = new THREE.Mesh(
       new THREE.CylinderGeometry(0.75, 0.8, 0.08, 24),
-      new THREE.MeshStandardMaterial({ color: 0x9b6636, roughness: 0.9, flatShading: true }),
+      new THREE.MeshStandardMaterial({ color: 0x9b6636, roughness: 0.9 }),
     );
     disc.position.y = -0.04;
     this.scene.add(disc);

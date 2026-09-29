@@ -142,7 +142,7 @@ export function createSmoke(emitters) {
   let geo = new THREE.IcosahedronGeometry(0.5, 0);
   geo = deform(geo, (v) => { v.x += jitter(v, 0.08, 2); v.y += jitter(v, 0.08, 3); v.z += jitter(v, 0.08, 4); });
   geo = paint(geo, (c, n) => (n.y > 0.4 ? '#ffffff' : n.y < -0.3 ? '#c9c6c2' : '#e6e3df'));
-  const mat = new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 1, transparent: true, opacity: 0.6, depthWrite: false });
+  const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, transparent: true, opacity: 0.6, depthWrite: false });
   const total = emitters.reduce((s, e) => s + e.count, 0);
   const im = new THREE.InstancedMesh(geo, mat, total);
   im.castShadow = false;

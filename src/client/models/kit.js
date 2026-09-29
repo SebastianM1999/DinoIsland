@@ -1,9 +1,11 @@
-// Model kit: small helpers for building "low-poly but detailed" models in code.
+// Model kit: small helpers for building soft, rounded models in code.
 //
 // Workflow: start from a primitive geometry, shape it with deform(), paint
 // color zones with paint(), place it with place(), then merge() all parts of
-// one rigid piece into a single geometry that uses the shared flat-shaded
-// vertex-color material. No textures.
+// one rigid piece into a single geometry that uses the shared smooth-shaded
+// vertex-color material. merge() welds normals across faces (up to a crease
+// angle), so curved shapes render smooth while real corners stay crisp.
+// No textures.
 
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
@@ -16,13 +18,68 @@ const _q = new THREE.Quaternion();
 const _e = new THREE.Euler();
 const _s = new THREE.Vector3();
 
-/** Shared materials. Everything uses vertex colors + flat shading. */
+/** Shared materials. Everything uses vertex colors + smooth shading. */
 export const MAT = {
-  standard: new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 0.82, metalness: 0 }),
-  glossy: new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 0.35, metalness: 0 }),
+  standard: new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.8, metalness: 0 }),
+  glossy: new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.35, metalness: 0 }),
   /** Unlit-ish glow for fruit, fire, eye highlights. */
-  glow: new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 0.5, emissive: 0xffffff, emissiveIntensity: 0.35 }),
+  glow: new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.5, emissive: 0xffffff, emissiveIntensity: 0.35 }),
 };
+
+/** Default crease angle: faces meeting at a sharper angle keep a hard edge. */
+export const CREASE = (72 * Math.PI) / 180;
+
+/**
+ * Smooth vertex normals for a (non-indexed) geometry: each vertex gets the
+ * area-weighted average of the face normals sharing its position, skipping
+ * faces that meet at more than `crease` radians (box corners stay sharp).
+ */
+export function smoothNormals(geo, crease = CREASE) {
+  const g = geo.index ? geo.toNonIndexed() : geo;
+  const p = g.attributes.position;
+  const n = p.count;
+  const faces = n / 3;
+  const fn = new Float32Array(faces * 3);
+  const a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3();
+  const e1 = new THREE.Vector3(), e2 = new THREE.Vector3(), cr = new THREE.Vector3();
+  const keys = new Array(n);
+  const buckets = new Map();
+  for (let i = 0; i < n; i++) {
+    keys[i] = `${Math.round(p.getX(i) * 2000)},${Math.round(p.getY(i) * 2000)},${Math.round(p.getZ(i) * 2000)}`;
+  }
+  for (let f = 0; f < faces; f++) {
+    a.fromBufferAttribute(p, f * 3); b.fromBufferAttribute(p, f * 3 + 1); c.fromBufferAttribute(p, f * 3 + 2);
+    e1.subVectors(b, a); e2.subVectors(c, a);
+    cr.crossVectors(e1, e2);                     // length = 2 * area -> area weighting
+    fn[f * 3] = cr.x; fn[f * 3 + 1] = cr.y; fn[f * 3 + 2] = cr.z;
+    for (let k = 0; k < 3; k++) {
+      const id = keys[f * 3 + k];
+      let list = buckets.get(id);
+      if (!list) { list = []; buckets.set(id, list); }
+      list.push(f);
+    }
+  }
+  const cosC = Math.cos(crease);
+  const out = new Float32Array(n * 3);
+  const own = new THREE.Vector3(), other = new THREE.Vector3(), sum = new THREE.Vector3();
+  for (let i = 0; i < n; i++) {
+    const f = (i / 3) | 0;
+    own.set(fn[f * 3], fn[f * 3 + 1], fn[f * 3 + 2]);
+    const ol = own.length() || 1;
+    sum.set(0, 0, 0);
+    for (const f2 of buckets.get(keys[i])) {
+      other.set(fn[f2 * 3], fn[f2 * 3 + 1], fn[f2 * 3 + 2]);
+      const len = other.length();
+      if (len < 1e-12) continue;
+      if (own.dot(other) / (ol * len) >= cosC) sum.add(other);
+    }
+    if (sum.lengthSq() < 1e-20) sum.copy(own);
+    sum.normalize();
+    out[i * 3] = sum.x; out[i * 3 + 1] = sum.y; out[i * 3 + 2] = sum.z;
+  }
+  g.setAttribute('normal', new THREE.BufferAttribute(out, 3));
+  return g;
+}
 
 /** Shared wind uniforms – Game updates time every frame. */
 export const WIND = {
@@ -142,10 +199,10 @@ export function part(geo, color, pos, rot, scale) {
   return place(paint(geo, color), pos, rot, scale);
 }
 
-/** Merge prepared geometries into one. */
-export function merge(geos) {
+/** Merge prepared geometries into one, with smooth (creased) normals. */
+export function merge(geos, crease = CREASE) {
   const list = geos.filter(Boolean).map(prep);
-  const g = mergeGeometries(list, false);
+  const g = smoothNormals(mergeGeometries(list, false), crease);
   g.computeBoundingSphere();
   return g;
 }
@@ -169,20 +226,24 @@ export function jitter(v, amount, seed = 1) {
  * optionally with mossy green on the upward facing faces.
  */
 export function rockGeometry({ radius = 1, detail = 0, seed = 1, squash = 0.7, colors = ['#9c93a8', '#8a8199', '#a79c9a'], moss = null } = {}) {
-  let g = new THREE.IcosahedronGeometry(radius, detail);
+  let g = new THREE.IcosahedronGeometry(radius, detail + 2);
   g = deform(g, (v) => {
-    v.x += jitter(v, radius * 0.22, seed);
-    v.y += jitter(v, radius * 0.18, seed + 1);
-    v.z += jitter(v, radius * 0.22, seed + 2);
+    // smooth, pebble-like lumps: low-frequency offsets instead of per-vertex spikes
+    const dx = v.x / radius, dy = v.y / radius, dz = v.z / radius;
+    const bump = Math.sin(dx * 2.1 + seed) * Math.cos(dz * 1.7 - seed * 0.7) * 0.12 + Math.sin(dy * 3.1 + dx * 1.3 + seed * 2.3) * 0.06;
+    v.multiplyScalar(1 + bump);
     v.y *= squash;
     if (v.y < -radius * 0.15) v.y = -radius * 0.15 - (v.y + radius * 0.15) * 0.2; // flat bottom sinks in
   });
-  g = paint(g, (c, n) => {
-    if (moss && n.y > 0.72) return moss;
-    const k = Math.abs(Math.floor(jitter(c, 10, seed + 3))) % colors.length;
-    return colors[k];
+  g = smoothNormals(g);
+  const c0 = new THREE.Color(colors[0]), c1 = new THREE.Color(colors[1 % colors.length]), c2 = new THREE.Color(colors[2 % colors.length]);
+  const mc = moss ? new THREE.Color(moss) : null, tmp = new THREE.Color();
+  return paint(g, (c, n) => {
+    const t = Math.sin((c.x * 3.1) / radius + seed) * 0.5 + Math.cos((c.z * 2.7) / radius - seed) * 0.5;
+    tmp.copy(c0).lerp(c1, Math.max(0, t)).lerp(c2, Math.max(0, -t) * 0.7);
+    if (mc) tmp.lerp(mc, Math.max(0, Math.min(1, (n.y - 0.55) / 0.3)));
+    return tmp;
   });
-  return g;
 }
 
 /**
@@ -195,7 +256,8 @@ export function rockGeometry({ radius = 1, detail = 0, seed = 1, squash = 0.7, c
  */
 export function tube(points, radius, { radial = 10, color = () => '#ffffff', capStart = true, capEnd = true, up = new THREE.Vector3(0, 1, 0), smoothColors = true } = {}) {
   const curve = new THREE.CatmullRomCurve3(points, false, 'centripetal');
-  const segs = Math.max(2, (points.length - 1) * 3);
+  const segs = Math.max(4, (points.length - 1) * 5);
+  radial = Math.max(8, Math.round(radial * 1.6));
   const rings = [];
   const tangent = new THREE.Vector3(), side = new THREE.Vector3(), upv = new THREE.Vector3();
   for (let s = 0; s <= segs; s++) {
@@ -261,27 +323,26 @@ export function tube(points, radius, { radial = 10, color = () => '#ffffff', cap
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
   g.setAttribute('color', new THREE.Float32BufferAttribute(cols, 3));
-  g.computeVertexNormals();
-  return g;
+  return smoothNormals(g);
 }
 
 /** A small ellipsoid (shaped sphere) – eyes, cheeks, bumps, fruit. */
 export function blob(rx, ry, rz, color, { w = 8, h = 6 } = {}) {
-  const g = new THREE.SphereGeometry(1, w, h);
+  const g = new THREE.SphereGeometry(1, Math.max(12, Math.round(w * 1.75)), Math.max(8, Math.round(h * 1.6)));
   g.scale(rx, ry, rz);
   return paint(g, color);
 }
 
 /** Cone pointing +Y (claws, teeth, spikes), base at y=0. `tip` colors the top half. */
 export function spike(radius, height, color, tip = null, radial = 5) {
-  const g = new THREE.ConeGeometry(radius, height, radial, 1);
+  const g = new THREE.ConeGeometry(radius, height, Math.max(8, radial * 2), 2);
   g.translate(0, height / 2, 0);
   return paint(g, tip ? (c) => (c.y > height * 0.55 ? tip : color) : color);
 }
 
-/** Tapered, slightly faceted cylinder along +Y from y=0 to y=height. */
+/** Tapered cylinder along +Y from y=0 to y=height. */
 export function limb(r0, r1, height, color, radial = 7) {
-  const g = new THREE.CylinderGeometry(r1, r0, height, radial, 1);
+  const g = new THREE.CylinderGeometry(r1, r0, height, Math.max(12, radial * 2), 1);
   g.translate(0, height / 2, 0);
   return paint(g, color);
 }
@@ -301,7 +362,7 @@ export function eye(size, iris = '#3a2a1a', { pupil = '#141018', highlight = tru
 export function wrap(radius, height, turns, color) {
   const parts = [];
   for (let i = 0; i < turns; i++) {
-    const g = new THREE.TorusGeometry(radius, radius * 0.28, 4, 8);
+    const g = new THREE.TorusGeometry(radius, radius * 0.28, 8, 16);
     parts.push(part(g, color, [0, (i / Math.max(1, turns - 1)) * height, 0], [Math.PI / 2 + (i % 2 ? 0.25 : -0.25), 0, 0]));
   }
   return merge(parts);
