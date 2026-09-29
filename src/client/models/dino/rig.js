@@ -78,7 +78,78 @@ export class Rig {
       leg.hipHeight = _v.y;
     }
     this.bodyRestY = this.body.position.y;
+    this.#fillHitGaps();
     return this;
+  }
+
+  /**
+   * The hand-placed hit zones cover the main masses; this adds spheres wherever
+   * visible geometry still sticks out (feet, tail tips, spikes, arms), attached
+   * to the joint that carries that geometry so they follow the animation. Each
+   * new sphere inherits the zone of the nearest hand-placed sphere.
+   */
+  #fillHitGaps() {
+    if (!this.hitZones.length) return;
+    const base = this.hitSpheres([]).map((s) => ({ zone: s.zone, center: s.center.clone(), radius: s.radius }));
+    const size = new THREE.Box3().setFromObject(this.root).getSize(_w);
+    const tol = Math.min(0.2, Math.max(0.05, Math.max(size.x, size.y, size.z) * 0.02));
+    const maxR = Math.max(...base.map((s) => s.radius)) * 0.8;
+    const nearest = (p) => {
+      let best = null, bd = Infinity;
+      for (const s of base) {
+        const d = p.distanceTo(s.center) - s.radius;
+        if (d < bd) { bd = d; best = s; }
+      }
+      return { s: best, d: bd };
+    };
+
+    // uncovered vertices, grouped by the joint that carries them (joint-local)
+    const groups = new Map();
+    this.root.traverse((o) => {
+      const pos = o.isMesh && o.visible && o.geometry.attributes.position;
+      if (!pos || pos.usage === THREE.DynamicDrawUsage) return; // skip rebuilt geometry (wing membranes)
+      const step = Math.max(1, Math.floor(pos.count / 1500));
+      for (let i = 0; i < pos.count; i += step) {
+        const p = new THREE.Vector3().fromBufferAttribute(pos, i);
+        o.localToWorld(p);
+        const n = nearest(p);
+        if (n.d <= tol) continue;
+        if (!groups.has(o.parent)) groups.set(o.parent, []);
+        groups.get(o.parent).push({ local: o.parent.worldToLocal(p.clone()), zone: n.s.zone });
+      }
+    });
+
+    const emit = (joint, pts, depth) => {
+      const bb = new THREE.Box3();
+      for (const p of pts) bb.expandByPoint(p.local);
+      const c = bb.getCenter(new THREE.Vector3()), ext = bb.getSize(new THREE.Vector3());
+      let r = 0, inner = Infinity;
+      for (const p of pts) {
+        const d = p.local.distanceTo(c);
+        r = Math.max(r, d);
+        inner = Math.min(inner, d);
+      }
+      const axis = ext.x >= ext.y && ext.x >= ext.z ? 'x' : ext.y >= ext.z ? 'y' : 'z';
+      const sorted = [ext.x, ext.y, ext.z].sort((a, b) => b - a);
+      const elongated = sorted[0] > sorted[1] * 1.4 + tol;
+      // points on opposite sides of a body (a hollow cluster) would give a sphere that bulges out
+      const hollow = inner > r * 0.5;
+      if (depth < 7 && pts.length > 3 && (((elongated || hollow) && r > tol * 2.5) || r > maxR)) {
+        pts.sort((a, b) => a.local[axis] - b.local[axis]);
+        const mid = pts.length >> 1;
+        emit(joint, pts.slice(0, mid), depth + 1);
+        emit(joint, pts.slice(mid), depth + 1);
+        return;
+      }
+      if (pts.length < 2) return;
+      const votes = {};
+      for (const p of pts) votes[p.zone] = (votes[p.zone] || 0) + 1;
+      const zone = Object.keys(votes).reduce((a, b) => (votes[a] >= votes[b] ? a : b));
+      // joint-local radius -> unscaled rig radius (hitSpheres multiplies by root scale)
+      const k = joint.getWorldScale(_v).x / this.root.getWorldScale(_w).x;
+      this.hitZones.push({ zone, joint, offset: c, radius: Math.max(r, tol) * k, auto: true });
+    };
+    for (const [joint, pts] of groups) emit(joint, pts, 0);
   }
 
   restX(o) { return this.rest.get(o)?.x ?? 0; }

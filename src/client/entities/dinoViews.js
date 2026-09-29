@@ -173,6 +173,12 @@ export class DinoViews {
     this.spotted = new Set();
     this.spotAttempts = new Map();
     this.spotTimer = 0;
+    // Debug view of hit spheres (F3, alongside the static colliders).
+    this.hitDebug = new THREE.Group();
+    this.hitDebug.visible = false;
+    this.hitDebugMat = new THREE.MeshBasicMaterial({ color: 0x00e5ff, wireframe: true });
+    this.hitDebugGeo = new THREE.SphereGeometry(1, 10, 6);
+    game.gfx.scene.add(this.hitDebug);
     this.ctx = { scene: game.gfx.scene, terrain: game.terrain, overlay: game.overlay, camera: game.gfx.camera, onStep: (v) => game.onDinoStep?.(v) };
     const net = game.net;
     net.on(`ev:${EV.DINO_ADD}`, (m) => this.add(m.dino));
@@ -238,11 +244,31 @@ export class DinoViews {
       v.update(far ? v.skip : dt, renderTime);
       v.skip = 0;
     }
+    this.#updateHitDebug(cam);
     this.spotTimer -= dt;
     if (this.spotTimer <= 0) {
       this.spotTimer = 0.35;
       this.spotVisibleDinosaurs();
     }
+  }
+
+  #updateHitDebug(cam) {
+    const g = this.hitDebug;
+    g.visible = !!this.game.debug;
+    if (!g.visible) return;
+    let i = 0;
+    for (const v of this.map.values()) {
+      if (!v.alive || v.pos.distanceToSquared(cam) > 90 * 90) continue;
+      for (const s of v.hitSpheres()) {
+        let m = g.children[i];
+        if (!m) g.add(m = new THREE.Mesh(this.hitDebugGeo, this.hitDebugMat));
+        m.visible = true;
+        m.position.copy(s.center);
+        m.scale.setScalar(s.radius);
+        i++;
+      }
+    }
+    for (; i < g.children.length; i++) g.children[i].visible = false;
   }
 
   spotVisibleDinosaurs() {

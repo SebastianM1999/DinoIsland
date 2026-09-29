@@ -5,11 +5,13 @@
 import { CONFIG } from './config.js';
 import { FEATURES } from './terrain.js';
 import { makeRng, fbm, smoothstep } from './rng.js';
+import { treeColliders } from './treeShapes.js';
+import { placeRock, rockHeightAt, PEBBLE_SCALE } from './rockShapes.js';
 
 const TAU = Math.PI * 2;
 
 /**
- * @typedef {{x:number,z:number,r:number}} CircleCollider
+ * @typedef {{x:number,z:number,r:number,bottom?:number,top?:number,kind?:string}} CircleCollider
  * @typedef {{x:number,z:number,hw:number,hd:number,rot:number,top:number}} BoxCollider
  */
 
@@ -132,12 +134,13 @@ export function buildLayout(terrain) {
 
   // -------------------------------------------------------------- trees
   let treeId = 0;
-  const addTree = (type, x, z, scale, colliderR) => {
+  // spacing only reserves room around the tree; the collider follows the visible trunk
+  const addTree = (type, x, z, scale, spacing) => {
     const y = terrain.heightAt(x, z);
     const t = { id: treeId++, type, x, z, y, scale, rot: rng() * TAU, lean: rng.range(-0.12, 0.12), hue: rng() };
     layout.trees.push(t);
-    occupied.push({ x, z, r: colliderR * 2.2 });
-    circles.push({ x, z, r: colliderR });
+    occupied.push({ x, z, r: spacing * 2.2 });
+    circles.push(...treeColliders(t));
     return t;
   };
 
@@ -169,11 +172,14 @@ export function buildLayout(terrain) {
 
   // -------------------------------------------------------------- rocks
   let rockId = 0;
-  const addRock = (x, z, scale, flags = {}) => {
+  const addRock = (x, z, scale, flags = {}, r = rng) => {
     const y = terrain.heightAt(x, z);
-    layout.rocks.push({ id: rockId++, x, z, y, scale, rot: rng() * TAU, sx: rng.range(0.8, 1.4), sz: rng.range(0.8, 1.3), variant: rng.int(0, 2), mossy: flags.mossy ?? rng() < 0.6 });
+    const rock = { id: rockId++, x, z, y, scale, rot: r() * TAU, sx: r.range(0.8, 1.4), sz: r.range(0.8, 1.3), variant: flags.variant ?? r.int(0, 2), mossy: flags.mossy ?? r() < 0.6 };
+    if (flags.sy) rock.sy = flags.sy;   // extra height (boulders)
+    layout.rocks.push(placeRock(rock, terrain));
     occupied.push({ x, z, r: scale * 1.4 });
-    if (scale > 0.45) circles.push({ x, z, r: scale * 1.05 });
+    // Players walk on rocks (see groundAt); dinosaurs can't climb, so for them a rock is a low post.
+    if (scale > PEBBLE_SCALE) circles.push({ x, z, r: rock.R * 0.85, bottom: rock.by - 1, top: rock.top, kind: 'rock' });
   };
   for (let i = 0; i < 6500 && layout.rocks.length < 220; i++) {
     const x = rng.range(-195, 195), z = rng.range(-195, 195);
@@ -229,7 +235,7 @@ export function buildLayout(terrain) {
       const edge = (pd > 3 && pd < 9) || (j > 0.45 && j < 0.75);
       if (!edge || !free(x, z, 2.2)) continue;
       occupied.push({ x, z, r: 1.2 });
-      circles.push({ x, z, r: 0.7 });
+      circles.push({ x, z, r: 0.7, top: terrain.heightAt(x, z) + 1.6 });
       addFruit('berry', x, z, 'bush');
       placed++;
     }
@@ -307,6 +313,84 @@ export function buildLayout(terrain) {
     }
     layout.trexPatrol.push({ x: bx, z: bz });
   }
+
+  // ------------------------------------------------ extra rocks (2nd pass)
+  // Placed last with their own random stream so everything above keeps its spot.
+  {
+    const rr = makeRng(S ^ 0x70c45);
+    const keepClear = [
+      ...Object.values(layout.dinoZones).flatMap((zone) => zone.spawns.map((p) => ({ ...p, r: 5 }))),
+      ...layout.trexPatrol.map((p) => ({ ...p, r: 7 })),
+      ...layout.nests.map((p) => ({ ...p, r: 6 })),
+      ...layout.fruitSpots.map((p) => ({ ...p, r: 2.5 })),
+      ...layout.spawnPoints.map((p) => ({ ...p, r: 4 })),
+    ];
+    const clear = (x, z, r) => keepClear.every((p) => Math.hypot(p.x - x, p.z - z) > p.r + r);
+    const meadow = (x, z, pad) => [FEATURES.eastMeadow, FEATURES.stegoMeadow]
+      .some((f) => Math.hypot(x - f.x, z - f.z) < f.radius * 0.6 + pad);
+
+    // Big boulders: landmarks on hillsides, meadow edges and cliff bases.
+    let big = 0;
+    for (let i = 0; i < 9000 && big < 48; i++) {
+      const x = rr.range(-185, 185), z = rr.range(-185, 185);
+      const s = rr.range(2.6, 4.2);
+      if (!dry(x, z, 1.8) || nearHut(x, z, 12) || distToPath(x, z) < s * 1.2 + 3) continue;
+      if (lakeDist(x, z) < FEATURES.lake.radius + 6 || meadow(x, z, s)) continue;
+      const slope = terrain.slopeAt(x, z);
+      if (slope > 1.1 || rr() > (slope > 0.35 ? 0.8 : 0.3)) continue;
+      if (!free(x, z, s * 1.3) || !clear(x, z, s * 1.2)) continue;
+      addRock(x, z, s, { variant: rr() < 0.55 ? 0 : 1, mossy: rr() < 0.8, sy: rr.range(1.5, 2.1) }, rr);
+      big++;
+      // a few mid-sized companions around the boulder
+      for (let k = rr.int(1, 3); k > 0; k--) {
+        const a = rr() * TAU, d = s * rr.range(1.5, 2.3);
+        const cx = x + Math.cos(a) * d, cz = z + Math.sin(a) * d, cs = rr.range(0.7, 1.4);
+        if (dry(cx, cz, 1) && distToPath(cx, cz) > 2.5 && free(cx, cz, cs * 1.1) && clear(cx, cz, cs)) addRock(cx, cz, cs, {}, rr);
+      }
+    }
+
+    // Little rocks: scattered pebbles and small clusters on land and in shallow water (walkable).
+    let small = 0;
+    for (let i = 0; i < 14000 && small < 520; i++) {
+      const x = rr.range(-195, 195), z = rr.range(-195, 195);
+      const h = terrain.heightAt(x, z);
+      if (h < -0.2 || nearHut(x, z, -2) || distToPath(x, z) < 1.2 || terrain.waterDepthAt(x, z) > 0.3) continue;
+      const n = rr() < 0.4 ? rr.int(2, 4) : 1;
+      for (let k = 0; k < n; k++) {
+        const cx = x + (k ? rr.range(-1.2, 1.2) : 0), cz = z + (k ? rr.range(-1.2, 1.2) : 0);
+        const cs = rr.range(0.16, 0.44);
+        if (!free(cx, cz, cs * 0.6) || !clear(cx, cz, 0.5)) continue;
+        addRock(cx, cz, cs, { mossy: h > 2.4 && rr() < 0.5 }, rr);
+        small++;
+      }
+    }
+  }
+
+  // ------------------------------------------------- walkable rock surface
+  // Rocks are part of the ground for players: stand on them, jump over them;
+  // only their steep sides stop you (like a small cliff).
+  const CELL = 8;
+  const rockGrid = new Map();
+  for (const rock of layout.rocks) {
+    if (rock.scale <= PEBBLE_SCALE) continue;
+    for (let ix = Math.floor((rock.x - rock.R) / CELL); ix <= Math.floor((rock.x + rock.R) / CELL); ix++) {
+      for (let iz = Math.floor((rock.z - rock.R) / CELL); iz <= Math.floor((rock.z + rock.R) / CELL); iz++) {
+        const key = ix * 4096 + iz;
+        if (!rockGrid.has(key)) rockGrid.set(key, []);
+        rockGrid.get(key).push(rock);
+      }
+    }
+  }
+  /** Top of rock at (x, z), or -Infinity. */
+  layout.rockHeightAt = (x, z) => {
+    let h = -Infinity;
+    for (const rock of rockGrid.get(Math.floor(x / CELL) * 4096 + Math.floor(z / CELL)) || []) h = Math.max(h, rockHeightAt(rock, x, z));
+    return h;
+  };
+  /** Ground a player stands on: terrain or the top of a rock. */
+  layout.groundAt = (x, z) => Math.max(terrain.heightAt(x, z), layout.rockHeightAt(x, z));
+  // Players collide with everything except rocks (those are ground, see above).
+  layout.playerColliders = { circles: circles.filter((c) => c.kind !== 'rock'), boxes };
 
   return layout;
 }

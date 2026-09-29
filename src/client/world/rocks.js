@@ -7,6 +7,7 @@ import { makeRng, hash2 } from '../../shared/rng.js';
 import { MAT, deform, paint, place, merge, jitter } from '../models/kit.js';
 import { treeGeometry, treeMatrix, TREE_WIND } from './veg/trees.js';
 import { clump, windPair, LEAF_MAT, instanced, finishInstanced, foliageTint } from './veg/shapes.js';
+import { ROCK_VARIANTS } from '../../shared/rockShapes.js';
 
 const TAU = Math.PI * 2;
 const ROCK_COLS = ['#9c93a8', '#8f86a0', '#a79c9a', '#958ba3'];
@@ -22,10 +23,8 @@ export function rockGeo(variant, mossy) {
   let g = rockCache.get(key);
   if (g) return g;
   const seed = 11 + variant * 7;
-  const base = variant === 1 ? new THREE.DodecahedronGeometry(1.02, 0) : new THREE.IcosahedronGeometry(1, 1);
-  const squash = [0.72, 0.88, 0.5][variant];
-  const topCut = [0.52, 0.6, 0.32][variant];
-  const stretch = [1, 0.95, 1.12][variant];
+  const { squash, topCut, stretch, base: size } = ROCK_VARIANTS[variant];
+  const base = variant === 1 ? new THREE.DodecahedronGeometry(size, 0) : new THREE.IcosahedronGeometry(size, 1);
   g = deform(base, (v) => {
     v.x += jitter(v, 0.2, seed);
     v.y += jitter(v, 0.16, seed + 1);
@@ -131,11 +130,9 @@ export function buildRocks(terrain, layout) {
     const [variant, mossy] = key.split(':').map(Number);
     const m = instanced(rockGeo(variant, !!mossy), MAT.standard, list.length, { name: `rocks-${key}` });
     list.forEach((r, i) => {
-      const slope = terrain.slopeAt(r.x, r.z);
-      const fx = r.scale * (1 + (r.sx - 1.1) * 0.4);
-      const fz = r.scale * (1 + (r.sz - 1.05) * 0.4);
-      const fy = r.scale * (0.85 + 0.3 * ((r.id * 0.618) % 1));
-      p.set(r.x, r.y - r.scale * (0.12 + Math.min(0.35, slope * 0.3)), r.z);
+      // fx/fy/fz/by come from placeRock() in the layout (shared with the walkable surface)
+      const { fx, fy, fz } = r;
+      p.set(r.x, r.by, r.z);
       e.set((r.sx - 1.1) * 0.15, r.rot, (r.sz - 1.05) * 0.15); q.setFromEuler(e);
       m.setMatrixAt(i, m4.compose(p, q, s.set(fx, fy, fz)));
       const b = 0.88 + 0.12 * ((r.id * 0.377) % 1);

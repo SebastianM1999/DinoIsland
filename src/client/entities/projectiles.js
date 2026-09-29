@@ -6,7 +6,7 @@
 import * as THREE from 'three';
 import { CONFIG } from '../../shared/config.js';
 import { EV, ACT } from '../../shared/protocol.js';
-import { segmentSphere } from '../../shared/collision.js';
+import { segmentSphere, segmentColliders } from '../../shared/collision.js';
 import { mesh } from '../models/kit.js';
 import { arrowGeometry, spearGeometry } from '../models/weapons.js';
 
@@ -59,7 +59,8 @@ export class Projectiles {
   update(dt) {
     const terrain = this.game.terrain;
     const dinos = this.game.dinos;
-    const circles = this.game.layout.colliders.circles;
+    const colliders = this.game.layout.colliders;
+    const groundAt = this.game.layout.groundAt;
     for (let i = this.list.length - 1; i >= 0; i--) {
       const p = this.list[i];
       if (p.done) {
@@ -106,29 +107,28 @@ export class Projectiles {
           else p.restT = 10; // spear bounces off: the server drops it next to the dinosaur
           break;
         }
-        // terrain
-        const g = terrain.heightAt(tb.x, tb.z);
+        // terrain and rocks
+        const g = groundAt(tb.x, tb.z);
         if (tb.y <= g + 0.02) {
           p.pos.y = Math.max(p.pos.y, g + 0.05);
           p.done = true;
           if (p.own) this.land(p, tb, g);
           break;
         }
-        // tree trunks / rocks (only low obstacles)
-        for (const c of circles) {
-          if (c.r < 0.3) continue;
-          const dx = tb.x - c.x, dz = tb.z - c.z;
-          if (dx * dx + dz * dz < c.r * c.r && tb.y < terrain.heightAt(c.x, c.z) + (c.r > 0.9 ? c.r * 1.2 : 6)) {
-            p.done = true;
-            p.vel.set(0, -1, 0);
-            if (p.own) this.land(p, tb, terrain.heightAt(tb.x, tb.z));
-            break;
-          }
+        // tree trunks, rocks, hut: stop at the first contact along this sub-step
+        const f = segmentColliders(ta.x, ta.y, ta.z, tb.x, tb.y, tb.z, colliders, groundAt);
+        if (f >= 0) {
+          const hp = _ta.lerp(tb, f);
+          p.pos.copy(hp).addScaledVector(dir, -lead);
+          this.orient(p);
+          p.done = true;
+          if (p.own) this.land(p, hp, groundAt(hp.x, hp.z));
+          break;
         }
         // out of the world / timeout
         if (p.t > 8 || Math.abs(tb.x) > CONFIG.world.size / 2) {
           p.done = true;
-          if (p.own) this.land(p, tb, terrain.heightAt(tb.x, tb.z));
+          if (p.own) this.land(p, tb, groundAt(tb.x, tb.z));
         }
       }
       if (!p.done) this.orient(p);

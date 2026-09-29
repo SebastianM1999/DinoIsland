@@ -8,15 +8,21 @@ import { resolveCircle } from '../../shared/collision.js';
 
 const P = CONFIG.player;
 const tmp = { x: 0, z: 0, hit: false };
+/** Rock sides steeper than this (tan) can't be walked up once they are higher than a step. */
+const ROCK_WALK_SLOPE = 0.45;
 
 export class PlayerController {
   /**
    * @param {import('../../shared/terrain.js').Terrain} terrain
    * @param {{circles:Array, boxes:Array}} colliders
+   * @param {(x:number, z:number) => number} [rockHeightAt] top of a rock at (x, z) or -Infinity
    */
-  constructor(terrain, colliders) {
+  constructor(terrain, colliders, rockHeightAt = () => -Infinity) {
     this.terrain = terrain;
     this.colliders = colliders;
+    this.rockHeightAt = rockHeightAt;
+    // rocks are ground: stand on them, jump over them
+    this.groundAt = (x, z) => Math.max(terrain.heightAt(x, z), rockHeightAt(x, z));
     this.pos = { x: 0, y: 0, z: 0 };   // feet position
     this.vel = { x: 0, y: 0, z: 0 };
     this.yaw = 0;                       // 0 = looking north (-z)
@@ -37,7 +43,7 @@ export class PlayerController {
   teleport(x, z, yaw = 0) {
     this.pos.x = x;
     this.pos.z = z;
-    this.pos.y = this.terrain.heightAt(x, z);
+    this.pos.y = this.groundAt(x, z);
     this.vel.x = this.vel.y = this.vel.z = 0;
     this.yaw = yaw;
     this.pitch = 0;
@@ -138,11 +144,11 @@ export class PlayerController {
 
     // --- horizontal move with slope + water limits (axis separated so we slide)
     const oldX = this.pos.x, oldZ = this.pos.z;
-    const groundNow = t.heightAt(oldX, oldZ);
+    const groundNow = this.groundAt(oldX, oldZ);
     this.#tryMove(this.vel.x * dt, 0, groundNow);
     this.#tryMove(0, this.vel.z * dt, groundNow);
 
-    resolveCircle(this.pos.x, this.pos.z, P.radius, this.colliders, tmp);
+    resolveCircle(this.pos.x, this.pos.z, P.radius, this.colliders, tmp, this.pos.y + 0.05, this.pos.y + P.height);
     if (tmp.hit) {
       this.pos.x = tmp.x;
       this.pos.z = tmp.z;
@@ -158,7 +164,7 @@ export class PlayerController {
 
     // --- vertical
     this.pos.y += this.vel.y * dt;
-    const ground = t.heightAt(this.pos.x, this.pos.z);
+    const ground = this.groundAt(this.pos.x, this.pos.z);
     // swimming-ish: water holds you up a little in deep spots
     if (this.pos.y <= ground) {
       if (!this.onGround && this.vel.y < -6) this.landImpact = Math.min(1, -this.vel.y / 16);
@@ -178,13 +184,21 @@ export class PlayerController {
     if (dx === 0 && dz === 0) return;
     const t = this.terrain;
     const nx = this.pos.x + dx, nz = this.pos.z + dz;
-    const gNew = t.heightAt(nx, nz);
-    const rise = gNew - Math.max(groundNow, this.pos.y - 0.05);
+    const base = Math.max(groundNow, this.pos.y - 0.05);
+    const gTerrain = t.heightAt(nx, nz);
+    const rise = gTerrain - base;
     // steep uphill is a wall (cliffs); small steps are fine
     if (rise > 0.02) {
       const slope = rise / Math.hypot(dx, dz);
       if (slope > P.maxWalkSlope && rise > 0.05) return;
       if (rise > P.stepHeight) return;
+    }
+    // rocks: step onto low ones; higher up only their flat tops are walkable, the sides need a jump
+    const gRock = this.rockHeightAt(nx, nz);
+    const riseRock = gRock - base;
+    if (riseRock > 0.02) {
+      if (riseRock > P.stepHeight) return;
+      if (gRock - gTerrain > P.stepHeight && riseRock / Math.hypot(dx, dz) > ROCK_WALK_SLOPE) return;
     }
     // do not walk out into deep water
     if (t.waterDepthAt(nx, nz) > CONFIG.world.maxWadeDepth && t.waterDepthAt(nx, nz) > t.waterDepthAt(this.pos.x, this.pos.z)) return;

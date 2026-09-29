@@ -6,6 +6,7 @@
 import * as THREE from 'three';
 import { CONFIG } from '../../shared/config.js';
 import { ACT, EV, PF, EQUIP } from '../../shared/protocol.js';
+import { segmentColliders } from '../../shared/collision.js';
 import { Viewmodel } from './viewmodel.js';
 import { mesh } from '../models/kit.js';
 import { trapGeometry, meatGeometry } from '../models/weapons.js';
@@ -206,6 +207,9 @@ export class PlayerActions {
     g.flags |= PF.ATTACK;
     g.audio?.play('swing');
     const hit = g.dinos.raycast(origin, dir, W.spear.range);
+    // no stabbing through a tree trunk or rock
+    const end = hit && origin.clone().addScaledVector(dir, hit.dist);
+    if (hit && segmentColliders(origin.x, origin.y, origin.z, end.x, end.y, end.z, g.layout.colliders, g.layout.groundAt) >= 0) return;
     if (hit) g.net.act(ACT.MELEE, { dino: hit.view.id, zone: hit.zone, p: hit.point.toArray().map((n) => +n.toFixed(2)) });
   }
 

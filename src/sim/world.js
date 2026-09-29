@@ -233,8 +233,8 @@ export class ServerWorld {
     p.lastMoveAt = this.now;
     const distance = Math.hypot(x - p.x, z - p.z);
     const lim = CONFIG.world.size / 2 - 5;
-    const ground = this.terrain.heightAt(x, z);
-    resolveCircle(x, z, P.radius, this.layout.colliders, collisionResult);
+    const ground = this.layout.groundAt(x, z);
+    resolveCircle(x, z, P.radius, this.layout.playerColliders, collisionResult, y + 0.05, y + P.height);
     const blocked = Math.hypot(collisionResult.x - x, collisionResult.z - z) > 0.6;
     if (distance > p.moveBudget + 0.05 || Math.abs(x) > lim || Math.abs(z) > lim ||
         !Number.isFinite(ground) || y < ground - 2 || y > ground + 20 ||
@@ -332,7 +332,7 @@ export class ServerWorld {
           }
           return;
         }
-        if (Math.abs(y - this.terrain.heightAt(x, z)) <= 2) this.spawnItem(proj.kind, x, z, 1, y);
+        if (Math.abs(y - this.layout.groundAt(x, z)) <= 2) this.spawnItem(proj.kind, x, z, 1, y);
         return;
       }
       case ACT.PICKUP: {
@@ -506,7 +506,7 @@ export class ServerWorld {
     const lim = CONFIG.world.size / 2 - 2;
     x = Math.max(-lim, Math.min(lim, x));
     z = Math.max(-lim, Math.min(lim, z));
-    const ground = this.terrain.heightAt(x, z);
+    const ground = this.layout.groundAt(x, z);
     const it = { id: this.id(), kind, n, x: r2(x), y: r2(y == null ? ground : Math.max(ground, Math.min(y, ground + 3))), z: r2(z), t: this.now };
     this.items.set(it.id, it);
     this.event(EV.ITEM_ADD, { item: it });

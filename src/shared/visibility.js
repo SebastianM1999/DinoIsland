@@ -22,7 +22,8 @@ export function lineBlocked(eye, target, terrain, layout) {
     if (intersects(tree.x, tree.z, radius, tree.y + 2 * tree.scale, top)) return true;
   }
   for (const rock of layout.rocks) {
-    if (intersects(rock.x, rock.z, rock.scale * 0.85, rock.y, rock.y + rock.scale * 1.3)) return true;
+    if (rock.scale < 0.5) continue; // pebbles never hide anything
+    if (intersects(rock.x, rock.z, rock.R * 0.75, rock.by, rock.top)) return true;
   }
   return false;
 }

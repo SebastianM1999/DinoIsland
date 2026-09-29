@@ -39,7 +39,7 @@ export class Game {
     this.layout = buildLayout(this.terrain);
     this.gfx = new Renderer(canvas);
     this.input = new Input(canvas);
-    this.player = new PlayerController(this.terrain, this.layout.colliders);
+    this.player = new PlayerController(this.terrain, this.layout.playerColliders, this.layout.rockHeightAt);
     this.time = 0;
     this.running = false;
     this.debug = false;
@@ -122,9 +122,12 @@ export class Game {
     this.debugGroup = new THREE.Group();
     this.debugGroup.visible = false;
     const dm = new THREE.MeshBasicMaterial({ color: 0xff00ff, wireframe: true });
+    const dmRock = new THREE.MeshBasicMaterial({ color: 0xffaa00, wireframe: true }); // blocks dinosaurs only
     for (const c of this.layout.colliders.circles) {
-      const m = new THREE.Mesh(new THREE.CylinderGeometry(c.r, c.r, 3, 10), dm);
-      m.position.set(c.x, this.terrain.heightAt(c.x, c.z) + 1.5, c.z);
+      const g = this.terrain.heightAt(c.x, c.z);
+      const bottom = Math.max(c.bottom ?? g, g - 0.2), top = c.top ?? g + 3;
+      const m = new THREE.Mesh(new THREE.CylinderGeometry(c.r, c.r, top - bottom, 10), c.kind === 'rock' ? dmRock : dm);
+      m.position.set(c.x, (top + bottom) / 2, c.z);
       this.debugGroup.add(m);
     }
     for (const b of this.layout.colliders.boxes) {

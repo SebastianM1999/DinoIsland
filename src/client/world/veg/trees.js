@@ -4,8 +4,11 @@
 
 import { THREE, tube, blob, merge, place, paint, deform, jitter } from '../../models/kit.js';
 import { clump, leafStrip, arcPath } from './shapes.js';
+import { TRUNKS, TREE_SINK } from '../../../shared/treeShapes.js';
 
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
+/** Centerline of a shared trunk shape as vectors. */
+const trunkPts = (shape) => shape.pts.map((p) => V(...p));
 const TAU = Math.PI * 2;
 
 /** Wind settings per tree type (geometry units, before instance scale). */
@@ -28,7 +31,7 @@ export const MANGO_FRUIT_LOCAL = [
 
 /** World matrix of a layout tree (shared by vegetation + fruit plants). */
 const _q = new THREE.Quaternion(), _e = new THREE.Euler(), _p = new THREE.Vector3(), _s = new THREE.Vector3();
-export function treeMatrix(t, out = new THREE.Matrix4(), sink = 0.12) {
+export function treeMatrix(t, out = new THREE.Matrix4(), sink = TREE_SINK) {
   _e.set(t.lean, t.rot, t.lean * 0.5, 'YXZ');
   _q.setFromEuler(_e);
   _p.set(t.x, t.y - sink, t.z);
@@ -51,20 +54,11 @@ function branch(a, b, r0, r1, base, dark, seed) {
 
 // ------------------------------------------------------------------ palm
 function buildPalm(variant) {
-  const H = variant ? 7.3 : 8.0;
-  const bend = variant ? 1.9 : 1.15;
-  const wob = variant ? 0.35 : 0.12;
-  const pts = [];
-  for (let i = 0; i <= 7; i++) {
-    const t = i / 7;
-    pts.push(V(bend * t * t, H * t, wob * Math.sin(t * 3.2)));
-  }
+  const shape = TRUNKS.palm[variant];
+  const pts = trunkPts(shape);
+  const H = pts[pts.length - 1].y;
   const segs = (pts.length - 1) * 3;
-  const trunk = tube(pts, (t) => {
-    const s = Math.round(t * segs);
-    const r = 0.33 - 0.13 * t + (t < 0.05 ? 0.12 : 0);
-    return r * (s % 2 ? 1.08 : 1);
-  }, {
+  const trunk = tube(pts, (t) => shape.r(t) * (Math.round(t * segs) % 2 ? 1.08 : 1), {
     radial: 7,
     color: (t) => {
       if (t > 0.94) return '#6d4c2f';
@@ -118,9 +112,10 @@ function buildPalm(variant) {
 const ROUND_COL = { top: '#9ad84f', mid: '#73c03f', mid2: '#66b23a', bottom: '#579f3b' };
 function buildRound(variant) {
   const s = variant * 17 + 3;
-  const trunkTop = V(variant ? -0.15 : 0.1, 4.0, variant ? 0.1 : 0);
-  const trunk = tube([V(0, 0, 0), V(0.08, 1.4, 0.05), V(-0.06, 2.8, 0), trunkTop],
-    (t) => 0.3 - 0.1 * t + (t < 0.06 ? 0.14 : 0), { radial: 7, color: bark('#8d5c3a', '#744a2f', s, '#6a452d') });
+  const shape = TRUNKS.round[variant];
+  const pts = trunkPts(shape);
+  const trunkTop = pts[pts.length - 1];
+  const trunk = tube(pts, shape.r, { radial: 7, color: bark('#8d5c3a', '#744a2f', s, '#6a452d') });
   const parts = [trunk];
   const clumps = [];
   const cy = variant ? 5.2 : 5.0;
@@ -142,9 +137,10 @@ function buildRound(variant) {
 const TALL_COL = { top: '#86cc4c', mid: '#5fae42', mid2: '#56a33e', bottom: '#4d9440' };
 function buildTall(variant) {
   const s = 40 + variant * 13;
-  const top = V(0.2, 8.4, -0.1);
-  const trunk = tube([V(0, 0, 0), V(0.1, 2.5, 0.1), V(-0.1, 5.0, 0), V(0.15, 7.0, -0.05), top],
-    (t) => 0.3 - 0.14 * t + (t < 0.05 ? 0.14 : 0), { radial: 7, color: bark('#a2856c', '#8a6e58', s, '#735a47') });
+  const shape = TRUNKS.tall[0];
+  const pts = trunkPts(shape);
+  const top = pts[pts.length - 1];
+  const trunk = tube(pts, shape.r, { radial: 7, color: bark('#a2856c', '#8a6e58', s, '#735a47') });
   const parts = [trunk];
   const clumps = [];
   const tiers = [
@@ -184,9 +180,10 @@ function buttress(angle, seed) {
 }
 function buildJungle(variant) {
   const s = 70 + variant * 11;
-  const top = V(0.3, 9.6, 0.2);
-  const trunk = tube([V(0, 0, 0), V(0.15, 3, 0.05), V(-0.05, 6.2, 0.1), top],
-    (t) => 0.5 - 0.2 * t + (t < 0.05 ? 0.12 : 0), {
+  const shape = TRUNKS.jungle[0];
+  const pts = trunkPts(shape);
+  const top = pts[pts.length - 1];
+  const trunk = tube(pts, shape.r, {
       radial: 8,
       color: (t, a, p) => (t < 0.12 ? '#5f8a39' : jitter(p, 1, s) > 0.3 ? '#6b4f3a' : '#806047'),
     });
@@ -218,8 +215,8 @@ function buildJungle(variant) {
 const MANGO_COL = { top: '#71c64a', mid: '#3f9a3c', mid2: '#378d37', bottom: '#3b8537' };
 function buildMango() {
   const s = 101;
-  const trunk = tube([V(0, 0, 0), V(0.05, 1.1, 0), V(-0.05, 2.1, 0.05)],
-    (t) => 0.36 - 0.1 * t + (t < 0.08 ? 0.14 : 0), { radial: 8, color: bark('#7b4e33', '#643e28', s, '#5a3a26') });
+  const shape = TRUNKS.mango[0];
+  const trunk = tube(trunkPts(shape), shape.r, { radial: 8, color: bark('#7b4e33', '#643e28', s, '#5a3a26') });
   const parts = [trunk];
   const leaves = [];
   const cy = 4.5;

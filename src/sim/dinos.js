@@ -18,9 +18,9 @@ const r3 = (v) => Math.round(v * 1000) / 1000;
 const TRACK_SPACING = { brachio: 1.3, stego: 1, raptor: 2.2, trex: 1.5 };
 const CARCASS_TIME = 90;
 const tmp = { x: 0, z: 0, hit: false };
-// Big animals only collide with big obstacles (they push through bushes/small trees).
+// Big animals only collide with big obstacles (they push through bushes and trees).
 const bigColliders = (world) => ({
-  circles: world.layout.colliders.circles.filter((c) => c.r > 0.9),
+  circles: world.layout.colliders.circles.filter((c) => c.kind !== 'tree' && c.r > 0.9),
   boxes: world.layout.colliders.boxes,
 });
 
@@ -180,7 +180,8 @@ export class DinoSystem {
     let nx = d.x + fx * step, nz = d.z + fz * step;
     if (!this.walkable(nx, nz, d)) { d.spd *= 0.5; return; }
     const cols = d.radius > 1.5 ? this.bigColliders : this.colliders;
-    resolveCircle(nx, nz, Math.min(d.radius * 0.6, 1.8), cols, tmp);
+    const gy = this.terrain.heightAt(nx, nz);
+    resolveCircle(nx, nz, Math.min(d.radius * 0.6, 1.8), cols, tmp, gy, gy + Math.max(1.5, d.radius * 2));
     if (tmp.hit) {
       nx = tmp.x; nz = tmp.z;
       if (!d.avoidSide) d.avoidSide = Math.random() < 0.5 ? 1 : -1;
