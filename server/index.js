@@ -8,6 +8,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { CONFIG } from '../src/shared/config.js';
+import { startGameHost } from './gameHost.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const argPort = process.argv.indexOf('--port');
@@ -41,7 +42,7 @@ function resolvePath(urlPath) {
   return path.join(ROOT, clean);
 }
 
-export const httpServer = http.createServer((req, res) => {
+const httpServer = http.createServer((req, res) => {
   if (req.url === '/status') {
     res.writeHead(200, { 'Content-Type': MIME['.json'], 'Cache-Control': 'no-store' });
     res.end(JSON.stringify(statusProvider()));
@@ -67,8 +68,8 @@ export const httpServer = http.createServer((req, res) => {
   });
 });
 
-let statusProvider = () => ({ players: [], maxPlayers: CONFIG.net.maxPlayers });
-export function setStatusProvider(fn) { statusProvider = fn; }
+const host = startGameHost(httpServer);
+const statusProvider = () => host.status();
 
 httpServer.listen(PORT, () => {
   console.log(`Dinosaur Island server running at http://localhost:${PORT}`);
