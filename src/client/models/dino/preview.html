@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Dino Preview</title>
+  <script type="importmap">
+    { "imports": { "three": "/vendor/three/build/three.module.js", "three/addons/": "/vendor/three/examples/jsm/" } }
+  </script>
+  <style>
+    :root { color-scheme: light; }
+    body { margin: 0; overflow: hidden; background: #8fd0ef; font: 14px system-ui, sans-serif; }
+    #ui { position: fixed; left: 8px; top: 8px; display: flex; flex-wrap: wrap; gap: 4px; max-width: 70vw; }
+    #ui button, #ui select, #ui label { font: inherit; padding: 4px 8px; border-radius: 6px; border: 0; background: #1f2a44; color: #fff; }
+    #ui button[aria-pressed="true"] { background: #e8a21c; color: #1f2a44; }
+    #info { position: fixed; left: 8px; bottom: 8px; color: #1f2a44; background: #fff8; padding: 4px 8px; border-radius: 6px; }
+  </style>
+</head>
+<body>
+  <!-- Dev tool: preview.html?type=raptor&state=walk&view=side
+       Renders one species on a flat ground with the shared animator. -->
+  <div id="ui"></div>
+  <div id="info"></div>
+  <script type="module">
+    import * as THREE from 'three';
+    import { DinoAnimator } from './rig.js';
+
+    const qs = new URLSearchParams(location.search);
+    const type = qs.get('type') || 'brachio';
+    const names = { brachio: 'Brachio', raptor: 'Raptor', stego: 'Stego', ptera: 'Ptera', trex: 'Trex' };
+    const mod = await import(`./${type}.js`);
+    const N = names[type];
+    const build = mod[`build${N}`];
+    const ANIM = mod[`${N.toUpperCase()}_ANIM`];
+    const extra = mod[`${type}ExtraUpdate`];
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+    renderer.setSize(innerWidth, innerHeight);
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    document.body.appendChild(renderer.domElement);
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color('#8fd0ef');
+    const sun = new THREE.DirectionalLight('#fff0d6', 2.6);
+    sun.position.set(-20, 40, 25);
+    sun.castShadow = true;
+    Object.assign(sun.shadow.camera, { left: -20, right: 20, top: 20, bottom: -20 });
+    sun.shadow.mapSize.set(2048, 2048);
+    scene.add(sun, new THREE.HemisphereLight('#bfe6ff', '#d8bb80', 1.6));
+    const ground = new THREE.Mesh(new THREE.PlaneGeometry(200, 200).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ color: '#86c650', roughness: 1 }));
+    ground.receiveShadow = true;
+    scene.add(ground);
+    // player-sized reference figure (1.8 m)
+    const ref = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.35, 1.8, 10), new THREE.MeshStandardMaterial({ color: '#57c24f' }));
+    ref.position.set(-3, 0.9, 2);
+    ref.castShadow = true;
+    scene.add(ref);
+
+    const rig = build();
+    scene.add(rig.root);
+    const anim = new DinoAnimator(rig, ANIM);
+    const box = new THREE.Box3().setFromObject(rig.root);
+    const size = box.getSize(new THREE.Vector3());
+    const camera = new THREE.PerspectiveCamera(45, innerWidth / innerHeight, 0.1, 500);
+    const R = Math.max(size.x, size.y, size.z) * 1.6 + 2;
+
+    const STATES = ['idle', 'walk', 'run', 'attack', 'roar', 'graze', 'alert', 'charge', 'tail', 'trapped', 'dead', 'fly', 'dive', 'landed'];
+    let state = qs.get('state') || 'walk';
+    let view = qs.get('view') || 'side';
+    let orbit = qs.get('orbit') === '1';
+    const ui = document.getElementById('ui');
+    const btns = {};
+    for (const s of STATES) {
+      const b = document.createElement('button');
+      b.textContent = s;
+      b.onclick = () => { state = s; for (const k in btns) btns[k].setAttribute('aria-pressed', k === state); };
+      b.setAttribute('aria-pressed', s === state);
+      btns[s] = b;
+      ui.appendChild(b);
+    }
+    for (const v of ['side', 'front', 'back', 'top', 'three-quarter']) {
+      const b = document.createElement('button');
+      b.textContent = `view: ${v}`;
+      b.onclick = () => { view = v; };
+      ui.appendChild(b);
+    }
+    const ob = document.createElement('button');
+    ob.textContent = 'orbit';
+    ob.onclick = () => { orbit = !orbit; };
+    ui.appendChild(ob);
+    document.getElementById('info').textContent = `${type}: ${size.x.toFixed(1)} × ${size.y.toFixed(1)} × ${size.z.toFixed(1)} m (W×H×L), ${countTris(rig.root)} tris, ${countMeshes(rig.root)} meshes`;
+
+    function countTris(o) { let n = 0; o.traverse((m) => { if (m.isMesh) n += (m.geometry.index ? m.geometry.index.count : m.geometry.attributes.position.count) / 3; }); return Math.round(n); }
+    function countMeshes(o) { let n = 0; o.traverse((m) => { if (m.isMesh) n++; }); return n; }
+
+    const speeds = { idle: 0, walk: ANIM.walkSpeed ?? 2, run: ANIM.runSpeed ?? 6, charge: ANIM.runSpeed ?? 6, fly: 11, dive: 20, landed: 0 };
+    const clock = new THREE.Clock();
+    let t = 0;
+    const fakeView = { rig, anim, st: 0, spd: 0, pos: rig.root.position, yaw: 0, time: 0 };
+    const DSMAP = { idle: 0, walk: 1, run: 2, alert: 4, attack: 5, charge: 6, tail: 7, trapped: 9, dead: 10, fly: 11, dive: 12, landed: 13, roar: 14, graze: 15 };
+    function loop() {
+      requestAnimationFrame(loop);
+      const dt = Math.min(clock.getDelta(), 0.05);
+      t += dt;
+      const speed = speeds[state] ?? 0;
+      const pose = {};
+      if (state === 'attack') { pose.attack = (t % 1.2) < 0.45 ? 1 : 0; pose.jaw = pose.attack; }
+      if (state === 'roar') { pose.roar = 1; pose.jaw = 1; }
+      if (state === 'graze') pose.headDown = 1;
+      if (state === 'alert') { pose.alert = 1; pose.neckRaise = 1; }
+      if (state === 'charge') pose.charge = 1;
+      if (state === 'tail') pose.tailSwing = (t % 1.6) < 0.6 ? 1 : 0;
+      if (state === 'trapped') pose.jaw = 0.6;
+      anim.update(dt, { speed, dist: speed * dt, yawRate: 0, dead: state === 'dead', trapped: state === 'trapped', groundAt: () => 0, groundPitch: 0, pose });
+      fakeView.st = DSMAP[state] ?? 0;
+      fakeView.spd = speed;
+      fakeView.time = t;
+      extra?.(fakeView, dt);
+      const a = orbit ? t * 0.4 : { side: Math.PI / 2, front: 0, back: Math.PI, top: 0.001, 'three-quarter': Math.PI / 4 }[view];
+      const cy = view === 'top' ? R : size.y * 0.55;
+      camera.position.set(Math.sin(a) * R, cy + (view === 'top' ? 0 : size.y * 0.15), -Math.cos(a) * R);
+      camera.lookAt(0, size.y * 0.45, 0);
+      renderer.render(scene, camera);
+    }
+    loop();
+    addEventListener('resize', () => { renderer.setSize(innerWidth, innerHeight); camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); });
+  </script>
+</body>
+</html>
