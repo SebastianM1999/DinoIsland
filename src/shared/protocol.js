@@ -8,7 +8,7 @@
 //     (range checks) and turns into damage.
 //
 // ---------------------------------------------------------------- client -> server
-//   hello   { name }
+//   hello   { name, outfit? }                            outfit = { hat, top, pants }
 //   state   { x, y, z, yaw, pitch, spd, eq, fl }       own movement (fl = PF flags)
 //   act     { a: <action>, ...fields }                  see ACT below
 //   ping    { c }                                       latency probe (server echoes pong)
@@ -51,6 +51,7 @@ export const ACT = {
   REFILL: 'refill',     // {}                                  refill arrows/traps/bait at the hut
   RESPAWN: 'respawn',   // {}                                  request respawn when dead
   SPOT: 'spot',         // { dino }                            player saw a dinosaur
+  OUTFIT: 'outfit',     // { outfit }                          change clothes at the hut wardrobe
 };
 
 /** Server events (msg.e). */
@@ -83,6 +84,7 @@ export const EV = {
   ATTACK: 'attack',         // { id, kind }                      dinosaur attack animation cue
   SPOT: 'spot',             // { id, type, by }                  share discovery with the team
   FULL: 'full',             // { text, icon }                    your inventory can't take an item
+  OUTFIT: 'outfit',         // { id, outfit }                    a player changed clothes
 };
 
 /** Player snapshot tuple layout. */

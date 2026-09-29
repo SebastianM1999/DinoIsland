@@ -206,6 +206,7 @@ export class Hud {
     this.$board.setAttribute('aria-label', 'Mission board');
     this.$board.hidden = true;
     this._boardOpen = false;
+    this._extras = new Map();
     this.$board.addEventListener('click', (e) => {
       const btn = e.target.closest('[data-track]');
       if (!btn) return;
@@ -684,6 +685,7 @@ export class Hud {
     if (except !== 'inv' && this._invOpen) { this._invOpen = false; this.$invPanel.hidden = true; }
     if (except !== 'map' && this._mapOpen) { this._mapOpen = false; this.$mapPanel.hidden = true; }
     if (except !== 'board' && this._boardOpen) { this._boardOpen = false; this.$board.hidden = true; }
+    for (const [name, p] of this._extras) if (except !== name && p.open) this._setExtra(p, false);
     this.$tip.hidden = true;
   }
 
@@ -772,5 +774,35 @@ export class Hud {
       </div>`;
   }
 
-  isPanelOpen() { return this._invOpen || this._mapOpen || this._boardOpen; }
+  /** Register a panel owned by another module (e.g. the wardrobe): { el, onOpen?, onClose? }. */
+  addPanel(name, panel) {
+    const p = { ...panel, open: false };
+    panel.el.hidden = true;
+    this._extras.set(name, p);
+    this.root.append(panel.el);
+  }
+
+  togglePanel(name, force) {
+    const p = this._extras.get(name);
+    const open = force === undefined ? !p.open : !!force;
+    this._closePanels(open ? name : null);
+    this._setExtra(p, open);
+    this.root.classList.toggle('has-panel', this.isPanelOpen());
+    return open;
+  }
+
+  isExtraOpen(name) { return !!this._extras.get(name)?.open; }
+
+  _setExtra(p, open) {
+    if (p.open === open) return;
+    p.open = open;
+    p.el.hidden = !open;
+    if (open) p.onOpen?.(); else p.onClose?.();
+  }
+
+  isPanelOpen() {
+    if (this._invOpen || this._mapOpen || this._boardOpen) return true;
+    for (const p of this._extras.values()) if (p.open) return true;
+    return false;
+  }
 }

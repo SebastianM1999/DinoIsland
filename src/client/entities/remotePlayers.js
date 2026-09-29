@@ -21,7 +21,7 @@ export class RemotePlayers {
 
   add(info) {
     if (this.map.has(info.id)) return this.map.get(info.id);
-    const model = new PlayerModel(info.slot);
+    const model = new PlayerModel(info.slot, info.outfit);
     model.root.position.set(info.x, info.y, info.z);
     this.scene.add(model.root);
     model.root.traverse((o) => { if (o.isMesh) o.castShadow = true; });
@@ -51,6 +51,8 @@ export class RemotePlayers {
   }
 
   get(id) { return this.map.get(id); }
+
+  setOutfit(id, outfit) { this.map.get(id)?.model.setOutfit(outfit); }
 
   /** Snapshot row: [id, x, y, z, yaw, pitch, spd, eq, fl, hp, alive, carry] */
   onRow(t, row) {

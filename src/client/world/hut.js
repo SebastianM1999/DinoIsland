@@ -1,12 +1,12 @@
 // The hunting hut ("Jagdhütte") base: log cabin, drop-off crates, workbench
-// with arrow barrel, mission board, flagpole with waving flag and a campfire
+// with arrow barrel, mission board, wardrobe, flagpole with waving flag and a campfire
 // with flames, light and smoke. Static pieces are merged into a handful of
 // meshes; animated parts live in hut/fx.js.
 
 import * as THREE from 'three';
 import { MAT, merge, mesh, place } from '../models/kit.js';
 import { buildCabin, CABIN } from './hut/cabin.js';
-import { buildDropOff, buildWorkbench, buildMissionBoard, buildFlagpole, buildCampfire, ARROW_BARREL, FLAG_ATTACH } from './hut/props.js';
+import { buildDropOff, buildWorkbench, buildMissionBoard, buildWardrobe, buildFlagpole, buildCampfire, ARROW_BARREL, FLAG_ATTACH } from './hut/props.js';
 import { createFlag, createFire, createSmoke, createArrows } from './hut/fx.js';
 
 const ANIM_RANGE = 220; // skip animation when the camera is farther than this
@@ -44,6 +44,7 @@ export function buildHut(terrain, layout) {
   // Mission board faces the campfire (its front is local -z).
   const bdx = firePos[0] - boardPos[0], bdz = firePos[2] - boardPos[2];
   add(buildMissionBoard(), boardPos, Math.atan2(-bdx, -bdz));
+  add(buildWardrobe(), local(hut.wardrobe));
   add(buildFlagpole(), flagPos);
   add(buildCampfire(), firePos);
 

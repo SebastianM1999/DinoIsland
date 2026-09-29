@@ -316,6 +316,9 @@ export class PlayerActions {
       const carrying = LOOT_KEYS.some((k) => inv.loot[k] > 0);
       return { text: carrying ? 'Drop off loot' : 'Loot drop-off (nothing to drop off)', run: carrying ? () => net.act(ACT.DEPOSIT) : null };
     }
+    if (near(h.wardrobe, 3)) {
+      return { text: 'Change clothes', run: () => g.openWardrobe() };
+    }
     if (near(h.arrowRack, 4)) {
       return { text: 'Refill arrows, traps and bait', run: () => net.act(ACT.REFILL) };
     }

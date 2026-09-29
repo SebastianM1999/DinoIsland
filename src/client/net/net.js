@@ -23,7 +23,7 @@ export class Net {
   }
 
   /** Connect to a co-op server and join with `name`. Resolves after the welcome. */
-  static connect(url, name) {
+  static connect(url, name, outfit) {
     return new Promise((resolve, reject) => {
       let ws;
       try {
@@ -43,7 +43,7 @@ export class Net {
       const timer = setTimeout(() => {
         if (!settled) { settled = true; ws.close(); reject(new Error('The server did not answer')); }
       }, 6000);
-      ws.onopen = () => transport.send({ t: MSG.HELLO, name });
+      ws.onopen = () => transport.send({ t: MSG.HELLO, name, outfit });
       ws.onmessage = (e) => {
         let msg;
         try { msg = JSON.parse(e.data); } catch { return; }
@@ -64,7 +64,7 @@ export class Net {
   }
 
   /** Start an in-page authoritative world for solo play. */
-  static async local(name) {
+  static async local(name, outfit) {
     const { ServerWorld } = await import('../../sim/world.js');
     let playerId = null;
     const inbox = [];
@@ -103,7 +103,7 @@ export class Net {
     transport.close = () => clearInterval(interval);
     const net = new Net(transport, 'local');
     net.world = world; // debugging aid (solo only)
-    world.join(name, (id) => { playerId = id; });
+    world.join(name, (id) => { playerId = id; }, outfit);
     const idx = inbox.findIndex((m) => m.startsWith('{"t":"welcome"'));
     const welcome = JSON.parse(inbox.splice(idx, 1)[0]);
     net.welcome = welcome;
