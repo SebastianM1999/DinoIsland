@@ -90,6 +90,7 @@ export class ServerWorld {
       nextFireAt: 0,
     };
     this.players.set(p.id, p);
+    p.inv.caps = this.caps();
     attach?.(p.id);
     this.send(p.id, {
       t: MSG.WELCOME,
@@ -130,7 +131,34 @@ export class ServerWorld {
     return { id: p.id, slot: p.slot, name: p.name, x: r2(p.x), y: r2(p.y), z: r2(p.z), yaw: r3(p.yaw), hp: Math.ceil(p.hp), alive: p.alive };
   }
 
-  sendInv(p) { this.send(p.id, { t: MSG.INV, inv: p.inv }); }
+  sendInv(p) {
+    p.inv.caps = this.caps();
+    this.send(p.id, { t: MSG.INV, inv: p.inv });
+  }
+
+  /** Inventory limits: config base values plus team upgrades from contracts. */
+  caps() {
+    const b = this.mission ? this.mission.bonus() : { arrows: 0, fruit: 0, carry: 0, traps: 0, baits: 0 };
+    return {
+      arrows: W.bow.maxArrows + b.arrows,
+      fruit: CONFIG.fruit.maxCarried + b.fruit,
+      carry: P.maxCarryWeight + b.carry,
+      traps: W.trap.startCount + b.traps,
+      baits: W.bait.startCount + b.baits,
+    };
+  }
+
+  /** A contract reward changed the limits: tell every player. */
+  onCapsChanged() {
+    for (const p of this.players.values()) this.sendInv(p);
+  }
+
+  /** Throttled "your pack is full" alert (auto-looting retries often). */
+  fullAlert(p, text, icon) {
+    if (this.now < (p.nextFullAlert ?? 0)) return;
+    p.nextFullAlert = this.now + 3;
+    this.send(p.id, { t: MSG.EV, e: EV.FULL, text, icon });
+  }
 
   carryWeight(p) {
     let w = 0;
@@ -311,13 +339,18 @@ export class ServerWorld {
         if (!p.alive) return;
         const it = this.items.get(m.item);
         if (!it || !this.near(p, it.x, it.z, CONFIG.pickupRange + 1.5)) return;
+        const caps = this.caps();
         if (it.kind === 'arrow') {
-          if (inv.arrows >= W.bow.maxArrows) return this.toast('Your quiver is full', 'arrow', p.id);
-          inv.arrows = Math.min(W.bow.maxArrows, inv.arrows + it.n);
+          if (inv.arrows >= caps.arrows) return this.fullAlert(p, 'Your quiver is full', 'arrow');
+          inv.arrows = Math.min(caps.arrows, inv.arrows + it.n);
         } else if (it.kind === 'spear') {
-          if (inv.spear) return this.toast('You already carry a spear', 'spear', p.id);
+          if (inv.spear) return;
           inv.spear = true;
         } else if (CONFIG.loot[it.kind]) {
+          const weight = CONFIG.loot[it.kind].weight * it.n;
+          if (this.carryWeight(p) + weight > caps.carry + 1e-6) {
+            return this.fullAlert(p, `Your pack is full (${this.carryWeight(p)}/${caps.carry}) – drop off loot at the hut`, 'weight');
+          }
           inv.loot[it.kind] += it.n;
           this.toast(`${CONFIG.loot[it.kind].name} +${it.n}`, it.kind, p.id);
         } else return;
@@ -331,13 +364,15 @@ export class ServerWorld {
         const f = this.fruit[m.spot | 0];
         const spot = this.layout.fruitSpots[m.spot | 0];
         if (!f || !spot || f.count <= 0 || !this.near(p, spot.x, spot.z, P.interactRange + 2)) return;
-        if (inv.fruit.length >= CONFIG.fruit.maxCarried) return this.toast(`You can carry ${CONFIG.fruit.maxCarried} fruits at most`, 'fruit', p.id);
+        const maxFruit = this.caps().fruit;
+        if (inv.fruit.length >= maxFruit) return this.fullAlert(p, `Your fruit pouch is full (${maxFruit})`, 'fruit');
         inv.fruit.push(spot.type);
         f.count--;
         if (f.count === 0) f.regrowAt = this.now + CONFIG.fruit.types[spot.type].regrow;
         this.event(EV.FRUIT, { spot: spot.id, count: f.count });
         this.toast(`${CONFIG.fruit.types[spot.type].name} +1`, spot.type, p.id);
         this.sendInv(p);
+        this.mission.onFruitPicked();
         return;
       }
       case ACT.EAT: {
@@ -355,7 +390,7 @@ export class ServerWorld {
         if (!p.alive || inv.fruit.length === 0) return;
         const q = this.players.get(m.to);
         if (!q || !q.alive || q === p || !this.near(p, q.x, q.z, P.giveRange + 1.5)) return;
-        if (q.inv.fruit.length >= CONFIG.fruit.maxCarried) return this.toast(`${q.name} can't carry more fruit`, 'fruit', p.id);
+        if (q.inv.fruit.length >= this.caps().fruit) return this.toast(`${q.name} can't carry more fruit`, 'fruit', p.id);
         // give the fruit that heals the most if they're hurt, else the first
         const idx = this.bestFruitIndex(p);
         const type = inv.fruit.splice(idx, 1)[0];
@@ -413,9 +448,10 @@ export class ServerWorld {
       case ACT.REFILL: {
         const h = this.layout.hut.arrowRack;
         if (!p.alive || !this.near(p, h.x, h.z, 6)) return;
-        inv.arrows = W.bow.maxArrows;
-        inv.traps = Math.max(inv.traps, W.trap.startCount);
-        inv.baits = Math.max(inv.baits, W.bait.startCount);
+        const caps = this.caps();
+        inv.arrows = caps.arrows;
+        inv.traps = Math.max(inv.traps, caps.traps);
+        inv.baits = Math.max(inv.baits, caps.baits);
         inv.spear = true;
         this.sendInv(p);
         this.toast('Arrows, traps and bait refilled', 'arrow', p.id);

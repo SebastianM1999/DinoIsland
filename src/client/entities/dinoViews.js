@@ -10,7 +10,7 @@ import { raySphere } from '../../shared/collision.js';
 import { lineBlocked } from '../../shared/visibility.js';
 import { InterpBuffer } from '../net/interp.js';
 import { DinoAnimator } from '../models/dino/rig.js';
-import { buildBrachio, BRACHIO_ANIM } from '../models/dino/brachio.js';
+import { buildBrachio, BRACHIO_ANIM, brachioExtraUpdate } from '../models/dino/brachio.js';
 import { buildStego, STEGO_ANIM, stegoExtraUpdate } from '../models/dino/stego.js';
 import { buildRaptor, RAPTOR_ANIM, raptorExtraUpdate } from '../models/dino/raptor.js';
 import { buildPtera, PTERA_ANIM, pteraExtraUpdate } from '../models/dino/ptera.js';
@@ -18,7 +18,7 @@ import { buildTrex, TREX_ANIM, trexExtraUpdate } from '../models/dino/trex.js';
 
 /** Every server species needs a visible model and its animation tuning. */
 export const SPECIES = {
-  brachio: { build: buildBrachio, anim: BRACHIO_ANIM, barHeight: 12.5, heavy: true },
+  brachio: { build: buildBrachio, anim: BRACHIO_ANIM, extraUpdate: brachioExtraUpdate, barHeight: 12.5, heavy: true },
   stego: { build: buildStego, anim: STEGO_ANIM, extraUpdate: stegoExtraUpdate, barHeight: 3.8, heavy: true },
   raptor: { build: buildRaptor, anim: RAPTOR_ANIM, extraUpdate: raptorExtraUpdate, barHeight: 1.8 },
   ptera: { build: buildPtera, anim: PTERA_ANIM, extraUpdate: pteraExtraUpdate, barHeight: 1.8 },

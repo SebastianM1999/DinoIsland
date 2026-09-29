@@ -54,6 +54,8 @@ export const CONFIG = {
     // Carrying loot slows you down: speed *= max(minCarrySpeed, 1 - weight * carrySlowPerKg)
     carrySlowPerUnit: 0.018,
     minCarrySpeed: 0.6,
+    maxCarryWeight: 20,      // loot weight a player can carry (contracts raise it)
+    autoLootRadius: 2.2,     // items inside this radius are picked up automatically
   },
 
   weapons: {
@@ -138,6 +140,14 @@ export const CONFIG = {
       turnRate: 0.7,
       alertRadius: 14,        // sprinting/attacking players inside this radius cause panic
       fleeTime: 9,
+      closeRadius: 6,          // walking closer than this makes it defend itself
+      defendRange: 16,         // attacked from closer than this: it fights back instead of fleeing
+      defendTime: 7,
+      stompRange: 7,
+      stompWindup: 0.8,
+      stompDamage: 24,
+      stompKnockback: 12,
+      stompCooldown: 2.6,
       radius: 3.2,
       scale: 1,
       loot: { meat: 4, hide: 2 },

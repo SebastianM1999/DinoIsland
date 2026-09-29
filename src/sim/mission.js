@@ -3,6 +3,7 @@
 
 import { CONFIG } from '../shared/config.js';
 import { EV } from '../shared/protocol.js';
+import { CONTRACTS } from '../shared/missions.js';
 
 const STEPS = { TRACKS: 0, HUNT: 1, COLLECT: 2, RETURN: 3, DONE: 4 };
 const M = CONFIG.mission;
@@ -11,7 +12,35 @@ export class Mission {
   constructor(world) {
     this.world = world;
     this.expedition = 1;
+    this.expeditionsDone = 0;
+    // Team contracts (mission board): progress survives expeditions.
+    this.contracts = CONTRACTS.map((c) => ({ id: c.id, progress: 0, done: false }));
+    this.stats = { kills: {}, delivered: {}, fruit: 0, traps: 0 };
     this.reset();
+  }
+
+  /** A game event happened; advance matching contracts. */
+  onEvent(event, n = 1) {
+    let changed = false;
+    CONTRACTS.forEach((def, i) => {
+      const c = this.contracts[i];
+      if (c.done || def.event !== event) return;
+      c.progress = Math.min(def.goal, c.progress + n);
+      changed = true;
+      if (c.progress >= def.goal) {
+        c.done = true;
+        this.world.toast(`Contract complete: ${def.title}! Reward: ${def.reward.text}`, 'quest');
+        this.world.onCapsChanged?.();
+      }
+    });
+    if (changed) this.broadcast();
+  }
+
+  /** Extra inventory capacity earned from completed contracts. */
+  bonus() {
+    const b = { arrows: 0, fruit: 0, carry: 0, traps: 0, baits: 0 };
+    CONTRACTS.forEach((def, i) => { if (this.contracts[i].done) b[def.reward.cap] += def.reward.amount; });
+    return b;
   }
 
   reset() {
@@ -56,6 +85,9 @@ export class Mission {
       ],
       complete: s === STEPS.DONE,
       completedIn: this.completedIn,
+      expeditionsDone: this.expeditionsDone,
+      contracts: this.contracts.map((c) => ({ ...c })),
+      stats: this.stats,
     };
   }
 
@@ -72,6 +104,8 @@ export class Mission {
 
   /** Called by the dinosaur system. */
   onDinoKilled(d) {
+    this.stats.kills[d.type] = (this.stats.kills[d.type] || 0) + 1;
+    this.onEvent(`kill:${d.type}`);
     if (d.type === 'brachio' && this.step <= STEPS.HUNT) {
       this.advance(STEPS.COLLECT, 'The Brachiosaurus is down! Collect the loot.');
     }
@@ -90,6 +124,18 @@ export class Mission {
 
   onDeposit(kind, n) {
     if (kind in this.deposited) this.deposited[kind] += n;
+    this.stats.delivered[kind] = (this.stats.delivered[kind] || 0) + n;
+    this.onEvent(`deliver:${kind}`, n);
+  }
+
+  onFruitPicked() {
+    this.stats.fruit++;
+    this.onEvent('fruit');
+  }
+
+  onTrapCatch() {
+    this.stats.traps++;
+    this.onEvent('trap');
   }
 
   update(dt) {
@@ -125,7 +171,9 @@ export class Mission {
       }
       if (alive > 0 && home === alive) {
         this.completedIn = Math.round(w.now - this.startedAt);
+        this.expeditionsDone++;
         this.advance(STEPS.DONE, 'Expedition complete! The whole team made it home.');
+        this.onEvent('expedition');
         this.doneTimer = 12;
       }
     } else if (this.step === STEPS.DONE) {

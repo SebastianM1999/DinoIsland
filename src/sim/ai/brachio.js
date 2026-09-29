@@ -11,6 +11,65 @@ function herdOf(sys, d) {
   return sys.groups.get(d.group);
 }
 
+/**
+ * Self-defence: a Brachiosaurus turns on a player who attacked it from close
+ * range or simply walks up too close, rears up and stomps (telegraphed wind-up,
+ * big knockback). Returns true while it is busy defending.
+ */
+function defend(d, sys, dt) {
+  d.cool = Math.max(0, d.cool - dt);
+  // someone walked right up to it?
+  if (!(d.defendT > 0)) {
+    const close = sys.nearestPlayer(d, C.closeRadius, (p) => !sys.inSafeZone(p));
+    if (!close) { d.fl &= ~1; return false; }
+    d.defendT = C.defendTime * 0.6;
+    d.targetId = close.id;
+    sys.roar(d);
+  }
+  const p = sys.world.players.get(d.targetId);
+  if (!p || !p.alive || sys.inSafeZone(p) || sys.distTo(d, p.x, p.z) > C.defendRange * 1.6) {
+    d.defendT = 0;
+    d.stompT = -1;
+    d.fl &= ~1;
+    return false;
+  }
+  d.fl |= 1;
+  d.defendT -= dt;
+  const dist = sys.distTo(d, p.x, p.z);
+  const toP = Math.atan2(-(p.x - d.x), -(p.z - d.z));
+
+  if (d.stompT >= 0) {
+    // rear up (wind-up), then slam the front legs down
+    d.stompT += dt;
+    d.st = DS.ATTACK;
+    sys.halt(d, dt);
+    sys.turnTo(d, toP, dt, C.turnRate * 1.5);
+    if (!d.stomped && d.stompT >= C.stompWindup) {
+      d.stomped = true;
+      if (sys.distTo(d, p.x, p.z) < C.stompRange + 1) sys.hitPlayer(d, p, C.stompDamage, C.stompKnockback, 1);
+    }
+    if (d.stompT >= C.stompWindup + 0.6) { d.stompT = -1; d.cool = C.stompCooldown; }
+    return true;
+  }
+  if (dist < C.stompRange && d.cool <= 0) {
+    d.stompT = 0;
+    d.stomped = false;
+    sys.cue(d, p.id);
+    return true;
+  }
+  // face the intruder and close in slowly
+  if (dist > C.stompRange * 0.8) {
+    sys.steer(d, p.x, p.z, C.walkSpeed * 1.4, dt, C.turnRate * 1.4);
+    d.st = DS.WALK;
+  } else {
+    sys.halt(d, dt);
+    sys.turnTo(d, toP, dt, C.turnRate * 1.4);
+    d.st = DS.ALERT;
+  }
+  if (d.defendT <= 0) d.fl &= ~1;
+  return d.defendT > 0;
+}
+
 function newHerd(sys, zone) {
   const id = `brachio-${sys.world.id()}`;
   const herd = { id, zone, target: { x: zone.x, z: zone.z }, retarget: 0, panic: 0, threat: null, graze: 0, alertT: 0 };
@@ -44,6 +103,9 @@ export const brachioBrain = {
 
   init(d) {
     d.idleT = 2 + Math.random() * 4;
+    d.defendT = 0;
+    d.cool = 0;
+    d.stompT = -1;
   },
 
   onHurt(d, sys, byId) {
@@ -51,6 +113,11 @@ export const brachioBrain = {
     const p = sys.world.players.get(byId);
     if (!herd) return;
     if (herd.panic <= 0) sys.roar(d);   // alarm bellow
+    // An attacker close by gets stomped; from far away the herd just flees.
+    if (p && sys.distTo(d, p.x, p.z) < C.defendRange) {
+      d.defendT = C.defendTime;
+      d.targetId = byId;
+    }
     herd.panic = C.fleeTime;
     herd.threat = p ? { x: p.x, z: p.z } : { x: d.x, z: d.z };
     herd.target = null;
@@ -59,13 +126,14 @@ export const brachioBrain = {
   update(d, sys, dt) {
     const herd = herdOf(sys, d);
     if (!herd) return;
-    const leader = sys.list.find((o) => o.group === d.group && o.alive);
+    if (defend(d, sys, dt)) return;
+    // the first herd member that isn't busy defending leads (d always qualifies here)
+    const leader = sys.list.find((o) => o.group === d.group && o.alive && !(o.defendT > 0));
     const isLeader = leader === d;
 
     if (isLeader) {
-      // Threat detection: sprinting players nearby, or anyone very close.
-      const threat = sys.nearestPlayer(d, C.alertRadius, (p) => (p.fl & PF_SPRINT) !== 0)
-        || sys.nearestPlayer(d, 7);
+      // Threat detection: sprinting players nearby.
+      const threat = sys.nearestPlayer(d, C.alertRadius, (p) => (p.fl & PF_SPRINT) !== 0);
       if (threat) {
         herd.panic = Math.max(herd.panic, C.fleeTime * 0.6);
         herd.threat = { x: threat.x, z: threat.z };

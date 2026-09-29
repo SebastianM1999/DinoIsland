@@ -229,7 +229,12 @@ export class DinoSystem {
     return (p.x - this.hut.x) ** 2 + (p.z - this.hut.z) ** 2 < r * r;
   }
 
-  roar(d) { this.world.event(EV.ROAR, { id: d.id }); }
+  /** Call/roar with a per-animal cooldown so re-targeting never spams sound. */
+  roar(d, cooldown = 5) {
+    if (this.world.now < (d.nextRoarAt ?? 0)) return;
+    d.nextRoarAt = this.world.now + cooldown;
+    this.world.event(EV.ROAR, { id: d.id });
+  }
 
   randomWalkablePoint(d, cx, cz, radius, tries = 20) {
     for (let i = 0; i < tries; i++) {
@@ -339,6 +344,7 @@ export class DinoSystem {
             d.stuckT = CONFIG.weapons.trap.holdTime * (d.type === 'trex' ? 0.4 : d.type === 'brachio' ? 0.8 : 1);
             w.event(EV.TRAP_SNAP, { id: tr.id, dino: d.id });
             w.toast(`A ${CONFIG.dinos[d.type].name} is caught in a trap!`, 'trap');
+            w.mission.onTrapCatch();
             this.damage(d, CONFIG.weapons.trap.damage, 'leg', tr.owner, 'trap');
             break;
           }

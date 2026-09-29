@@ -37,6 +37,44 @@ export const BRACHIO_ANIM = {
   blinkEvery: 5,
 };
 
+const STOMP_WINDUP = 0.8;   // matches CONFIG.dinos.brachio.stompWindup on the server
+
+/**
+ * Defensive stomp: rear up on the hind legs (front legs lifted and folded),
+ * then slam down with a heavy footfall. Driven by the ATTACK state.
+ */
+export function brachioExtraUpdate(view, dt) {
+  const rig = view.rig;
+  const s = view._stomp || (view._stomp = { t: -1, rear: 0, slammed: false });
+  if (view.st === 5 /* DS.ATTACK */) {
+    if (s.t < 0) { s.t = 0; s.slammed = false; }
+    s.t += dt;
+  } else s.t = -1;
+  let target = 0;
+  if (s.t >= 0) {
+    if (s.t < STOMP_WINDUP) target = Math.sin((s.t / STOMP_WINDUP) * Math.PI * 0.5);   // rise
+    else target = Math.max(0, 1 - (s.t - STOMP_WINDUP) / 0.15);                         // slam
+    if (!s.slammed && s.t >= STOMP_WINDUP + 0.12) {
+      s.slammed = true;
+      view.ctx.onStep?.(view);
+      view.ctx.onStep?.(view);
+    }
+  }
+  // fast down, smooth up
+  s.rear += (target - s.rear) * Math.min(1, dt * (target < s.rear ? 22 : 7));
+  if (s.rear < 0.001) return;
+  const r = s.rear;
+  rig.body.rotation.x += r * 0.42;
+  rig.body.position.y += r * 1.1;
+  for (const leg of rig.legs) {
+    if (!leg.front) continue;
+    leg.hip.rotation.x += r * 0.9;
+    leg.knee.rotation.x -= r * 1.3;
+  }
+  for (const j of rig.neck) j.rotation.x += r * 0.06;
+  if (rig.jaw) rig.jaw.rotation.x -= r * 0.25;
+}
+
 export function buildBrachio() {
   const rig = new Rig();
   const body = rig.body;

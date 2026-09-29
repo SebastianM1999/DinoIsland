@@ -82,6 +82,7 @@ export const EV = {
   EAT: 'eat',               // { id, fruit }                     someone is eating (animation)
   ATTACK: 'attack',         // { id, kind }                      dinosaur attack animation cue
   SPOT: 'spot',             // { id, type, by }                  share discovery with the team
+  FULL: 'full',             // { text, icon }                    your inventory can't take an item
 };
 
 /** Player snapshot tuple layout. */
