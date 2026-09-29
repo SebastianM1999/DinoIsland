@@ -11,15 +11,21 @@ const V = (x, y, z) => new THREE.Vector3(x, y, z);
  * angle: 0 = top, PI = bottom.
  */
 export function countershade({ main, back, belly, stripe = null, stripes = 0, stripeWidth = 0.35, bellyFrom = 2.1, backTo = 0.75, stripePhase = 0, tip = null, tipFrom = 1.1 }) {
+  const colors = { main: new THREE.Color(main), back: new THREE.Color(back), belly: new THREE.Color(belly),
+    stripe: stripe && new THREE.Color(stripe), tip: tip && new THREE.Color(tip) };
+  const out = new THREE.Color();
+  const fade = (a, b, v) => { const t = Math.max(0, Math.min(1, (v - a) / (b - a))); return t * t * (3 - 2 * t); };
   return (t, a) => {
     const aa = Math.abs(((a + Math.PI) % (Math.PI * 2)) - Math.PI); // 0 top .. PI bottom
-    if (tip && t > tipFrom) return tip;
-    if (aa > bellyFrom) return belly;
-    if (stripe && stripes > 0 && aa < 1.55) {
+    out.copy(colors.main).lerp(colors.back, 1 - fade(backTo - 0.3, backTo + 0.3, aa));
+    out.lerp(colors.belly, fade(bellyFrom - 0.3, bellyFrom + 0.3, aa));
+    if (colors.stripe && stripes > 0) {
       const s = (t * stripes + stripePhase) % 1;
-      if (s < stripeWidth * (1.2 - aa / 1.55)) return stripe;
+      const width = stripeWidth * (1.2 - Math.min(1, aa / 1.55));
+      out.lerp(colors.stripe, (1 - fade(width - 0.09, width + 0.09, s)) * (1 - fade(1.2, 1.65, aa)) * 0.85);
     }
-    return aa < backTo ? back : main;
+    if (colors.tip) out.lerp(colors.tip, fade(tipFrom - 0.06, tipFrom + 0.06, t));
+    return out;
   };
 }
 
@@ -58,6 +64,7 @@ export function chain(parent, segs, { dir = 'fwd', color, radial = 10, overlap =
     };
     let geo = tube(pts, (t) => lerpR(t), {
       radial,
+      smoothColors: true,
       up,
       capStart: capFirst && i === 0,   // later segments start inside their parent
       capEnd: i === segs.length - 1,

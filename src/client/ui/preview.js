@@ -85,7 +85,6 @@ function frame(now) {
       { x: dino.x, z: dino.z, kind: 'dino' },
       { x: dino.x - 8, z: dino.z + 10, kind: 'track' },
       { x: dino.x - 14, z: dino.z + 19, kind: 'track' },
-      { x: px - 30, z: pz + 10, kind: 'fruit', color: CONFIG.fruit.types.berry.color },
       { x: 0, z: -60, kind: 'objective' },
     ],
   });

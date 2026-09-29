@@ -304,12 +304,12 @@ export class PlayerActions {
     for (const s of g.layout.fruitSpots) {
       const r = s.type === 'mango' ? 3.4 : P.interactRange;
       const d = Math.hypot(s.x - pos.x, s.z - pos.z);
-      if (d < r && d < bd && g.fruitPlants.isRipe?.(s.id) !== false && g.fruitRipe[s.id]) { bd = d; best = s; }
+      if (d < r && d < bd && g.fruitCounts[s.id] > 0) { bd = d; best = s; }
     }
     if (best) {
       const name = CONFIG.fruit.types[best.type].name;
       if (inv.fruit.length >= CONFIG.fruit.maxCarried) return { text: `Fruit pouch full (${CONFIG.fruit.maxCarried})`, run: null };
-      return { text: `Pick ${name}`, run: () => net.act(ACT.HARVEST, { spot: best.id }) };
+      return { text: `Pick ${name} (${g.fruitCounts[best.id]} left)`, run: () => net.act(ACT.HARVEST, { spot: best.id }) };
     }
     // 3. hut
     const h = g.layout.hut;
@@ -397,23 +397,15 @@ export class PlayerActions {
     if (step === 1) {
       // once tracks are found the trail points toward the herd
       const near = g.dinos.nearest('brachio', pos);
-      if (near) out.push({ bearing: bearing(near.view.pos.x, near.view.pos.z), kind: 'objective' });
+      if (near && g.dinos.spotted.has(near.view.id)) out.push({ bearing: bearing(near.view.pos.x, near.view.pos.z), kind: 'objective' });
     } else if (step === 2) {
       const it = g.items.nearestItem(pos, 400);
       if (it) out.push({ bearing: bearing(it.x, it.z), kind: 'objective' });
     }
     // dinosaurs you can see nearby
     for (const v of g.dinos.map.values()) {
-      if (v.alive && v.pos.distanceTo(pos) < 60) out.push({ bearing: bearing(v.pos.x, v.pos.z), kind: 'dino' });
+      if (v.alive && g.dinos.spotted.has(v.id) && v.pos.distanceTo(pos) < 60) out.push({ bearing: bearing(v.pos.x, v.pos.z), kind: 'dino' });
     }
   }
 
-  minimapMarkers(out) {
-    const g = this.game;
-    const pos = g.player.pos;
-    for (const s of g.layout.fruitSpots) {
-      if (!g.fruitRipe[s.id]) continue;
-      if (Math.abs(s.x - pos.x) < 130 && Math.abs(s.z - pos.z) < 130) out.push({ x: s.x, z: s.z, kind: 'fruit', color: CONFIG.fruit.types[s.type].color });
-    }
-  }
 }

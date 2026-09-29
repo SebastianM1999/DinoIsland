@@ -53,7 +53,7 @@ export function buildBrachio() {
       const r = t < 0.3 ? 0.85 + t * 2.2 : t < 0.6 ? 1.5 + (t - 0.3) * 0.8 : 1.74 - (t - 0.6) * 1.55;
       return [r * 0.92, r * (t > 0.25 && t < 0.75 ? 1.02 : 0.95)];
     },
-    { radial: 12, color: bodyColor },
+    { radial: 12, color: bodyColor, smoothColors: true },
   );
   // shoulder + hip muscle bulges
   const bulges = [];

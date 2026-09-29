@@ -153,7 +153,7 @@ function hutGlyph(ctx, x, y, s) {
   ctx.fill();
 }
 
-const MARKER_COLORS = { dino: '#ee4d5f', track: '#8a5a33', fruit: '#ff5fb4', objective: '#ffc933' };
+const MARKER_COLORS = { dino: '#ee4d5f', track: '#8a5a33', objective: '#ffc933' };
 
 function marker(ctx, m, x, y, s) {
   const color = m.color || MARKER_COLORS[m.kind] || '#fff';
@@ -164,11 +164,6 @@ function marker(ctx, m, x, y, s) {
   switch (m.kind) {
     case 'track':
       ctx.arc(x, y, s * 0.4, 0, TAU);
-      ctx.fill();
-      return;
-    case 'fruit':
-      ctx.arc(x, y, s * 0.55, 0, TAU);
-      ctx.stroke();
       ctx.fill();
       return;
     case 'objective':

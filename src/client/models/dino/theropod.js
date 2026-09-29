@@ -74,7 +74,7 @@ export function buildTheropod(S) {
   rig.chest = chest;
   const T = S.torso;
   const bodyColor = countershade({ main: C.main, back: C.back, belly: C.belly, stripe: C.stripe, stripes: T.stripes, stripeWidth: T.stripeWidth ?? 0.4, bellyFrom: T.bellyFrom ?? 2.05, backTo: 0.7, stripePhase: 0.3 });
-  let torso = tube(T.path.map((p) => V(0, p[0], p[1])), (t) => T.radius(t), { radial: T.radial ?? 12, color: bodyColor });
+  let torso = tube(T.path.map((p) => V(0, p[0], p[1])), (t) => T.radius(t), { radial: T.radial ?? 12, color: bodyColor, smoothColors: true });
   // deeper, rounder belly
   torso = deform(torso, (v) => {
     if (v.y < T.bellyY) v.y = T.bellyY + (v.y - T.bellyY) * (T.bellyDrop ?? 1.15);

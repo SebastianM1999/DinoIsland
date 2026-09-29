@@ -29,20 +29,22 @@ function center(g) {
   return g;
 }
 
-function berryCluster() {
-  const berryCol = (c, n) => (n.y > 0.55 ? '#ff7a7e' : n.y < -0.4 ? '#b41e2e' : '#e8323c');
-  const spots = [[0, 0, 0], [0.085, 0.02, 0.03], [-0.05, 0.025, 0.07], [0.02, 0.06, -0.075], [-0.07, -0.03, -0.03]];
-  const parts = [];
-  spots.forEach(([x, y, z], i) => {
-    const r = 0.058 + 0.008 * Math.sin(i * 2.3);
-    let g = new THREE.SphereGeometry(r, 6, 5);
-    g = deform(g, (v) => { v.x += jitter(v, r * 0.08, i + 1); v.z += jitter(v, r * 0.08, i + 2); });
-    parts.push(place(paint(g, berryCol), [x, y, z]));
-    // tiny dark calyx on top of each berry
-    parts.push(place(blob(r * 0.35, r * 0.15, r * 0.35, '#5a1a22', { w: 5, h: 2 }), [x, y + r * 0.95, z]));
+function berry() {
+  let body = new THREE.SphereGeometry(1, 9, 7);
+  body = deform(body, (v) => {
+    const point = v.y < 0 ? 1 + v.y * 0.16 : 1;
+    v.set(v.x * 0.105 * point, v.y * 0.13, v.z * 0.105 * point);
   });
-  parts.push(place(leaf(0.14, 0.05), [0, 0.15, 0], [0, 0.6, 0.35]));
-  parts.push(place(leaf(0.11, 0.04), [0, 0.15, 0], [0, 2.9, 0.25]));
+  const dark = new THREE.Color('#b82030'), red = new THREE.Color('#e8323c'), light = new THREE.Color('#ff7880');
+  const shade = new THREE.Color();
+  body = paint(body, (v) => {
+    const t = Math.max(0, Math.min(1, (v.y + 0.13) / 0.26));
+    return t < 0.6 ? shade.copy(dark).lerp(red, t / 0.6) : shade.copy(red).lerp(light, (t - 0.6) / 0.4);
+  });
+  const parts = [body];
+  parts.push(place(blob(0.045, 0.015, 0.045, '#5a8330', { w: 6, h: 3 }), [0, 0.122, 0]));
+  parts.push(tube([V(0, 0.13, 0), V(0.01, 0.19, 0)], () => 0.012, { radial: 5, color: () => '#567b2d' }));
+  parts.push(place(leaf(0.11, 0.045), [0, 0.16, 0], [0.2, 0.6, 0.4]));
   return center(merge(parts));
 }
 
@@ -98,7 +100,7 @@ const geoCache = new Map();
 export function fruitGeometry(type) {
   let g = geoCache.get(type);
   if (!g) {
-    g = type === 'mango' ? mango() : type === 'dragon' ? dragon() : berryCluster();
+    g = type === 'mango' ? mango() : type === 'dragon' ? dragon() : berry();
     geoCache.set(type, g);
   }
   return g;

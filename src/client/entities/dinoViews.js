@@ -4,19 +4,26 @@
 
 import * as THREE from 'three';
 import { CONFIG } from '../../shared/config.js';
-import { MSG, EV, DS } from '../../shared/protocol.js';
+import { MSG, EV, DS, ACT } from '../../shared/protocol.js';
 import { angleDiff } from '../../shared/rng.js';
 import { raySphere } from '../../shared/collision.js';
+import { lineBlocked } from '../../shared/visibility.js';
 import { InterpBuffer } from '../net/interp.js';
 import { DinoAnimator } from '../models/dino/rig.js';
 import { buildBrachio, BRACHIO_ANIM } from '../models/dino/brachio.js';
+import { buildStego, STEGO_ANIM, stegoExtraUpdate } from '../models/dino/stego.js';
+import { buildRaptor, RAPTOR_ANIM, raptorExtraUpdate } from '../models/dino/raptor.js';
+import { buildPtera, PTERA_ANIM, pteraExtraUpdate } from '../models/dino/ptera.js';
+import { buildTrex, TREX_ANIM, trexExtraUpdate } from '../models/dino/trex.js';
 
-/** Species registry: model builder + animation tuning. Phase 6 adds more. */
+/** Every server species needs a visible model and its animation tuning. */
 export const SPECIES = {
   brachio: { build: buildBrachio, anim: BRACHIO_ANIM, barHeight: 12.5, heavy: true },
+  stego: { build: buildStego, anim: STEGO_ANIM, extraUpdate: stegoExtraUpdate, barHeight: 3.8, heavy: true },
+  raptor: { build: buildRaptor, anim: RAPTOR_ANIM, extraUpdate: raptorExtraUpdate, barHeight: 1.8 },
+  ptera: { build: buildPtera, anim: PTERA_ANIM, extraUpdate: pteraExtraUpdate, barHeight: 1.8 },
+  trex: { build: buildTrex, anim: TREX_ANIM, extraUpdate: trexExtraUpdate, barHeight: 5.5, heavy: true },
 };
-
-export function registerSpecies(type, def) { SPECIES[type] = def; }
 
 const X = 0, Y = 1, Z = 2, YAW = 3, SPD = 4;
 const V = new THREE.Vector3();
@@ -163,6 +170,9 @@ export class DinoViews {
   constructor(game) {
     this.game = game;
     this.map = new Map();
+    this.spotted = new Set();
+    this.spotAttempts = new Map();
+    this.spotTimer = 0;
     this.ctx = { scene: game.gfx.scene, terrain: game.terrain, overlay: game.overlay, camera: game.gfx.camera, onStep: (v) => game.onDinoStep?.(v) };
     const net = game.net;
     net.on(`ev:${EV.DINO_ADD}`, (m) => this.add(m.dino));
@@ -180,9 +190,15 @@ export class DinoViews {
     });
     net.on(`ev:${EV.ATTACK}`, (m) => { const v = this.map.get(m.id); if (v) { v.attackT = 0.45; game.onDinoAttack?.(v); } });
     net.on(`ev:${EV.ROAR}`, (m) => { const v = this.map.get(m.id); if (v) { v.roarT = 1.6; game.onRoar?.(v); } });
+    net.on(`ev:${EV.SPOT}`, (m) => {
+      if (this.spotted.has(m.id)) return;
+      this.spotted.add(m.id);
+      game.hud.toast(`${CONFIG.dinos[m.type]?.name || 'Dinosaur'} spotted — marked for the team`, 'dino');
+    });
   }
 
   onWelcome(world) {
+    this.spotted = new Set(world.spottedDinos || []);
     for (const d of world.dinos) this.add(d);
   }
 
@@ -196,6 +212,8 @@ export class DinoViews {
     if (!v) return;
     v.dispose();
     this.map.delete(id);
+    this.spotted.delete(id);
+    this.spotAttempts.delete(id);
   }
 
   onSnapshot(m) {
@@ -220,6 +238,29 @@ export class DinoViews {
       v.update(far ? v.skip : dt, renderTime);
       v.skip = 0;
     }
+    this.spotTimer -= dt;
+    if (this.spotTimer <= 0) {
+      this.spotTimer = 0.35;
+      this.spotVisibleDinosaurs();
+    }
+  }
+
+  spotVisibleDinosaurs() {
+    if (!this.game.me.alive || !this.game.input.locked || this.game.hud.isPanelOpen()) return;
+    const camera = this.game.gfx.camera;
+    const eye = camera.position;
+    for (const v of this.map.values()) {
+      if (!v.alive || this.spotted.has(v.id) || this.game.time - (this.spotAttempts.get(v.id) ?? -10) < 1.5) continue;
+      const target = v.pos.clone();
+      target.y += v.type === 'brachio' ? 5 : v.type === 'trex' ? 2.5 : 1;
+      const distance = eye.distanceTo(target);
+      if (distance > 110 || distance < 0.1) continue;
+      const ndc = target.clone().project(camera);
+      if (ndc.z < -1 || ndc.z > 1 || Math.abs(ndc.x) > 0.8 || Math.abs(ndc.y) > 0.8) continue;
+      if (lineBlocked(eye, target, this.ctx.terrain, this.game.layout)) continue;
+      this.spotAttempts.set(v.id, this.game.time);
+      this.game.net.act(ACT.SPOT, { dino: v.id });
+    }
   }
 
   /**
@@ -242,11 +283,8 @@ export class DinoViews {
   }
 
   minimapMarkers(out) {
-    const p = this.game.player.pos;
     for (const v of this.map.values()) {
-      if (!v.alive) continue;
-      // Only dinosaurs you can plausibly see/hear show up on the minimap.
-      if (Math.hypot(v.pos.x - p.x, v.pos.z - p.z) < 70) out.push({ x: v.pos.x, z: v.pos.z, kind: 'dino' });
+      if (v.alive && this.spotted.has(v.id)) out.push({ x: v.pos.x, z: v.pos.z, kind: 'dino' });
     }
   }
 

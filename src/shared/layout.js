@@ -142,7 +142,7 @@ export function buildLayout(terrain) {
   };
 
   // Palms along the beach ring.
-  for (let i = 0; i < 900 && layout.trees.length < 70; i++) {
+  for (let i = 0; i < 1600 && layout.trees.length < 110; i++) {
     const a = rng() * TAU;
     const r = rng.range(120, 200);
     const x = Math.cos(a) * r, z = Math.sin(a) * r;
@@ -153,18 +153,18 @@ export function buildLayout(terrain) {
   }
 
   // Broadleaf / jungle trees inland.
-  for (let i = 0; i < 9000 && layout.trees.length < 470; i++) {
+  for (let i = 0; i < 19000 && layout.trees.length < 900; i++) {
     const x = rng.range(-190, 190), z = rng.range(-190, 190);
     const h = terrain.heightAt(x, z);
     if (!dry(x, z, 2.2) || nearHut(x, z, 4) || lakeDist(x, z) < FEATURES.lake.radius + 5) continue;
     if (terrain.slopeAt(x, z) > 0.55) continue;
-    if (distToPath(x, z) < 3.5) continue;
+    if (distToPath(x, z) < 3.1) continue;
     const dens = jungle(x, z);
-    if (rng() > dens * dens * 1.3) continue;
+    if (rng() > Math.min(1, dens * dens * 1.55 + 0.08)) continue;
     const onMesa = h > 12;
-    if (!free(x, z, onMesa ? 3 : 3.2)) continue;
-    const type = onMesa ? (rng() < 0.6 ? 'palm' : 'round') : dens > 0.75 && rng() < 0.45 ? 'jungle' : rng() < 0.5 ? 'round' : 'tall';
-    addTree(type, x, z, rng.range(0.8, 1.35), type === 'palm' ? 0.35 : 0.55);
+    if (!free(x, z, onMesa ? 2.6 : 2.8)) continue;
+    const type = onMesa ? (rng() < 0.6 ? 'palm' : 'round') : dens > 0.62 && rng() < 0.55 ? 'jungle' : rng() < 0.5 ? 'round' : 'tall';
+    addTree(type, x, z, rng.range(0.9, 1.5), type === 'palm' ? 0.35 : 0.55);
   }
 
   // -------------------------------------------------------------- rocks
@@ -175,7 +175,7 @@ export function buildLayout(terrain) {
     occupied.push({ x, z, r: scale * 1.4 });
     if (scale > 0.45) circles.push({ x, z, r: scale * 1.05 });
   };
-  for (let i = 0; i < 3000 && layout.rocks.length < 120; i++) {
+  for (let i = 0; i < 6500 && layout.rocks.length < 220; i++) {
     const x = rng.range(-195, 195), z = rng.range(-195, 195);
     const h = terrain.heightAt(x, z);
     if (h < -0.4 || nearHut(x, z, 2) || distToPath(x, z) < 2) continue;
@@ -202,14 +202,14 @@ export function buildLayout(terrain) {
   }
 
   // ------------------------------------------------------ bushes (visual)
-  for (let i = 0; i < 5000 && layout.bushes.length < 260; i++) {
+  for (let i = 0; i < 12000 && layout.bushes.length < 600; i++) {
     const x = rng.range(-190, 190), z = rng.range(-190, 190);
     if (!dry(x, z, 1.2) || nearHut(x, z, -4) || distToPath(x, z) < 2) continue;
     if (terrain.slopeAt(x, z) > 0.7) continue;
     if (rng() > jungle(x, z) + 0.15) continue;
     if (!free(x, z, 1.4)) continue;
     const type = rng() < 0.55 ? 'fern' : 'bush';
-    layout.bushes.push({ type, x, z, y: terrain.heightAt(x, z), scale: rng.range(0.7, 1.4), rot: rng() * TAU, hue: rng() });
+    layout.bushes.push({ type, x, z, y: terrain.heightAt(x, z), scale: rng.range(0.8, 1.65), rot: rng() * TAU, hue: rng() });
     occupied.push({ x, z, r: 0.8 });
   }
 

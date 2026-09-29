@@ -77,6 +77,7 @@ export class DinoSystem {
   remove(d) {
     this.list.splice(this.list.indexOf(d), 1);
     this.byId.delete(d.id);
+    this.world.spottedDinos.delete(d.id);
     this.world.event(EV.DINO_REMOVE, { id: d.id });
   }
 
@@ -212,7 +213,8 @@ export class DinoSystem {
   hitPlayer(d, p, dmg, knock = 6, down = 0) {
     const dx = p.x - d.x, dz = p.z - d.z;
     const l = Math.hypot(dx, dz) || 1;
-    this.world.hurtPlayer(p, dmg, { kx: (dx / l) * knock, kz: (dz / l) * knock, down, src: d.type });
+    this.world.hurtPlayer(p, dmg, { kx: (dx / l) * knock, kz: (dz / l) * knock, down,
+      src: d.type, from: { id: d.id, x: r2(d.x), y: r2(d.y), z: r2(d.z) } });
   }
 
   /** Cue + damage in one go (quick bites). */

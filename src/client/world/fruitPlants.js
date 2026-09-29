@@ -1,7 +1,7 @@
 // Fruit plants: berry bushes with red berry clusters, mangos hanging in the
 // mango trees (trees themselves come from vegetation.js), and exotic dragon
 // fruit plants with a glowing fruit and sparkles. Fruit can be hidden/shown
-// per spot (setRipe) with a pop-in animation.
+// per spot (setCount) with a pop-in animation.
 
 import * as THREE from 'three';
 import { CONFIG } from '../../shared/config.js';
@@ -15,8 +15,9 @@ import { LEAF_MAT, instanced, finishInstanced } from './veg/shapes.js';
 const TAU = Math.PI * 2;
 const POP_TIME = 0.35;
 const SPARKLES_PER_DRAGON = 6;
+const MAX_FRUIT_PER_PLANT = 4;
 /** Visual scale of fruit on the plants (fruit models are ~0.25 m; bigger = easier to spot). */
-export const FRUIT_PLANT_SCALE = { berry: 1.5, mango: 2.0, dragon: 1.6 };
+export const FRUIT_PLANT_SCALE = { berry: 1.8, mango: 2.0, dragon: 1.6 };
 
 const easeOutBack = (t) => {
   const c1 = 1.9, c3 = c1 + 1;
@@ -42,14 +43,14 @@ export function buildFruitPlants(terrain, layout) {
   const bushes = instanced(berryBushGeometry(), MAT.standard, nBerry, { name: 'berry-bushes' });
   const dragonPlants = instanced(dragonPlantGeometry(), LEAF_MAT, nDragon, { name: 'dragon-plants' });
   // fruit
-  const berries = instanced(fruitGeometry('berry'), fruitMaterial('berry'), nBerry * BERRY_SPOTS_LOCAL.length, { cast: false, name: 'fruit-berries' });
-  const mangos = instanced(fruitGeometry('mango'), fruitMaterial('mango'), nMango * MANGO_FRUIT_LOCAL.length, { cast: true, name: 'fruit-mangos' });
-  const dragons = instanced(fruitGeometry('dragon'), fruitMaterial('dragon'), nDragon, { cast: false, name: 'fruit-dragon' });
+  const berries = instanced(fruitGeometry('berry'), fruitMaterial('berry'), nBerry * MAX_FRUIT_PER_PLANT, { cast: false, name: 'fruit-berries' });
+  const mangos = instanced(fruitGeometry('mango'), fruitMaterial('mango'), nMango * MAX_FRUIT_PER_PLANT, { cast: true, name: 'fruit-mangos' });
+  const dragons = instanced(fruitGeometry('dragon'), fruitMaterial('dragon'), nDragon * MAX_FRUIT_PER_PLANT, { cast: false, name: 'fruit-dragon' });
   const sparkleMat = new THREE.MeshBasicMaterial({ color: new THREE.Color('#dff7ff'), fog: true });
   const sparkles = instanced(new THREE.OctahedronGeometry(0.05, 0), sparkleMat, nDragon * SPARKLES_PER_DRAGON, { cast: false, receive: false, name: 'fruit-sparkles' });
   sparkles.frustumCulled = false; // animated every frame; bounding sphere would go stale
 
-  /** @type {Map<number, {spot:any, ripe:boolean, pop:number, anchor:THREE.Vector3, fruit:{mesh:THREE.InstancedMesh,index:number,pos:THREE.Vector3,quat:THREE.Quaternion,scale:number}[], sparkleBase:number}>} */
+  /** @type {Map<number, {spot:any, count:number, pop:number, anchor:THREE.Vector3, fruit:{mesh:THREE.InstancedMesh,index:number,pos:THREE.Vector3,quat:THREE.Quaternion,scale:number}[], sparkleBase:number}>} */
   const state = new Map();
   const counters = { berry: 0, mango: 0, dragon: 0, bush: 0, plant: 0 };
 
@@ -60,7 +61,7 @@ export function buildFruitPlants(terrain, layout) {
   };
 
   for (const spot of spots) {
-    const st = { spot, ripe: true, pop: 1, anchor: new THREE.Vector3(), fruit: [], sparkleBase: -1 };
+    const st = { spot, count: 0, pop: 1, anchor: new THREE.Vector3(), fruit: [], sparkleBase: -1 };
     state.set(spot.id, st);
     const rot = rng() * TAU;
     if (spot.type === 'berry') {
@@ -69,44 +70,52 @@ export function buildFruitPlants(terrain, layout) {
       p.set(spot.x, spot.y - 0.08, spot.z);
       m4.compose(p, q, s.setScalar(sc));
       bushes.setMatrixAt(counters.bush++, m4);
-      for (const l of BERRY_SPOTS_LOCAL) {
+      for (const l of BERRY_SPOTS_LOCAL.slice(0, MAX_FRUIT_PER_PLANT)) {
         const wp = new THREE.Vector3(...l).applyMatrix4(m4);
         addFruit(st, berries, wp, FRUIT_PLANT_SCALE.berry, rng() * TAU);
         st.anchor.add(wp);
       }
-      st.anchor.divideScalar(BERRY_SPOTS_LOCAL.length);
+      st.anchor.divideScalar(MAX_FRUIT_PER_PLANT);
     } else if (spot.type === 'mango') {
       const id = Number(String(spot.host).split(':')[1]);
       const tree = treesById.get(id);
       if (tree) treeMatrix(tree, m4);
       else m4.compose(p.set(spot.x, spot.y, spot.z), q.identity(), s.setScalar(1));
-      for (const l of MANGO_FRUIT_LOCAL) {
+      for (const l of MANGO_FRUIT_LOCAL.slice(0, MAX_FRUIT_PER_PLANT)) {
         const wp = new THREE.Vector3(...l).applyMatrix4(m4);
         addFruit(st, mangos, wp, FRUIT_PLANT_SCALE.mango, rng() * TAU);
         st.anchor.add(wp);
       }
-      st.anchor.divideScalar(MANGO_FRUIT_LOCAL.length);
+      st.anchor.divideScalar(MAX_FRUIT_PER_PLANT);
     } else {
       const sc = 1.1;
       e.set(0, rot, 0); q.setFromEuler(e);
       p.set(spot.x, spot.y - 0.04, spot.z);
       m4.compose(p, q, s.setScalar(sc));
       dragonPlants.setMatrixAt(counters.plant++, m4);
-      const wp = new THREE.Vector3(...DRAGON_FRUIT_LOCAL).applyMatrix4(m4);
-      wp.y += 0.06;
-      addFruit(st, dragons, wp, FRUIT_PLANT_SCALE.dragon, rot);
-      st.anchor.copy(wp);
-      st.sparkleBase = (counters.dragon - 1) * SPARKLES_PER_DRAGON;
+      for (let i = 0; i < MAX_FRUIT_PER_PLANT; i++) {
+        const a = i * TAU / MAX_FRUIT_PER_PLANT + rot;
+        const local = new THREE.Vector3(...DRAGON_FRUIT_LOCAL);
+        local.x += Math.cos(a) * 0.14;
+        local.z += Math.sin(a) * 0.14;
+        local.y += i % 2 ? -0.09 : 0.06;
+        const wp = local.applyMatrix4(m4);
+        addFruit(st, dragons, wp, FRUIT_PLANT_SCALE.dragon * 0.82, a);
+        st.anchor.add(wp);
+      }
+      st.anchor.divideScalar(MAX_FRUIT_PER_PLANT);
+      st.sparkleBase = (counters.plant - 1) * SPARKLES_PER_DRAGON;
     }
   }
 
   const writeFruit = (st, k = 1) => {
-    for (const f of st.fruit) {
-      f.mesh.setMatrixAt(f.index, m4.compose(f.pos, f.quat, s.setScalar(f.scale * k)));
+    for (let i = 0; i < st.fruit.length; i++) {
+      const f = st.fruit[i];
+      f.mesh.setMatrixAt(f.index, m4.compose(f.pos, f.quat, s.setScalar(f.scale * (i < st.count ? k : 0))));
       f.mesh.instanceMatrix.needsUpdate = true;
     }
   };
-  for (const st of state.values()) writeFruit(st, 1);
+  for (const st of state.values()) writeFruit(st, 0);
   const zero = new THREE.Matrix4().makeScale(0, 0, 0);
   for (let i = 0; i < sparkles.count; i++) sparkles.setMatrixAt(i, zero);
 
@@ -122,21 +131,22 @@ export function buildFruitPlants(terrain, layout) {
   return {
     group,
 
-    /** Show/hide a spot's fruit. Showing plays a quick pop-in. */
-    setRipe(spotId, ripe) {
+    /** Show the server-owned number of fruit left on a plant. */
+    setCount(spotId, count) {
       const st = state.get(spotId);
       if (!st) return;
-      ripe = !!ripe;
-      if (st.ripe === ripe) return;
-      st.ripe = ripe;
-      if (ripe) {
+      count = Math.max(0, Math.min(MAX_FRUIT_PER_PLANT, count | 0));
+      if (st.count === count) return;
+      const growing = count > st.count;
+      st.count = count;
+      if (growing) {
         st.pop = 0;
         popping.add(st);
         writeFruit(st, 0);
       } else {
         popping.delete(st);
-        st.pop = 0;
-        writeFruit(st, 0);
+        st.pop = 1;
+        writeFruit(st);
       }
     },
 
@@ -144,10 +154,6 @@ export function buildFruitPlants(terrain, layout) {
     getAnchor(spotId) {
       const st = state.get(spotId);
       return st ? st.anchor.clone() : null;
-    },
-
-    isRipe(spotId) {
-      return state.get(spotId)?.ripe ?? false;
     },
 
     update(dt, time) {
@@ -162,11 +168,12 @@ export function buildFruitPlants(terrain, layout) {
       for (const st of state.values()) {
         if (st.spot.type !== 'dragon') continue;
         const f = st.fruit[0];
-        const k = st.ripe ? (popping.has(st) ? easeOutBack(st.pop) : 1) : 0;
-        if (k > 0) {
-          _q.setFromEuler(e.set(0, time * 0.6 + st.spot.id, 0));
-          _v.copy(f.pos); _v.y += Math.sin(time * 1.8 + st.spot.id) * 0.03;
-          dragons.setMatrixAt(f.index, m4.compose(_v, _q, s.setScalar(f.scale * k)));
+        const k = st.count > 0 ? (popping.has(st) ? easeOutBack(st.pop) : 1) : 0;
+        for (let i = 0; i < st.count; i++) {
+          const fruit = st.fruit[i];
+          _q.setFromEuler(e.set(0, time * 0.6 + st.spot.id + i, 0));
+          _v.copy(fruit.pos); _v.y += Math.sin(time * 1.8 + st.spot.id + i) * 0.03;
+          dragons.setMatrixAt(fruit.index, m4.compose(_v, _q, s.setScalar(fruit.scale * k)));
         }
         for (let j = 0; j < SPARKLES_PER_DRAGON; j++) {
           const idx = st.sparkleBase + j;

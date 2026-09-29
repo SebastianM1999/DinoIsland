@@ -16,6 +16,8 @@ import { MSG, ACT, EV, EQUIP } from '../shared/protocol.js';
 import { DinoSystem } from './dinos.js';
 import { Mission } from './mission.js';
 import { resolveCircle } from '../shared/collision.js';
+import { makeRng } from '../shared/rng.js';
+import { lineBlocked } from '../shared/visibility.js';
 
 const P = CONFIG.player;
 const W = CONFIG.weapons;
@@ -42,13 +44,16 @@ export class ServerWorld {
     this.tracks = [];
     this.nextId = 1;
     this.store = Object.fromEntries(LOOT_KEYS.map((k) => [k, 0]));
-    this.fruit = this.layout.fruitSpots.map((s) => ({ spot: s.id, ripe: true, regrowAt: 0 }));
+    this.fruitRng = makeRng((Math.random() * 0xffffffff) >>> 0);
+    this.fruit = this.layout.fruitSpots.map((s) => ({ spot: s.id, count: this.rollFruitCount(), regrowAt: 0 }));
+    this.spottedDinos = new Set();
     this.dinos = new DinoSystem(this);
     this.mission = new Mission(this);
     this.dinos.spawnAll();
   }
 
   id() { return this.nextId++; }
+  rollFruitCount() { return 1 + Math.floor(this.fruitRng() * 4); }
 
   send(to, msg) { this.host.send(to, msg); }
   broadcast(msg, except) { this.host.send('*', msg, except); }
@@ -133,7 +138,7 @@ export class ServerWorld {
     return w;
   }
 
-  hurtPlayer(p, dmg, { kx = 0, kz = 0, down = 0, src = null } = {}) {
+  hurtPlayer(p, dmg, { kx = 0, kz = 0, down = 0, src = null, from = null } = {}) {
     if (!p.alive || dmg <= 0) return;
     p.hp = Math.max(0, p.hp - dmg);
     if (p.eating) p.eating = null;   // getting hit interrupts eating
@@ -142,7 +147,7 @@ export class ServerWorld {
       p.knockBudgetUntil = this.now + 1;
       p.moveBudget = Math.max(p.moveBudget, Math.min(7, Math.hypot(kx, kz) * 0.5));
     }
-    this.event(EV.HURT, { id: p.id, dmg: Math.round(dmg), hp: Math.ceil(p.hp), kx: r2(kx), kz: r2(kz), down, src });
+    this.event(EV.HURT, { id: p.id, dmg: Math.round(dmg), hp: Math.ceil(p.hp), kx: r2(kx), kz: r2(kz), down, src, from });
     if (p.hp <= 0) this.killPlayer(p, src);
   }
 
@@ -220,9 +225,31 @@ export class ServerWorld {
 
   near(p, x, z, range) { return dist2(p.x, p.z, x, z) <= range * range; }
 
+  canSpotDino(p, d) {
+    const dx = d.x - p.x, dz = d.z - p.z;
+    const horizontal = Math.hypot(dx, dz);
+    if (horizontal > 110) return false;
+    const eyeY = p.y + P.eyeHeight;
+    const targetY = d.y + (d.type === 'brachio' ? 5 : d.type === 'trex' ? 2.5 : 1);
+    const dy = targetY - eyeY;
+    const distance = Math.hypot(horizontal, dy);
+    if (distance > 115) return false;
+    const forward = (-dx * Math.sin(p.yaw) - dz * Math.cos(p.yaw)) / Math.max(horizontal, 0.001);
+    if (forward < 0.45 || Math.abs(Math.atan2(dy, horizontal) - p.pitch) > 0.7) return false;
+    return !lineBlocked({ x: p.x, y: eyeY, z: p.z }, { x: d.x, y: targetY, z: d.z }, this.terrain, this.layout);
+  }
+
   onAct(p, m) {
     const inv = p.inv;
     switch (m.a) {
+      case ACT.SPOT: {
+        if (!p.alive || !Number.isSafeInteger(m.dino) || this.spottedDinos.has(m.dino)) return;
+        const d = this.dinos.get(m.dino);
+        if (!d || !d.alive || !this.canSpotDino(p, d)) return;
+        this.spottedDinos.add(d.id);
+        this.event(EV.SPOT, { id: d.id, type: d.type, by: p.id });
+        return;
+      }
       case ACT.MELEE: {
         if (!p.alive || p.eating || !inv.spear || this.now < p.nextMeleeAt) return;
         const d = this.dinos.get(m.dino);
@@ -303,12 +330,12 @@ export class ServerWorld {
         if (!p.alive) return;
         const f = this.fruit[m.spot | 0];
         const spot = this.layout.fruitSpots[m.spot | 0];
-        if (!f || !spot || !f.ripe || !this.near(p, spot.x, spot.z, P.interactRange + 2)) return;
+        if (!f || !spot || f.count <= 0 || !this.near(p, spot.x, spot.z, P.interactRange + 2)) return;
         if (inv.fruit.length >= CONFIG.fruit.maxCarried) return this.toast(`You can carry ${CONFIG.fruit.maxCarried} fruits at most`, 'fruit', p.id);
         inv.fruit.push(spot.type);
-        f.ripe = false;
-        f.regrowAt = this.now + CONFIG.fruit.types[spot.type].regrow;
-        this.event(EV.FRUIT, { spot: spot.id, ripe: false });
+        f.count--;
+        if (f.count === 0) f.regrowAt = this.now + CONFIG.fruit.types[spot.type].regrow;
+        this.event(EV.FRUIT, { spot: spot.id, count: f.count });
         this.toast(`${CONFIG.fruit.types[spot.type].name} +1`, spot.type, p.id);
         this.sendInv(p);
         return;
@@ -514,9 +541,9 @@ export class ServerWorld {
 
     // fruit regrowth
     for (const f of this.fruit) {
-      if (!f.ripe && this.now >= f.regrowAt) {
-        f.ripe = true;
-        this.event(EV.FRUIT, { spot: f.spot, ripe: true });
+      if (f.count === 0 && this.now >= f.regrowAt) {
+        f.count = this.rollFruitCount();
+        this.event(EV.FRUIT, { spot: f.spot, count: f.count });
       }
     }
     // stale items
@@ -555,7 +582,8 @@ export class ServerWorld {
       players: [...this.players.values()].map((p) => this.publicPlayer(p)),
       dinos: this.dinos.describeAll(),
       items: [...this.items.values()],
-      fruit: this.fruit.map((f) => f.ripe),
+      fruit: this.fruit.map((f) => f.count),
+      spottedDinos: [...this.spottedDinos],
       traps: [...this.traps.values()],
       baits: [...this.baits.values()].map((b) => ({ id: b.id, x: b.x, y: b.y, z: b.z })),
       tracks: this.tracks.slice(-200),

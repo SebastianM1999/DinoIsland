@@ -61,13 +61,15 @@ function buildParts(slot) {
   const look = LOOKS[slot % LOOKS.length];
   const skin = CONFIG.playerColors[slot % 4];
   const skinDark = shade(skin, 0.82);
+  const skinBase = new THREE.Color(skin);
+  const skinBlend = new THREE.Color();
 
   // --- head (big round, slightly squashed) with eyes looking -Z
   const headG = merge([
     paint(deform(new THREE.IcosahedronGeometry(0.36, 2), (v) => {
       v.y *= 0.95;
       if (v.y < -0.2) v.z *= 0.92;
-    }), (c) => (c.y < -0.24 ? skinDark : skin)),
+    }), (c) => skinBlend.copy(skinDark).lerp(skinBase, Math.max(0, Math.min(1, (c.y + 0.3) / 0.2)))),
     place(blob(0.045, 0.075, 0.03, '#15131c'), [-0.12, 0.03, -0.335], [0.1, -0.3, 0]),
     place(blob(0.045, 0.075, 0.03, '#15131c'), [0.12, 0.03, -0.335], [0.1, 0.3, 0]),
     place(blob(0.014, 0.018, 0.01, '#ffffff'), [-0.11, 0.06, -0.36]),
@@ -76,10 +78,11 @@ function buildParts(slot) {
   const hatG = hatGeometry(look.hat);
 
   // --- torso: shirt, collar, strap, belt
+  const shirt = new THREE.Color(look.shirt), shirtDark = shade(look.shirt, 0.92), shirtBlend = new THREE.Color();
   const torso = paint(deform(new THREE.CylinderGeometry(0.25, 0.28, 0.5, 10, 2), (v) => {
     v.z *= 0.82;
     if (v.y > 0.2) { v.x *= 0.95; }
-  }), (c) => (c.y > 0.22 ? shade(look.shirt, 0.92) : look.shirt));
+  }), (c) => shirtBlend.copy(shirt).lerp(shirtDark, Math.max(0, Math.min(1, (c.y - 0.12) / 0.16))));
   const collar = part(new THREE.ConeGeometry(0.2, 0.12, 8, 1, true), shade(look.shirt, 0.85), [0, 0.27, 0], [Math.PI, 0, 0]);
   const strap = part(new THREE.BoxGeometry(0.06, 0.66, 0.5), STRAP, [0, 0.02, 0], [0, 0, 0.72]);
   const belt = part(new THREE.CylinderGeometry(0.285, 0.29, 0.07, 10, 1, true), '#4a3020', [0, -0.21, 0]);

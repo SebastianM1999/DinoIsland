@@ -50,6 +50,7 @@ export const ACT = {
   DEPOSIT: 'deposit',   // {}                                  drop loot at the hut
   REFILL: 'refill',     // {}                                  refill arrows/traps/bait at the hut
   RESPAWN: 'respawn',   // {}                                  request respawn when dead
+  SPOT: 'spot',         // { dino }                            player saw a dinosaur
 };
 
 /** Server events (msg.e). */
@@ -58,7 +59,7 @@ export const EV = {
   PLAYER_LEAVE: 'pleave',   // { id }
   ITEM_ADD: 'item+',        // { item }
   ITEM_REMOVE: 'item-',     // { id, by }
-  FRUIT: 'fruit',           // { spot, ripe }
+  FRUIT: 'fruit',           // { spot, count } (0..4 fruit left on the plant)
   FIRE: 'fire',             // { by, kind, o, v, pid }            remote projectile visuals
   HURT: 'hurt',             // { id, dmg, hp, kx, kz, down, src }
   DINO_HIT: 'dhit',         // { id, zone, dmg, by, weak }
@@ -80,6 +81,7 @@ export const EV = {
   STEAL: 'steal',           // { dino, player }
   EAT: 'eat',               // { id, fruit }                     someone is eating (animation)
   ATTACK: 'attack',         // { id, kind }                      dinosaur attack animation cue
+  SPOT: 'spot',             // { id, type, by }                  share discovery with the team
 };
 
 /** Player snapshot tuple layout. */

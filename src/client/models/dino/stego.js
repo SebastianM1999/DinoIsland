@@ -78,9 +78,11 @@ function plateGeo(h, w, lean = 0.18) {
     v.y = k * h;
     v.z += k * k * lean * h;                 // lean backward
   });
+  const base = new THREE.Color(COL.plate), mid = new THREE.Color(COL.plateMid), tip = new THREE.Color(COL.plateTip);
+  const out = new THREE.Color();
   return paint(g, (c) => {
-    const k = c.y / h;
-    return k > 0.74 ? COL.plateTip : k > 0.42 ? COL.plateMid : COL.plate;
+    const k = Math.max(0, Math.min(1, c.y / h));
+    return k < 0.58 ? out.copy(base).lerp(mid, k / 0.58) : out.copy(mid).lerp(tip, (k - 0.58) / 0.42);
   });
 }
 
@@ -121,7 +123,7 @@ export function buildStego() {
   const torso = tube(TORSO.map((r) => V(0, r[1], r[0])), (t) => {
     const p = prof(z0 + (z1 - z0) * t);
     return [p[3], p[2]];
-  }, { radial: 12, color: bodyColor });
+  }, { radial: 12, color: bodyColor, smoothColors: true });
   const bulges = [];
   for (const s of [-1, 1]) {
     bulges.push(part(blob(0.36, 0.62, 0.72, COL.main, { w: 8, h: 6 }), [s * 0.66, -0.02, 0.62]));   // thigh muscle

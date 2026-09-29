@@ -55,6 +55,21 @@ export class Game {
     this.stepDist = 0;
     this.hud = new Hud(document.getElementById('hud'));
     this.hud.initMinimap(this.terrain, this.layout);
+    this.input.onPanelToggle = (action) => {
+      if (action === 'close' && !this.hud.isPanelOpen()) return false;
+      let open;
+      if (action === 'inventory') open = this.hud.toggleInventory();
+      else if (action === 'map') open = this.hud.toggleMap();
+      else {
+        this.hud.toggleInventory(false);
+        this.hud.toggleMap(false);
+        open = false;
+      }
+      this.onPanelChange?.(open);
+      if (open) this.input.exitLock();
+      else this.input.requestLock();
+      return true;
+    };
 
     this.#buildWorld();
     this.remotes = new RemotePlayers(this.gfx.scene, this.gfx.camera, this.overlay);
@@ -125,8 +140,8 @@ export class Game {
         this.remotes.add(p);
       }
     }
-    this.fruitRipe = world.fruit.slice();
-    world.fruit.forEach((ripe, id) => this.fruitPlants.setRipe(id, ripe));
+    this.fruitCounts = world.fruit.slice();
+    world.fruit.forEach((count, id) => this.fruitPlants.setCount(id, count));
     this.hud.setPlayer({ name: this.me.name, slot: this.me.slot });
     this.hud.setMission(this.mission);
     for (const sys of this.systems) sys.onWelcome?.(world);
@@ -154,8 +169,8 @@ export class Game {
     net.on(`ev:${EV.PLAYER_JOIN}`, (m) => this.remotes.add(m.player));
     net.on(`ev:${EV.PLAYER_LEAVE}`, (m) => this.remotes.remove(m.id));
     net.on(`ev:${EV.FRUIT}`, (m) => {
-      this.fruitRipe[m.spot] = m.ripe;
-      this.fruitPlants.setRipe(m.spot, m.ripe);
+      this.fruitCounts[m.spot] = m.count;
+      this.fruitPlants.setCount(m.spot, m.count);
     });
     net.on(`ev:${EV.TOAST}`, (m) => this.hud.toast(m.text, m.icon));
     net.on(`ev:${EV.ITEM_REMOVE}`, (m) => { if (m.by === this.me.id) this.audio.play('pickup'); });
@@ -174,6 +189,20 @@ export class Game {
       if (m.id === this.me.id) {
         this.me.hp = m.hp;
         this.hud.damageFlash(m.dmg);
+        if (m.src) {
+          const name = CONFIG.dinos[m.src]?.name || 'Dinosaur';
+          let direction = 'nearby';
+          if (m.from) {
+            const dx = m.from.x - this.player.pos.x, dz = m.from.z - this.player.pos.z;
+            const length = Math.hypot(dx, dz) || 1;
+            const forward = (-dx * Math.sin(this.player.yaw) - dz * Math.cos(this.player.yaw)) / length;
+            const right = (dx * Math.cos(this.player.yaw) - dz * Math.sin(this.player.yaw)) / length;
+            direction = [m.from.y > this.player.pos.y + 3 ? 'above' : '',
+              forward > 0.38 ? 'ahead' : forward < -0.38 ? 'behind' : '',
+              right > 0.38 ? 'right' : right < -0.38 ? 'left' : ''].filter(Boolean).join(' ') || 'nearby';
+          }
+          this.hud.damageSource(`${name} · ${direction}`);
+        }
         this.audio.play('hurt');
         if (m.kx || m.kz) this.player.knock(m.kx, m.kz, m.down ? 5 : 3, m.down ? CONFIG.player.knockdownTime : 0.15);
       }
@@ -260,10 +289,7 @@ export class Game {
       this.debug = !this.debug;
       this.debugGroup.visible = this.debug;
     }
-    if (input.wasPressed('inventory')) this.hud.toggleInventory();
-    if (input.wasPressed('map')) this.hud.toggleMap();
-
-    const canMove = this.me.alive;
+    const canMove = this.me.alive && !this.hud.isPanelOpen();
     p.update(dt, {
       forward: canMove && input.isHeld('forward'),
       back: canMove && input.isHeld('back'),
@@ -312,12 +338,20 @@ export class Game {
     // surf gets louder toward the coast
     const g = this.terrain.heightAt(p.pos.x, p.pos.z);
     const coast = Math.max(0, Math.min(1, (Math.hypot(p.pos.x, p.pos.z) - 110) / 70)) * (g < 6 ? 1 : 0.3);
-    this.audio.update(dt, { coast, height: g });
+    const fall = this.layout.waterfall?.bottom;
+    const waterfallDistance = fall ? Math.hypot(p.pos.x - fall.x, p.pos.z - fall.z) : Infinity;
+    let danger = false;
+    for (const v of this.dinos.map.values()) {
+      if (!v.alive || v.type === 'brachio') continue;
+      const range = v.type === 'trex' ? 75 : v.type === 'stego' ? 24 : v.type === 'ptera' ? 50 : 42;
+      if (Math.hypot(v.pos.x - p.pos.x, v.pos.z - p.pos.z) < range) { danger = true; break; }
+    }
+    this.audio.update(dt, { coast, waterfallDistance, danger });
   }
 
   /** Sound hooks called by the dinosaur views. */
   onRoar(v) { this.audio.play(`roar_${v.type}`, { pos: v.pos }); }
-  onDinoAttack(v) { if (v.type === 'raptor' || v.type === 'trex' || v.type === 'ptera') this.audio.play('bite', { pos: v.pos }); }
+  onDinoAttack(v) { if (v.type !== 'brachio') this.audio.play(v.type === 'stego' ? 'bigStep' : 'bite', { pos: v.pos }); }
   onDinoHit(v, m) { if (m.by !== this.me.id) this.audio.play('hit', { pos: v.pos, vol: 0.7 }); }
   onDinoStep(v) { this.audio.play('bigStep', { pos: v.pos, vol: v.type === 'trex' ? 1.2 : 0.7 }); }
 

@@ -59,8 +59,9 @@ async function start(mode) {
   }
   window.__game = game; // handy for debugging in the console
   game.input.onLockChange = (locked) => {
-    paused.hidden = locked || !game?.running;
+    paused.hidden = locked || !game?.running || game.hud.isPanelOpen();
   };
+  game.onPanelChange = (open) => { paused.hidden = open || game.input.locked; };
   game.onLeave = (reason) => backToMenu(reason);
   loading.hidden = true;
   game.start();
@@ -85,7 +86,7 @@ paused.addEventListener('click', (e) => {
   if (e.target === paused) game?.input.requestLock();
 });
 canvas.addEventListener('click', () => {
-  if (!game?.running) return;
+  if (!game?.running || game.hud.isPanelOpen()) return;
   game.audio.resume();
   game.input.requestLock();
 });

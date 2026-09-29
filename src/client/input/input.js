@@ -32,6 +32,7 @@ export class Input {
     this.locked = false;
     this.enabled = false;       // gameplay input only while playing
     this.onLockChange = null;
+    this.onPanelToggle = null;
 
     addEventListener('keydown', (e) => this.#onKey(e, true));
     addEventListener('keyup', (e) => this.#onKey(e, false));
@@ -68,10 +69,19 @@ export class Input {
   }
 
   #onKey(e, down) {
+    if (this.enabled && down && !e.repeat && e.code === 'Escape' && this.onPanelToggle?.('close')) {
+      e.preventDefault();
+      return;
+    }
     const action = KEY_BINDINGS[e.code];
     if (!action || !this.enabled) return;
+    if (action === 'inventory' || action === 'map') {
+      e.preventDefault();
+      if (down && !e.repeat) this.onPanelToggle?.(action);
+      return;
+    }
     // Keep Tab/F3/Space from moving focus or scrolling while playing.
-    if (this.locked || action === 'inventory') e.preventDefault();
+    if (this.locked) e.preventDefault();
     this.#set(action, down, e.repeat);
   }
 

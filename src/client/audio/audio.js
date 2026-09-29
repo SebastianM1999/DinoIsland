@@ -1,6 +1,6 @@
 // Procedural audio with the Web Audio API – no sound files. Short synthesized
 // effects (bow, hits, roars, footsteps, UI), 3D-positioned where it matters,
-// an ambient bed (waves, wind, birds) and a gentle generated music loop.
+// location-aware shore/waterfall details and adaptive melodic music.
 
 import { CONFIG } from '../../shared/config.js';
 
@@ -21,8 +21,14 @@ export class GameAudio {
     this.musicBus = this.ctx.createGain();
     this.musicBus.gain.value = A.musicVolume;
     this.musicBus.connect(this.master);
+    this.calmBus = this.ctx.createGain();
+    this.dangerBus = this.ctx.createGain();
+    this.calmBus.gain.value = 1;
+    this.dangerBus.gain.value = 0;
+    this.calmBus.connect(this.musicBus);
+    this.dangerBus.connect(this.musicBus);
     this.ambBus = this.ctx.createGain();
-    this.ambBus.gain.value = 0.5;
+    this.ambBus.gain.value = 0.35;
     this.ambBus.connect(this.master);
     this.noiseBuf = this.#makeNoise(2);
     this.listenerPos = { x: 0, y: 0, z: 0 };
@@ -31,6 +37,8 @@ export class GameAudio {
     this.nextNote = 0;
     this.step = 0;
     this.birdT = 3;
+    this.musicMode = 'calm';
+    this.dangerUntil = 0;
   }
 
   resume() {
@@ -128,7 +136,7 @@ export class GameAudio {
       o.start(t); lfo.start(t);
       o.stop(t + dur + 0.1); lfo.stop(t + dur + 0.1);
     }
-    this.#noise(t, dur, out, { vol: vol * 0.5, f0: 600 * bright, f1: 300 * bright, q: 0.8, a: dur * 0.1 });
+    this.#noise(t, dur, out, { vol: vol * 0.16, f0: 600 * bright, f1: 300 * bright, q: 1.2, a: dur * 0.1 });
   }
 
   // ------------------------------------------------------------------ API
@@ -149,15 +157,15 @@ export class GameAudio {
     switch (name) {
       case 'bow':
         this.#osc('triangle', 220, 120, t, 0.18, out, 0.5);
-        this.#noise(t, 0.12, out, { vol: 0.4, f0: 2500, f1: 800, q: 2 });
+        this.#noise(t, 0.09, out, { vol: 0.16, f0: 2200, f1: 900, q: 3 });
         break;
       case 'swing':
       case 'throw':
-        this.#noise(t, name === 'throw' ? 0.35 : 0.22, out, { vol: 0.35, f0: 600, f1: 2400, q: 1.5, a: 0.05 });
+        this.#noise(t, name === 'throw' ? 0.25 : 0.16, out, { vol: 0.17, f0: 700, f1: 2000, q: 2.4, a: 0.03 });
         break;
       case 'hit':
         this.#osc('sine', 140, 60, t, 0.16, out, 0.8);
-        this.#noise(t, 0.08, out, { vol: 0.5, type: 'lowpass', f0: 1200, q: 0.5 });
+        this.#noise(t, 0.06, out, { vol: 0.2, type: 'lowpass', f0: 850, q: 1.1 });
         break;
       case 'hitWeak':
         this.#osc('sine', 180, 70, t, 0.18, out, 0.9);
@@ -186,16 +194,16 @@ export class GameAudio {
         break;
       case 'hurt':
         this.#osc('sine', 90, 50, t, 0.25, out, 1);
-        this.#noise(t, 0.15, out, { vol: 0.5, type: 'lowpass', f0: 700 });
+        this.#noise(t, 0.12, out, { vol: 0.17, type: 'lowpass', f0: 650 });
         break;
       case 'step':
-        this.#noise(t, 0.06, out, { vol: 0.12 * (o.vol ?? 1), type: 'lowpass', f0: 700 + Math.random() * 300 });
+        this.#noise(t, 0.045, out, { vol: 0.05 * (o.vol ?? 1), type: 'lowpass', f0: 650 + Math.random() * 180 });
         break;
       case 'bigStep':
         this.#osc('sine', 55, 35, t, 0.3, out, 0.7);
         break;
       case 'splash':
-        this.#noise(t, 0.3, out, { vol: 0.3, f0: 1500, f1: 600, q: 0.7 });
+        this.#noise(t, 0.22, out, { vol: 0.15, f0: 1500, f1: 550, q: 1.6 });
         break;
       case 'roar_trex': this.#roar(t, out, { base: 70, dur: 2.0, vol: 1.3, bright: 0.8 }); break;
       case 'roar_raptor': this.#roar(t, out, { base: 330, dur: 0.6, vol: 0.6, bright: 2.2 }); break;
@@ -203,7 +211,7 @@ export class GameAudio {
       case 'roar_ptera': this.#roar(t, out, { base: 520, dur: 0.7, vol: 0.6, bright: 3 }); break;
       case 'roar_brachio': this.#roar(t, out, { base: 60, dur: 2.4, vol: 0.9, bright: 0.6 }); break;
       case 'bite':
-        this.#noise(t, 0.1, out, { vol: 0.8, f0: 900, q: 1.2 });
+        this.#noise(t, 0.08, out, { vol: 0.24, f0: 900, q: 2.2 });
         this.#osc('sine', 120, 50, t + 0.03, 0.15, out, 0.7);
         break;
       case 'death':
@@ -236,37 +244,29 @@ export class GameAudio {
     }
   }
 
-  /** Ambient bed: surf that grows near the coast, soft wind, random birds. */
+  /** Sparse ambience is scheduled near its source; no always-on noise bed. */
   startAmbient() {
     if (!this.ok || this.amb) return;
-    const ctx = this.ctx;
-    const mk = (type, freq, q) => {
-      const s = ctx.createBufferSource();
-      s.buffer = this.noiseBuf;
-      s.loop = true;
-      const f = ctx.createBiquadFilter();
-      f.type = type; f.frequency.value = freq; f.Q.value = q;
-      const g = ctx.createGain();
-      g.gain.value = 0;
-      s.connect(f).connect(g).connect(this.ambBus);
-      s.start();
-      return { f, g };
-    };
-    this.amb = { surf: mk('lowpass', 500, 0.5), wind: mk('bandpass', 400, 0.4) };
+    this.amb = { surfAt: 0, waterfallAt: 0 };
   }
 
-  /** Per-frame: ambient levels + music scheduling. coast = 0..1 closeness to the sea. */
-  update(dt, { coast = 0, height = 0 } = {}) {
+  /** Per-frame: quiet positional ambience and calm/danger music scheduling. */
+  update(dt, { coast = 0, waterfallDistance = Infinity, danger = false } = {}) {
     if (!this.ok || this.ctx.state !== 'running') return;
     const t = this.ctx.currentTime;
     if (this.amb) {
-      const surf = 0.05 + coast * 0.35 * (0.7 + 0.3 * Math.sin(t * 0.6));
-      this.amb.surf.g.gain.setTargetAtTime(surf, t, 0.5);
-      this.amb.wind.g.gain.setTargetAtTime(0.03 + Math.min(0.12, height * 0.004) + 0.02 * Math.sin(t * 0.23), t, 1);
-      this.amb.wind.f.frequency.setTargetAtTime(350 + 150 * Math.sin(t * 0.17), t, 1);
+      if (coast > 0.45 && t >= this.amb.surfAt) {
+        this.#noise(t, 1.2, this.ambBus, { vol: 0.055 * coast, type: 'lowpass', f0: 360, f1: 210, q: 0.7, a: 0.25 });
+        this.amb.surfAt = t + 2.2 + Math.random() * 0.7;
+      }
+      if (waterfallDistance < 30 && t >= this.amb.waterfallAt) {
+        const proximity = (1 - waterfallDistance / 30) ** 2;
+        this.#noise(t, 0.8, this.ambBus, { vol: 0.035 * proximity, f0: 700, f1: 420, q: 1.8, a: 0.12 });
+        this.amb.waterfallAt = t + 1.8;
+      }
       this.birdT -= dt;
       if (this.birdT <= 0) {
-        this.birdT = 2 + Math.random() * 6;
+        this.birdT = 5 + Math.random() * 9;
         const out = this.ctx.createGain();
         out.gain.value = 0.08 * (1 - coast * 0.5);
         const p = this.ctx.createStereoPanner();
@@ -277,49 +277,41 @@ export class GameAudio {
         for (let i = 0; i < n; i++) this.#osc('sine', f, f * (0.8 + Math.random() * 0.4), t + i * 0.11, 0.07, out, 1, 0.01);
       }
     }
+    if (danger) this.dangerUntil = t + 4;
+    const mode = t < this.dangerUntil ? 'danger' : 'calm';
+    if (mode !== this.musicMode) {
+      this.musicMode = mode;
+      this.nextNote = t + 0.08;
+      this.step = 0;
+      this.calmBus.gain.setTargetAtTime(mode === 'calm' ? 1 : 0, t, 0.55);
+      this.dangerBus.gain.setTargetAtTime(mode === 'danger' ? 1 : 0, t, 0.55);
+    }
     if (this.musicOn) this.#music(t);
   }
 
-  /** A calm pentatonic marimba loop with a soft bass, scheduled ahead of time. */
+  /** Two composed phrases with different harmony and pacing. */
   #music(t) {
-    if (this.nextNote === 0) this.nextNote = t + 0.5;
-    const beat = 0.34;
-    const scale = [0, 2, 4, 7, 9, 12, 14, 16];
-    const chords = [[0, 4, 7], [-3, 0, 4], [-5, -1, 2], [-7, -3, 0]];
+    if (this.nextNote === 0) this.nextNote = t + 0.3;
+    const danger = this.musicMode === 'danger';
+    const beat = danger ? 0.27 : 0.42;
+    const melody = danger
+      ? [62, 65, 64, null, 62, 60, 58, null, 62, 65, 69, 65, 64, 62, 60, null]
+      : [72, null, 76, 79, 76, null, 74, 72, 69, null, 72, 76, 74, null, 72, null];
+    const bass = danger ? [38, 36, 34, 36] : [48, 53, 45, 50];
+    const bus = danger ? this.dangerBus : this.calmBus;
+    const hz = (m) => 440 * 2 ** ((m - 69) / 12);
     while (this.nextNote < t + 0.3) {
       const s = this.step++;
-      const bar = Math.floor(s / 8) % 4;
-      const root = 60 + chords[bar][0];
-      const hz = (m) => 440 * Math.pow(2, (m - 69) / 12);
-      // melody: sparse, stepwise-ish
-      if (s % 8 === 0 || Math.random() < 0.45) {
-        const deg = scale[(s * 3 + bar * 2 + Math.floor(Math.random() * 3)) % scale.length];
-        const f = hz(root + 12 + deg);
-        const g = this.ctx.createGain();
-        this.#env(g, this.nextNote, 0.005, 0.5, 0.18);
-        const o = this.ctx.createOscillator();
-        o.type = 'sine';
-        o.frequency.value = f;
-        const o2 = this.ctx.createOscillator();
-        o2.type = 'sine';
-        o2.frequency.value = f * 4;       // marimba-ish overtone
-        const g2 = this.ctx.createGain();
-        this.#env(g2, this.nextNote, 0.002, 0.08, 0.05);
-        o.connect(g).connect(this.musicBus);
-        o2.connect(g2).connect(this.musicBus);
-        o.start(this.nextNote); o2.start(this.nextNote);
-        o.stop(this.nextNote + 0.7); o2.stop(this.nextNote + 0.2);
+      const note = melody[s % melody.length];
+      if (note !== null) {
+        const f = hz(note);
+        this.#osc(danger ? 'triangle' : 'sine', f, f, this.nextNote, danger ? 0.24 : 0.46, bus, danger ? 0.11 : 0.15, 0.012);
+        if (!danger) this.#osc('sine', f * 2, f * 2, this.nextNote, 0.18, bus, 0.032);
       }
       if (s % 4 === 0) {
-        const f = hz(root - 12);
-        const g = this.ctx.createGain();
-        this.#env(g, this.nextNote, 0.02, 1.1, 0.12);
-        const o = this.ctx.createOscillator();
-        o.type = 'triangle';
-        o.frequency.value = f;
-        o.connect(g).connect(this.musicBus);
-        o.start(this.nextNote);
-        o.stop(this.nextNote + 1.3);
+        this.#osc('sine', hz(bass[Math.floor(s / 4) % 4]), hz(bass[Math.floor(s / 4) % 4]),
+          this.nextNote, danger ? 0.85 : 1.5, bus, danger ? 0.19 : 0.1, 0.03);
+        if (danger) this.#osc('sine', 95, 42, this.nextNote, 0.17, bus, 0.13, 0.005);
       }
       this.nextNote += beat;
     }

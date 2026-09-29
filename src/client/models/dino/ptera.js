@@ -206,7 +206,7 @@ export function buildPtera() {
   const torso = tube([V(0, 0.0, 0.52), V(0, 0.0, 0.26), V(0, 0.02, -0.08), V(0, 0.05, -0.36)], (t) => {
     const r = t < 0.35 ? 0.07 + t * 0.34 : t < 0.75 ? 0.19 + (t - 0.35) * 0.08 : 0.222 - (t - 0.75) * 0.3;
     return [r * 0.95, r * 1.08];
-  }, { radial: 10, color: bodyColor });
+  }, { radial: 10, color: bodyColor, smoothColors: true });
   const keel = part(blob(0.13, 0.12, 0.16, COL.belly, { w: 8, h: 5 }), [0, -0.1, -0.22]);
   chest.add(mesh(merge([torso, keel])));
 

@@ -102,7 +102,8 @@ export function deform(geo, fn) {
 
 /**
  * Paint vertex colors. `color` is a hex/Color, or fn(pos, normal, faceCenter) -> hex|Color.
- * Faces get one uniform color (evaluated at the face center) for crisp zones.
+ * Function colors are evaluated per vertex so adjacent faces share a blended
+ * color, while their normals remain faceted. Solid colors stay solid.
  */
 export function paint(geo, color) {
   const g = prep(geo);
@@ -112,18 +113,13 @@ export function paint(geo, color) {
   const fnMode = typeof color === 'function';
   if (!fnMode) _c.set(color);
   const center = new THREE.Vector3();
-  for (let i = 0; i < p.count; i += 3) {
+  for (let i = 0; i < p.count; i++) {
     if (fnMode) {
-      center.set(
-        (p.getX(i) + p.getX(i + 1) + p.getX(i + 2)) / 3,
-        (p.getY(i) + p.getY(i + 1) + p.getY(i + 2)) / 3,
-        (p.getZ(i) + p.getZ(i + 1) + p.getZ(i + 2)) / 3,
-      );
+      center.set(p.getX(i), p.getY(i), p.getZ(i));
       _n.set(nrm.getX(i), nrm.getY(i), nrm.getZ(i));
-      const r = color(center, _n);
-      _c.set(r);
+      _c.set(color(center, _n, center));
     }
-    for (let k = 0; k < 3; k++) col.setXYZ(i + k, _c.r, _c.g, _c.b);
+    col.setXYZ(i, _c.r, _c.g, _c.b);
   }
   col.needsUpdate = true;
   return g;
@@ -194,10 +190,10 @@ export function rockGeometry({ radius = 1, detail = 0, seed = 1, squash = 0.7, c
  * necks, tails and limbs.
  * @param {THREE.Vector3[]} points path (at least 2)
  * @param {(t:number)=>number|[number,number]} radius radius (or [rx, ry]) at t in [0,1]
- * @param {{radial?:number, color?:(t:number, angle:number, pos:THREE.Vector3)=>any, capStart?:boolean, capEnd?:boolean, up?:THREE.Vector3}} opts
+ * @param {{radial?:number, color?:(t:number, angle:number, pos:THREE.Vector3)=>any, capStart?:boolean, capEnd?:boolean, up?:THREE.Vector3, smoothColors?:boolean}} opts
  *   angle: 0 = top (+up), PI = bottom. Use it for countershading.
  */
-export function tube(points, radius, { radial = 10, color = () => '#ffffff', capStart = true, capEnd = true, up = new THREE.Vector3(0, 1, 0) } = {}) {
+export function tube(points, radius, { radial = 10, color = () => '#ffffff', capStart = true, capEnd = true, up = new THREE.Vector3(0, 1, 0), smoothColors = true } = {}) {
   const curve = new THREE.CatmullRomCurve3(points, false, 'centripetal');
   const segs = Math.max(2, (points.length - 1) * 3);
   const rings = [];
@@ -224,9 +220,9 @@ export function tube(points, radius, { radial = 10, color = () => '#ffffff', cap
   }
   const pos = [];
   const cols = [];
-  const pushTri = (A, B, C, colr) => {
+  const pushTri = (A, B, C, ca, cb = ca, cc = ca) => {
     pos.push(A.x, A.y, A.z, B.x, B.y, B.z, C.x, C.y, C.z);
-    for (let k = 0; k < 3; k++) cols.push(colr.r, colr.g, colr.b);
+    for (const c of [ca, cb, cc]) cols.push(c.r, c.g, c.b);
   };
   const colAt = (t, a, p) => _c.set(color(t, a, p)).clone();
   for (let s = 0; s < segs; s++) {
@@ -234,13 +230,21 @@ export function tube(points, radius, { radial = 10, color = () => '#ffffff', cap
     for (let k = 0; k < radial; k++) {
       const k2 = (k + 1) % radial;
       const a = r0[k].p, b = r0[k2].p, c = r1[k].p, d = r1[k2].p;
-      const tm = (rings[s].t + rings[s + 1].t) / 2;
-      let am = (r0[k].a + (k2 === 0 ? Math.PI * 2 : r0[k2].a)) / 2;
-      const mid = a.clone().add(d).multiplyScalar(0.5);
-      const colr = colAt(tm, am, mid);
       // counter-clockwise seen from outside -> outward normals
-      pushTri(a, b, c, colr);
-      pushTri(b, d, c, colr);
+      if (smoothColors) {
+        const ca = colAt(rings[s].t, r0[k].a, a);
+        const cb = colAt(rings[s].t, r0[k2].a, b);
+        const cc = colAt(rings[s + 1].t, r1[k].a, c);
+        const cd = colAt(rings[s + 1].t, r1[k2].a, d);
+        pushTri(a, b, c, ca, cb, cc);
+        pushTri(b, d, c, cb, cd, cc);
+      } else {
+        const tm = (rings[s].t + rings[s + 1].t) / 2;
+        const am = (r0[k].a + (k2 === 0 ? Math.PI * 2 : r0[k2].a)) / 2;
+        const colr = colAt(tm, am, a.clone().add(d).multiplyScalar(0.5));
+        pushTri(a, b, c, colr);
+        pushTri(b, d, c, colr);
+      }
     }
   }
   const cap = (rg, reverse) => {

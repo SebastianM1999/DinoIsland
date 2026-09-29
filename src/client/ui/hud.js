@@ -130,7 +130,10 @@ export class Hud {
     this.$prompt = el('div', 'hud-prompt brush');
     this.$prompt.setAttribute('role', 'status');
     this.$prompt.hidden = true;
-    cc.append(this.$cross, this.$hit, this.$eat, this.$prompt);
+    this.$threat = el('div', 'hud-threat brush');
+    this.$threat.setAttribute('role', 'status');
+    this.$threat.hidden = true;
+    cc.append(this.$cross, this.$hit, this.$eat, this.$prompt, this.$threat);
 
     // ---------- bottom-left: key hints
     const bl = el('ul', 'hud-keys');
@@ -193,8 +196,8 @@ export class Hud {
     mapWrap.append(this.$mapCanvas, el('span', 'hud-map-n', 'N'));
     this.$mapPanel.append(mapWrap);
     this.$mapPanel.insertAdjacentHTML('beforeend', `<ul class="hud-map-legend">
-      <li><i class="lg-you"></i>You</li><li><i class="lg-hut"></i>Hut</li><li><i class="lg-dino"></i>Dinosaur</li>
-      <li><i class="lg-track"></i>Tracks</li><li><i class="lg-fruit"></i>Fruit</li><li><i class="lg-obj"></i>Objective</li></ul>`);
+      <li><i class="lg-you"></i>You</li><li><i class="lg-hut"></i>Hut</li><li><i class="lg-dino"></i>Spotted dinosaur</li>
+      <li><i class="lg-track"></i>Tracks</li><li><i class="lg-obj"></i>Objective</li></ul>`);
 
     r.append(this.$flash, tl, tc, tr, cc, bl, bc, br, this.$toasts, this.$death, this.$win, this.$invPanel, this.$mapPanel);
 
@@ -533,6 +536,18 @@ export class Hud {
     const a = Math.max(0.25, Math.min(1, (amount || 0) / 35));
     this.$flash.getAnimations().forEach((x) => x.cancel());
     this.$flash.animate([{ opacity: a }, { opacity: 0 }], { duration: 350 + a * 450, easing: 'ease-out' });
+  }
+
+  damageSource(text) {
+    clearTimeout(this._threatTimer);
+    this.$threat.textContent = text;
+    this.$threat.hidden = false;
+    this.$threat.getAnimations().forEach((a) => a.cancel());
+    this.$threat.animate([
+      { opacity: 0, transform: 'translateX(-50%) translateY(0.4em)' },
+      { opacity: 1, transform: 'translateX(-50%) translateY(0)' },
+    ], { duration: 180, easing: 'ease-out' });
+    this._threatTimer = setTimeout(() => { this.$threat.hidden = true; }, 2200);
   }
 
   setDeath(visible, seconds = 0) {
