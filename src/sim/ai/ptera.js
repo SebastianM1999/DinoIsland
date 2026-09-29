@@ -1,6 +1,175 @@
-// Placeholder – implemented in Phase 6 (aggressive dinosaurs). Does not spawn yet.
+// Pteranodon: nests on cliffs, circles above the beach and hills, dives at
+// players (preferring lone, injured or meat-carrying ones), knocks them
+// down, steals carried meat and flies off with it. After an attack it lands
+// briefly and is vulnerable to melee; in the air the bow is the answer.
+
+import { CONFIG } from '../../shared/config.js';
+import { DS, EV, MSG } from '../../shared/protocol.js';
+
+const C = CONFIG.dinos.ptera;
+// Circling areas: over the eastern beach, the western hills and the south-west shore.
+const AREAS = [
+  { x: 150, z: 20 },
+  { x: -105, z: 25 },
+  { x: -95, z: 120 },
+];
+
+function flyTo(sys, d, tx, ty, tz, speed, dt, agility = 2.2) {
+  const dx = tx - d.x, dy = ty - d.y, dz = tz - d.z;
+  const len = Math.hypot(dx, dy, dz) || 1;
+  const k = Math.min(1, agility * dt);
+  d.vx += (dx / len * speed - d.vx) * k;
+  d.vy += (dy / len * speed - d.vy) * k;
+  d.vz += (dz / len * speed - d.vz) * k;
+  d.x += d.vx * dt;
+  d.y += d.vy * dt;
+  d.z += d.vz * dt;
+  const lim = CONFIG.world.size / 2 - 10;
+  d.x = Math.max(-lim, Math.min(lim, d.x));
+  d.z = Math.max(-lim, Math.min(lim, d.z));
+  const ground = sys.terrain.heightAt(d.x, d.z);
+  d.y = Math.max(d.y, Math.max(ground, 0) + 1.2);
+  d.yaw = Math.atan2(-d.vx, -d.vz);
+  d.spd = Math.hypot(d.vx, d.vy, d.vz);
+  return len;
+}
+
+function pickTarget(sys, d) {
+  const area = d.area;
+  let best = null, bestScore = 0;
+  for (const p of sys.world.players.values()) {
+    if (!p.alive || sys.inSafeZone(p)) continue;
+    const dist = Math.hypot(p.x - area.x, p.z - area.z);
+    const near = Math.hypot(p.x - d.x, p.z - d.z);
+    if (dist > C.targetRadius && near > C.targetRadius) continue;
+    let alone = true;
+    for (const q of sys.world.players.values()) if (q !== p && q.alive && Math.hypot(q.x - p.x, q.z - p.z) < 14) alone = false;
+    let score = 1 + (alone ? 2 : 0) + (p.hp < 50 ? 2 : 0) + (p.inv.loot.meat > 0 ? 3 : 0) - near / 80;
+    if (score > bestScore) { bestScore = score; best = p; }
+  }
+  return best;
+}
+
 export const pteraBrain = {
+  spawnInitial(sys) {
+    const nests = sys.world.layout.nests;
+    for (let i = 0; i < C.count; i++) {
+      const n = nests[i % nests.length];
+      const d = sys.spawn('ptera', n.x, n.z, { nest: n, area: AREAS[i % AREAS.length], slot: i });
+      d.y = n.y + 2;
+    }
+  },
+
+  respawn(sys, r) {
+    const nests = sys.world.layout.nests;
+    const i = Math.floor(Math.random() * nests.length);
+    const d = sys.spawn('ptera', nests[i].x, nests[i].z, { nest: nests[i], area: AREAS[i % AREAS.length], slot: i });
+    d.y = nests[i].y + 2;
+  },
+
+  init(d) {
+    d.mode = 'circle';
+    d.grounded = false;
+    d.st = DS.FLY;
+    d.vx = d.vy = d.vz = 0;
+    d.angle = Math.random() * Math.PI * 2;
+    d.cool = 4 + Math.random() * 6;
+    d.modeT = 0;
+    d.carryingMeat = false;
+  },
+
+  onHurt(d, sys) {
+    if (d.mode === 'landed') { d.mode = 'climb'; d.modeT = 0; }
+    else if (d.mode === 'dive') { d.mode = 'climb'; d.modeT = 0; d.cool = C.attackCooldown * 0.5; }
+  },
+
   update(d, sys, dt) {
-    sys.halt(d, dt);
+    d.modeT += dt;
+    d.cool = Math.max(0, d.cool - dt);
+    d.fl = (d.fl & ~2) | (d.carryingMeat ? 2 : 0);
+    const circleY = (cx, cz) => Math.max(sys.terrain.heightAt(cx, cz), 0) + C.circleHeight;
+
+    switch (d.mode) {
+      case 'circle': {
+        d.grounded = false;
+        d.st = DS.FLY;
+        const a = d.area;
+        d.angle += (C.flySpeed / C.circleRadius) * dt * (d.slot % 2 ? 1 : -1);
+        const tx = a.x + Math.cos(d.angle) * C.circleRadius, tz = a.z + Math.sin(d.angle) * C.circleRadius;
+        flyTo(sys, d, tx, circleY(tx, tz) + Math.sin(d.modeT * 0.5) * 3, tz, C.flySpeed, dt, 1.2);
+        if (d.cool <= 0) {
+          const p = pickTarget(sys, d);
+          if (p) {
+            d.targetId = p.id;
+            d.mode = 'dive';
+            d.modeT = 0;
+            sys.roar(d);
+          } else d.cool = 2;
+        }
+        break;
+      }
+      case 'dive': {
+        d.st = DS.DIVE;
+        const p = sys.world.players.get(d.targetId);
+        if (!p || !p.alive || sys.inSafeZone(p) || d.modeT > 7) { d.mode = 'climb'; d.modeT = 0; d.cool = 4; break; }
+        // lead the target a little
+        const dist = flyTo(sys, d, p.x, p.y + 1.0, p.z, C.diveSpeed, dt, 3.2);
+        if (dist < 2.3) {
+          sys.hitPlayer(d, p, C.diveDamage, C.knockback, 1);
+          sys.cue(d, p.id);
+          if (p.inv.loot.meat > 0 && !d.carryingMeat) {
+            p.inv.loot.meat--;
+            d.carryingMeat = true;
+            sys.world.send(p.id, { t: MSG.INV, inv: p.inv });
+            sys.world.event(EV.STEAL, { dino: d.id, player: p.id });
+            sys.world.toast(`A Pteranodon snatched meat from ${p.name}! Shoot it down to get it back.`, 'meat');
+            sys.world.mission.onLootChanged();
+          }
+          // land next to the victim, briefly vulnerable
+          d.mode = d.carryingMeat ? 'climb' : 'landed';
+          d.modeT = 0;
+          d.vx *= 0.2; d.vz *= 0.2; d.vy = 0;
+        }
+        break;
+      }
+      case 'landed': {
+        d.grounded = true;
+        d.spd = 0;
+        d.vx = d.vy = d.vz = 0;
+        d.y = sys.terrain.heightAt(d.x, d.z);
+        d.st = d.modeT < 0.6 ? DS.LANDED : DS.IDLE;
+        // turn toward the nearest player, hiss
+        const p = sys.nearestPlayer(d, 15);
+        if (p) sys.turnTo(d, Math.atan2(-(p.x - d.x), -(p.z - d.z)), dt, 3);
+        if (d.modeT > C.landTime) { d.mode = 'climb'; d.modeT = 0; }
+        break;
+      }
+      case 'climb': {
+        d.grounded = false;
+        d.st = DS.FLY;
+        const a = d.carryingMeat ? d.nest : d.area;
+        const ty = d.carryingMeat ? d.nest.y + 6 : circleY(a.x, a.z);
+        flyTo(sys, d, d.x + (a.x - d.x) * 0.3, ty, d.z + (a.z - d.z) * 0.3, C.flySpeed, dt, 1.6);
+        if (d.y > ty - 6 || d.modeT > 6) {
+          d.mode = d.carryingMeat ? 'return' : 'circle';
+          d.modeT = 0;
+          d.cool = C.attackCooldown;
+        }
+        break;
+      }
+      case 'return': {
+        d.st = DS.FLY;
+        const n = d.nest;
+        const dist = flyTo(sys, d, n.x, n.y + 2, n.z, C.flySpeed * 1.1, dt, 1.6);
+        if (dist < 4) {
+          // the meat is gone for good once it reaches the nest
+          d.carryingMeat = false;
+          d.mode = 'circle';
+          d.modeT = 0;
+          d.cool = C.attackCooldown;
+        }
+        break;
+      }
+    }
   },
 };

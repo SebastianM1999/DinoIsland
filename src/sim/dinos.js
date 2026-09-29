@@ -203,12 +203,28 @@ export class DinoSystem {
   /** Stand still (decelerate). */
   halt(d, dt) { this.move(d, 0, dt); }
 
-  /** Damage a player from a dinosaur attack with knockback away from the dinosaur. */
-  attackPlayer(d, p, dmg, knock = 6, down = 0) {
+  /** Animation cue for an attack (bite lunge, tail swing wind-up ...). */
+  cue(d, target = null) {
+    this.world.event(EV.ATTACK, { id: d.id, target });
+  }
+
+  /** Damage a player with knockback away from the dinosaur (no animation cue). */
+  hitPlayer(d, p, dmg, knock = 6, down = 0) {
     const dx = p.x - d.x, dz = p.z - d.z;
     const l = Math.hypot(dx, dz) || 1;
-    this.world.event(EV.ATTACK, { id: d.id, target: p.id });
     this.world.hurtPlayer(p, dmg, { kx: (dx / l) * knock, kz: (dz / l) * knock, down, src: d.type });
+  }
+
+  /** Cue + damage in one go (quick bites). */
+  attackPlayer(d, p, dmg, knock = 6, down = 0) {
+    this.cue(d, p.id);
+    this.hitPlayer(d, p, dmg, knock, down);
+  }
+
+  /** True if the player stands in the hut's safe zone (dinosaurs leave them alone). */
+  inSafeZone(p) {
+    const r = CONFIG.player.hutHealRadius + 6;
+    return (p.x - this.hut.x) ** 2 + (p.z - this.hut.z) ** 2 < r * r;
   }
 
   roar(d) { this.world.event(EV.ROAR, { id: d.id }); }

@@ -50,6 +50,7 @@ export const brachioBrain = {
     const herd = herdOf(sys, d);
     const p = sys.world.players.get(byId);
     if (!herd) return;
+    if (herd.panic <= 0) sys.roar(d);   // alarm bellow
     herd.panic = C.fleeTime;
     herd.threat = p ? { x: p.x, z: p.z } : { x: d.x, z: d.z };
     herd.target = null;
