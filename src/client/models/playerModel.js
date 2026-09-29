@@ -156,7 +156,9 @@ export class PlayerModel {
     this.head.position.y = 0.3;
     this.neck.add(this.head);
     this.hat = mesh(g.hatG);
-    this.hat.position.y = 0.58;
+    // each hat sits at its own height on the round head (head centre is at 0.3)
+    this.hat.position.y = { ranger: 0.5, cap: 0.36, helmet: 0.38, bucket: 0.47 }[LOOKS[slot % LOOKS.length].hat];
+    this.hat.position.z = 0.02;
     this.neck.add(this.hat);
 
     this.armL = new THREE.Group();

@@ -218,9 +218,14 @@ export class Game {
     this.hud.show(true);
     this.clock.start();
     requestAnimationFrame(this.loop);
+    // Heartbeat on a timer: background tabs pause rAF, but must not time out.
+    this.heartbeat = setInterval(() => {
+      if (document.hidden) this.net.send({ t: MSG.PING, c: performance.now() / 1000 });
+    }, 2000);
   }
 
   stop() {
+    clearInterval(this.heartbeat);
     this.running = false;
     this.input.enabled = false;
     this.input.exitLock();
