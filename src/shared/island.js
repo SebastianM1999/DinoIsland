@@ -170,7 +170,14 @@ function riverCarve(plan, x, z, h) {
   const depth = plan.river.kind === 'lava' ? 0.8 : 1.35;
   if (q.d < half) {
     const k = q.d / half;
-    return Math.min(h, q.surface - depth * (1 - k * k) - 0.15);
+    let bed = Math.min(h, q.surface - depth * (1 - k * k) - 0.15);
+    const sb = plan.sandbank;
+    if (sb) {
+      // a low, rounded sand island rising out of the water
+      const u = Math.hypot(x - sb.x, z - sb.z) / sb.r;
+      if (u < 1.8) bed = Math.max(bed, sb.top - 0.9 * u * u);
+    }
+    return bed;
   }
   // banks: sloped valley walls up to the natural ground
   return Math.min(h, q.surface + 0.25 + (q.d - half) * (plan.river.kind === 'lava' ? 0.55 : 0.42));
@@ -212,8 +219,8 @@ function padEffect(plan, x, z, h) {
 export function islandHeight(plan, x, z) {
   let h = naturalHeight(plan, x, z);
   h = poolEffect(plan, x, z, h);
-  h = riverCarve(plan, x, z, h);
   h = rampEffect(plan, x, z, h);
+  h = riverCarve(plan, x, z, h);       // rivers cut through mountain paths, never dammed by them
   h = padEffect(plan, x, z, h);
   return h;
 }
@@ -467,6 +474,20 @@ export function planIsland(levelIndex = 0, variant = 1) {
       { x: pool.x + east * (along + 40 * K), z: side * B * 1.3 },
     ];
     plan.river = traceFlow(plan, start, goals, { kind: 'water', width0: 6.5, width1: 13, surface0: pool.level, stopAt: 'sea' });
+  }
+  // a sandbank in the middle of the (water) river: the river widens around a small sand island
+  if (plan.river.kind === 'water') {
+    const pts = plan.river.pts;
+    const lo = Math.floor(pts.length * 0.35), hi = Math.max(lo + 1, Math.floor(pts.length * 0.65));
+    let pick = -1;
+    for (let i = lo; i < hi; i++) if (pts[i].y > 0.6) { pick = i; break; }
+    if (pick < 0) pick = Math.min(pts.length - 2, Math.max(1, lo));
+    for (let k = -2; k <= 2; k++) {
+      const p = pts[pick + k];
+      if (p) p.w *= 1 + (1 - Math.abs(k) / 3) * 1.1;
+    }
+    const c = pts[pick];
+    plan.sandbank = { x: c.x, z: c.z, r: Math.min(3.4, c.w * 0.22), top: c.y + 0.45 };
   }
   indexRiver(plan.river);
 

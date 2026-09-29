@@ -205,6 +205,51 @@ export function buildLayout(terrain) {
     reserve(n.x, n.z, 5);
   }
 
+  // ------------------------------------------------------------- relics
+  const findDryNear = (cx, cz, maxR, pred = () => true) => {
+    // strict first (flat, matches pred), then relaxed – but never in water or lava
+    for (const [slope, usePred, R2] of [[0.6, true, maxR], [1.0, true, maxR * 2], [1.2, false, maxR * 3]]) {
+      for (let k = 0; k < 600; k++) {
+        const a = rng() * TAU, r = (k / 600) * R2;
+        const x = cx + Math.cos(a) * r, z = cz + Math.sin(a) * r;
+        if (dry(x, z, 0.8) && terrain.slopeAt(x, z) < slope && (!usePred || pred(x, z))) return { x, z };
+      }
+    }
+    return { x: cx, z: cz };
+  };
+  const relicSpot = (site) => {
+    switch (site) {
+      case 'cave': return layout.caves.length ? layout.caves[0].inner : null;
+      case 'ruins': return layout.ruins ? ruinsCenter(layout.ruins) : null;
+      case 'nest': return layout.nest ? { x: layout.nest.x, z: layout.nest.z } : null;
+      case 'peak': return plan.sites.peak ? { x: plan.sites.peak.x, z: plan.sites.peak.z } : null;
+      case 'waterfall': {
+        const wf = layout.waterfall;
+        if (!wf) return null;
+        // on the shore right beside the falling water
+        return findDryNear(wf.bottom.x - wf.dirX * 1.5, wf.bottom.z - wf.dirZ * 1.5, 14, (x, z) => terrain.heightAt(x, z) < wf.bottom.y + 3);
+      }
+      case 'river':
+        if (plan.sandbank) return { x: plan.sandbank.x, z: plan.sandbank.z };
+      // falls through (no sandbank)
+      case 'lava': {
+        const rv = plan.river;
+        if (!rv) return null;
+        const p = rv.pts[Math.floor(rv.pts.length * 0.55)];
+        return findDryNear(p.x, p.z, 16, (x, z) => riverDist(x, z) > 2.5 && riverDist(x, z) < 8);
+      }
+      default: return null;
+    }
+  };
+  for (const site of plan.relicSites) {
+    const spot = relicSpot(site);
+    if (!spot) continue;
+    const kind = RELIC_FOR_SITE[site];
+    const y = terrain.heightAt(spot.x, spot.z) + (site === 'ruins' ? RUINS_ALTAR_TOP : site === 'nest' ? 0.3 * (layout.nest?.size ?? 1) : 0);
+    layout.relics.push({ id: layout.relics.length, kind, site, x: spot.x, z: spot.z, y });
+    reserve(spot.x, spot.z, 3.5);          // no trees, bushes or rocks on top of a boat part
+  }
+
   // ---------------------------------------------------- jungle density
   const meadowCut = (x, z) => {
     let d = 0;
@@ -375,48 +420,6 @@ export function buildLayout(terrain) {
         }
       }
     }
-  }
-
-  // ------------------------------------------------------------- relics
-  const findDryNear = (cx, cz, maxR, pred = () => true) => {
-    // strict first (flat, matches pred), then relaxed – but never in water or lava
-    for (const [slope, usePred, R2] of [[0.6, true, maxR], [1.0, true, maxR * 2], [1.2, false, maxR * 3]]) {
-      for (let k = 0; k < 600; k++) {
-        const a = rng() * TAU, r = (k / 600) * R2;
-        const x = cx + Math.cos(a) * r, z = cz + Math.sin(a) * r;
-        if (dry(x, z, 0.8) && terrain.slopeAt(x, z) < slope && (!usePred || pred(x, z))) return { x, z };
-      }
-    }
-    return { x: cx, z: cz };
-  };
-  const relicSpot = (site) => {
-    switch (site) {
-      case 'cave': return layout.caves.length ? layout.caves[0].inner : null;
-      case 'ruins': return layout.ruins ? ruinsCenter(layout.ruins) : null;
-      case 'nest': return layout.nest ? { x: layout.nest.x, z: layout.nest.z } : null;
-      case 'peak': return plan.sites.peak ? { x: plan.sites.peak.x, z: plan.sites.peak.z } : null;
-      case 'waterfall': {
-        const wf = layout.waterfall;
-        if (!wf) return null;
-        // on the shore right beside the falling water
-        return findDryNear(wf.bottom.x - wf.dirX * 1.5, wf.bottom.z - wf.dirZ * 1.5, 14, (x, z) => terrain.heightAt(x, z) < wf.bottom.y + 3);
-      }
-      case 'river':
-      case 'lava': {
-        const rv = plan.river;
-        if (!rv) return null;
-        const p = rv.pts[Math.floor(rv.pts.length * 0.55)];
-        return findDryNear(p.x, p.z, 16, (x, z) => riverDist(x, z) > 2.5 && riverDist(x, z) < 8);
-      }
-      default: return null;
-    }
-  };
-  for (const site of plan.relicSites) {
-    const spot = relicSpot(site);
-    if (!spot) continue;
-    const kind = RELIC_FOR_SITE[site];
-    const y = terrain.heightAt(spot.x, spot.z) + (site === 'ruins' ? RUINS_ALTAR_TOP : site === 'nest' ? 0.3 * (layout.nest?.size ?? 1) : 0);
-    layout.relics.push({ id: layout.relics.length, kind, site, x: spot.x, z: spot.z, y });
   }
 
   // ------------------------------------------------------- dino zones
