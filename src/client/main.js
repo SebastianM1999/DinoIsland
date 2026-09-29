@@ -4,6 +4,7 @@ import { Game } from './core/game.js';
 import { Net } from './net/net.js';
 import { CONFIG } from '../shared/config.js';
 import { ICON_SPRITE, initSettings, renderPause } from './ui/menus.js';
+import { savedOutfit } from './ui/wardrobe.js';
 
 // SVG filter that gives HUD and menu panels their brush-stroke edges.
 document.body.insertAdjacentHTML('beforeend', `
@@ -51,7 +52,8 @@ async function start(mode) {
   setBusy(true, mode === 'online' ? 'Connecting…' : 'Starting…');
   let net;
   try {
-    net = mode === 'online' ? await Net.connect(serverInput.value.trim(), name) : await Net.local(name);
+    const outfit = savedOutfit();
+    net = mode === 'online' ? await Net.connect(serverInput.value.trim(), name, outfit) : await Net.local(name, outfit);
   } catch (err) {
     setBusy(false, err.message || String(err));
     return;

@@ -27,6 +27,7 @@ import { Projectiles } from '../entities/projectiles.js';
 import { PlayerActions } from '../player/actions.js';
 import { GameAudio } from '../audio/audio.js';
 import { settings } from './settings.js';
+import { Wardrobe } from '../ui/wardrobe.js';
 
 export class Game {
   /**
@@ -68,10 +69,12 @@ export class Game {
       if (action === 'inventory') open = this.hud.toggleInventory();
       else if (action === 'map') open = this.hud.toggleMap();
       else if (action === 'board') open = this.hud.toggleBoard();
+      else if (action === 'wardrobe') open = this.hud.togglePanel('wardrobe');
       else {
         this.hud.toggleInventory(false);
         this.hud.toggleMap(false);
         this.hud.toggleBoard(false);
+        this.hud.togglePanel('wardrobe', false);
         open = false;
       }
       this.onPanelChange?.(open);
@@ -100,6 +103,17 @@ export class Game {
     this.systems = [this.dinos, this.tracks, this.items, this.actions, this.projectiles];
 
     this.#applyWelcome(w);
+    this.wardrobe = new Wardrobe({
+      slot: this.me.slot,
+      outfit: this.me.outfit,
+      onWear: (outfit) => this.net.act(ACT.OUTFIT, { outfit }),
+      onClose: () => this.input.onPanelToggle('close'),
+    });
+    this.hud.addPanel('wardrobe', {
+      el: this.wardrobe.el,
+      onOpen: () => this.wardrobe.onOpen(),
+      onClose: () => this.wardrobe.onClosed(),
+    });
     this.#bindNet();
 
     this.clock = new THREE.Clock(false);
@@ -147,6 +161,8 @@ export class Game {
     for (const p of world.players) {
       if (p.id === w.id) {
         this.me.name = p.name;
+        this.me.outfit = p.outfit;
+        this.actions.vm.setOutfit(p.outfit);
         this.player.teleport(p.x, p.z, p.yaw);
       } else {
         this.remotes.add(p);
@@ -171,6 +187,11 @@ export class Game {
       ? [...m.objectives, { text: `${CONTRACTS[i].title}: ${c.progress}/${CONTRACTS[i].goal}`, done: c.done }]
       : m.objectives;
     this.hud.setMission({ ...m, objectives });
+  }
+
+  /** E at the hut wardrobe. */
+  openWardrobe() {
+    if (!this.hud.isPanelOpen()) this.input.onPanelToggle('wardrobe');
   }
 
   /** E at the mission board. */
@@ -199,6 +220,16 @@ export class Game {
     });
     net.on(`ev:${EV.PLAYER_JOIN}`, (m) => this.remotes.add(m.player));
     net.on(`ev:${EV.PLAYER_LEAVE}`, (m) => this.remotes.remove(m.id));
+    net.on(`ev:${EV.OUTFIT}`, (m) => {
+      if (m.id === this.me.id) {
+        this.me.outfit = m.outfit;
+        this.actions.vm.setOutfit(m.outfit);
+        this.wardrobe.setWorn(m.outfit);
+        this.hud.toast('New outfit on!', 'team');
+      } else {
+        this.remotes.setOutfit(m.id, m.outfit);
+      }
+    });
     net.on(`ev:${EV.FRUIT}`, (m) => {
       this.fruitCounts[m.spot] = m.count;
       this.fruitPlants.setCount(m.spot, m.count);
@@ -334,7 +365,7 @@ export class Game {
       this.debugGroup.visible = this.debug;
     }
     // E toggles the mission board closed again (opening is an interaction)
-    if (this.hud._boardOpen && input.wasPressed('interact')) this.input.onPanelToggle('close');
+    if ((this.hud._boardOpen || this.hud.isExtraOpen('wardrobe')) && input.wasPressed('interact')) this.input.onPanelToggle('close');
     const canMove = this.me.alive && !this.hud.isPanelOpen();
     p.update(dt, {
       forward: canMove && input.isHeld('forward'),

@@ -42,7 +42,7 @@ export function startGameHost(httpServer) {
         const res = world.join(msg.name, (id) => {
           playerId = id;
           sockets.set(id, ws);
-        });
+        }, msg.outfit);
         if (!res.ok) {
           ws.send(JSON.stringify({ t: MSG.REJECT, reason: res.reason }));
           ws.close(4000, 'full');

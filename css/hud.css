@@ -912,3 +912,115 @@
 @media (max-width: 900px) {
   .board-body { grid-template-columns: 1fr; }
 }
+
+/* ---------------------------------------------------------------- wardrobe */
+.hud-wardrobe { width: min(60em, 96vw); }
+.hud-wardrobe .hud-panel-head h2::before {
+  content: '';
+  display: inline-block;
+  width: 1em;
+  height: 0.8em;
+  margin-right: 0.35em;
+  background: var(--yellow);
+  clip-path: polygon(30% 0, 70% 0, 100% 22%, 88% 45%, 78% 38%, 78% 100%, 22% 100%, 22% 38%, 12% 45%, 0 22%);
+}
+.wd-body { display: grid; grid-template-columns: 17em 1fr; gap: 1.4em; }
+.wd-stage {
+  position: relative;
+  border-radius: 1em;
+  background:
+    radial-gradient(ellipse at 50% 85%, rgba(255, 201, 51, 0.35), transparent 55%),
+    linear-gradient(180deg, #4f86c6 0%, #86bde8 70%, #f3d9a2 100%);
+  box-shadow: inset 0 0 0 3px rgba(255, 255, 255, 0.12), inset 0 -2em 3em rgba(0, 0, 0, 0.15);
+  overflow: hidden;
+}
+.wd-canvas { display: block; width: 100%; height: 24em; cursor: grab; touch-action: none; }
+.wd-canvas:active { cursor: grabbing; }
+.wd-drag {
+  position: absolute;
+  left: 0; right: 0; bottom: 0.5em;
+  margin: 0;
+  text-align: center;
+  font-size: 0.85em;
+  font-weight: 700;
+  color: rgba(31, 42, 68, 0.75);
+  pointer-events: none;
+}
+.wd-slots { display: grid; gap: 0.8em; align-content: start; }
+.wd-slot {
+  padding: 0.7em 0.9em 0.8em;
+  border-radius: 0.8em;
+  background: rgba(10, 15, 28, 0.45);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+.wd-slot header { display: flex; align-items: center; justify-content: space-between; gap: 1em; margin-bottom: 0.55em; }
+.wd-slot h3 { margin: 0; font-size: 0.85em; font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; color: var(--yellow); }
+.wd-cycle { display: flex; align-items: center; gap: 0.5em; }
+.wd-name { min-width: 11em; text-align: center; font-weight: 800; color: var(--ink); }
+.wd-name small { margin-left: 0.3em; font-weight: 700; color: var(--ink-dim); font-variant-numeric: tabular-nums; }
+.wd-arrow {
+  width: 1.8em; height: 1.8em;
+  border: 0;
+  border-radius: 0.5em;
+  font: inherit;
+  font-size: 1.1em;
+  font-weight: 800;
+  line-height: 1;
+  color: var(--ink);
+  background: #3a4a72;
+  box-shadow: 0 2px 0 #1a233b;
+}
+.wd-arrow:hover { filter: brightness(1.15); }
+.wd-arrow:active { transform: translateY(1px); box-shadow: none; }
+.wd-swatches { display: grid; grid-template-columns: repeat(10, 1fr); gap: 0.4em; }
+.wd-swatch {
+  position: relative;
+  aspect-ratio: 1;
+  padding: 0;
+  border: 0;
+  border-radius: 0.55em;
+  background: #151d33;
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.08);
+  transition: transform 0.1s ease;
+}
+.wd-swatch i {
+  position: absolute;
+  inset: 18%;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--a) 0 55%, var(--b) 55% 100%);
+  box-shadow: inset 0 -0.15em 0 rgba(0, 0, 0, 0.25), 0 0 0 2px rgba(0, 0, 0, 0.25);
+}
+.wd-swatch:hover { transform: translateY(-2px); }
+.wd-swatch[aria-checked="true"] { background: #3a4a72; box-shadow: inset 0 0 0 3px var(--yellow); }
+.wd-swatch.is-worn::after {
+  content: '';
+  position: absolute;
+  right: -0.2em; top: -0.2em;
+  width: 0.65em; height: 0.65em;
+  border-radius: 50%;
+  background: var(--green);
+  box-shadow: 0 0 0 2px #1f2a44;
+}
+.wd-swatch:focus-visible, .wd-arrow:focus-visible, .wd-btn:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+.wd-foot { display: flex; justify-content: flex-end; gap: 0.6em; margin-top: 1em; }
+.wd-btn {
+  font: inherit;
+  font-weight: 800;
+  padding: 0.55em 1.1em;
+  border: 0;
+  border-radius: 0.7em;
+  color: var(--ink);
+  background: #3a4a72;
+  box-shadow: 0 3px 0 #1a233b;
+}
+.wd-btn:hover { filter: brightness(1.12); }
+.wd-btn:active { transform: translateY(2px); box-shadow: 0 1px 0 #1a233b; }
+.wd-primary { background: var(--green); color: #17301a; box-shadow: 0 3px 0 #4a8a24; min-width: 9em; }
+.wd-primary.is-idle { background: #4c6a3a; color: var(--cream); }
+.hud-wardrobe button { cursor: url('../assets/cursor-hand.svg') 12 3, pointer; }
+
+@media (max-width: 760px) {
+  .wd-body { grid-template-columns: 1fr; }
+  .wd-canvas { height: 15em; }
+  .wd-name { min-width: 8em; }
+}

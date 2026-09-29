@@ -46,6 +46,7 @@ export function buildLayout(terrain) {
     arrowRack: { x: hf.x - 7.5, z: hf.z + 3.8, y: g }, // workbench with arrows
     missionBoard: { x: hf.x + 9, z: hf.z - 5, y: g },  // signpost / mission board
     flag: { x: hf.x - 6.2, z: hf.z + 11, y: g },
+    wardrobe: { x: hf.x - 3.7, z: hf.z + 3.5, y: g }, // clothes rack + mirror, faces north
   };
   layout.hut = hut;
   boxes.push({ x: hut.x, z: hut.z + 1, hw: 5.4, hd: 4.2, rot: 0, top: g + 7 });           // cabin
@@ -53,6 +54,7 @@ export function buildLayout(terrain) {
   boxes.push({ x: hut.arrowRack.x, z: hut.arrowRack.z, hw: 1.4, hd: 0.6, rot: 0, top: g + 1.0 });
   circles.push({ x: hut.missionBoard.x, z: hut.missionBoard.z, r: 0.5 });
   circles.push({ x: hut.flag.x, z: hut.flag.z, r: 0.3 });
+  boxes.push({ x: hut.wardrobe.x, z: hut.wardrobe.z - 0.15, hw: 1.05, hd: 0.55, rot: 0, top: g + 2.2 });
   for (let i = 0; i < 4; i++) {
     const a = -Math.PI / 2 + (i - 1.5) * 0.45;
     layout.spawnPoints.push({ x: hf.x + Math.cos(a) * 4.5 - 1, z: hf.z - 2 + Math.sin(a) * 4.5 - 1.5, yaw: 0 });

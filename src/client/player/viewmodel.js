@@ -5,19 +5,26 @@
 
 import * as THREE from 'three';
 import { CONFIG } from '../../shared/config.js';
+import { TOPS } from '../../shared/outfits.js';
 import { MAT, paint, place, part, merge, mesh, tube, blob } from '../models/kit.js';
 import { spearGeometry, bowGeometry, arrowGeometry, trapGeometry, meatGeometry, makeBowString } from '../models/weapons.js';
 import { makeFruitMesh } from '../models/fruit.js';
 
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
-const SHIRTS = ['#f2e3a2', '#ffb52e', '#f4ecd6', '#f3d27e'];
 const damp = (a, b, r, dt) => a + (b - a) * (1 - Math.exp(-r * dt));
 
-function armGeometry(skin, shirt, side) {
+function armGeometry(skin, top, side) {
   // hand at the origin; the forearm runs back/down/outward to off-screen
   const s = side;
+  const shirt = top.sleeveColor || top.color;
   const fore = tube([V(0, 0, 0), V(0.06 * s, -0.08, 0.2), V(0.16 * s, -0.2, 0.55)], (t) => 0.055 + t * 0.03, { radial: 8, color: () => skin, capStart: false });
-  const sleeve = tube([V(0.13 * s, -0.17, 0.46), V(0.2 * s, -0.26, 0.7)], () => 0.11, { radial: 8, color: () => shirt });
+  // long sleeves reach down to the wrist (with a darker cuff); tank tops show bare arms
+  const sleeve = top.sleeve === 'none' ? null
+    : top.sleeve === 'long'
+      ? tube([V(0.025 * s, -0.035, 0.09), V(0.08 * s, -0.11, 0.3), V(0.2 * s, -0.26, 0.7)], (t) => 0.075 + t * 0.04, {
+        radial: 8, color: (t) => (t < 0.08 ? new THREE.Color(shirt).multiplyScalar(0.78) : shirt),
+      })
+      : tube([V(0.13 * s, -0.17, 0.46), V(0.2 * s, -0.26, 0.7)], () => 0.11, { radial: 8, color: () => shirt });
   const fist = paint(new THREE.IcosahedronGeometry(0.075, 1), skin);
   const thumb = part(blob(0.03, 0.03, 0.055, skin), [-0.05 * s, 0.03, -0.03]);
   return merge([fore, sleeve, place(fist, [0, 0, 0], [0, 0, 0], [1, 0.9, 1.15]), thumb]);
@@ -29,20 +36,22 @@ export class Viewmodel {
     this.root = new THREE.Group();
     gfx.viewCamera.add(this.root);
     const skin = CONFIG.playerColors[slot % 4];
-    const shirt = SHIRTS[slot % 4];
+    this.skin = skin;
 
     // right hand
     this.rHand = new THREE.Group();
     this.rHandRest = V(0.25, -0.2, -0.42);
     this.rHand.position.copy(this.rHandRest);
-    this.rHand.add(mesh(armGeometry(skin, shirt, 1), MAT.standard, { cast: false }));
+    this.rArm = mesh(armGeometry(skin, TOPS[0], 1), MAT.standard, { cast: false });
+    this.rHand.add(this.rArm);
     this.root.add(this.rHand);
 
     // left hand
     this.lHand = new THREE.Group();
     this.lHandRest = V(-0.22, -0.2, -0.45);
     this.lHand.position.copy(this.lHandRest);
-    this.lHand.add(mesh(armGeometry(skin, shirt, -1), MAT.standard, { cast: false }));
+    this.lArm = mesh(armGeometry(skin, TOPS[0], -1), MAT.standard, { cast: false });
+    this.lHand.add(this.lArm);
     this.root.add(this.lHand);
 
     // spear: grip in the right hand, pointing forward, a bit up and left
@@ -96,6 +105,15 @@ export class Viewmodel {
     this.sway = V(0, 0, 0);
     this.recoil = 0;
     this.applyVisibility();
+  }
+
+  /** Match the first-person sleeves to the chosen shirt/jacket. */
+  setOutfit(outfit) {
+    const top = TOPS[outfit?.top] || TOPS[0];
+    this.rArm.geometry.dispose();
+    this.lArm.geometry.dispose();
+    this.rArm.geometry = armGeometry(this.skin, top, 1);
+    this.lArm.geometry = armGeometry(this.skin, top, -1);
   }
 
   setTool(tool, { hasSpear = true, fruitType = null, hasArrow = true } = {}) {

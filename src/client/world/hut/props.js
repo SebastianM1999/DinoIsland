@@ -1,5 +1,5 @@
 // Static props around the hut: loot drop-off crates, workbench with arrow
-// barrel, mission board, flagpole and the campfire's stones/logs/seats.
+// barrel, mission board, wardrobe, flagpole and the campfire's stones/logs/seats.
 // Each builder works in its own local frame (origin at the prop's ground
 // point) and returns { std, glossy, glow } geometry lists.
 
@@ -240,6 +240,72 @@ export function buildMissionBoard() {
 }
 
 // ------------------------------------------------------------ flagpole
+// ------------------------------------------------------------ wardrobe
+/**
+ * Outfitter's corner: a log clothes rack with hanging shirts and hats on
+ * pegs, a standing mirror and a clothes chest. Front faces -z. ~2 x 0.8 m.
+ */
+export function buildWardrobe() {
+  const o = out();
+  const rng = makeRng(0x0c107e);
+  const S = o.std;
+  const H = 2.05;
+  // rack posts on crossed feet + top rail
+  for (const x of [-0.95, 0.35]) {
+    S.push(place(limb(0.06, 0.05, H, rng.pick(COL.log), 7), [x, 0, 0]));
+    S.push(log(0.6, 0.045, [x, 0.06, 0], 'z', { body: COL.log[2], seed: 7 + x * 10 }));
+    S.push(lashing(0.07, 0.1, 3, [x, H - 0.16, 0]));
+  }
+  S.push(log(1.5, 0.04, [-0.3, H - 0.1, 0], 'x', { body: COL.log[1], seed: 31 }));
+  // hanging shirts on hangers
+  const shirts = ['#ffb52e', '#4a7fd0', '#c73a3a', '#8c9a5b', '#ffd23f'];
+  shirts.forEach((c, k) => {
+    const x = -0.82 + k * 0.26;
+    S.push(part(new THREE.TorusGeometry(0.1, 0.012, 3, 8, Math.PI), COL.metal, [x, H - 0.2, -0.02 - k * 0.012]));
+    const body = paint(deform(new THREE.BoxGeometry(0.34, 0.5, 0.06, 2, 3, 1), (v) => {
+      if (v.y > 0.15) v.x *= 1 + (v.y - 0.15) * 1.6;   // shoulders + short sleeves
+      v.z += jitter(v, 0.01, k + 3);
+    }), (p) => (p.y < -0.22 ? tone(c, 0.85) : c));
+    S.push(place(body, [x, H - 0.53, -0.04 - k * 0.012], [0, (rng() - 0.5) * 0.25, 0]));
+  });
+  // hat pegs on the right post
+  S.push(part(new THREE.CylinderGeometry(0.02, 0.02, 0.2, 5), COL.frame, [0.45, 1.55, -0.02], [0, 0, Math.PI / 2]));
+  S.push(part(new THREE.CylinderGeometry(0.28, 0.29, 0.03, 12), '#8b5a2b', [0.62, 1.55, -0.02], [0, 0, 0.35]));
+  S.push(part(new THREE.CylinderGeometry(0.14, 0.16, 0.14, 10), '#9a6632', [0.64, 1.62, -0.02], [0, 0, 0.35]));
+  S.push(part(new THREE.CylinderGeometry(0.02, 0.02, 0.2, 5), COL.frame, [0.45, 1.2, -0.02], [0, 0, Math.PI / 2]));
+  S.push(part(new THREE.SphereGeometry(0.18, 10, 5, 0, Math.PI * 2, 0, Math.PI / 2), '#d84a4a', [0.6, 1.1, -0.02], [0, 0, -0.3]));
+  // standing mirror (right side), slightly turned toward the front
+  {
+    const mx = 0.78, my = 1.0;
+    const frame = [];
+    for (const s of [-1, 1]) frame.push(plank(0.07, 1.35, 0.06, COL.frame, [s * 0.27, my, 0], [0, 0, 0], 40 + s));
+    frame.push(plank(0.62, 0.08, 0.06, COL.frame, [0, my + 0.7, 0], [0, 0, 0], 43));
+    frame.push(plank(0.62, 0.08, 0.06, COL.frame, [0, my - 0.7, 0], [0, 0, 0], 44));
+    for (const s of [-1, 1]) frame.push(place(limb(0.03, 0.03, 0.34, COL.plankDark, 5), [s * 0.27, 0, 0.12], [-0.35, 0, 0]));
+    frame.push(place(blob(0.05, 0.05, 0.05, '#e0b03a', { w: 6, h: 4 }), [0, my + 0.8, 0]));
+    const m = merge(frame);
+    S.push(place(m, [mx, 0, 0.1], [0, -0.35, 0]));
+    const glass = paint(new THREE.PlaneGeometry(0.48, 1.3), (c) => (c.x - c.y * 0.35 > 0.02 && c.x - c.y * 0.35 < 0.12 ? '#dfefff' : c.y > 0.2 ? '#9fc6e8' : '#7ea7cf'));
+    o.glossy.push(place(place(glass, [0, my, -0.035], [0, Math.PI, 0]), [mx, 0, 0.1], [0, -0.35, 0]));
+  }
+  // clothes chest in front of the rack
+  {
+    const cx = -0.3, cz = -0.45;
+    S.push(box(0.9, 0.42, 0.46, COL.plank[1], [cx, 0.21, cz], [0, 0, 0], 0.01, 51));
+    S.push(box(0.94, 0.08, 0.5, COL.plank[2], [cx, 0.46, cz], [0, 0, 0], 0.008, 52));
+    for (const s of [-1, 1]) S.push(box(0.05, 0.44, 0.48, COL.metal, [cx + s * 0.36, 0.23, cz]));
+    S.push(box(0.1, 0.1, 0.03, '#e0b03a', [cx, 0.36, cz - 0.24]));
+    // folded clothes spilling out
+    S.push(box(0.36, 0.06, 0.28, '#3d5f95', [cx - 0.15, 0.53, cz], [0, 0.2, 0]));
+    S.push(box(0.3, 0.05, 0.24, '#5fae4c', [cx - 0.12, 0.585, cz + 0.02], [0, -0.1, 0]));
+    S.push(box(0.3, 0.06, 0.26, '#c8b27a', [cx + 0.22, 0.53, cz], [0, -0.3, 0]));
+  }
+  // little sign: a shirt icon on a plank
+  S.push(plank(0.5, 0.2, 0.04, COL.plank[0], [-0.3, H + 0.14, -0.03], [0, 0, 0.03], 61));
+  S.push(part(deform(new THREE.BoxGeometry(0.16, 0.12, 0.012, 2, 2, 1), (v) => { if (v.y > 0.02) v.x *= 1.6; }), COL.white, [-0.3, H + 0.14, -0.056]));
+  return o;
+}
+
 export const FLAG_ATTACH = { y0: 7.35, y1: 8.8, r: 0.07 };
 
 /** Flagpole (the cloth is animated in fx.js). Fits r 0.3 at ground. */

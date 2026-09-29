@@ -18,6 +18,7 @@ import { Mission } from './mission.js';
 import { resolveCircle } from '../shared/collision.js';
 import { makeRng } from '../shared/rng.js';
 import { lineBlocked } from '../shared/visibility.js';
+import { sanitizeOutfit, sameOutfit } from '../shared/outfits.js';
 
 const P = CONFIG.player;
 const W = CONFIG.weapons;
@@ -63,7 +64,7 @@ export class ServerWorld {
   // ------------------------------------------------------------------ players
 
   /** @param {(id:number)=>void} [attach] called with the new id before the welcome is sent */
-  join(name, attach) {
+  join(name, attach, outfit) {
     if (this.players.size >= CONFIG.net.maxPlayers) return { ok: false, reason: 'The expedition is full (4 players max).' };
     const used = new Set([...this.players.values()].map((p) => p.slot));
     let slot = 0;
@@ -74,6 +75,7 @@ export class ServerWorld {
       id: this.id(),
       slot,
       name: clean,
+      outfit: sanitizeOutfit(outfit, slot),
       x: sp.x, y: this.terrain.heightAt(sp.x, sp.z), z: sp.z,
       yaw: sp.yaw, pitch: 0, spd: 0, eq: 0, fl: 0,
       hp: P.maxHealth,
@@ -129,7 +131,7 @@ export class ServerWorld {
   }
 
   publicPlayer(p) {
-    return { id: p.id, slot: p.slot, name: p.name, x: r2(p.x), y: r2(p.y), z: r2(p.z), yaw: r3(p.yaw), hp: Math.ceil(p.hp), alive: p.alive };
+    return { id: p.id, slot: p.slot, name: p.name, outfit: p.outfit, x: r2(p.x), y: r2(p.y), z: r2(p.z), yaw: r3(p.yaw), hp: Math.ceil(p.hp), alive: p.alive };
   }
 
   sendInv(p) {
@@ -453,6 +455,15 @@ export class ServerWorld {
         this.event(EV.STORE, { store: this.store });
         this.toast(`${p.name} dropped off ${parts.join(', ')}`, 'crate');
         this.mission.onLootChanged();
+        return;
+      }
+      case ACT.OUTFIT: {
+        const wd = this.layout.hut.wardrobe;
+        if (!this.near(p, wd.x, wd.z, 6)) return;
+        const outfit = sanitizeOutfit(m.outfit, p.slot);
+        if (sameOutfit(outfit, p.outfit)) return;
+        p.outfit = outfit;
+        this.event(EV.OUTFIT, { id: p.id, outfit });
         return;
       }
       case ACT.REFILL: {
