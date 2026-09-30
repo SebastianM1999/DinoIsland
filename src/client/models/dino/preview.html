@@ -10,7 +10,9 @@
   <style>
     :root { color-scheme: light; }
     body { margin: 0; overflow: hidden; background: #8fd0ef; font: 14px system-ui, sans-serif; }
-    #ui { position: fixed; left: 8px; top: 8px; display: flex; flex-wrap: wrap; gap: 4px; max-width: 70vw; }
+    canvas { display: block; }
+    #ui { position: fixed; z-index: 10; left: 8px; top: 8px; display: flex; flex-wrap: wrap; gap: 4px; max-width: min(900px, calc(100vw - 16px)); }
+    #species { display: flex; flex-wrap: wrap; gap: 4px; width: 100%; }
     #ui button, #ui select, #ui label { font: inherit; padding: 4px 8px; border-radius: 6px; border: 0; background: #1f2a44; color: #fff; }
     #ui button[aria-pressed="true"] { background: #e8a21c; color: #1f2a44; }
     #info { position: fixed; left: 8px; bottom: 8px; color: #1f2a44; background: #fff8; padding: 4px 8px; border-radius: 6px; }
@@ -28,13 +30,13 @@
     import { preloadDinoModels } from './glbDino.js';
 
     const qs = new URLSearchParams(location.search);
-    const type = SPECIES[qs.get('type')] ? qs.get('type') : 'brachio';
+    let type = SPECIES[qs.get('type')] ? qs.get('type') : 'brachio';
     document.getElementById('info').textContent = 'Loading dinosaur models…';
     await preloadDinoModels();
-    const species = SPECIES[type];
-    const build = species.build;
-    const ANIM = species.anim;
-    const extra = species.extraUpdate;
+    let species = SPECIES[type];
+    let build = species.build;
+    let ANIM = species.anim;
+    let extra = species.extraUpdate;
 
     const renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
@@ -61,24 +63,28 @@
     ref.castShadow = true;
     scene.add(ref);
 
-    const rig = build();
+    let rig = build();
     scene.add(rig.root);
-    const anim = species.createAnimator(rig);
+    let anim = species.createAnimator(rig);
     // ?count=20 provides a repeatable skin/mixer/render performance scene.
     const count = Math.min(20, Math.max(1, Number(qs.get('count')) || 1));
     const copies = [];
-    for (let i = 1; i < count; i++) {
-      const copy = build();
-      copy.root.position.set((i % 5 - 2) * 4, 0, (Math.floor(i / 5) + 1) * 5);
-      scene.add(copy.root);
-      copies.push({ rig: copy, anim: species.createAnimator(copy), st: 0, spd: 0, pos: copy.root.position });
+    function addCopies() {
+      for (let i = 1; i < count; i++) {
+        const copy = build();
+        copy.root.position.set((i % 5 - 2) * 4, 0, (Math.floor(i / 5) + 1) * 5);
+        scene.add(copy.root);
+        copies.push({ rig: copy, anim: species.createAnimator(copy), st: 0, spd: 0, pos: copy.root.position });
+      }
     }
+    addCopies();
     const box = new THREE.Box3().setFromObject(rig.root, true);   // precise: skinned vertices, not culling bounds
     const size = box.getSize(new THREE.Vector3());
     const camera = new THREE.PerspectiveCamera(45, innerWidth / innerHeight, 0.1, 500);
     const zoom = parseFloat(qs.get('zoom') || '1');
     const focus = qs.get('focus') || 'body';   // body | head
-    const R = (focus === 'head' ? Math.max(size.x, size.y, size.z) * 0.5 + 1 : Math.max(size.x, size.y, size.z) * 1.6 + 2) / zoom;
+    const cameraRadius = () => (focus === 'head' ? Math.max(size.x, size.y, size.z) * 0.5 + 1 : Math.max(size.x, size.y, size.z) * 1.6 + 2) / zoom;
+    let R = cameraRadius();
     const _fp = new THREE.Vector3();
 
     const STATES = ['idle', 'walk', 'run', 'attack', 'roar', 'graze', 'alert', 'charge', 'tail', 'trapped', 'dead', 'fly', 'dive', 'landed'];
@@ -86,16 +92,26 @@
     let view = qs.get('view') || 'side';
     let orbit = qs.get('orbit') === '1';
     const ui = document.getElementById('ui');
-    const select = document.createElement('select');
-    select.setAttribute('aria-label', 'Dinosaur species');
-    for (const name of Object.keys(SPECIES)) select.add(new Option(name, name, false, name === type));
-    select.onchange = () => { qs.set('type', select.value); qs.set('state', state); location.search = qs; };
-    ui.appendChild(select);
+    const speciesRow = document.createElement('div');
+    speciesRow.id = 'species';
+    speciesRow.setAttribute('role', 'group');
+    speciesRow.setAttribute('aria-label', 'Dinosaur species');
+    const speciesButtons = {};
+    const speciesNames = { brachio: 'Brachio', stego: 'Stego', raptor: 'Raptor', ptera: 'Ptera', trex: 'T-Rex' };
+    for (const name of Object.keys(SPECIES)) {
+      const button = document.createElement('button');
+      button.textContent = speciesNames[name];
+      button.setAttribute('aria-pressed', name === type);
+      button.onclick = () => switchSpecies(name);
+      speciesButtons[name] = button;
+      speciesRow.appendChild(button);
+    }
+    ui.appendChild(speciesRow);
     const btns = {};
     for (const s of STATES) {
       const b = document.createElement('button');
       b.textContent = s;
-      b.onclick = () => { state = s; for (const k in btns) btns[k].setAttribute('aria-pressed', k === state); };
+      b.onclick = () => { state = s; t = 0; for (const k in btns) btns[k].setAttribute('aria-pressed', k === state); syncURL(); };
       b.setAttribute('aria-pressed', s === state);
       btns[s] = b;
       ui.appendChild(b);
@@ -103,24 +119,51 @@
     for (const v of ['side', 'front', 'back', 'top', 'three-quarter']) {
       const b = document.createElement('button');
       b.textContent = `view: ${v}`;
-      b.onclick = () => { view = v; };
+      b.onclick = () => { view = v; syncURL(); };
       ui.appendChild(b);
     }
     const ob = document.createElement('button');
     ob.textContent = 'orbit';
-    ob.onclick = () => { orbit = !orbit; };
+    ob.onclick = () => { orbit = !orbit; syncURL(); };
     ui.appendChild(ob);
-    document.getElementById('info').textContent = `${type}: ${size.x.toFixed(1)} × ${size.y.toFixed(1)} × ${size.z.toFixed(1)} m (W×H×L), ${countTris(rig.root)} tris, ${countMeshes(rig.root)} meshes`;
+    function updateInfo() {
+      document.getElementById('info').textContent = `${speciesNames[type]} (${rig.isGLB ? 'GLB' : 'procedural'}): ${size.x.toFixed(1)} × ${size.y.toFixed(1)} × ${size.z.toFixed(1)} m (W×H×L), ${countTris(rig.root)} tris, ${countMeshes(rig.root)} meshes`;
+    }
+    updateInfo();
 
     function countTris(o) { let n = 0; o.traverse((m) => { if (m.isMesh) n += (m.geometry.index ? m.geometry.index.count : m.geometry.attributes.position.count) / 3; }); return Math.round(n); }
     function countMeshes(o) { let n = 0; o.traverse((m) => { if (m.isMesh) n++; }); return n; }
 
-    const speeds = { idle: 0, walk: ANIM.walkSpeed ?? 2, run: ANIM.runSpeed ?? 6, charge: ANIM.runSpeed ?? 6, fly: 11, dive: 20, landed: 0 };
+    const previewSpeeds = () => ({ idle: 0, walk: ANIM.walkSpeed ?? 2, run: ANIM.runSpeed ?? 6, charge: ANIM.runSpeed ?? 6, fly: 11, dive: 20, landed: 0 });
+    let speeds = previewSpeeds();
     const clock = new THREE.Clock();
     let t = 0;
     const frameSamples = [];
     const updateSamples = [];
-    const fakeView = { rig, anim, st: 0, spd: 0, pos: rig.root.position, yaw: 0, time: 0 };
+    let fakeView = { rig, anim, st: 0, spd: 0, pos: rig.root.position, yaw: 0, time: 0 };
+    function syncURL() {
+      qs.set('type', type); qs.set('state', state); qs.set('view', view); qs.set('orbit', orbit ? '1' : '0');
+      history.replaceState(null, '', `${location.pathname}?${qs}`);
+    }
+    function switchSpecies(nextType) {
+      if (nextType === type) return;
+      for (const old of [{ rig, anim }, ...copies]) {
+        scene.remove(old.rig.root);
+        old.anim.dispose?.(); old.rig.dispose?.();
+      }
+      copies.length = 0;
+      type = nextType; species = SPECIES[type];
+      build = species.build; ANIM = species.anim; extra = species.extraUpdate;
+      rig = build(); anim = species.createAnimator(rig);
+      scene.add(rig.root); addCopies();
+      box.setFromObject(rig.root, true).getSize(size);
+      R = cameraRadius(); speeds = previewSpeeds();
+      fakeView = { rig, anim, st: 0, spd: 0, pos: rig.root.position, yaw: 0, time: 0 };
+      t = 0; frameSamples.length = 0; updateSamples.length = 0;
+      document.getElementById('perf').textContent = '';
+      for (const [name, button] of Object.entries(speciesButtons)) button.setAttribute('aria-pressed', name === type);
+      updateInfo(); syncURL();
+    }
     const DSMAP = { idle: 0, walk: 1, run: 2, alert: 4, attack: 5, charge: 6, tail: 7, trapped: 9, dead: 10, fly: 11, dive: 12, landed: 13, roar: 14, graze: 15 };
     function loop() {
       requestAnimationFrame(loop);

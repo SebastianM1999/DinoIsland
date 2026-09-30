@@ -49,6 +49,9 @@ camera in alert, charge and attack states.
 - Browser preview: all five species smoke-tested through idle, walk, run,
   attack, roar, graze, alert, charge, tail, trapped and dead. Ptera also tested
   through fly, dive and landed. No console warnings or errors.
+- Species switching uses visible buttons and replaces the rigs in place without
+  reloading. Direct clicks and keyboard activation verified for GLB/procedural
+  switches; animation state is preserved and the camera refits to the new model.
 - Solo mode: loading completed and the island/HUD appeared without console
   errors. Full combat and multiplayer play were not exercised in-browser.
 - Preview `?type=stego&state=run&count=20`: 735,082 rendered triangles,
