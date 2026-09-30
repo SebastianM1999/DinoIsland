@@ -239,7 +239,7 @@ export function standPose(rig, params) {
   rig.tilt.position.set(0, 0, 0);
 }
 
-export function buildHead(head, P, C) {
+function buildHead(head, P, C) {
   const span = P.back + P.L;
   const zAt = (t) => P.back - t * span;
   const tAt = (z) => (P.back - z) / span;

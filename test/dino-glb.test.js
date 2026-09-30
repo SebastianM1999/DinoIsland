@@ -35,8 +35,15 @@ test('GLBs keep combat, independent skins, semantic clips and terrain animation 
     assert.notEqual(a.head, gltf.scene.getObjectByName('Head'));
     const animator = new DinoAnimator(a, SPECIES[type].anim), other = SPECIES[type].createAnimator(b);
     assert.notEqual(animator.mixer, other.mixer);
-    assert.ok(a.jaw, `${type}: missing movable jaw`);
+    assert.equal(!!a.jaw, type === 'brachio', `${type}: preserve the existing head anatomy`);
     assert.ok(a.model.getObjectByName('FaceEyes'), `${type}: missing visible eyes`);
+    assert.equal(a.model.getObjectByName('DetailedFace'), undefined, 'no replacement facial geometry');
+    if (type !== 'brachio') {
+      const sourceTriangles = { raptor: 20608, trex: 27968, stego: 36752 };
+      let skinTriangles = 0;
+      a.model.traverse(o => { if (o.isSkinnedMesh) skinTriangles += o.geometry.index.count / 3; });
+      assert.equal(skinTriangles, sourceTriangles[type], 'integrated head/body surface remains complete');
+    }
     for (const state of ['walk', 'run']) for (const track of a.clips[state].tracks) {
       const size = track.getValueSize();
       for (let i = 0; i < size; i++) assert.ok(Math.abs(track.values[i] - track.values[track.values.length - size + i]) < 1e-5,
@@ -91,11 +98,13 @@ test('GLBs keep combat, independent skins, semantic clips and terrain animation 
     }
     reference.stopAllAction();
     for (let i = 0; i < 120; i++) animator.update(1 / 60, {});
+    if (a.jaw) {
     const closed = a.jaw.quaternion.clone();
     for (let i = 0; i < 60; i++) animator.update(1 / 60, { pose: { roar: 1 } });
     assert.ok(closed.angleTo(a.jaw.quaternion) > .25, `${type}: mouth fails to open`);
     for (let i = 0; i < 120; i++) animator.update(1 / 60, {});
     assert.ok(closed.angleTo(a.jaw.quaternion) < .02, `${type}: jaw overlay accumulates`);
+    }
     let previous = a.legChains.map(leg => leg.lower.quaternion.clone());
     for (let i = 0; i < 360; i++) {
       animator.update(1 / 60, { speed: 10.2, groundAt: () => 2 });

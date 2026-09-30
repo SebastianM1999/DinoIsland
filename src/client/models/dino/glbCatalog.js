@@ -1,6 +1,6 @@
 // Replace files, semantic clips and bone aliases here when changing asset providers.
 const bones = {
-  head: 'Head', jaw: 'FaceJaw', neck: ['Neck'], body: 'Body', spine: ['Hips', 'Torso', 'Shoulders'],
+  head: 'Head', jaw: null, neck: ['Neck'], body: 'Body', spine: ['Hips', 'Torso', 'Shoulders'],
   tail: ['Tail1', 'Tail2', 'Tail3', 'Tail4', 'Tail5'],
   legs: ['BackUpLegR', 'BackUpLegL', 'FrontUpLegR', 'FrontUpLegL'],
   feet: ['BackFootR', 'BackFootL', 'FrontFootR', 'FrontFootL'],
@@ -26,6 +26,7 @@ export const GLB_DINOS = {
 };
 GLB_DINOS.brachio.yaw = 0;
 GLB_DINOS.brachio.bones = { ...GLB_DINOS.brachio.bones,
+  jaw: 'FaceJaw',
   neck: Array.from({ length: 6 }, (_, i) => `Neck${i + 1}`),
   tail: Array.from({ length: 8 }, (_, i) => `Tail${i + 1}`), spine: ['Body', 'Shoulders'] };
 GLB_DINOS.stego.width = 2.4;

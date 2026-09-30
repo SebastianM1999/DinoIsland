@@ -4,9 +4,10 @@ Branch: `codex/animated-dinosaur-models`. Local commits only; no push.
 
 ## Corrected defects
 
-- Added readable eyes, pupils, highlights, brows, nostrils, cheeks and movable
-  lower jaws to the imported Raptor, T-Rex and Stegosaurus heads. Removed the
-  original fixed head surfaces so mouths do not contain a second jaw.
+- Restored the original integrated Raptor, T-Rex and Stegosaurus heads after
+  visual feedback. No skin triangles are removed. Each head gets only two black
+  eye dots; replacement skulls, cheeks, brows, teeth and jaws are removed.
+- Brachiosaurus and Ptera also use black dots without detailed eyes or brows.
 - Added rest-space vertex-color stripes, cream undersides and skin flecks.
   These markings deform with the skin; they are not bitmap texture maps.
 - Removed the second runtime leg solver. The source foot targets are parented
@@ -21,7 +22,7 @@ Branch: `codex/animated-dinosaur-models`. Local commits only; no push.
   feet are planted during the windup; the front legs lift and return on impact.
 - Corrected inward-facing triangle winding in procedural skin lofts. This
   fixes missing surfaces and inverted shading on Brachiosaurus and Ptera.
-- Ptera now has larger eyes, patterned body skin, wing rays and pale wing-edge
+- Ptera now has black eye dots, patterned body skin, wing rays and pale wing-edge
   bands. Its procedural flight, dive and landing rig is retained.
 - Added a preview pause/resume control and camera refitting on narrow screens.
 
@@ -29,11 +30,11 @@ Branch: `codex/animated-dinosaur-models`. Local commits only; no push.
 
 | Species | Geometry source | Triangles | Height × length |
 | --- | --- | ---: | --- |
-| Raptor | Quaternius Velociraptor plus project facial geometry | 27,281 | 1.4 × 2.9 m |
-| T-Rex | Quaternius T-Rex plus project facial geometry | 25,882 | 4.1 × 11 m |
-| Stego | Quaternius Stegosaurus plus project facial geometry | 41,216 | 4 × 7.9 m |
-| Brachio | Project Brachiosaurus baked to GLB | 29,588 | 11 × 19 m |
-| Ptera | Project procedural flight rig | 26,872 | Existing dimensions |
+| Raptor | Quaternius Velociraptor plus black eye dots | 21,312 | 1.4 × 2.9 m |
+| T-Rex | Quaternius T-Rex plus black eye dots | 28,672 | 4.1 × 11 m |
+| Stego | Quaternius Stegosaurus plus black eye dots | 37,456 | 4 × 7.9 m |
+| Brachio | Project Brachiosaurus baked to GLB | 28,524 | 11 × 19 m |
+| Ptera | Project procedural flight rig | 25,808 | Existing dimensions |
 
 Original Quaternius assets remain CC0. Project additions retain the project's
 license. Source Blend files are retained; Apatosaurus is now unused. Regeneration
@@ -41,10 +42,14 @@ commands are in `art/sources/quaternius-dinosaurs/README.md`.
 
 ## Verification, 2026-09-30
 
-- `npm test`: 43 passing tests. The original visibility and co-op tests pass.
+- Latest `npm test`: 42 of 43 passing. Both full runs hit the pre-existing
+  random fruit-fixture failure (`discovery-fruit.test.js`: missing berry).
+  Dinosaur, visibility and co-op checks pass; the four targeted dinosaur tests
+  also pass independently.
 - Parsed actual GLBs and checked triangle counts, vertex colors, dimensions,
   clone independence, combat hit spheres and all pose inputs.
-- Regression checks verify eyes/jaws, identical loop endpoints, no accumulated
+- Regression checks verify eyes, complete source skin surfaces, absence of
+  replacement facial geometry, identical loop endpoints, no accumulated
   jaw rotation, bounded cadence, and no knee jumps over six seconds of running.
   An independent mixer gives identical leg rotations, proving the runtime
   layers do not overwrite baked leg poses. Loft normals face outward.
@@ -55,8 +60,8 @@ commands are in `art/sources/quaternius-dinosaurs/README.md`.
   failed model/module requests.
 - Real UI clicks exercised rapid species changes while dead, pause/resume,
   and the 390 × 844 narrow viewport.
-- 20 Stegosaurus instances: approximately 824,362 rendered triangles, 6.1 ms
-  frame interval and 1.37 ms animation CPU time in the local Chromium preview.
+- 20 Stegosaurus instances: approximately 749,162 rendered triangles, 6.2 ms
+  frame interval and 1.76 ms animation CPU time in the local Chromium preview.
   These are local preview measurements, not an island or hardware guarantee.
 
 Reproduce browser checks with a running localhost:8080 server:

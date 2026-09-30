@@ -6,7 +6,7 @@
       "source": "Quaternius Animated Dinosaur Pack / Velociraptor",
       "license": "CC0-1.0",
       "url": "https://quaternius.com/packs/animateddinosaurs.html",
-      "triangles": 27281
+      "triangles": 21312
     },
     {
       "id": "dino-trex",
@@ -14,7 +14,7 @@
       "source": "Quaternius Animated Dinosaur Pack / T-Rex",
       "license": "CC0-1.0",
       "url": "https://quaternius.com/packs/animateddinosaurs.html",
-      "triangles": 25882
+      "triangles": 28672
     },
     {
       "id": "dino-stego",
@@ -22,14 +22,14 @@
       "source": "Quaternius Animated Dinosaur Pack / Stegosaurus",
       "license": "CC0-1.0",
       "url": "https://quaternius.com/packs/animateddinosaurs.html",
-      "triangles": 41216
+      "triangles": 37456
     },
     {
       "id": "dino-brachio",
       "file": "assets/models/dinos/brachio.glb",
       "source": "Project-authored Brachiosaurus; scripts/build-brachio-glb.mjs",
       "license": "Project source",
-      "triangles": 29588
+      "triangles": 28524
     }
   ]
 }

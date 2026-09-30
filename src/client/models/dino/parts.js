@@ -2,7 +2,7 @@
 // chained into joints, eyes with blinking lids, claws, teeth and feet.
 
 import * as THREE from 'three';
-import { MAT, paint, place, part, merge, mesh, blob, eye, deform, smoothNormals } from '../kit.js';
+import { MAT, paint, place, part, merge, mesh, blob, deform, smoothNormals } from '../kit.js';
 
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
 
@@ -230,31 +230,19 @@ export function chain(parent, segs, { dir = 'fwd', color, radial = 10, overlap =
   return joints;
 }
 
-/** Pair of eyes on the sides of a head (looking ±X), plus a blinking eyelid mesh. */
-export function sideEyes(head, { x, y, z, size, iris = '#2a1a10', lid = '#666', yaw = 0.25, pitch = 0 }) {
+/** Two small black dots; keep the existing head silhouette intact. */
+export function sideEyes(head, { x, y, z, size }) {
   const eyes = merge([
-    place(eye(size, iris), [-x, y, z], [pitch, -Math.PI / 2 - yaw, 0]),
-    place(eye(size, iris), [x, y, z], [pitch, Math.PI / 2 + yaw, 0]),
+    place(blob(size * .5, size, size, '#080808', { w: 16, h: 12 }), [-x, y, z]),
+    place(blob(size * .5, size, size, '#080808', { w: 16, h: 12 }), [x, y, z]),
   ]);
-  const eyeMesh = mesh(eyes, MAT.glossy);
+  const eyeMesh = mesh(eyes);
   eyeMesh.name = 'FaceEyes';
   head.add(eyeMesh);
-  // Lids: skin-colored caps centred on the eye height; scale.y blinks.
-  const lidGroup = new THREE.Group();
-  lidGroup.position.set(0, y, z);
-  const capGeo = (sx) => place(blob(size * 1.12, size * 1.12, size * 1.0, lid, { w: 8, h: 6 }), [sx, 0, 0]);
-  const lids = mesh(merge([capGeo(-x - size * 0.08), capGeo(x + size * 0.08)]));
-  lids.castShadow = false;
+  // Preserve the animator interface without adding brows or visible eyelids.
+  const lids = new THREE.Group();
   lids.name = 'FaceEyelids';
-  lidGroup.add(lids);
-  lids.scale.y = 0.12;
-  head.add(lidGroup);
-  // brow ridges
-  const brow = merge([
-    place(blob(size * 1.05, size * 0.32, size * 0.8, lid, { w: 12, h: 8 }), [-x * 0.95, y + size * 0.9, z], [0, 0.25, -0.2]),
-    place(blob(size * 1.05, size * 0.32, size * 0.8, lid, { w: 12, h: 8 }), [x * 0.95, y + size * 0.9, z], [0, -0.25, 0.2]),
-  ]);
-  head.add(mesh(brow));
+  head.add(lids);
   return lids;
 }
 

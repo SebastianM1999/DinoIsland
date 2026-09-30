@@ -25,8 +25,8 @@ Use inspect-dino-pack.py to print source action names and skeletons.
 Two subdivision levels round silhouettes; smooth normals remove flat facets.
 Materials are replaced by species vertex palettes with gradual variation.
 The loader fits height and length independently to the game's scale and rotates
-the pack's forward direction to -Z. The detailing pass replaces the source heads
-with eyes, nostrils, cheeks, teeth and separate lower jaws, then adds rest-space
+the pack's forward direction to -Z. The detailing pass preserves the complete
+integrated head/body surface and adds only two black eye dots, plus rest-space
 body stripes and flecks. Run it once after a fresh Blender conversion.
 The smoothing pass closes gait endpoints, filters sparse knee keys, and retimes
 held frames moderately. Runtime cadence is bounded to avoid frantic short-stride runs.
@@ -35,4 +35,4 @@ Brachio is now baked from the project's own Brachiosaurus builder, with natural
 neck/body/leg proportions and a 0.8-second defensive-stomp windup. Apatosaurus is
 retained as an unused source rather than stretched into a different dinosaur.
 Ptera retains its procedural flight rig, with corrected outward-facing skin,
-larger eyes, body markings, wing rays and a pale trailing-edge band.
+simple black eye dots, body markings, wing rays and a pale trailing-edge band.
