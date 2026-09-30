@@ -7,7 +7,7 @@ import * as THREE from 'three';
 import { CONFIG } from '../../shared/config.js';
 import { TOPS } from '../../shared/outfits.js';
 import { MAT, merge, mesh, tube } from '../models/kit.js';
-import { spearGeometry, bowGeometry, arrowGeometry, trapGeometry, meatGeometry, makeBowString } from '../models/weapons.js';
+import { spearGeometry, bowGeometry, arrowGeometry, trapGeometry, meatGeometry, makeBowString, BOW_REST, ARROW_TIP_Y } from '../models/weapons.js';
 import { handGeometry } from '../models/hands.js';
 import { makeFruitMesh } from '../models/fruit.js';
 
@@ -111,10 +111,11 @@ export class Viewmodel {
     this.swayVelocity = V(0, 0, 0);
     this.contact = V(0, 0, 0);
     this.armAim = V(0, 0, 0);
-    this.arrowAim = V(0, 0, 0);
+    this.arrowTip = V(0, 0, 0);
     this.arrowUp = V(0, 1, 0);
     this.aimMatrix = new THREE.Matrix4();
     this.armForward = V(0, 0, 1);
+    this.arrowForward = V(0, 0, -1);
     this.inverseHand = new THREE.Quaternion();
     this.gripArmR = this.rArm.geometry;
 
@@ -247,22 +248,33 @@ export class Viewmodel {
     const l = this.lHand.position.copy(this.lHandRest);
     l.x += bx * 0.8 + this.sway.x; l.y += by + this.sway.y - lower + breathe;
     if (this.tool === 'bow') {
-      l.set(-0.1 + this.sway.x + bx, -0.20 + this.sway.y + by - lower, -0.92 + this.recoil * 0.05);
+      // The arrow passes through BOTH its nock and its rest, along local -Z.
       this.lHand.rotation.set(0, 0, 0.1);
-      this.bow.rotation.set(0, 0.55, -0.3 + this.drawVis * 0.2);
+      this.bow.rotation.set(0.32, 0.35, -0.3 + this.drawVis * 0.2);
       this.string.userData.setPull(this.drawVis * 0.24);
-      this.nocked.position.set(0, 0.065, 0.16 + this.drawVis * 0.24);
+      this.nocked.position.set(BOW_REST.x, BOW_REST.y, 0.16 + this.drawVis * 0.24);
+      this.nocked.quaternion.setFromUnitVectors(this.arrowUp, this.arrowForward);
       this.nocked.visible = this.hasArrow && this.recoil < 0.2;
-      this.lHand.updateMatrix();
       this.bow.updateMatrix();
-      this.contact.set(0, 0.065, 0.16 + this.drawVis * 0.24).applyMatrix4(this.bow.matrix).applyMatrix4(this.lHand.matrix);
+      // Keep the arrowhead centered by positioning the whole held assembly.
+      // Its direction stays constrained by the bow rest rather than aiming the
+      // arrow independently and letting it float beside the bow.
+      this.arrowTip.copy(this.nocked.position).addScaledVector(this.armForward, -ARROW_TIP_Y)
+        .applyMatrix4(this.bow.matrix).applyQuaternion(this.lHand.quaternion);
+      l.set(-this.arrowTip.x, -this.arrowTip.y, -0.92 + this.recoil * 0.05);
+      this.root.updateMatrix();
+      this.contact.copy(l).add(this.arrowTip).applyMatrix4(this.root.matrix);
+      this.contact.set(0, 0, this.contact.z);
+      this.aimMatrix.copy(this.root.matrix).invert();
+      this.contact.applyMatrix4(this.aimMatrix).sub(this.arrowTip);
+      l.copy(this.contact);
+      l.y -= lower;
+      this.lHand.updateMatrix();
+      this.contact.copy(this.nocked.position).applyMatrix4(this.bow.matrix).applyMatrix4(this.lHand.matrix);
       if (this.eatT <= 0) {
         r.copy(this.contact);
         this.rHand.quaternion.copy(this.lHand.quaternion).multiply(this.bow.quaternion);
       }
-      this.aimMatrix.multiplyMatrices(this.lHand.matrix, this.bow.matrix).invert();
-      this.arrowAim.set(0, 0, -4).applyMatrix4(this.aimMatrix).sub(this.nocked.position).normalize();
-      this.nocked.quaternion.setFromUnitVectors(this.arrowUp, this.arrowAim);
       this.lPalm.quaternion.copy(this.bow.quaternion);
     } else if (this.tool === 'trap') {
       this.trap.position.set(bx + this.sway.x, -0.28 + by + this.sway.y - lower - Math.sin(this.placeT * Math.PI) * 0.25, -0.65);

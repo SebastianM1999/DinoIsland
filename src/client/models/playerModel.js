@@ -8,7 +8,7 @@ import * as THREE from 'three';
 import { CONFIG } from '../../shared/config.js';
 import { HATS, TOPS, PANTS, defaultOutfit, sanitizeOutfit } from '../../shared/outfits.js';
 import { MAT, deform, paint, place, part, merge, mesh, blob, jitter } from './kit.js';
-import { spearGeometry, bowGeometry, trapGeometry, meatGeometry, arrowGeometry, makeBowString } from './weapons.js';
+import { spearGeometry, bowGeometry, trapGeometry, meatGeometry, arrowGeometry, makeBowString, BOW_REST } from './weapons.js';
 
 const PACKS = [
   { pack: '#3d3c44', dark: '#2a2930', roll: '#6c8a3c' },
@@ -607,11 +607,11 @@ export class PlayerModel {
       if (s.eq === 'bow') {
         const pull = s.drawing ? 0.24 : 0;
         held.userData.string.userData.setPull(pull);
-        held.userData.arrow.position.set(0, 0.065, 0.16 + pull);
+        held.userData.arrow.position.set(BOW_REST.x, BOW_REST.y, 0.16 + pull);
         held.userData.arrow.visible = s.drawing;
         this.gripTarget.set(0, 0, 0).applyMatrix4(this.toolRig.matrix);
         this.fitArm(this.armL, this.gripTarget);
-        this.gripTarget.set(0, 0.065, 0.16 + pull).applyMatrix4(this.toolRig.matrix);
+        this.gripTarget.set(BOW_REST.x, BOW_REST.y, 0.16 + pull).applyMatrix4(this.toolRig.matrix);
         this.fitArm(this.armR, this.gripTarget);
       } else {
         this.gripTarget.set(-0.99 * 0.35, 0.18 * 0.35, 0).applyMatrix4(this.toolRig.matrix);

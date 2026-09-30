@@ -6,7 +6,7 @@ Reference inspected: [Claude-of-Duty](https://github.com/mshumer/Claude-of-Duty/
 The useful techniques are grip-centered construction, hands following weapon contacts, additive motion layers, bounded camera lag, and readable material separation. This is an original implementation of those techniques with Dinosaur Island's existing Three.js kit and wood/stone/rope palette. No reference source or assets are bundled.
 
 - Spear: larger faceted stone blade, leather-colored grip, rope collars, and a grip origin that actually sits in the hand. Throw visibility follows the existing 220 ms projectile launch.
-- Bow: continuous recurved limbs, wrapped grip, reinforced tips, an arrow shelf, and a string that shares its nock with the arrow and pulling hand. The arrow points toward the camera's aiming line.
+- Bow: continuous recurved limbs, wrapped grip, reinforced tips, an arrow shelf, and a string that shares its nock with the arrow and pulling hand. The shaft passes through the shared rest and nock. The held assembly is positioned so the arrowhead projects to the screen center during draw and camera sway.
 - Trap: pressure plate, diagonal cord braces, carry handles, and distinct open/closed stake angles. Both hands follow the handles through bob, switching, and placement.
 - Player: separate palms and forearms preserve grip orientation while directing sleeves out of frame. Co-op bows and traps use the same contact targets for their arm poses; co-op spears point forward.
 
