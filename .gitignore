@@ -40,3 +40,4 @@ coverage/
 
 # Playwright MCP screenshots / snapshots
 .playwright-mcp/
+output/playwright/

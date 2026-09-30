@@ -83,7 +83,8 @@
     const camera = new THREE.PerspectiveCamera(45, innerWidth / innerHeight, 0.1, 500);
     const zoom = parseFloat(qs.get('zoom') || '1');
     const focus = qs.get('focus') || 'body';   // body | head
-    const cameraRadius = () => (focus === 'head' ? Math.max(size.x, size.y, size.z) * 0.5 + 1 : Math.max(size.x, size.y, size.z) * 1.6 + 2) / zoom;
+    const cameraRadius = () => (focus === 'head' ? Math.max(size.x, size.y, size.z) * 0.5 + 1 : Math.max(size.x, size.y, size.z) * 1.6 + 2) / zoom
+      * Math.max(1, .8 / camera.aspect);
     let R = cameraRadius();
     const _fp = new THREE.Vector3();
 
@@ -126,6 +127,11 @@
     ob.textContent = 'orbit';
     ob.onclick = () => { orbit = !orbit; syncURL(); };
     ui.appendChild(ob);
+    let paused = false;
+    const pauseButton = document.createElement('button');
+    pauseButton.textContent = 'pause';
+    pauseButton.onclick = () => { paused = !paused; pauseButton.textContent = paused ? 'resume' : 'pause'; };
+    ui.appendChild(pauseButton);
     function updateInfo() {
       document.getElementById('info').textContent = `${speciesNames[type]} (${rig.isGLB ? 'GLB' : 'procedural'}): ${size.x.toFixed(1)} × ${size.y.toFixed(1)} × ${size.z.toFixed(1)} m (W×H×L), ${countTris(rig.root)} tris, ${countMeshes(rig.root)} meshes`;
     }
@@ -168,7 +174,7 @@
     function loop() {
       requestAnimationFrame(loop);
       const rawDelta = clock.getDelta();
-      const dt = Math.min(rawDelta, 0.05);
+      const dt = paused ? 0 : Math.min(rawDelta, 0.05);
       const frameStart = performance.now();
       t += dt;
       const speed = speeds[state] ?? 0;
@@ -209,8 +215,10 @@
         document.getElementById('perf').textContent = `${rig.isGLB ? 'GLB' : 'Procedural'} · ${count} dinos · frame ${avg(frameSamples).toFixed(1)} ms · animation ${avg(updateSamples).toFixed(2)} ms · ${renderer.info.render.triangles.toLocaleString()} rendered tris`;
       }
     }
+    // Preview-only inspection hook for clip/bone QA, never used by the game.
+    window.dinoPreview = { get rig() { return rig; }, get anim() { return anim; }, get state() { return state; } };
     loop();
-    addEventListener('resize', () => { renderer.setSize(innerWidth, innerHeight); camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); });
+    addEventListener('resize', () => { renderer.setSize(innerWidth, innerHeight); camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); R = cameraRadius(); });
   </script>
 </body>
 </html>

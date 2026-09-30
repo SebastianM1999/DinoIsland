@@ -1,78 +1,85 @@
-# Animated dinosaur verification
+# Dinosaur appearance and animation verification
 
-Branch: `codex/animated-dinosaur-models`. No push.
+Branch: `codex/animated-dinosaur-models`. Local commits only; no push.
 
-## Assets and mapping
+## Corrected defects
 
-CC0 pack: https://quaternius.com/packs/animateddinosaurs.html
+- Added readable eyes, pupils, highlights, brows, nostrils, cheeks and movable
+  lower jaws to the imported Raptor, T-Rex and Stegosaurus heads. Removed the
+  original fixed head surfaces so mouths do not contain a second jaw.
+- Added rest-space vertex-color stripes, cream undersides and skin flecks.
+  These markings deform with the skin; they are not bitmap texture maps.
+- Removed the second runtime leg solver. The source foot targets are parented
+  to the root rather than the knees, and their IK is already baked into clips.
+  Solving that hierarchy again caused the leg distortion.
+- Closed walk/run endpoints, smoothed sparse knee keys, and moderately retimed
+  held sections. Walk/run transitions preserve cycle phase. Bounded cadence
+  reduces the Raptor run from approximately 4.6 to at most 1.9 cycles/second.
+- Replaced the vertically stretched Apatosaurus with a GLB baked from the
+  project's Brachiosaurus geometry. It has its own neck proportions, periodic
+  four-legged gaits, and a defensive stomp with a 0.8-second windup. The hind
+  feet are planted during the windup; the front legs lift and return on impact.
+- Corrected inward-facing triangle winding in procedural skin lofts. This
+  fixes missing surfaces and inverted shading on Brachiosaurus and Ptera.
+- Ptera now has larger eyes, patterned body skin, wing rays and pale wing-edge
+  bands. Its procedural flight, dive and landing rig is retained.
+- Added a preview pause/resume control and camera refitting on narrow screens.
 
-| Game species | Pack model | Triangles | Height × length |
+## Assets
+
+| Species | Geometry source | Triangles | Height × length |
 | --- | --- | ---: | --- |
-| raptor | Velociraptor | 20,608 | 1.4 × 2.9 m |
-| trex | T-Rex | 27,968 | 4.1 × 11 m |
-| stego | Stegosaurus | 36,752 | 4 × 7.9 m |
-| brachio | Apatosaurus | 22,960 | 11 × 19 m |
-| ptera | Existing procedural model | 26,872 | Existing dimensions |
+| Raptor | Quaternius Velociraptor plus project facial geometry | 27,281 | 1.4 × 2.9 m |
+| T-Rex | Quaternius T-Rex plus project facial geometry | 25,882 | 4.1 × 11 m |
+| Stego | Quaternius Stegosaurus plus project facial geometry | 41,216 | 4 × 7.9 m |
+| Brachio | Project Brachiosaurus baked to GLB | 29,588 | 11 × 19 m |
+| Ptera | Project procedural flight rig | 26,872 | Existing dimensions |
 
-Parasaurolophus and Triceratops complete the six-species pack; their original
-Blender files are retained but unused. There is no pteranodon in the pack.
-All procedural builders and skins remain available if an imported model fails.
+Original Quaternius assets remain CC0. Project additions retain the project's
+license. Source Blend files are retained; Apatosaurus is now unused. Regeneration
+commands are in `art/sources/quaternius-dinosaurs/README.md`.
 
-## Clips and state layers
+## Verification, 2026-09-30
 
-Each imported species provides `<prefix>_Idle`, `_Walk`, `_Run`, `_Attack`,
-`_Death`, and `_Jump`. Prefixes are `Velociraptor`, `TRex`, `Stegosaurus`,
-and `Apatosaurus`. Apatosaurus's death clip is actually named
-`Stegosaurus_Death` in the source; the catalog explicitly maps it.
-Jump is exported but unused by the current server AI.
+- `npm test`: 43 passing tests. The original visibility and co-op tests pass.
+- Parsed actual GLBs and checked triangle counts, vertex colors, dimensions,
+  clone independence, combat hit spheres and all pose inputs.
+- Regression checks verify eyes/jaws, identical loop endpoints, no accumulated
+  jaw rotation, bounded cadence, and no knee jumps over six seconds of running.
+  An independent mixer gives identical leg rotations, proving the runtime
+  layers do not overwrite baked leg poses. Loft normals face outward.
+- Playwright Chromium: exercised all five species through idle, walk, run,
+  attack, roar, death and return to idle. Also exercised Ptera flight, dive and
+  landing. Rechecked the final assets and captured face close-ups and six poses
+  spanning every land species' walking and running cycle. No page errors or
+  failed model/module requests.
+- Real UI clicks exercised rapid species changes while dead, pause/resume,
+  and the 390 × 844 narrow viewport.
+- 20 Stegosaurus instances: approximately 824,362 rendered triangles, 6.1 ms
+  frame interval and 1.37 ms animation CPU time in the local Chromium preview.
+  These are local preview measurements, not an island or hardware guarantee.
 
-Idle/walk/run are selected from interpolated ground speed; charge selects run.
-Attack/tail pulses select the authored attack once; death plays once and clamps.
-Transitions crossfade over 0.18 seconds. Clip timescale is
-`groundSpeed * clipDuration / strideMetres`. Strides are measured from median
-grounded foot travel using `node scripts/measure-dino-strides.mjs`.
+Reproduce browser checks with a running localhost:8080 server:
 
-Roar, graze, alert and hurt have no authored clips: the mixer keeps the base
-idle/locomotion pose while neck/head or body layers supply the motion. Trapped
-uses idle, body struggle and foot movement. Post-mixer overlays use creature
-axes rather than assuming the source bones' local axes. Tail follow-through
-uses a substepped spring. Terrain following combines body pitch and two-bone
-leg IK during stance, preserving swing arcs. Head tracking follows the local
-camera in alert, charge and attack states.
+```
+node scripts/check-dino-preview.mjs <playwright/index.mjs> [chromium.exe]
+```
 
-## Verification
+Screenshots, cycle contact sheets, a video, and result JSON are written under
+`output/playwright/dino-revision/` (ignored by Git). The bundled Playwright was
+used because the interactive MCP Node runtime failed to initialize. Installing
+a separate copy was unnecessary; the attempted npm installation failed on a
+registry certificate verification error, without changing package dependencies.
 
-- `npm test`: 42 passing tests, including the original dinosaur visibility test.
-- Actual GLBs parsed in Node without WebGL; tested instance independence,
-  vertex colors, dimensions, triangle budgets, hit zones, every pose state,
-  sloped ground, death clamping, and failed-load retries.
-- Browser preview: all five species smoke-tested through idle, walk, run,
-  attack, roar, graze, alert, charge, tail, trapped and dead. Ptera also tested
-  through fly, dive and landed. No console warnings or errors.
-- Species switching uses visible buttons and replaces the rigs in place without
-  reloading. Direct clicks and keyboard activation verified for GLB/procedural
-  switches; animation state is preserved and the camera refits to the new model.
-- Solo mode: loading completed and the island/HUD appeared without console
-  errors. Full combat and multiplayer play were not exercised in-browser.
-- Preview `?type=stego&state=run&count=20`: 735,082 rendered triangles,
-  approximately 6.1 ms frame interval and 1.28 ms animation CPU time in the
-  desktop in-app browser. These are local preview measurements, not an island
-  performance guarantee or a GPU profiler capture.
+## Remaining limits
 
-## Known limits
+Server AI, networking, combat and movement speeds are unchanged. Terrain follows
+body pitch; the incompatible per-foot solver is removed. Uneven ground can still
+produce imperfect foot contact, and cadence caps can cause sliding at the highest
+movement speeds. Full in-island combat and slope traversal were not visually
+replayed during this revision. Automated tests and flat-ground preview checks
+cannot establish that every possible gameplay animation is artifact-free.
 
-- Brachio uses Apatosaurus anatomy fitted independently to height, length and
-  width. Its neck posture and leg proportions are not a true Brachiosaurus.
-- The source skeletons have no separate jaw bones. Roar/jaw flags cannot visibly
-  articulate a jaw with these assets. The loader supports an optional Jaw alias
-  and optional roar/eat/hurt clips for future model providers.
-- Foot IK is limited to modest terrain corrections; extremely steep terrain or
-  snapshot discontinuities can still cause imperfect contact or sliding.
-- Ptera stays procedural. Server species, AI, networking and combat rules are
-  unchanged; hit spheres now follow imported bones on the four land species.
-
-To inspect the result, run `npm start`, open
-http://localhost:8080/src/client/models/dino/preview.html and select a species.
-Use `count=20` for the repeatable performance scene.
-
-![Stegosaurus preview](stego-preview.jpg)
+![Raptor face](raptor-face.png)
+![Brachiosaurus](brachio-revised.png)
+![Ptera flight](ptera-revised.png)
