@@ -64,7 +64,7 @@ export function buildGLBDino(type) {
   const root = new THREE.Group(), tilt = new THREE.Group(), body = new THREE.Group();
   const model = clone(template.scene);
   const scale = spec.length / template.size.z;
-  model.scale.set(scale, spec.height / template.size.y, scale);
+  model.scale.set(spec.width ? spec.width / template.size.x : scale, spec.height / template.size.y, scale);
   model.rotation.y = spec.yaw;
   model.position.y = -template.box.min.y * model.scale.y;
   root.add(tilt); tilt.add(body); body.add(model);
@@ -111,6 +111,11 @@ export function buildGLBDino(type) {
     return out;
   };
   rig.createAnimator = () => new GLBDinoAnimator(rig);
+  rig.dispose = () => {
+    const skeletons = new Set();
+    model.traverse(o => { if (o.isSkinnedMesh) skeletons.add(o.skeleton); });
+    for (const skeleton of skeletons) skeleton.dispose();
+  };
   return rig;
 }
 
@@ -244,7 +249,7 @@ class GroundLegIK {
     const side = Math.sqrt(Math.max(0, l1*l1 - along*along));
     this.desiredKnee.copy(this.hip).addScaledVector(this.direction, along).addScaledVector(this.pole, side);
     this.from.copy(this.knee).sub(this.hip); this.to.copy(this.desiredKnee).sub(this.hip);
-    this.upperDelta.setFromUnitVectors(this.from.clone().normalize(), this.to.clone().normalize());
+    this.upperDelta.setFromUnitVectors(this.from.normalize(), this.to.normalize());
     this.rotate(upper, this.from, this.to);
     this.from.copy(this.foot).sub(this.knee).applyQuaternion(this.upperDelta);
     lower.getWorldPosition(this.knee);

@@ -38,7 +38,7 @@ for o in list(bpy.context.scene.objects):
         zmin, zmax = min(zvalues), max(zvalues)
         for p in o.data.polygons:
             name = o.data.materials[p.material_index].name.lower()
-            accent = ('darkbrown' in name and species == 'stego')
+            accent = (name == 'brown' and species == 'stego')
             base = linear('24202b') if 'black' in name else palette[2] if 'light' in name else palette[3] if accent else palette[0]
             if 'red' in name: base = linear('a53b3d')
             for li in p.loop_indices:

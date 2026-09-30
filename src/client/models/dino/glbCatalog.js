@@ -23,3 +23,6 @@ export const GLB_DINOS = {
   stego: model('stego', 'Stegosaurus', 4, 7.9, 2.3, 4.2, true),
   brachio: model('brachio', 'Apatosaurus', 11, 19, 4.4, 6.5, true),
 };
+// The long-neck needs a broader body when fitting Apatosaurus to brachio height.
+GLB_DINOS.brachio.width = 4;
+GLB_DINOS.stego.width = 2.4;

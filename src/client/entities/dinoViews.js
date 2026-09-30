@@ -77,6 +77,7 @@ class DinoView {
 
   dispose() {
     this.anim.dispose?.();
+    this.rig.dispose?.();
     this.ctx.scene.remove(this.root);
     this.bar.remove();
   }
@@ -222,6 +223,14 @@ export class DinoViews {
   onWelcome(world) {
     this.spotted = new Set(world.spottedDinos || []);
     for (const d of world.dinos) this.add(d);
+  }
+
+  dispose() {
+    for (const view of this.map.values()) view.dispose();
+    this.map.clear();
+    this.game.gfx.scene.remove(this.hitDebug, this.bodyDebug);
+    this.hitDebugGeo.dispose(); this.hitDebugMat.dispose();
+    this.bodyDebugGeo.dispose(); this.bodyDebugMat.dispose();
   }
 
   add(desc) {

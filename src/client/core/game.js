@@ -382,6 +382,7 @@ export class Game {
    */
   dispose() {
     this.stop();
+    this.dinos.dispose();
     this.overlay.remove();
     this.wardrobe.dispose?.();
     this.net.clearHandlers();
