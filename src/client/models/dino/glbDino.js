@@ -138,6 +138,16 @@ export class GLBDinoAnimator {
     this.v = new THREE.Vector3(); this.q = new THREE.Quaternion();
     this.footOffsets = new Map();
     this.ik = new GroundLegIK();
+    this.axis = new THREE.Vector3();
+    this.rootQuaternion = new THREE.Quaternion();
+    this.boneQuaternion = new THREE.Quaternion();
+  }
+  bend(bone, axis, angle) {
+    // Source bones have different local axes. Express overlays in creature space.
+    bone.getWorldQuaternion(this.boneQuaternion).invert();
+    this.axis.copy(axis).applyQuaternion(this.rootQuaternion).applyQuaternion(this.boneQuaternion).normalize();
+    bone.quaternion.multiply(this.q.setFromAxisAngle(this.axis, angle));
+    bone.updateWorldMatrix(false, true);
   }
   update(dt, input = {}) {
     dt = clamp(dt, 0, .1);
@@ -179,16 +189,18 @@ export class GLBDinoAnimator {
     r.body.rotation.z = Math.sin(this.time * 22) * .035 * hurt * live;
     r.tilt.rotation.z = Math.sin(this.time * 8) * .06 * this.trapped;
     // Graze/alert/roar are overlays because this pack has no dedicated clips.
-    const pitch = (.38 * this.c.headDown - .16 * this.c.neckRaise - .10 * this.c.roar) * live;
-    for (const bone of r.neck) bone.quaternion.multiply(this.q.setFromAxisAngle(RIGHT, pitch));
+    r.root.updateMatrixWorld(true);
+    r.root.getWorldQuaternion(this.rootQuaternion);
+    const pitch = (-.38 * this.c.headDown + .16 * this.c.neckRaise + .10 * this.c.roar) * live;
+    for (const bone of r.neck) this.bend(bone, RIGHT, pitch);
     if (r.head) {
       let look = 0;
       if (lookTarget) {
         this.v.copy(lookTarget); r.root.worldToLocal(this.v);
         look = clamp(Math.atan2(-this.v.x, -this.v.z), -.55, .55);
       }
-      r.head.quaternion.multiply(this.q.setFromAxisAngle(UP, (look + .025 * Math.sin(this.time * 2) * this.c.alert) * live));
-      r.head.quaternion.multiply(this.q.setFromAxisAngle(RIGHT, -.08 * Math.sin(this.time * 9) * this.c.roar * live));
+      this.bend(r.head, UP, (look + .025 * Math.sin(this.time * 2) * this.c.alert) * live);
+      this.bend(r.head, RIGHT, -.08 * Math.sin(this.time * 9) * this.c.roar * live);
     }
     // Stable substepped spring: tail lags behind turns instead of snapping.
     const target = clamp(-yawRate * .10, -.35, .35) * live;
@@ -197,8 +209,8 @@ export class GLBDinoAnimator {
       this.tailVelocity += (55 * (target - this.tailAngle) - 12 * this.tailVelocity) * h;
       this.tailAngle += this.tailVelocity * h;
     }
-    r.tail.forEach((bone, i) => bone.quaternion.multiply(this.q.setFromAxisAngle(UP,
-      (this.tailAngle + Math.sin(this.time * 1.8 - i * .5) * .018 * live) / r.tail.length)));
+    r.tail.forEach((bone, i) => this.bend(bone, UP,
+      (this.tailAngle + Math.sin(this.time * 1.8 - i * .5) * .018 * live) / r.tail.length));
     // Ground-following contacts: correct only feet near the stance plane, retaining swing arcs.
     r.root.updateMatrixWorld(true);
     if (groundAt && live > .05) for (const leg of r.legChains) {
