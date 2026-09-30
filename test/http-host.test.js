@@ -1,9 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { WebSocket } from 'ws';
+import { CONFIG } from '../src/shared/config.js';
+import { EQUIP } from '../src/shared/protocol.js';
 import { createGameServer } from '../server/index.js';
 
-test('HTTP host serves the game and joins two co-op players', async (t) => {
+test('HTTP host serves the game and routes firearm shots and reloads between two co-op players', async (t) => {
   const { httpServer, host } = createGameServer();
   await new Promise((resolve) => httpServer.listen(0, '127.0.0.1', resolve));
   t.after(() => { host.stop(); httpServer.close(); });
@@ -36,4 +38,32 @@ test('HTTP host serves the game and joins two co-op players', async (t) => {
   assert.equal(b.welcome.world.players.length, 2);
   const status = await (await fetch(`${base}/status`)).json();
   assert.equal(status.players.length, 2);
+
+  // Verify the live transport routes new equipment, private ammo updates,
+  // reload completion and remote shot effects to the other player.
+  function message(ws, match) {
+    return new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => { ws.off('message', receive); reject(new Error('gun message timed out')); }, 4000);
+      function receive(raw) {
+        const m = JSON.parse(raw.toString());
+        if (!match(m)) return;
+        clearTimeout(timeout); ws.off('message', receive); resolve(m);
+      }
+      ws.on('message', receive);
+    });
+  }
+  for (const kind of ['pistol', 'rifle']) {
+    const player = host.world.players.get(a.welcome.id);
+    a.ws.send(JSON.stringify({ t: 'state', x: player.x, y: player.y, z: player.z, yaw: 0, pitch: 0, eq: EQUIP.indexOf(kind) }));
+    const ammo = message(a.ws, m => m.t === 'inv' && m.inv.guns[kind].loaded === CONFIG.weapons[kind].magazine - 1);
+    const remote = message(b.ws, m => m.t === 'ev' && m.e === 'shot' && m.kind === kind);
+    a.ws.send(JSON.stringify({ t: 'act', a: 'shot', kind, o: [player.x, player.y + CONFIG.player.eyeHeight, player.z], dir: [0, 0, -1] }));
+    const [inv, event] = await Promise.all([ammo, remote]);
+    assert.equal(inv.inv.guns[kind].reserve, CONFIG.weapons[kind].reserve);
+    assert.equal(event.by, a.welcome.id);
+    assert.ok(event.end.every(Number.isFinite));
+    const reloaded = message(a.ws, m => m.t === 'inv' && m.inv.reloading === null && m.inv.guns[kind].loaded === CONFIG.weapons[kind].magazine);
+    a.ws.send(JSON.stringify({ t: 'act', a: 'reload', kind }));
+    assert.equal((await reloaded).inv.guns[kind].reserve, CONFIG.weapons[kind].reserve - 1);
+  }
 });

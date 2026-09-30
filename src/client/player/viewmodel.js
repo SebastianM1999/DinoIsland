@@ -9,6 +9,7 @@ import { TOPS } from '../../shared/outfits.js';
 import { MAT, merge, mesh, tube } from '../models/kit.js';
 import { spearGeometry, bowGeometry, arrowGeometry, trapGeometry, meatGeometry, makeBowString, BOW_REST, ARROW_TIP_Y } from '../models/weapons.js';
 import { handGeometry } from '../models/hands.js';
+import { makeFirearm } from '../models/firearms/index.js';
 import { makeFruitMesh } from '../models/fruit.js';
 
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
@@ -91,6 +92,18 @@ export class Viewmodel {
     this.rHand.add(this.fruitHolder);
     this.fruitMeshes = {};
 
+    this.guns = { pistol: makeFirearm('pistol'), rifle: makeFirearm('rifle') };
+    for (const [kind, gun] of Object.entries(this.guns)) {
+      gun.scale.setScalar(kind === 'pistol' ? 1.5 : 1.2);
+      gun.traverse(o => { o.castShadow = false; });
+      const flash = new THREE.Mesh(new THREE.ConeGeometry(0.035, 0.14, 6),
+        new THREE.MeshBasicMaterial({ color: '#ffcf72', transparent: true, opacity: 0.9, depthWrite: false }));
+      flash.rotation.x = -Math.PI / 2;
+      flash.position.fromArray(gun.userData.nodes.muzzle); flash.position.z -= 0.04;
+      flash.visible = false; gun.add(flash); gun.userData.flash = flash;
+      this.root.add(gun);
+    }
+    this.flashT = 0; this.reload = 0; this.ads = 0; this.adsVis = 0;
     this.tool = 'spear';
     this.hasSpear = true;
     this.fruitType = null;
@@ -162,7 +175,8 @@ export class Viewmodel {
       }
       this.fruitMeshes[this.fruitType].visible = true;
     }
-    this.lHand.visible = t === 'bow' || t === 'trap' || this.eatT > 0;
+    this.lHand.visible = t === 'bow' || t === 'trap' || !!this.guns[t] || this.eatT > 0;
+    for (const [kind, gun] of Object.entries(this.guns)) gun.visible = t === kind;
   }
 
   stab() { if (this.stabT <= 0) this.stabT = 1; }
@@ -171,6 +185,13 @@ export class Viewmodel {
   release() { this.recoil = 1; this.draw = 0; }
   eat(type, duration) { this.fruitType = type; this.eatT = duration; this.eatDur = duration; this.applyVisibility(); }
   place() { this.placeT = 1; }
+  fireGun() { this.recoil = 1; this.flashT = 0.055; }
+  setGunPose(aim, reload = 0) { this.ads = aim ? 1 : 0; this.reload = reload; }
+  muzzlePosition(out) {
+    const gun = this.guns[this.tool];
+    this.root.updateMatrixWorld(true);
+    return gun.localToWorld(out.fromArray(gun.userData.nodes.muzzle));
+  }
 
   /** @param {{speed:number, sprint:boolean, grounded:boolean, lookX:number, lookY:number}} s */
   update(dt, s) {
@@ -191,6 +212,8 @@ export class Viewmodel {
     this.eatT = Math.max(0, this.eatT - dt);
     this.placeT = Math.max(0, this.placeT - dt / 0.5);
     this.recoil = Math.max(0, this.recoil - dt * 5);
+    this.flashT = Math.max(0, this.flashT - dt);
+    this.adsVis = damp(this.adsVis, this.ads, 14, dt);
     this.drawVis = damp(this.drawVis, this.draw, 18, dt);
     this.applyVisibility();
 
@@ -288,6 +311,28 @@ export class Viewmodel {
       this.rPalm.rotation.x = Math.PI / 2;
       this.lPalm.rotation.x = Math.PI / 2;
     }
+    const gun = this.guns[this.tool];
+    if (gun) {
+      const scale = gun.scale.x, nodes = gun.userData.nodes;
+      const reload = Math.sin(this.reload * Math.PI);
+      gun.position.set(0.19 * (1 - this.adsVis) + bx + this.sway.x,
+        -0.21 * (1 - this.adsVis) - nodes.sight[1] * scale * this.adsVis + by + this.sway.y - lower - reload * 0.10,
+        -0.45 - this.adsVis * 0.12 + this.recoil * 0.025);
+      gun.rotation.set(0.14 * (1 - this.adsVis) + this.recoil * 0.08 + reload * 0.35,
+        0.18 * (1 - this.adsVis), -reload * 0.25);
+      gun.userData.flash.visible = this.flashT > 0;
+      const parts = gun.userData.parts;
+      if (parts.slide) parts.slide.position.z = parts.slide.userData.rest.z + this.recoil * nodes.slideTravel[2];
+      if (parts.bolt) parts.bolt.position.z = parts.bolt.userData.rest.z + this.recoil * nodes.boltTravel[2];
+      parts.magazine.position.y = parts.magazine.userData.rest.y - reload * 0.16;
+      gun.updateMatrix();
+      r.copy(gun.userData.gripR).applyMatrix4(gun.matrix);
+      l.copy(gun.userData.gripL).applyMatrix4(gun.matrix);
+      this.rHand.quaternion.copy(gun.quaternion); this.lHand.quaternion.copy(gun.quaternion);
+      this.rPalm.rotation.x = -0.2;
+      if (this.tool === 'rifle') this.lPalm.rotation.x = -Math.PI / 2;
+    }
+    for (const [kind, other] of Object.entries(this.guns)) if (kind !== this.tool) other.userData.flash.visible = false;
     this.aimArm(this.rArm, this.rHand, 1);
     this.aimArm(this.lArm, this.lHand, -1);
   }

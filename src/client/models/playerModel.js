@@ -5,6 +5,7 @@
 // The character faces -Z.
 
 import * as THREE from 'three';
+import { makeFirearm } from './firearms/index.js';
 import { CONFIG } from '../../shared/config.js';
 import { HATS, TOPS, PANTS, defaultOutfit, sanitizeOutfit } from '../../shared/outfits.js';
 import { MAT, deform, paint, place, part, merge, mesh, blob, jitter } from './kit.js';
@@ -408,6 +409,8 @@ function neckGeometry(slot) {
 }
 
 const HELD = {
+  pistol: () => makeFirearm('pistol'),
+  rifle: () => makeFirearm('rifle'),
   spear: () => mesh(spearGeometry()),
   bow: () => {
     const g = new THREE.Group();
@@ -525,7 +528,7 @@ export class PlayerModel {
       const m = HELD[name]();
       if (name === 'spear') m.rotation.set(-Math.PI / 2, 0, 0);
       if (name === 'bait') m.position.set(0, -0.05, 0);
-      if (name === 'bow' || name === 'trap') this.toolRig.add(m);
+      if (name === 'bow' || name === 'trap' || name === 'pistol' || name === 'rifle') this.toolRig.add(m);
       else this.hand.add(m);
       this.held[name] = m;
     }
@@ -600,6 +603,15 @@ export class PlayerModel {
     this.armR.rotation.z = rz;
     // Shared grip targets keep both hands on the bow/trap in co-op views.
     const held = this.held[s.eq];
+    if (held && (s.eq === 'pistol' || s.eq === 'rifle')) {
+      this.toolRig.position.set(0.12, 0.24, -0.24);
+      this.toolRig.rotation.set(-s.pitch - this.attackT * 0.15, 0, 0);
+      this.toolRig.updateMatrix();
+      this.gripTarget.copy(held.userData.gripR).applyMatrix4(this.toolRig.matrix);
+      this.fitArm(this.armR, this.gripTarget);
+      this.gripTarget.copy(held.userData.gripL).applyMatrix4(this.toolRig.matrix);
+      this.fitArm(this.armL, this.gripTarget);
+    }
     if (held && (s.eq === 'bow' || s.eq === 'trap')) {
       this.toolRig.position.set(s.eq === 'bow' ? -0.22 : 0, 0.20, -0.34);
       this.toolRig.rotation.set(s.eq === 'bow' ? -s.pitch : 0.12, 0, 0);

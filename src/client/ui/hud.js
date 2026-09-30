@@ -5,6 +5,7 @@
 // only touch `transform` / canvas pixels and skip writes when the value did
 // not change. Nothing here reads layout during a frame.
 
+import { EQUIP } from '../../shared/protocol.js';
 import { CONFIG } from '../../shared/config.js';
 import { icon, portraitSvg } from './icons.js';
 import { buildMapBase, drawMap } from './minimap.js';
@@ -158,7 +159,7 @@ export class Hud {
     this.$hotbar = el('ol', 'hud-hotbar brush');
     this.$hotbar.setAttribute('aria-label', 'Equipment');
     this._slots = [];
-    for (let i = 0; i < 5; i++) {
+    for (let i = 0; i < EQUIP.length; i++) {
       const li = el('li', 'hud-slot');
       li.innerHTML = `<span class="hud-slot-key">${i + 1}</span><span class="hud-slot-ic"></span><span class="hud-slot-count"></span>`;
       this.$hotbar.appendChild(li);
@@ -405,7 +406,7 @@ export class Hud {
   }
 
   setHotbar(slots, selected) {
-    for (let i = 0; i < 5; i++) {
+    for (let i = 0; i < EQUIP.length; i++) {
       const s = slots && slots[i];
       const slot = this._slots[i];
       const sig = s ? `${s.id}|${s.label}|${s.count}|${s.enabled !== false}|${s.sub || ''}|${i === selected}` : `-|${i === selected}`;
@@ -430,11 +431,12 @@ export class Hud {
     if (!inv) return;
     this._inv = inv;
     // quiver
-    const q = `${inv.arrows ?? 0}/${inv.maxArrows ?? CONFIG.weapons.bow.maxArrows}`;
+    const gunAmmo = inv.guns?.[inv.weapon];
+    const q = gunAmmo ? `${inv.reloading ? 'Reloading - ' : ''}${gunAmmo.loaded}/${gunAmmo.reserve}` : `${inv.arrows ?? 0}/${inv.maxArrows ?? CONFIG.weapons.bow.maxArrows}`;
     if (this._c.quiver !== q) {
       this._c.quiver = q;
-      this.$quiver.innerHTML = `<span class="hud-pill-ic">${icon('quiver')}</span><span class="hud-pill-num">${q}</span><span class="sr"> arrows</span>`;
-      this.$quiver.classList.toggle('is-empty', !(inv.arrows > 0));
+      this.$quiver.innerHTML = `<span class="hud-pill-ic">${icon(gunAmmo ? inv.weapon : 'quiver')}</span><span class="hud-pill-num">${q}</span><span class="sr">${gunAmmo ? ' rounds loaded / reserve' : ' arrows'}</span>`;
+      this.$quiver.classList.toggle('is-empty', !(gunAmmo ? gunAmmo.loaded > 0 : inv.arrows > 0));
     }
     // fruit row
     const fruit = inv.fruit || [];
@@ -471,7 +473,7 @@ export class Hud {
     // Only rebuild when the contents change – rebuilding every frame would
     // break hover tooltips.
     const maxCarry = inv.maxCarry ?? CONFIG.player.maxCarryWeight;
-    const sig = JSON.stringify([inv.arrows, inv.maxArrows, inv.maxFruit, maxCarry, inv.traps, inv.baits, inv.fruit, inv.loot, inv.store, Math.round((inv.carryWeight || 0) * 10), Math.round((inv.speedFactor ?? 1) * 100)]);
+    const sig = JSON.stringify([inv.guns, inv.reloading, inv.arrows, inv.maxArrows, inv.maxFruit, maxCarry, inv.traps, inv.baits, inv.fruit, inv.loot, inv.store, Math.round((inv.carryWeight || 0) * 10), Math.round((inv.speedFactor ?? 1) * 100)]);
     if (this._c.invSig === sig) return;
     this._c.invSig = sig;
     const cell = (ic, n, name, tip = ic) => `<li class="hud-cell${n ? '' : ' is-zero'}" data-tip="${tip}" tabindex="-1"><span class="hud-cell-ic">${icon(ic)}</span><span class="hud-cell-n">${n ?? ''}</span><span class="sr">${esc(name)}</span></li>`;
@@ -479,6 +481,7 @@ export class Hud {
     for (const f of inv.fruit || []) fruitCounts[f] = (fruitCounts[f] || 0) + 1;
     const loot = inv.loot || {}, store = inv.store || {};
     const gear = [
+      ...['pistol', 'rifle'].map(k => cell(k, `${inv.guns?.[k]?.loaded ?? 0}/${inv.guns?.[k]?.reserve ?? 0}`, k === 'pistol' ? 'Pistol' : 'Assault rifle')),
       cell('arrow', `${inv.arrows ?? 0}/${inv.maxArrows ?? CONFIG.weapons.bow.maxArrows}`, 'Arrows'),
       cell('trap', inv.traps ?? 0, 'Traps'),
       cell('meat', inv.baits ?? 0, 'Bait', 'bait'),

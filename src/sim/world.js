@@ -9,6 +9,7 @@
 //   snapshot()          at CONFIG.net.snapshotRate (the host broadcasts it)
 // and provides send(to, msg) where `to` is a player id or '*' (everyone).
 
+import { gunInventory, gunAction, updateGunReload } from './firearms.js';
 import { CONFIG } from '../shared/config.js';
 import { Terrain } from '../shared/terrain.js';
 import { buildLayout } from '../shared/layout.js';
@@ -87,6 +88,7 @@ export class ServerWorld {
       p.inv.traps = Math.max(p.inv.traps, caps.traps);
       p.inv.baits = Math.max(p.inv.baits, caps.baits);
       p.inv.spear = true;
+      p.inv.guns = gunInventory(); p.inv.reloading = null;
       p.inv.caps = caps;
     }
     for (const p of this.players.values()) {
@@ -162,6 +164,7 @@ export class ServerWorld {
 
   freshInventory() {
     return {
+      guns: gunInventory(), reloading: null,
       arrows: W.bow.startArrows,
       spear: true,
       traps: W.trap.startCount,
@@ -248,6 +251,7 @@ export class ServerWorld {
     p.knockBudgetUntil = 0;
     p.inv.arrows = Math.max(p.inv.arrows, W.bow.startArrows);
     p.inv.spear = true;
+    p.inv.guns = gunInventory(); p.inv.reloading = null;
     this.sendInv(p);
     this.event(EV.RESPAWN, { id: p.id, x: r2(p.x), z: r2(p.z), yaw: p.yaw });
   }
@@ -359,6 +363,8 @@ export class ServerWorld {
         this.event(EV.SPOT, { id: d.id, type: d.type, by: p.id });
         return;
       }
+      case ACT.SHOT:
+      case ACT.RELOAD: return gunAction(this, p, m);
       case ACT.MELEE: {
         if (!p.alive || p.eating || !inv.spear || this.now < p.nextMeleeAt) return;
         const d = this.dinos.get(m.dino);
@@ -551,8 +557,9 @@ export class ServerWorld {
         inv.traps = Math.max(inv.traps, caps.traps);
         inv.baits = Math.max(inv.baits, caps.baits);
         inv.spear = true;
+        inv.guns = gunInventory(); inv.reloading = null;
         this.sendInv(p);
-        this.toast('Arrows, traps and bait refilled', 'arrow', p.id);
+        this.toast('Ammunition, traps and bait refilled', 'arrow', p.id);
         return;
       }
     }
@@ -646,6 +653,7 @@ export class ServerWorld {
     const F = CONFIG.fruit;
 
     for (const p of this.players.values()) {
+      updateGunReload(this, p);
       if (!p.alive) {
         p.deadT -= dt;
         if (p.deadT <= 0) this.respawnPlayer(p);

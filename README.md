@@ -30,3 +30,8 @@ The game is level based: every level is one oblong, randomly generated island (`
 Each fruit plant starts with 1–4 fruit and regrows a new random crop after it is picked clean. Fruit is found in the world, not on the map. Dinosaur map markers appear only after a player sees the animal; that discovery is shared with teammates and players who join later. The music shifts from a calm theme to a danger theme when hostile dinosaurs approach.
 
 The Windows desktop folder build is ready for local testing. Steamworks setup, upload, store configuration, and testing on target player machines still require the project's Steam account and release process. The desktop build currently uses Electron's default executable icon and has no Steam lobby or overlay integration.
+
+
+## Firearms and weapon preview
+
+The weapon branch adds the MIT-licensed Claude-of-Duty P-19 pistol and M4A1 assault rifle models. Use 6 for the pistol, 7 for the rifle, left-click to fire (hold for the rifle), right-click to aim, and R to reload. Refill magazines and reserve ammunition at the hut workbench. The weapon workshop at `/src/client/player/weapon-preview.html` includes both firearms and visible spear throws with a reset control. Model provenance and the server validation limits are documented in `docs/weapon-presentation.md`; the upstream license is preserved in `src/client/models/firearms/reference/LICENSE`.

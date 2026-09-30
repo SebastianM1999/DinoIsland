@@ -6,7 +6,9 @@
 import * as THREE from 'three';
 import { CONFIG } from '../../shared/config.js';
 import { ACT, EV, PF, EQUIP } from '../../shared/protocol.js';
+import { shotEnd } from '../../shared/gunshots.js';
 import { segmentColliders } from '../../shared/collision.js';
+import { GunEffects } from '../entities/gunEffects.js';
 import { Viewmodel } from './viewmodel.js';
 import { mesh } from '../models/kit.js';
 import { trapGeometry, meatGeometry } from '../models/weapons.js';
@@ -14,7 +16,7 @@ import { trapGeometry, meatGeometry } from '../models/weapons.js';
 const W = CONFIG.weapons;
 const P = CONFIG.player;
 const LOOT_KEYS = Object.keys(CONFIG.loot);
-const SLOT_LABEL = { spear: 'Spear', bow: 'Bow', trap: 'Trap', bait: 'Meat bait', fruit: 'Fruit' };
+const SLOT_LABEL = { spear: 'Spear', bow: 'Bow', trap: 'Trap', bait: 'Meat bait', fruit: 'Fruit', pistol: 'P-19 pistol', rifle: 'M4A1 rifle' };
 const _fwd = new THREE.Vector3();
 const _right = new THREE.Vector3();
 const _up = new THREE.Vector3();
@@ -23,6 +25,8 @@ export class PlayerActions {
   constructor(game) {
     this.game = game;
     this.vm = new Viewmodel(game.gfx, game.me.slot);
+    this.gunEffects = new GunEffects(game);
+    this.reloadT = 0;
     this.cooldown = 0;
     this.drawT = 0;
     this.drawing = false;
@@ -116,9 +120,9 @@ export class PlayerActions {
     const panel = g.hud.isPanelOpen();
 
     // --- slot selection
-    for (let i = 0; i < 5; i++) if (input.wasPressed(`slot${i + 1}`)) this.select(i);
+    for (let i = 0; i < EQUIP.length; i++) if (input.wasPressed(`slot${i + 1}`)) this.select(i);
     const wheel = g.lastWheel || 0;
-    if (wheel) this.select((g.eq + (wheel > 0 ? 1 : 4)) % 5);
+    if (wheel) this.select((g.eq + (wheel > 0 ? 1 : EQUIP.length - 1)) % EQUIP.length);
 
     // --- carry slowdown (and eating makes you slow and vulnerable)
     const w = this.carryWeight();
@@ -142,10 +146,22 @@ export class PlayerActions {
         this.drawT = 0;
         this.vm.release();
       }
+    } else if (tool === 'pistol' || tool === 'rifle') {
+      const ammo = this.inv.guns?.[tool];
+      const ready = canAct && this.vm.tool === tool && !this.vm.pendingTool && this.vm.switchT < 0.05;
+      if (ready && input.wasPressed('reloadHint')) this.reloadGun();
+      const trigger = tool === 'rifle' ? input.isHeld('primary') : input.wasPressed('primary');
+      if (ready && trigger && this.cooldown <= 0 && !this.inv.reloading) {
+        if (ammo?.loaded > 0) this.shootGun();
+        else { g.audio?.play('empty'); this.cooldown = 0.25; }
+      }
     } else if (tool === 'fruit') {
       if (canAct && input.wasPressed('primary')) this.eat();
     }
     if (tool !== 'bow' && this.drawing) { this.drawing = false; this.drawT = 0; }
+    this.gunEffects.update(dt);
+    this.reloadT = this.inv.reloading ? this.reloadT + dt : 0;
+    this.vm.setGunPose(canAct && input.isHeld('secondary'), this.inv.reloading === tool ? Math.min(0.98, this.reloadT / W[tool].reloadTime) : 0);
     this.vm.setDraw(this.drawing ? this.drawT / W.bow.maxDrawTime : 0);
 
     // placement tools with a ghost preview
@@ -240,6 +256,33 @@ export class PlayerActions {
     g.audio?.play('bow');
   }
 
+  reloadGun() {
+    const tool = this.tool, ammo = this.inv.guns?.[tool];
+    if (!ammo || this.inv.reloading || ammo.loaded >= W[tool].magazine || !ammo.reserve) return;
+    this.reloadT = 0;
+    this.game.net.act(ACT.RELOAD, { kind: tool });
+    this.game.audio?.play('reload');
+  }
+
+  shootGun() {
+    const g = this.game, tool = this.tool;
+    const { origin, dir } = this.aim();
+    const blocked = new THREE.Vector3(...shotEnd(g, origin.toArray(), dir.toArray(), W[tool].range));
+    const candidate = g.dinos.raycast(origin, dir, W[tool].range);
+    const hit = candidate && candidate.dist <= blocked.distanceTo(origin) ? candidate : null;
+    const end = hit ? hit.point : blocked;
+    g.net.act(ACT.SHOT, { kind: tool, o: origin.toArray(), dir: dir.toArray(),
+      ...(hit ? { dino: hit.view.id, p: hit.point.toArray(), zone: hit.zone } : {}) });
+    // Position the tracer at the rendered muzzle, transformed into world space.
+    const muzzle = this.vm.muzzlePosition(new THREE.Vector3());
+    g.gfx.viewCamera.worldToLocal(muzzle); g.gfx.camera.localToWorld(muzzle);
+    this.gunEffects.fire(muzzle, end);
+    this.vm.fireGun();
+    this.inv.guns[tool].loaded--;
+    this.cooldown = W[tool].cooldown;
+    g.flags |= PF.ATTACK; g.audio?.play(tool);
+  }
+
   eat() {
     if (this.eatingT > 0 || !this.inv.fruit.length) {
       if (!this.inv.fruit.length) this.game.hud.toast('No fruit – look for berry bushes, mango trees and dragon fruit', 'fruit');
@@ -327,7 +370,7 @@ export class PlayerActions {
       return { text: 'Change clothes', run: () => g.openWardrobe() };
     }
     if (near(h.arrowRack, 4)) {
-      return { text: 'Refill arrows, traps and bait', run: () => net.act(ACT.REFILL) };
+      return { text: 'Refill ammunition, traps and bait', run: () => net.act(ACT.REFILL) };
     }
     if (near(h.missionBoard, 3.5)) {
       return { text: 'Open the mission board', run: () => g.openBoard() };
@@ -404,9 +447,11 @@ export class PlayerActions {
       { id: 'trap', label: SLOT_LABEL.trap, count: inv.traps, enabled: inv.traps > 0 },
       { id: 'bait', label: SLOT_LABEL.bait, count: inv.baits, enabled: inv.baits > 0 },
       { id: 'fruit', label: SLOT_LABEL.fruit, count: inv.fruit.length, enabled: inv.fruit.length > 0, sub: fruitType || undefined },
+      ...['pistol', 'rifle'].map(id => ({ id, label: `${SLOT_LABEL[id]} - R reload`, count: inv.guns?.[id]?.loaded ?? 0, enabled: (inv.guns?.[id]?.loaded ?? 0) > 0 })),
     ], g.eq);
     const caps = this.caps;
     hud.setInventory({
+      guns: inv.guns, reloading: inv.reloading, weapon: this.tool,
       arrows: inv.arrows,
       maxArrows: caps.arrows,
       fruit: inv.fruit,

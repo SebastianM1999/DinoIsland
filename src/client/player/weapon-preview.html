@@ -18,12 +18,12 @@
 </head>
 <body>
   <nav aria-label="Weapon preview controls">
-    <select id="tool" aria-label="Weapon"><option>spear</option><option>bow</option><option>trap</option><option>bait</option><option>fruit</option></select>
-    <button id="primary">Use / hold to draw</button><button id="throw">Throw spear</button>
+    <select id="tool" aria-label="Weapon"><option>spear</option><option>bow</option><option>trap</option><option>bait</option><option>fruit</option><option>pistol</option><option>rifle</option></select>
+    <button id="primary">Use / hold to draw</button><button id="throw">Throw spear</button><button id="reset-spear">Reset spear</button><button id="reload">Reload</button><label><input id="aim" type="checkbox"> Aim</label>
     <label><input id="walk" type="checkbox"> Walk</label><label><input id="sprint" type="checkbox"> Sprint</label>
     <select id="outfit" aria-label="Outfit"></select><label><input id="remote" type="checkbox"> Co-op model</label>
   </nav>
-  <div id="cross"></div><p>Move the pointer to inspect camera lag. Switch tools, hold the bow string, or inspect the co-op pose.</p>
+  <div id="cross"></div><p id="status" aria-live="polite">Move the pointer to inspect camera lag. Switch tools, hold the bow string, or inspect the co-op pose.</p>
   <canvas id="game"></canvas><script type="module" src="./weapon-preview.js"></script>
 </body>
 </html>

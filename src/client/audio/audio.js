@@ -209,6 +209,15 @@ export class GameAudio {
     const t = now + 0.005;
     const out = this.#out(o.pos, o.vol ?? 1);
     switch (name) {
+      case 'pistol':
+      case 'rifle':
+        this.#noise(t, 0.10, out, { vol: 0.35, type: 'lowpass', f0: 5500, f1: 400, q: 0.7 });
+        this.#osc('sine', name === 'pistol' ? 180 : 140, 40, t, 0.16, out, 0.55);
+        break;
+      case 'empty':
+      case 'reload':
+        this.#noise(t, name === 'empty' ? 0.035 : 0.16, out, { vol: 0.12, f0: 1800, f1: 600, q: 2 });
+        break;
       case 'bow':
         this.#osc('triangle', 220, 120, t, 0.18, out, 0.5);
         this.#noise(t, 0.09, out, { vol: 0.16, f0: 2200, f1: 900, q: 3 });

@@ -8,6 +8,8 @@ const svg = (body, vb = '0 0 32 32') =>
 const OUT = '#1a2238'; // soft dark outline used on colorful item icons
 
 export const ICONS = {
+  pistol: svg(`<path d="M4 10h23v7H15l-3 12H6l3-12H4z" fill="#596573" stroke="${OUT}" stroke-width="1.2"/><path d="M6 12h18M18 17v5h-5" fill="none" stroke="#abb6bf" stroke-width="1.4"/>`),
+  rifle: svg(`<path d="M2 10h7v3h5v-2h10v3h6v3H19l-2 10h-5l1-9H9v4H3z" fill="#596573" stroke="${OUT}" stroke-width="1.1"/><path d="M17 9h5M11 14h13" stroke="#b5bec5" stroke-width="1.4"/>`),
   heart: svg(`<path d="M16 28 C6 20 2 15.5 2 10.5 2 6.4 5.2 3.5 9 3.5c2.9 0 5.3 1.6 7 4 1.7-2.4 4.1-4 7-4 3.8 0 7 2.9 7 7C30 15.5 26 20 16 28z" fill="#ee4d5f"/>
     <path d="M7.5 8.5c1-1.6 2.6-2 3.8-1.6" stroke="#ff9aa6" stroke-width="2.2" stroke-linecap="round" fill="none"/>`),
 

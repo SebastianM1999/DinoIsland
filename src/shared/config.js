@@ -85,6 +85,8 @@ export const CONFIG = {
       startArrows: 12,
       arrowLifetime: 60,     // seconds an arrow stays on the ground as pickup
     },
+    pistol: { damage: 26, range: 85, cooldown: 0.28, magazine: 12, reserve: 48, reloadTime: 1.25 },
+    rifle: { damage: 19, range: 140, cooldown: 0.12, magazine: 30, reserve: 90, reloadTime: 1.65 },
     trap: {
       startCount: 2,
       maxCount: 3,
