@@ -1,14 +1,23 @@
 // Pteranodon: teal/turquoise membrane wings (lighter underside), cream body,
-// backswept red-orange crest, long pointed beak, a visible finger bone along
-// the wing's leading edge with small clawed fingers at the wrist, short hind
-// legs. Walks on its hind legs with folded wings; the wings are animated by
-// pteraExtraUpdate (flap / glide / dive / folded / limp) since the shared
-// animator has no wing support. Same structure as brachio.js.
+// backswept red-orange crest, long pointed beak, short hind legs. Walks on its
+// hind legs with folded wings; the wings are animated by pteraExtraUpdate
+// (flap / glide / dive / landing flare / folded / limp) since the shared
+// animator has no wing support.
+//
+// The soft body (head-neck-torso-tail, both legs, both wing arms) is ONE set of
+// smooth lofts bound to the joints as a SkinnedMesh (see skin.js), so the neck,
+// shoulders, elbows and knees bend like flesh. Only the rigid anatomy (skull,
+// beak, jaw, eyes, feet, wrist claws) stays as normal meshes on its joint. The
+// wing membrane is still a separate dynamic mesh rebuilt every frame from the
+// posed arm; its leading edge runs along the bone centre line (inside the skinned
+// arm) and its inner edge is buried in the torso, so no gap can show.
 
 import * as THREE from 'three';
-import { place, part, merge, mesh, blob } from '../kit.js';
+import { place, merge, mesh, blob } from '../kit.js';
 import { Rig } from './rig.js';
-import { countershade, chain, sideEyes, claw, birdFoot, tube, V } from './parts.js';
+import { SkinBuilder, loft, restPoint } from './skin.js';
+import { talon } from './theropod.js';
+import { countershade, sideEyes, birdFoot, tube, V } from './parts.js';
 import { DS } from '../../../shared/protocol.js';
 
 const COL = {
@@ -64,9 +73,7 @@ const MAT_BOT = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 
 const SUB = 6, ROWS = 7;
 const COLS = 4 * SUB + 1;
 
-const wingColor = (t, a) => (Math.abs(((a + Math.PI) % (Math.PI * 2)) - Math.PI) > 1.9 ? COL.under : COL.teal);
-
-/** One wing (built pointing +X; the left one is mirrored by its base group). */
+/** One wing (built pointing +X; the left one is mirrored by its base group). The arm itself is skinned later. */
 function buildWing(body, side) {
   const base = new THREE.Group();
   base.position.set(side * 0.15, 0.1, -0.24);
@@ -76,47 +83,32 @@ function buildWing(body, side) {
   const S = new THREE.Group();
   S.rotation.order = 'ZYX';
   base.add(S);
-  S.add(mesh(merge([
-    tube([V(-0.06, 0, 0), V(HUM * 0.5, 0.01, 0.01), V(HUM + 0.04, 0, 0)], (t) => [0.075 - t * 0.02, 0.065 - t * 0.02], { radial: 7, up: V(0, 1, 0), color: wingColor }),
-    place(blob(0.11, 0.09, 0.12, COL.back, { w: 7, h: 5 }), [0.02, 0.02, 0.02]),
-  ])));
-
   const E = new THREE.Group();
   E.rotation.order = 'ZYX';
   E.position.x = HUM;
   S.add(E);
-  E.add(mesh(merge([
-    tube([V(-0.03, 0, 0), V(FORE * 0.5, 0, 0), V(FORE + 0.02, 0, 0)], (t) => [0.055 - t * 0.012, 0.05 - t * 0.012], { radial: 7, color: wingColor }),
-    place(blob(0.06, 0.055, 0.06, COL.tealDark, { w: 6, h: 4 }), [0, 0, 0]),
-  ])));
-
   // wrist + the long wing finger
   const W = new THREE.Group();
   W.rotation.order = 'ZYX';
   W.position.x = FORE;
   E.add(W);
-  const fingers = [];
-  for (let i = 0; i < 3; i++) {
-    const f = tube([V(0, 0, 0), V(0.02, -0.01, -0.06), V(0.03, -0.02, -0.11)], (t) => 0.018 * (1 - t * 0.5), { radial: 5, color: () => COL.main });
-    const c = place(claw(0.055, 0.014, '#e8dcc0', COL.claw), [0.03, -0.02, -0.11], [0, 0, 0]);
-    fingers.push(place(merge([f, c]), [0.02, 0.01 - i * 0.02, -0.02], [0, -0.35 + i * 0.35, 0]));
-  }
-  W.add(mesh(merge([
-    place(blob(0.065, 0.055, 0.07, COL.tealDark, { w: 7, h: 5 }), [0, 0, 0]),
-    tube([V(0, 0.005, 0), V(FIN1 * 0.5, 0.012, 0.005), V(FIN1 + 0.02, 0.008, 0)], (t) => [0.04 - t * 0.01, 0.036 - t * 0.008], { radial: 6, color: () => COL.bone }),
-    place(blob(0.035, 0.03, 0.035, COL.main), [FIN1, 0.008, 0]),
-    ...fingers,
-  ])));
-
   const F = new THREE.Group();
   F.rotation.order = 'ZYX';
   F.position.x = FIN1;
   W.add(F);
-  F.add(mesh(tube([V(0, 0.008, 0), V(FIN2 * 0.55, 0.01, 0.01), V(FIN2, 0.004, 0.035)], (t) => [0.03 - t * 0.024, 0.028 - t * 0.022], { radial: 6, color: () => COL.bone })));
+
+  // wrist knob and the three small clawed fingers (rigid, they stick out of the skin)
+  const fingers = [];
+  for (let i = 0; i < 3; i++) {
+    const f = tube([V(0, 0, 0), V(0.008, -0.004, -0.05), V(0.016, -0.012, -0.095)], (t) => 0.017 * (1 - t * 0.45), { radial: 5, color: () => COL.main });
+    const c = place(talon(0.06, 0.013, '#efe4cc', COL.claw), [0.016, -0.012, -0.095]);
+    fingers.push(place(merge([f, c]), [0.0, 0.0 - i * 0.012, -0.03], [0, -0.42 + i * 0.42, 0]));
+  }
+  W.add(mesh(merge([place(blob(0.056, 0.05, 0.06, COL.tealDark, { w: 8, h: 6 }), [0, 0, -0.012]), ...fingers])));
 
   // membrane anchor points: [joint, local offset] along the leading and trailing edges
   const L = [[S, V(0, 0, 0)], [E, V(0, 0, 0)], [W, V(0, 0, 0)], [F, V(0, 0, 0)], [F, V(FIN2, 0, 0.035)]];
-  const T = [[base, V(0.02, -0.05, 0.5)], [S, V(0.4, 0, 0.62)], [E, V(0.6, 0, 0.6)], [W, V(0.65, 0, 0.42)], [F, V(0.62, 0, 0.18)]];
+  const T = [[base, V(-0.12, -0.07, 0.46)], [S, V(0.4, 0, 0.62)], [E, V(0.6, 0, 0.6)], [W, V(0.65, 0, 0.42)], [F, V(0.62, 0, 0.18)]];
   // smooth, subdivided membrane: shared position + normal buffers, rebuilt per frame
   const nv = COLS * (ROWS + 1);
   const pos = new THREE.BufferAttribute(new Float32Array(nv * 3), 3);
@@ -220,37 +212,141 @@ function updateMembrane(w) {
   w.top.geometry.attributes.normal.needsUpdate = true;
 }
 
+const lerp = (a, b, t) => a + (b - a) * t;
+const sstep = (e0, e1, x) => { const k = Math.min(1, Math.max(0, (x - e0) / (e1 - e0))); return k * k * (3 - 2 * k); };
+/** Piecewise profile through keys [pos, a, b] (pos ascending) with smoothstep between the keys. */
+function profile(keys, x) {
+  if (x <= keys[0][0]) return [keys[0][1], keys[0][2]];
+  for (let i = 1; i < keys.length; i++) {
+    if (x <= keys[i][0]) {
+      const k = sstep(keys[i - 1][0], keys[i][0], x);
+      return [lerp(keys[i - 1][1], keys[i][1], k), lerp(keys[i - 1][2], keys[i][2], k)];
+    }
+  }
+  const l = keys[keys.length - 1];
+  return [l[1], l[2]];
+}
+const vang = (a) => Math.abs(((a + Math.PI) % (Math.PI * 2)) - Math.PI);
+
+/** Joint chain without geometry (the skin covers it). dir: 'fwd' (-Z) or 'back' (+Z). */
+function jointChain(parent, segs, dir) {
+  const joints = [];
+  let p = parent;
+  segs.forEach((g, i) => {
+    const j = new THREE.Group();
+    if (i > 0) j.position.z = (dir === 'fwd' ? -1 : 1) * segs[i - 1].len;
+    j.rotation.set(g.rx || 0, g.ry || 0, g.rz || 0);
+    p.add(j);
+    joints.push(j);
+    p = j;
+  });
+  return joints;
+}
+
+// Head geometry (head-local: -Z forward, +Y up). The skull and the beak are ONE smooth tube.
+const SK = { back: 0.13, tip: -0.86, mouthY: -0.02, hinge: 0.05 };
+const SK_LEN = SK.back - SK.tip;
+/** Mouth line height at z: flat, tilting up a little toward the beak tip. */
+const mouthAt = (z) => SK.mouthY + 0.045 * Math.pow(sstep(-0.35, SK.tip, z), 1.6);
+/** Skull/beak half-width and half-height at z (keys by -z ascending). */
+const SKULL_KEYS = [[-0.13, 0.072, 0.082], [-0.06, 0.092, 0.105], [0.04, 0.09, 0.098], [0.14, 0.066, 0.072], [0.3, 0.046, 0.05], [0.55, 0.03, 0.03], [0.78, 0.013, 0.012], [0.86, 0.005, 0.005]];
+const skullAt = (z) => profile(SKULL_KEYS, -z);
+// the beak sits on the mouth line, the skull is centred higher
+const skullY = (z) => {
+  const ry = skullAt(z)[1];
+  return lerp(0.03, mouthAt(z) + ry, sstep(-0.05, -0.3, z));
+};
+const JAW_KEYS = [[-0.03, 0.04, 0.03], [0.15, 0.042, 0.03], [0.4, 0.028, 0.02], [0.7, 0.012, 0.011], [0.81, 0.005, 0.005]];
+
+function buildHead(head, headColor) {
+  const pts = [];
+  const N = 9;
+  for (let i = 0; i <= N; i++) {
+    const z = SK.back - (i / N) * SK_LEN;
+    pts.push(V(0, skullY(z), z));
+  }
+  const cBeak = new THREE.Color(COL.beak), cTip = new THREE.Color(COL.beakTip), cLow = new THREE.Color('#f7dc86');
+  const cCrest = new THREE.Color(COL.crest), cCrestTip = new THREE.Color(COL.crestTip);
+  const out = new THREE.Color();
+  const skull = tube(pts, (t) => skullAt(SK.back - t * SK_LEN), {
+    radial: 8,
+    color: (t, a, p) => {
+      out.copy(headColor(t, a));
+      out.lerp(vang(a) > 2.2 ? cLow : cBeak, sstep(-0.1, -0.24, p.z));
+      return out.lerp(cTip, sstep(-0.62, -0.84, p.z));
+    },
+  });
+  // backswept blade crest, rooted inside the skull
+  const crest = tube([V(0, 0.06, -0.03), V(0, 0.11, 0.12), V(0, 0.19, 0.32), V(0, 0.25, 0.54)], (t) => [0.03 * (1 - t) + 0.006, 0.07 * (1 - t * 0.85) + 0.008], {
+    radial: 6, up: V(0, 1, 0), color: (t) => out.copy(cCrest).lerp(cCrestTip, sstep(0.55, 0.95, t)),
+  });
+  const nostrils = merge([-1, 1].map((s) => place(blob(0.011, 0.008, 0.03, '#3a2a1a', { w: 6, h: 4 }), [s * 0.028, skullY(-0.3) + 0.03, -0.3], [0.1, 0, 0])));
+  head.add(mesh(merge([skull, crest, nostrils])));
+  const lids = sideEyes(head, { x: 0.078, y: 0.04, z: -0.005, size: 0.042, iris: '#e3a21c', lid: COL.back, yaw: 0.3 });
+
+  // lower jaw: a slim tube hanging off the mouth line
+  const jaw = new THREE.Group();
+  jaw.position.set(0, mouthAt(SK.hinge), SK.hinge);
+  head.add(jaw);
+  const jpts = [];
+  for (let i = 0; i <= 6; i++) {
+    const zr = 0.03 - (i / 6) * 0.84;
+    const ry = profile(JAW_KEYS, -zr)[1];
+    jpts.push(V(0, mouthAt(SK.hinge + zr) - mouthAt(SK.hinge) - ry, zr));
+  }
+  jaw.add(mesh(tube(jpts, (t) => profile(JAW_KEYS, t * 0.84 - 0.03), {
+    radial: 6, color: (t, a) => out.set(vang(a) > 2.0 ? '#f7dc86' : COL.beak).lerp(cTip, sstep(0.75, 0.97, t)),
+  })));
+  return { jaw, lids };
+}
+
 export function buildPtera() {
   const rig = new Rig();
   const body = rig.body;
   body.position.set(0, 0.68, 0);
   body.rotation.x = GROUND_PITCH;
 
-  // ---- torso: small, deep chest, cream with a teal saddle
+  // ---- skeleton (the skin covers it)
   const chest = new THREE.Group();
   body.add(chest);
   rig.chest = chest;
-  const bodyColor = countershade({ main: COL.main, back: COL.back, belly: COL.belly, bellyFrom: 2.2, backTo: 0.55 });
-  const torso = tube([V(0, 0.0, 0.52), V(0, 0.0, 0.26), V(0, 0.02, -0.08), V(0, 0.05, -0.36)], (t) => {
-    const r = t < 0.35 ? 0.07 + t * 0.34 : t < 0.75 ? 0.19 + (t - 0.35) * 0.08 : 0.222 - (t - 0.75) * 0.3;
-    return [r * 0.95, r * 1.08];
-  }, { radial: 10, color: bodyColor, smoothColors: true });
-  const keel = place(blob(0.13, 0.12, 0.16, COL.belly, { w: 8, h: 5 }), [0, -0.1, -0.22]);
-  chest.add(mesh(merge([torso, keel])));
 
-  // ---- legs (short, bird-like feet)
+  // short tail stub
+  const tailBase = new THREE.Group();
+  tailBase.position.set(0, 0.0, 0.5);
+  body.add(tailBase);
+  const TAIL = [{ len: 0.14, r0: 0.05, r1: 0.032 }, { len: 0.12, r0: 0.032, r1: 0.009 }];
+  rig.tail = jointChain(tailBase, TAIL, 'back');
+
+  // neck: three links with a gentle S, the head hangs off the last
+  const neckBase = new THREE.Group();
+  neckBase.position.set(0, 0.08, -0.33);
+  chest.add(neckBase);
+  const NECK = [
+    { len: 0.17, rx: 0.3, r: 0.1 },
+    { len: 0.17, rx: 0.12, r: 0.08 },
+    { len: 0.15, rx: 0.03, r: 0.064 },
+  ];
+  rig.neck = jointChain(neckBase, NECK, 'fwd');
+  const head = new THREE.Group();
+  head.position.set(0, 0, -NECK[NECK.length - 1].len);
+  head.rotation.x = -0.95;
+  rig.neck[NECK.length - 1].add(head);
+  rig.head = head;
+  const headColor = countershade({ main: COL.main, back: COL.back, belly: COL.belly, bellyFrom: 2.0, backTo: 0.7 });
+  const { jaw, lids } = buildHead(head, headColor);
+  rig.jaw = jaw;
+  rig.eyelids.push(lids);
+
+  // legs (short, bird-like feet)
   const mkLeg = (x) => {
     const hip = new THREE.Group();
     hip.position.set(x, -0.08, 0.22);
     body.add(hip);
     const l1 = 0.27, l2 = 0.27;
-    hip.add(mesh(merge([
-      tube([V(0, 0.05, 0), V(0, -l1 * 0.5, 0), V(0, -l1 - 0.02, 0)], (t) => [0.065 - t * 0.025, 0.07 - t * 0.025], { radial: 7, up: V(0, 0, -1), color: () => COL.main }),
-    ])));
     const knee = new THREE.Group();
     knee.position.y = -l1;
     hip.add(knee);
-    knee.add(mesh(tube([V(0, 0.02, 0), V(0, -l2 * 0.5, 0), V(0, -l2, 0)], (t) => 0.035 - t * 0.01, { radial: 6, up: V(0, 0, -1), color: () => COL.leg })));
     const foot = new THREE.Group();
     foot.position.y = -l2;
     knee.add(foot);
@@ -261,60 +357,7 @@ export function buildPtera() {
   LL.offset = 0; RL.offset = 0.5;
   rig.legs.push(LL, RL);
 
-  // ---- short tail stub
-  const tailBase = new THREE.Group();
-  tailBase.position.set(0, 0.0, 0.5);
-  body.add(tailBase);
-  rig.tail = chain(tailBase, [
-    { len: 0.14, r0: 0.06, r1: 0.035 },
-    { len: 0.12, r0: 0.035, r1: 0.01 },
-  ], { dir: 'back', color: countershade({ main: COL.main, back: COL.back, belly: COL.belly }), radial: 6, capFirst: false });
-
-  // ---- neck
-  const neckBase = new THREE.Group();
-  neckBase.position.set(0, 0.08, -0.33);
-  body.add(neckBase);
-  const neckSegs = [
-    { len: 0.2, r0: [0.1, 0.11], r1: [0.075, 0.08], rx: 0.35 },
-    { len: 0.18, r0: [0.075, 0.08], r1: [0.06, 0.065], rx: 0.1 },
-  ];
-  rig.neck = chain(neckBase, neckSegs, { dir: 'fwd', color: countershade({ main: COL.main, back: COL.back, belly: COL.belly, bellyFrom: 1.8, backTo: 0.5 }), radial: 8, capFirst: false });
-
-  // ---- head: long pointed beak, backswept crest
-  const head = new THREE.Group();
-  head.position.set(0, 0, -neckSegs[1].len);
-  head.rotation.x = -0.95;
-  rig.neck[1].add(head);
-  rig.head = head;
-  const headColor = countershade({ main: COL.main, back: COL.back, belly: COL.belly, bellyFrom: 2.0, backTo: 0.7 });
-  const skull = tube([V(0, 0.0, 0.12), V(0, 0.03, -0.02), V(0, 0.02, -0.14)], (t) => [0.085 - t * 0.02, 0.1 - t * 0.02], { radial: 8, color: headColor });
-  const upperBeak = tube([V(0, 0.02, -0.1), V(0, 0.0, -0.36), V(0, -0.03, -0.62), V(0, -0.06, -0.8)], (t) => [0.06 * (1 - t) + 0.004, 0.055 * (1 - t) + 0.004], {
-    radial: 6, color: (t) => (t > 0.8 ? COL.beakTip : COL.beak),
-  });
-  const crest = tube([V(0, 0.07, 0.02), V(0, 0.14, 0.2), V(0, 0.22, 0.4), V(0, 0.3, 0.56)], (t) => [0.03 - t * 0.022, 0.085 - t * 0.07], {
-    radial: 6, color: (t) => (t > 0.7 ? COL.crestTip : COL.crest),
-  });
-  const crestBase = place(blob(0.06, 0.06, 0.1, COL.crest, { w: 6, h: 4 }), [0, 0.08, 0.02]);
-  const nostrils = merge([
-    place(blob(0.012, 0.01, 0.03, '#3a2a1a'), [-0.035, 0.03, -0.3]),
-    place(blob(0.012, 0.01, 0.03, '#3a2a1a'), [0.035, 0.03, -0.3]),
-  ]);
-  const cheeks = merge([
-    place(blob(0.04, 0.035, 0.06, COL.main), [-0.07, -0.04, -0.02]),
-    place(blob(0.04, 0.035, 0.06, COL.main), [0.07, -0.04, -0.02]),
-  ]);
-  head.add(mesh(merge([skull, upperBeak, crest, crestBase, nostrils, cheeks])));
-  rig.eyelids.push(sideEyes(head, { x: 0.075, y: 0.035, z: 0.0, size: 0.04, iris: '#e3a21c', lid: COL.back, yaw: 0.3 }));
-
-  const jaw = new THREE.Group();
-  jaw.position.set(0, -0.045, 0.02);
-  head.add(jaw);
-  rig.jaw = jaw;
-  jaw.add(mesh(tube([V(0, 0, 0.04), V(0, -0.02, -0.2), V(0, -0.03, -0.5), V(0, -0.035, -0.7)], (t) => [0.05 * (1 - t) + 0.004, 0.028 * (1 - t) + 0.004], {
-    radial: 6, color: (t) => (t > 0.8 ? COL.beakTip : COL.beak),
-  })));
-
-  // ---- wings
+  // wings
   const right = buildWing(body, 1);
   const left = buildWing(body, -1);
   rig.wings = { left: left.joints, right: right.joints, sides: [left, right] };
@@ -325,7 +368,7 @@ export function buildPtera() {
   rig.hitZones.push({ zone: 'head', joint: head, offset: V(0, 0.18, 0.32), radius: 0.12 });
   rig.hitZones.push({ zone: 'body', joint: body, offset: V(0, 0.02, -0.05), radius: 0.3 });
   rig.hitZones.push({ zone: 'body', joint: body, offset: V(0, 0.0, 0.32), radius: 0.2 });
-  rig.hitZones.push({ zone: 'body', joint: rig.neck[0], offset: V(0, 0, -0.15), radius: 0.14 });
+  rig.neck.forEach((j, i) => rig.hitZones.push({ zone: 'body', joint: j, offset: V(0, 0, -NECK[i].len * 0.5), radius: NECK[i].r * 1.6 }));
   for (const w of [left, right]) {
     const [S, E, Wr, F] = w.joints;
     rig.hitZones.push({ zone: 'wing', joint: S, offset: V(0.28, 0, 0.26), radius: 0.3 });
@@ -336,18 +379,102 @@ export function buildPtera() {
     rig.hitZones.push({ zone: 'wing', joint: F, offset: V(0.72, 0, 0.04), radius: 0.14 });
   }
 
-  // start folded
+  // bind the skin with the wings outstretched (straight arms), then fold them
+  const neutral = new Float32Array(12);
+  applyWingPose(rig, neutral, neutral);
+  rig.finalize({ gaps: false });
+  buildSkin(rig, { neckBase, tailBase, NECK, TAIL, headColor });
+  rig.fillHitGaps();
   const pose = new Float32Array(12);
   foldedPose(pose, 0);
   applyWingPose(rig, pose, pose);
-  rig.finalize();
   for (const w of rig.wings.sides) {
     // finalize() enables shadows on every mesh; the membrane must not shadow itself
     w.bot.castShadow = false;
     w.top.receiveShadow = w.bot.receiveShadow = false;
-    updateMembrane(w);
   }
+  rig.root.updateMatrixWorld(true);
+  for (const w of rig.wings.sides) updateMembrane(w);
   return rig;
+}
+
+/** The soft body as skinned lofts: head-neck-torso-tail, a loft per leg and per wing arm. */
+function buildSkin(rig, { neckBase, tailBase, NECK, TAIL, headColor }) {
+  const root = rig.root, body = rig.body, chest = rig.chest, head = rig.head;
+  const at = (obj, x = 0, y = 0, z = 0) => restPoint(root, obj, [x, y, z]);
+  const skin = new SkinBuilder(root);
+
+  // ---- main body loft: head (hidden in the skull) -> neck -> torso -> tail
+  const st = [];
+  const add = (p, rx, ry, bone, rb = ry) => st.push({ p, rx, ry, rb, bone });
+  add(at(head, 0, 0.03, -0.06), 0.055, 0.062, head);
+  add(at(head, 0, 0.03, 0.07), 0.075, 0.085, head);
+  for (let i = NECK.length - 1; i >= 0; i--) {
+    const r = NECK[i].r;
+    add(at(rig.neck[i], 0, 0, -NECK[i].len * 0.5), r * 0.92, r, rig.neck[i], r * 1.08);
+  }
+  add(at(neckBase), 0.13, 0.13, chest, 0.145);
+  // torso: deep chest with a keel, tapering into the hips (z, y, half width, half height above, below)
+  for (const [z, y, rx, ry, rb, b] of [
+    [-0.17, 0.03, 0.17, 0.165, 0.215, chest],
+    [-0.01, 0.02, 0.19, 0.18, 0.22, chest],
+    [0.15, 0.0, 0.16, 0.145, 0.16, body],
+    [0.31, 0.0, 0.1, 0.092, 0.092, body],
+  ]) add(at(body, 0, y, z), rx, ry, b, rb);
+  // tail stub
+  add(at(tailBase), TAIL[0].r0, TAIL[0].r0, body);
+  TAIL.forEach((g, i) => {
+    const r = (g.r0 + g.r1) / 2;
+    add(at(rig.tail[i], 0, 0, g.len * 0.5), r, r, rig.tail[i]);
+  });
+  const lt = TAIL.length - 1;
+  add(at(rig.tail[lt], 0, 0, TAIL[lt].len), TAIL[lt].r1, TAIL[lt].r1, rig.tail[lt]);
+  skin.loft(loft(st, { radial: 22, segs: 7, color: headColor, capStart: true, capEnd: true, dome: 0.8 }));
+
+  // ---- legs: two stations per bone keep the bones firm, the skin blends only across knee and foot
+  for (const leg of rig.legs) {
+    const ls = [];
+    const push = (p, rx, ry, bone, rb = ry) => ls.push({ p, rx, ry, rb, bone });
+    push(at(leg.hip, 0, 0.13, 0), 0.07, 0.075, body);
+    push(at(leg.hip, 0, -leg.l1 * 0.3, 0), 0.066, 0.076, leg.hip);
+    push(at(leg.hip, 0, -leg.l1 * 0.6, 0), 0.05, 0.056, leg.hip);
+    push(at(leg.hip, 0, -leg.l1 * 0.93, 0), 0.04, 0.045, leg.hip);
+    push(at(leg.knee, 0, -leg.l2 * 0.1, 0), 0.04, 0.044, leg.knee);
+    push(at(leg.knee, 0, -leg.l2 * 0.5, 0), 0.03, 0.032, leg.knee);
+    push(at(leg.knee, 0, -leg.l2 * 0.95, 0), 0.024, 0.026, leg.knee);
+    push(at(leg.foot, 0, -0.012, 0), 0.022, 0.024, leg.foot);
+    skin.loft(loft(ls, { up: V(0, 0, -1), radial: 12, segs: 5, color: (t) => (t < 0.3 ? COL.main : COL.leg), dome: 0.7 }));
+  }
+
+  // ---- wing arms: root buried in the shoulder, blends into the torso
+  const cBack = new THREE.Color(COL.back), cTeal = new THREE.Color(COL.teal), cDark = new THREE.Color(COL.tealDark), cBone = new THREE.Color(COL.bone);
+  const cUnder = new THREE.Color(COL.under), cMain = new THREE.Color(COL.main), cMix = new THREE.Color(), out = new THREE.Color();
+  const armColor = (t, a) => {
+    out.copy(cBack).lerp(cTeal, sstep(0.02, 0.12, t)).lerp(cDark, sstep(0.25, 0.5, t)).lerp(cBone, sstep(0.5, 0.75, t));
+    // the underside starts out cream like the belly and turns pale teal like the membrane underside
+    cMix.copy(cMain).lerp(cUnder, sstep(0.1, 0.3, t));
+    return out.lerp(cMix, sstep(1.6, 2.4, vang(a)) * (1 - sstep(0.4, 0.6, t)));
+  };
+  for (const w of rig.wings.sides) {
+    const [S, E, Wr, F] = w.joints;
+    const as = [];
+    const push = (p, rx, ry, bone) => as.push({ p, rx, ry, rb: ry, bone });
+    push(at(w.base, -0.07, 0, 0), 0.085, 0.085, body);
+    push(at(S, 0.05, 0, 0), 0.092, 0.084, S);
+    push(at(S, 0.3, 0, 0), 0.078, 0.07, S);
+    push(at(S, HUM * 0.9, 0, 0), 0.066, 0.062, S);
+    push(at(E, 0.06, 0, 0), 0.06, 0.058, E);
+    push(at(E, FORE * 0.45, 0, 0), 0.054, 0.05, E);
+    push(at(E, FORE * 0.92, 0, 0), 0.05, 0.048, E);
+    push(at(Wr, 0.06, 0, 0), 0.046, 0.042, Wr);
+    push(at(Wr, FIN1 * 0.5, 0, 0), 0.038, 0.034, Wr);
+    push(at(Wr, FIN1 * 0.9, 0, 0), 0.033, 0.03, Wr);
+    push(at(F, 0.07, 0, 0), 0.03, 0.027, F);
+    push(at(F, FIN2 * 0.55, 0, 0.012), 0.02, 0.018, F);
+    push(at(F, FIN2 * 0.96, 0.002, 0.034), 0.01, 0.009, F);
+    skin.loft(loft(as, { radial: 14, segs: 5, color: armColor, capStart: true, capEnd: true, dome: 0.9 }));
+  }
+  rig.skin = skin.build();
 }
 
 // ---------------------------------------------------------------------------
@@ -357,10 +484,12 @@ export function buildPtera() {
 function setJ(p, j, x, y, z) { p[j * 3] = x; p[j * 3 + 1] = y; p[j * 3 + 2] = z; }
 
 function foldedPose(p, t) {
-  setJ(p, 0, -0.2, -1.2, 0.55);
-  setJ(p, 1, 0.1, 2.55, -0.35);
-  setJ(p, 2, -0.1, -2.75, 0.2);
-  setJ(p, 3, 0, -0.08, 0.02 + Math.sin(t * 1.1) * 0.01);
+  // Z-fold like a real pterosaur: elbow out and back, wrist up front, the wing finger folded back along the flank
+  const br = Math.sin(t * 1.1) * 0.012;
+  setJ(p, 0, -0.1, -1.3, 0.3 + br);
+  setJ(p, 1, 0, 2.65, -0.2);
+  setJ(p, 2, 0, -2.92, 0.1);
+  setJ(p, 3, 0, 3.0, br);
 }
 
 function glidePose(p, t) {
@@ -371,12 +500,14 @@ function glidePose(p, t) {
   setJ(p, 3, 0, -0.06, 0.1 + s * 0.8);
 }
 
-function flapPose(p, ph) {
+function flapPose(p, ph0, k = 1) {
+  // quicker upstroke than downstroke; every joint lags the one before, so a wave runs out to the tip
+  const ph = ph0 + 0.22 * Math.sin(ph0);
   const up = Math.max(0, Math.cos(ph));   // upstroke: fold the wing a little
-  setJ(p, 0, -0.12 * Math.cos(ph), 0.12 - up * 0.1, 0.12 + 0.62 * Math.sin(ph));
-  setJ(p, 1, 0, -0.06 + up * 0.3, 0.2 * Math.sin(ph - 0.7));
-  setJ(p, 2, 0, -0.14 - up * 0.55, 0.26 * Math.sin(ph - 1.3));
-  setJ(p, 3, 0, -0.06 - up * 0.1, 0.1 + 0.22 * Math.sin(ph - 1.9));
+  setJ(p, 0, -0.14 * Math.cos(ph) * k, 0.12 - up * 0.1 * k, 0.12 + 0.66 * k * Math.sin(ph));
+  setJ(p, 1, 0, -0.06 + up * 0.3 * k, 0.3 * k * Math.sin(ph - 0.8));
+  setJ(p, 2, 0, -0.14 - up * 0.55 * k, 0.36 * k * Math.sin(ph - 1.5));
+  setJ(p, 3, 0, -0.06 - up * 0.1 * k, 0.1 + 0.3 * k * Math.sin(ph - 2.2));
 }
 
 function divePose(p, t) {
@@ -418,7 +549,7 @@ export function pteraExtraUpdate(view, dt) {
   if (!s) {
     s = view._wing = {
       t: Math.random() * 10, ph: 0, vy: 0, lastY: view.pos.y,
-      fly: 0, dive: 0, fold: 1, dead: 0, flap: 1, cycleT: 0, struggle: 0, display: 0,
+      fly: 0, dive: 0, fold: 1, dead: 0, flap: 1, cycleT: 0, struggle: 0, display: 0, flare: 0, launch: 0, walk: 0,
       cur: new Float32Array(12), curL: new Float32Array(12), init: false,
     };
   }
@@ -446,17 +577,27 @@ export function pteraExtraUpdate(view, dt) {
   s.struggle = damp(s.struggle, st === DS.TRAPPED ? 1 : 0, 5, dt);
   s.display = damp(s.display, !airborne && !dead && anim && (anim.c.attack > 0.3 || anim.c.roar > 0.3 || st === DS.ALERT) ? 1 : 0, 5, dt);
 
+  // landing flare (sinking close to the ground: wings spread and beating, nose up, feet reaching down)
+  // and take-off (climbing out low: deep, powerful strokes)
+  const clearance = terrain ? view.pos.y - terrain.heightAt(view.pos.x, view.pos.z) : 99;
+  const low = airborne && st !== DS.DIVE && clearance < 4.5;
+  s.flare = damp(s.flare, low && s.vy < -0.25 ? 1 : 0, 4, dt);
+  s.launch = damp(s.launch, low && s.vy > 0.5 ? 1 : 0, 4, dt);
+  const walkAmp = anim && !airborne && !dead ? anim.amp * (1 - anim.trapped) : 0;
+  s.walk = damp(s.walk, walkAmp, 6, dt);
+
   // flap vs glide: flap while climbing, glide while sinking, else alternate
   s.cycleT += dt;
   const cyc = s.cycleT % 5.2;
   let flapT = cyc < 2.6 ? 1 : 0;   // ~4 beats, then a glide
   if (s.vy > 0.4) flapT = 1;
   else if (s.vy < -0.9) flapT = 0;
+  flapT = Math.max(flapT, s.flare, s.launch);
   s.flap = damp(s.flap, flapT, 1.8, dt);
-  s.ph += dt * Math.PI * 2 * (1.55 + 0.25 * s.flap);
+  s.ph += dt * Math.PI * 2 * (1.55 + 0.25 * s.flap + 0.5 * Math.max(s.flare, s.launch));
 
   // ---- target wing pose = weighted blend of the pose library
-  flapPose(_pf, s.ph);
+  flapPose(_pf, s.ph, 1 + 0.3 * Math.max(s.flare, s.launch));
   glidePose(_pg, s.t);
   divePose(_pd, s.t);
   limpPose(_pl);
@@ -470,6 +611,7 @@ export function pteraExtraUpdate(view, dt) {
     // half-open threat display / trapped flailing on the ground
     const open = Math.max(s.display * 0.55, s.struggle * (0.45 + 0.35 * Math.sin(s.t * 11)));
     ground += (_pg[i] - ground) * open;
+    if (i === 2 && s.walk > 0.01) ground += Math.sin(anim.phase * Math.PI * 2) * 0.05 * s.walk;
     cur[i] = air * wf + _pd[i] * wd + ground * wo + _pl[i] * wx;
   }
   if (s.struggle > 0.01) cur[2] += s.struggle * Math.sin(s.t * 14) * 0.35;
@@ -481,22 +623,41 @@ export function pteraExtraUpdate(view, dt) {
 
   // ---- flight posture: level body, legs tucked back, bank into turns
   const air = Math.min(1, s.fly + s.dive);
+  const beat = Math.max(s.flare, s.launch);
   if (air > 0.001) {
-    const flapBob = -Math.sin(s.ph) * 0.07 * s.flap * s.fly;
+    const fl = s.flap * s.fly;
+    const flapBob = -Math.sin(s.ph) * (0.07 + 0.03 * beat) * fl;
     rig.body.position.y += ((rig.bodyRestY + flapBob) - rig.body.position.y) * air;
     const climb = Math.max(-0.35, Math.min(0.35, s.vy * 0.05)) * s.fly;
-    rig.body.rotation.x += -GROUND_PITCH * air + climb - 0.55 * s.dive;
+    // nose up for the landing flare / take-off, dips a little with each downstroke
+    rig.body.rotation.x += -GROUND_PITCH * air + climb - 0.55 * s.dive + 0.45 * s.flare * s.fly + 0.05 * Math.sin(s.ph - 0.4) * fl;
     const bank = Math.max(-0.6, Math.min(0.6, (anim?.yawRate || 0) * 0.35));
-    rig.body.rotation.z += (bank - rig.body.rotation.z) * air;
-    // neck stretches forward, head stays level
-    rig.neck[0].rotation.x -= 0.2 * air;
-    rig.head.rotation.x += 0.55 * air - 0.2 * s.dive;
+    const sway = Math.sin(s.t * 0.9) * 0.025 * (1 - fl);
+    rig.body.rotation.z += (bank + sway - rig.body.rotation.z) * air;
+    // neck stretches forward, head stays level (the neck ripples against the wing beat)
+    rig.neck.forEach((j, i) => {
+      j.rotation.x -= (0.2 / rig.neck.length) * air;
+      j.rotation.x += 0.05 * Math.sin(s.ph - 0.6 - i * 0.5) * fl;
+    });
+    rig.head.rotation.x += 0.55 * air - 0.2 * s.dive - 0.35 * s.flare * s.fly - 0.04 * Math.sin(s.ph - 1.6) * fl;
+    const legAir = air * (1 - 0.85 * s.flare);   // landing gear comes down for the flare
     for (const leg of rig.legs) {
-      leg.hip.rotation.x += (LEG_AIR[0] - leg.hip.rotation.x) * air;
-      leg.knee.rotation.x += (LEG_AIR[1] - leg.knee.rotation.x) * air;
-      leg.foot.rotation.x += (LEG_AIR[2] - leg.foot.rotation.x) * air;
+      leg.hip.rotation.x += (LEG_AIR[0] - leg.hip.rotation.x) * legAir;
+      leg.knee.rotation.x += (LEG_AIR[1] - leg.knee.rotation.x) * legAir;
+      leg.foot.rotation.x += (LEG_AIR[2] - leg.foot.rotation.x) * legAir;
+      leg.hip.rotation.x += 0.1 * Math.sin(s.ph - 1.2 - leg.offset) * fl * legAir;
+      leg.knee.rotation.x += 0.08 * Math.sin(s.ph - 1.8) * fl * legAir;
     }
-    for (const j of rig.tail) j.rotation.y *= 1 - air * 0.7;
+    rig.tail.forEach((j, i) => {
+      j.rotation.y *= 1 - air * 0.7;
+      j.rotation.x += air * (0.12 * Math.sin(s.ph - 1.2 - i * 0.6) * fl - 0.1 * s.dive);
+    });
+  }
+  // walking: the head pecks forward with every step like a wading bird
+  if (s.walk > 0.01) {
+    const bobPh = anim.phase * Math.PI * 2 * 2;
+    rig.neck.forEach((j, i) => { j.rotation.x += Math.sin(bobPh - i * 0.5) * 0.07 * s.walk; });
+    rig.head.rotation.x += Math.sin(bobPh - 1.5) * 0.08 * s.walk;
   }
   // dead: lie mostly on the belly with the wings spread instead of rolling over
   if (s.dead > 0.001) {
