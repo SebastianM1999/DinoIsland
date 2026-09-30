@@ -59,7 +59,7 @@ export function buildRuins(r, biome) {
   };
   const warp = (amt, s) => (v) => { v.x += noise3(v.x * 2 + s, v.y * 2, v.z * 2, seed) * amt; v.y += noise3(v.x * 2, v.y * 2 + s, v.z * 2, seed + 1) * amt * 0.6; v.z += noise3(v.x * 2, v.y * 2, v.z * 2 + s, seed + 2) * amt; };
   const block = (w, h, d, pos, rot = [0, 0, 0], s = 1) => {
-    const g = roundedBox(w, h, d, Math.min(0.07, h * 0.25), stone(pos, 0.92 + 0.12 * rng()), warp(0.025, s));
+    const g = roundedBox(w, h, d, Math.min(0.07, h * 0.25), stone(pos, 0.92 + 0.12 * rng()), warp(0.025, s), h < 0.25);
     return place(g, pos, rot);
   };
 
@@ -69,7 +69,7 @@ export function buildRuins(r, biome) {
     const x = gx * step + ((gz % 2) ? step * 0.5 : 0), z = gz * step;
     if (Math.hypot(x, z) > RUINS_RADIUS - 0.4) continue;
     if (Math.abs(x) < 1.2 && Math.abs(z) < 1.2) continue;           // under the altar
-    if (rng() < 0.17) continue;                                     // missing slab (grass shows)
+    if (rng() < 0.36) continue;                                     // missing slab (grass shows)
     const tilt = rng() < 0.2 ? 0.06 : 0.015;
     std.push(block(1.26 + rng() * 0.06, 0.18, 1.26 + rng() * 0.06, [x, 0.0 + rng() * 0.03, z], [(rng() - 0.5) * tilt, (rng() - 0.5) * 0.08, (rng() - 0.5) * tilt], rng() * 9));
   }
@@ -100,12 +100,12 @@ export function buildRuins(r, biome) {
   const pillar = (p) => {
     const parts = [];
     parts.push(block(1.15, 0.32, 1.15, [0, 0.16, 0]));
-    parts.push(place(paint(new THREE.TorusGeometry(0.45, 0.07, 8, 28), stone([p.x, 0, p.z])), [0, 0.36, 0], [Math.PI / 2, 0, 0]));
+    parts.push(place(paint(new THREE.TorusGeometry(0.45, 0.07, 6, 24), stone([p.x, 0, p.z])), [0, 0.36, 0], [Math.PI / 2, 0, 0]));
     const h = p.h - 0.32;
     const broken = p.state !== 'full';
     parts.push(place(paint(shaftGeo(h - (broken ? 0 : 0.3), p.r, broken, p.x * 3.1), drumSeams(h)), [0, 0.32, 0]));
     if (!broken) {
-      parts.push(place(paint(new THREE.TorusGeometry(0.42, 0.08, 8, 28), stone([p.x, p.h, p.z])), [0, p.h - 0.34, 0], [Math.PI / 2, 0, 0]));
+      parts.push(place(paint(new THREE.TorusGeometry(0.42, 0.08, 6, 24), stone([p.x, p.h, p.z])), [0, p.h - 0.34, 0], [Math.PI / 2, 0, 0]));
       parts.push(block(1.05, 0.3, 1.05, [0, p.h - 0.15, 0]));
     }
     return merge(parts);
@@ -118,7 +118,7 @@ export function buildRuins(r, biome) {
       const len = 0.8 + rng() * 0.6;
       std.push(place(paint(shaftGeo(len, p.r, true, a), stone([p.x, 0, p.z])), [p.x + Math.cos(a) * 1.1, p.r * 0.95, p.z + Math.sin(a) * 1.1], [Math.PI / 2, a, 0.1]));
     }
-    if (!P.volcano) vines(p.x, p.z, p.r + 0.04, Math.min(p.h, 3.2));
+    if (!P.volcano && (p.state === 'full' || rng() < 0.35)) vines(p.x, p.z, p.r + 0.04, Math.min(p.h, 3.2));
   }
 
   // --------------------------------------------------------------- arch
@@ -173,6 +173,90 @@ export function buildRuins(r, biome) {
     std.push(place(place(g, [0, -f.len / 2, 0]), [f.x, f.r * 0.92, f.z], [0, f.yaw, Math.PI / 2]));
   }
 
+  // ------------------------------------ overgrowth: rubble, collapse, roots
+  /** Low earth mound that half-buries a heap (dirt at the foot, grass/moss on top). */
+  const earth = (c, n) => {
+    const t = noise3(c.x * 0.8, 0, c.z * 0.8, seed + 12);
+    tmp.copy(P.earth[0]).lerp(P.earth[1], smoothstep(-0.3, 0.5, n.y + 0.3 * t)).lerp(P.earth[2], 0.4 * smoothstep(0.1, 0.7, t));
+    return tmp.multiplyScalar(0.94 + 0.08 * noise3(c.x * 3, c.y * 3, c.z * 3, seed + 13));
+  };
+  const mound = (x, z, rx, rz, h, yaw) => place(blob(rx, h, rz, earth, { w: 10, h: 5 }), [x, -h * 0.25, z], [0, yaw, 0]);
+  for (const [k, p] of L.rubble.entries()) {
+    if (p.r > 0.8) std.push(mound(p.x, p.z, p.r * 1.1, p.r * 0.95, Math.max(0.25, p.h * 0.5), rng() * TAU));
+    const n = p.r > 0.8 ? 3 + Math.floor(rng() * 2) : 1;
+    for (let i = 0; i < n; i++) {
+      const top = i === n - 1 && p.r > 0.8;
+      const a = (i / n) * TAU + rng() * 0.8, d = top ? 0.1 : p.r * (0.35 + rng() * 0.35);
+      const w = 0.55 + rng() * 0.3, hh = 0.35 + rng() * 0.15, dd = 0.45 + rng() * 0.25;
+      const y = top ? p.h - hh * 0.5 : hh * 0.2 + rng() * 0.15;
+      std.push(block(w, hh, dd, [p.x + Math.cos(a) * d, y, p.z + Math.sin(a) * d], [(rng() - 0.5) * 0.7, rng() * TAU, (rng() - 0.5) * 0.7], k * 5 + i));
+    }
+    if (!P.volcano) {
+      const a = rng() * TAU;
+      leafs.push([p.x + Math.cos(a) * (p.r + 0.2), p.z + Math.sin(a) * (p.r + 0.2)]);
+    } else {
+      std.push(place(blob(p.r * 0.8, 0.12, p.r * 0.6, (c, n2) => (n2.y > 0.6 ? '#9a9496' : '#7a7476'), { w: 12, h: 6 }), [p.x, p.h * 0.45, p.z], [0, rng() * TAU, 0]));
+    }
+  }
+  for (const sl of L.slabs) {
+    // a wall section that toppled over sideways and sank into the ground
+    const parts = [];
+    const tall = sl.h / Math.cos(sl.tilt) + 0.6;
+    const rows = Math.max(2, Math.round(tall / 0.7));
+    const rh = tall / rows;
+    for (let row = 0; row < rows; row++) {
+      let x = -sl.len / 2 + (row % 2 ? 0.55 : 0);
+      const end = row === rows - 1 ? -sl.len / 2 + sl.len * (0.4 + rng() * 0.3) : sl.len / 2;
+      while (x < end - 0.05) {
+        const bl = Math.min(1.0 + rng() * 0.4, end - x);
+        if (bl > 0.3) parts.push(block(bl - 0.05, rh - 0.03, 0.7 + (rng() - 0.5) * 0.06, [x + bl / 2, rh / 2 + row * rh, (rng() - 0.5) * 0.04]));
+        x += bl;
+      }
+    }
+    const g = place(merge(parts), [0, -0.6, 0], [sl.tilt, 0, 0]);
+    std.push(place(g, [sl.x, 0, sl.z], [0, sl.yaw, 0]));
+    const cy = Math.cos(sl.yaw), sy = Math.sin(sl.yaw);
+    // local +z of the slab is world (sin yaw, cos yaw); it leans toward sign(tilt)
+    const lean = Math.sign(sl.tilt);
+    std.push(mound(sl.x + sy * lean * 0.4, sl.z + cy * lean * 0.4, sl.len * 0.65, 1.0, 0.45, sl.yaw));
+    for (let k = 0; k < 2; k++) {
+      const u = (rng() - 0.5) * sl.len, v = -lean * (1.0 + rng() * 0.4);
+      std.push(block(0.7, 0.4, 0.6, [sl.x + cy * u + sy * v, 0.12, sl.z - sy * u + cy * v], [(rng() - 0.5) * 0.5, rng() * TAU, (rng() - 0.5) * 0.5]));
+    }
+    if (!P.volcano) {
+      for (let k = 0; k < 2; k++) {
+        const u = ((k + 0.5) / 2 - 0.5) * sl.len * 0.8;
+        drape(sl.x + cy * u + sy * lean * 0.15, sl.z - sy * u + cy * lean * 0.15, sl.h - 0.05, 0.35);
+      }
+      leafs.push([sl.x - sy * lean * 1.3, sl.z - cy * lean * 1.3]);
+    }
+  }
+  if (!P.volcano) {
+    // big jungle roots creeping in from outside over the paving
+    for (const [k, rt] of L.roots.entries()) {
+      const dx = Math.sin(rt.yaw), dz = Math.cos(rt.yaw), sx = dz, sz = -dx;
+      const main = [];
+      for (let i = 0; i <= 4; i++) {
+        const t = i / 4, w = Math.sin(t * 5 + k) * 0.5;
+        const rad = 0.2 * (1 - t * 0.7);
+        const y = i === 0 ? -0.1 : 0.2 + rad * 0.6 + 0.1 * Math.sin(t * 9 + k * 2) ** 2;
+        main.push(V(rt.x + dx * rt.len * t + sx * w, y, rt.z + dz * rt.len * t + sz * w));
+      }
+      std.push(tube(main, (t) => [0.22 * (1 - t * 0.75), 0.16 * (1 - t * 0.7)], { radial: 6, color: rootColor, capStart: false }));
+      const b0 = main[1 + (k % 2)], bs = k % 2 ? 1 : -1;
+      const br = [b0.clone(), V(b0.x + (dx * 0.6 + sx * bs) * 0.9, 0.24, b0.z + (dz * 0.6 + sz * bs) * 0.9), V(b0.x + (dx * 0.5 + sx * bs) * 2.0, 0.2, b0.z + (dz * 0.5 + sz * bs) * 2.0)];
+      std.push(tube(br, (t) => [0.1 * (1 - t * 0.6), 0.08 * (1 - t * 0.6)], { radial: 5, color: rootColor, capStart: false }));
+    }
+    // creepers draped over the standing walls
+    for (const w of L.walls) {
+      const cy = Math.cos(w.yaw), sy = Math.sin(w.yaw);
+      for (let k = 0; k < 2; k++) {
+        const u = ((k + 0.5) / 2 - 0.5) * w.len * 0.8 + (rng() - 0.5) * 0.3;
+        drape(w.x + cy * u, w.z - sy * u, w.h, 0.4);
+      }
+    }
+  }
+
   // --------------------------------------------------------------- altar
   std.push(block(2.0, 0.3, 2.0, [0, 0.15, 0]));
   std.push(block(1.55, 0.35, 1.55, [0, 0.47, 0]));
@@ -189,7 +273,7 @@ export function buildRuins(r, biome) {
   if (!P.volcano) {
     const fern = fernGeometry();
     for (const [x, z] of leafs) leaf.push(place(fern.clone(), [x, 0.02, z], [0, rng() * TAU, 0], 0.8 + rng() * 0.6));
-    for (let k = 0; k < 9; k++) {
+    for (let k = 0; k < 3; k++) {
       const a = rng() * TAU, rr = 2 + rng() * 5.5;
       leaf.push(place(fern.clone(), [Math.cos(a) * rr, 0.02, Math.sin(a) * rr], [0, rng() * TAU, 0], 0.7 + rng() * 0.6));
     }
@@ -225,12 +309,12 @@ export function buildRuins(r, biome) {
   function vines(x, z, radius, h) {
     const turns = 1.2 + rng() * 0.6, a0 = rng() * TAU;
     const pts = [];
-    for (let i = 0; i <= 7; i++) {
-      const t = i / 7, a = a0 + t * turns * TAU;
-      pts.push(V(x + Math.cos(a) * radius, 0.3 + t * h * (0.6 + rng() * 0.2), z + Math.sin(a) * radius));
+    for (let i = 0; i <= 5; i++) {
+      const t = i / 5, a = a0 + t * turns * TAU;
+      pts.push(V(x + Math.cos(a) * (radius + 0.05), 0.3 + t * h * (0.6 + rng() * 0.2), z + Math.sin(a) * (radius + 0.05)));
     }
     std.push(tube(pts, () => 0.035, { radial: 5, color: () => '#3f7a2c', capStart: false }));
-    for (let i = 1; i < 7; i++) {
+    for (let i = 1; i < 6; i++) {
       const q = pts[i], dx = q.x - x, dz = q.z - z, l = Math.hypot(dx, dz) || 1;
       leaf.push(leafStrip(arcPath(q, dx / l, dz / l, 0.25, 0.5, 1.2, 3), (t) => (t >= 1 ? 0.005 : 0.08 * Math.sin(Math.PI * (0.1 + 0.9 * t))), {
         side: V(-dz / l, 0, dx / l), ridge: 0.3, serrate: 0, color: (t, hh) => (hh ? '#7cc545' : '#4e9a34'),

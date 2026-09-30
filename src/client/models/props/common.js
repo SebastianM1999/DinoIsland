@@ -76,11 +76,13 @@ export function doubleSided(base = MAT.standard) {
 /**
  * Box with softly rounded edges (a bevel of radius r). Origin at the center.
  * warp(v) may bend the result (weathered stone). Color: hex or paint() fn.
+ * thin = true builds a cheaper version for flat slabs (60 instead of 108
+ * tris): the vertical edges stay rounded, top/bottom edges get one chamfer.
  */
-export function roundedBox(w, h, d, r, color, warp = null) {
+export function roundedBox(w, h, d, r, color, warp = null, thin = false) {
   const hx = w / 2, hy = h / 2, hz = d / 2;
   r = Math.min(r, hx * 0.95, hy * 0.95, hz * 0.95);
-  const g = prep(new THREE.BoxGeometry(2, 2, 2, 3, 3, 3));
+  const g = prep(new THREE.BoxGeometry(2, 2, 2, 3, thin ? 1 : 3, 3));
   const p = g.attributes.position;
   const map = (c, half) => {
     const a = Math.abs(c);

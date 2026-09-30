@@ -92,10 +92,18 @@ export function caveColliders(c) {
     push(s * (cx + 0.3), -6.6);
   }
   // hillside rock masses (only outside the interior ring matters)
+  // (the interior is carved out of them, so circles reaching into it are
+  // shrunk to the part outside the wall ring)
   for (const m of caveMasses(c.seed)) {
     for (const f of massFootprint(m)) {
-      if (Math.hypot(f.x, f.z) + f.r < R) continue;
-      push(f.x, f.z, f.r, y + m.y + m.ry);
+      const d = Math.hypot(f.x, f.z);
+      if (d + f.r <= R + CAVE.wallR) continue;
+      let { x, z, r } = f;
+      if (d - r < R) {
+        r = (d + r - R) / 2;
+        x = (f.x / d) * (R + r); z = (f.z / d) * (R + r);
+      }
+      if (r >= 0.4) push(x, z, r, y + m.y + m.ry);
     }
   }
   return out;
@@ -109,9 +117,16 @@ export function caveColliders(c) {
 export function caveRockPilesLocal(seed = 1) {
   const rng = makeRng(((seed | 0) * 69621 + 7) >>> 0);
   const out = [];
+  const walls = caveColliders({ x: 0, z: 0, y: 0, rot: 0, seed });   // local frame
+  // either overlap a neighbour clearly or leave a gap a mover fits through
+  const spaced = (x, z, r, o, overlap) => {
+    const g = Math.hypot(o.x - x, o.z - z) - o.r - r;
+    return g >= 1.1 || g <= -overlap * Math.min(r, o.r);
+  };
   const fits = (x, z, r) => {
     if (z < -4 && Math.abs(x) - r < CAVE_WALKWAY) return false;
-    for (const o of out) if (Math.hypot(o.x - x, o.z - z) < (o.r + r) * 0.8) return false;
+    for (const o of out) if (!spaced(x, z, r, o, 0.2) || Math.hypot(o.x - x, o.z - z) < (o.r + r) * 0.8) return false;
+    for (const o of walls) if (!spaced(x, z, r, o, 0.3)) return false;
     return true;
   };
   // big boulders at the foot of the buttresses, then smaller rubble further out

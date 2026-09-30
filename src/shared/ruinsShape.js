@@ -63,7 +63,7 @@ export function ruinsLayout(r) {
   const entrance = (x, z, pad) => z < -2 && Math.abs(x) < 2.6 + pad;   // walkway through the arch
 
   const rubble = [];
-  for (let tries = 0; tries < 60 && rubble.length < 6; tries++) {
+  for (let tries = 0; tries < 60 && rubble.length < 5; tries++) {
     const phi = rng() * Math.PI * 2;
     if (Math.cos(phi) < -0.55) continue;                                // not in front of the arch
     const rad = rng.range(7.4, 9.8);
@@ -134,7 +134,12 @@ export function ruinsColliders(r) {
   for (const f of L.fallen) boxes.push(siteBox(r, f.x, f.z, f.len / 2, f.r, y + f.r * 2, f.yaw));
   boxes.push(siteBox(r, 0, 0, 1.0, 1.0, y + RUINS_ALTAR_TOP));
   for (const p of L.rubble) if (p.h > 0.6) circle(p.x, p.z, p.r * 0.85, p.h);
-  for (const sl of L.slabs) if (sl.h > 0.6) boxes.push(siteBox(r, sl.x, sl.z, sl.len / 2, 0.45, y + sl.h, sl.yaw));
+  for (const sl of L.slabs) {
+    if (sl.h <= 0.6) continue;
+    // centered between the buried foot and the leaning top (lean toward local +z * sign(tilt))
+    const off = Math.sign(sl.tilt) * 0.3;
+    boxes.push(siteBox(r, sl.x + Math.sin(sl.yaw) * off, sl.z + Math.cos(sl.yaw) * off, sl.len / 2, 0.65, y + sl.h, sl.yaw));
+  }
   return { circles, boxes };
 }
 

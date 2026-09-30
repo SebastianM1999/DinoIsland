@@ -5,6 +5,7 @@
 import * as THREE from 'three';
 import { buildBoat } from '../models/props/boat.js';
 import { buildCave } from '../models/props/cave.js';
+import { buildSpringCave } from '../models/props/springCave.js';
 import { buildRuins } from '../models/props/ruins.js';
 import { buildNest } from '../models/props/nest.js';
 import { buildVolcanoFx } from '../models/props/volcano.js';
@@ -21,6 +22,8 @@ export function buildSites(terrain, layout) {
   updaters.push({ pos: new THREE.Vector3(layout.boat.x, layout.boat.y, layout.boat.z), u: boat });
 
   for (const c of layout.caves) group.add(buildCave(c, layout.biome));
+  // waterfalls pour out of a grotto in the cliff face
+  for (const wf of layout.waterfalls) if (wf.source) group.add(buildSpringCave(wf.source, layout.biome));
   if (layout.ruins) group.add(buildRuins(layout.ruins, layout.biome));
   if (layout.nest) group.add(buildNest(layout.nest));
   if (layout.volcano) {

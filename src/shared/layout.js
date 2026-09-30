@@ -7,7 +7,7 @@ import { makeRng, fbm, smoothstep } from './rng.js';
 import { TRUNKS, TREE_SINK, treeColliders } from './treeShapes.js';
 import { placeRock, rockSurfaceAt, PEBBLE_SCALE } from './rockShapes.js';
 import { RELIC_FOR_SITE } from './relics.js';
-import { caveColliders, caveInterior, caveMouth } from './caveShape.js';
+import { caveColliders, caveInterior, caveMouth, caveRockPiles } from './caveShape.js';
 import { ruinsColliders, ruinsCenter, RUINS_ALTAR_TOP } from './ruinsShape.js';
 import { boatColliders, boatInteractPoint } from './boatShape.js';
 
@@ -135,7 +135,10 @@ export function buildLayout(terrain) {
       }
       const width = 4.5;
       const source = { x: src.x, y: src.y, z: src.z, rot: Math.atan2(dir.x, dir.z), width };
-      layout.waterfall = { top: { x: src.x, y: src.y, z: src.z }, bottom, dirX: -dir.x, dirZ: -dir.z, width, kind: 'water', source };
+      // the water leaves the grotto over its lip, 2 m in front of the opening and
+      // just below it (SPRING_LIP_OFFSET / SPRING_FLOOR in props/springCave.js)
+      const lip = { x: src.x - dir.x * 2.0, y: src.y - 0.12, z: src.z - dir.z * 2.0 };
+      layout.waterfall = { top: lip, bottom, dirX: -dir.x, dirZ: -dir.z, width, kind: 'water', source };
       layout.waterfalls.push(layout.waterfall);
     }
   }
@@ -190,17 +193,24 @@ export function buildLayout(terrain) {
   // ------------------------------------------------ special sites first
   for (const c of plan.sites.caves) {
     const cave = { ...c, y: terrain.heightAt(c.x, c.z) };
-    // entrance toward the trail
-    let best = null, bd = Infinity;
-    for (const [px, pz] of layout.path[0]) {
-      const d = Math.hypot(px - c.x, pz - c.z);
-      if (d < bd) { bd = d; best = [px, pz]; }
+    // caves dug into a hill flank already face outward; free-standing ones face the trail
+    if (c.host == null) {
+      let best = null, bd = Infinity;
+      for (const [px, pz] of layout.path[0]) {
+        const d = Math.hypot(px - c.x, pz - c.z);
+        if (d < bd) { bd = d; best = [px, pz]; }
+      }
+      if (best) cave.rot = Math.atan2(-(best[0] - c.x), -(best[1] - c.z));
     }
-    if (best) cave.rot = Math.atan2(-(best[0] - c.x), -(best[1] - c.z));
     cave.mouth = caveMouth(cave);
     cave.inner = caveInterior(cave);
     layout.caves.push(cave);
     circles.push(...caveColliders(cave));
+    // rubble and boulders at the mouth are solid too
+    for (const p of caveRockPiles(cave)) {
+      circles.push({ x: p.x, z: p.z, r: p.r, bottom: cave.y - 1, top: cave.y + p.h, kind: 'rock' });
+      reserve(p.x, p.z, p.r);
+    }
     reserve(c.x, c.z, 11);
     reserve(cave.mouth.x, cave.mouth.z, 4);
   }
