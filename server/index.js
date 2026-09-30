@@ -24,6 +24,7 @@ const MIME = {
   '.woff2': 'font/woff2',
   '.txt': 'text/plain; charset=utf-8',
   '.webmanifest': 'application/manifest+json',
+  '.glb': 'model/gltf-binary',
 };
 
 // Only these top-level folders are public; /vendor/three maps into node_modules.

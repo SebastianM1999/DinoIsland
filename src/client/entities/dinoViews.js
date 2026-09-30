@@ -15,6 +15,7 @@ import { buildStego, STEGO_ANIM, stegoExtraUpdate } from '../models/dino/stego.j
 import { buildRaptor, RAPTOR_ANIM, raptorExtraUpdate } from '../models/dino/raptor.js';
 import { buildPtera, PTERA_ANIM, pteraExtraUpdate } from '../models/dino/ptera.js';
 import { buildTrex, TREX_ANIM, trexExtraUpdate } from '../models/dino/trex.js';
+import { buildGLBDino } from '../models/dino/glbDino.js';
 
 /** Every server species needs a visible model and its animation tuning. */
 export const SPECIES = {
@@ -26,6 +27,12 @@ export const SPECIES = {
 };
 
 const X = 0, Y = 1, Z = 2, YAW = 3, SPD = 4;
+for (const [type, species] of Object.entries(SPECIES)) {
+  const fallback = species.build, extra = species.extraUpdate;
+  species.build = () => buildGLBDino(type) || fallback();
+  species.createAnimator = rig => rig.createAnimator?.() || new DinoAnimator(rig, species.anim);
+  species.extraUpdate = (view, dt) => { if (!view.rig.isGLB) extra?.(view, dt); };
+}
 const V = new THREE.Vector3();
 
 class DinoView {
@@ -35,7 +42,7 @@ class DinoView {
     this.type = desc.type;
     this.ctx = ctx;
     this.rig = sp.build();
-    this.anim = new DinoAnimator(this.rig, sp.anim);
+    this.anim = sp.createAnimator(this.rig);
     this.sp = sp;
     this.root = this.rig.root;
     this.buf = new InterpBuffer([YAW]);
@@ -69,6 +76,7 @@ class DinoView {
   }
 
   dispose() {
+    this.anim.dispose?.();
     this.ctx.scene.remove(this.root);
     this.bar.remove();
   }
@@ -112,8 +120,11 @@ class DinoView {
       groundAt: (x, z) => t.heightAt(x, z),
       groundPitch: -groundPitch,
       pose,
+      hurt: this.flinch,
+      lookTarget: this.st === DS.ALERT || this.attackT > 0 || this.st === DS.CHARGE
+        ? this.ctx.camera.position : null,
     });
-    if (this.flinch > 0) this.rig.body.rotation.z += Math.sin(this.flinch * 30) * 0.05 * this.flinch;
+    if (!this.rig.isGLB && this.flinch > 0) this.rig.body.rotation.z += Math.sin(this.flinch * 30) * 0.05 * this.flinch;
     // heavy footfalls for the big ones
     if (this.sp.heavy && this.alive) {
       const half = Math.floor(this.anim.phase * 2);

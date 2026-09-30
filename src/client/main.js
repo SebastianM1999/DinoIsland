@@ -5,6 +5,7 @@ import { Net } from './net/net.js';
 import { CONFIG } from '../shared/config.js';
 import { ICON_SPRITE, initSettings, renderPause } from './ui/menus.js';
 import { savedOutfit } from './ui/wardrobe.js';
+import { preloadDinoModels } from './models/dino/glbDino.js';
 
 // SVG filter that gives HUD and menu panels their brush-stroke edges.
 document.body.insertAdjacentHTML('beforeend', `
@@ -74,6 +75,10 @@ async function launch(net, reuse = null) {
   // Let the loading screen paint before the heavy world build.
   await new Promise((r) => requestAnimationFrame(() => setTimeout(r, 30)));
   try {
+    await preloadDinoModels((done, total) => {
+      loadingText.textContent = `Loading dinosaurs… ${done}/${total}`;
+    });
+    loadingText.textContent = 'Building the island…';
     game = new Game(canvas, net, reuse);
   } catch (err) {
     console.error(err);
