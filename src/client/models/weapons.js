@@ -14,8 +14,8 @@ const WOOD = '#8a5a35';
 const WOOD_DARK = '#6b4228';
 const WOOD_LIGHT = '#b07a48';
 const ROPE = '#c7995a';
-const STONE = '#b8b4c4';
-const STONE_DARK = '#8f8aa0';
+const STONE = '#c5cbd0';
+const STONE_DARK = '#727f8a';
 
 /** Spear: ~2 m. Origin at the grip (about 40% up the shaft), tip at +Y. */
 export function spearGeometry() {
@@ -30,15 +30,18 @@ export function spearGeometry() {
     let tip = new THREE.OctahedronGeometry(1, 0);
     tip = deform(tip, (v) => {
       v.y = v.y > 0 ? v.y * tipLen * 0.8 : v.y * tipLen * 0.25;
-      v.x *= 0.075;
-      v.z *= 0.03;
+      v.x *= 0.10;
+      v.z *= 0.042;
     });
     tip = paint(tip, (c, n) => (n.x > 0 ? STONE : STONE_DARK));
     return merge([
       place(shaft, [0, len / 2 - grip, 0]),
       place(tip, [0, len - grip + tipLen * 0.12, 0]),
       place(wrap(0.034, 0.1, 4, ROPE), [0, len - grip - 0.1, 0]),        // tip lashing
-      place(wrap(0.036, 0.28, 7, '#9a6b3c'), [0, -0.14, 0]),              // hand grip wrap
+      place(wrap(0.034, 0.24, 9, '#59402e'), [0, -0.12, 0]),
+      place(wrap(0.038, 0.028, 2, ROPE), [0, 0.12, 0]),
+      place(wrap(0.038, 0.028, 2, ROPE), [0, -0.15, 0]),
+      part(new THREE.CylinderGeometry(0.027, 0.033, 0.10, 7), WOOD_DARK, [0, -grip + 0.02, 0]),              // hand grip wrap
       place(wrap(0.03, 0.03, 2, ROPE), [0, -grip + 0.08, 0]),
     ]);
   });
@@ -47,21 +50,22 @@ export function spearGeometry() {
 /** Bow: limb curves toward -Z, string on +Z side. Origin at the grip, limbs along Y. */
 export function bowGeometry() {
   return cached('bow', () => {
-    const pts = [];
-    const H = 0.62;
-    for (let i = 0; i <= 8; i++) {
-      const t = i / 8;
-      const y = (t - 0.5) * 2 * H;
-      const z = -Math.cos((t - 0.5) * Math.PI) * 0.16 + 0.16 * (Math.abs(t - 0.5) > 0.42 ? (Math.abs(t - 0.5) - 0.42) * 6 : 0);
-      pts.push(new THREE.Vector3(0, y, -z + 0.16));
-    }
-    const limbGeo = tube(pts, (t) => 0.012 + 0.014 * (1 - Math.abs(t - 0.5) * 2), {
-      radial: 6,
-      color: (t) => (Math.abs(t - 0.5) < 0.08 ? '#5b3a22' : Math.abs(t - 0.5) > 0.46 ? WOOD_DARK : WOOD_LIGHT),
+    const pts = [
+      [0, -0.64, 0.16], [0, -0.55, 0.08], [0, -0.39, -0.075],
+      [0, -0.19, -0.035], [0, 0, 0], [0, 0.19, -0.035],
+      [0, 0.39, -0.075], [0, 0.55, 0.08], [0, 0.64, 0.16],
+    ].map((p) => new THREE.Vector3(...p));
+    const limbs = tube(pts, (t) => [0.014 + 0.017 * Math.sin(t * Math.PI), 0.010 + 0.010 * Math.sin(t * Math.PI)], {
+      radial: 6, up: new THREE.Vector3(1, 0, 0), color: (t, angle) => Math.abs(t - 0.5) < 0.10 ? WOOD_DARK : angle < Math.PI ? WOOD_LIGHT : WOOD,
     });
     return merge([
-      limbGeo,
-      place(wrap(0.03, 0.14, 5, '#5b3a22'), [0, -0.07, 0.0]),
+      limbs,
+      place(wrap(0.034, 0.15, 7, '#59402e'), [0, -0.075, 0]),
+      ...[-1, 1].flatMap((side) => [
+        place(wrap(0.025, 0.065, 4, ROPE), [0, side * 0.54 - 0.0325, 0.075]),
+        part(new THREE.SphereGeometry(0.022, 8, 6), '#e2d0ad', [0, side * 0.64, 0.16]),
+      ]),
+      part(new THREE.BoxGeometry(0.08, 0.025, 0.06), WOOD_DARK, [0.025, 0.065, 0]),
     ]);
   });
 }
@@ -72,12 +76,12 @@ export function makeBowString() {
   geo.setAttribute('position', new THREE.Float32BufferAttribute(new Float32Array(9), 3));
   const line = new THREE.Line(geo, new THREE.LineBasicMaterial({ color: '#f5ecd8' }));
   line.frustumCulled = false;
-  const top = new THREE.Vector3(0, 0.6, 0.165);
-  const bottom = new THREE.Vector3(0, -0.6, 0.165);
+  const top = new THREE.Vector3(0, 0.64, 0.16);
+  const bottom = new THREE.Vector3(0, -0.64, 0.16);
   line.userData.setPull = (pull) => {
     const p = geo.attributes.position;
     p.setXYZ(0, top.x, top.y, top.z);
-    p.setXYZ(1, 0, 0, 0.165 + pull);
+    p.setXYZ(1, 0, 0.065, 0.16 + pull);
     p.setXYZ(2, bottom.x, bottom.y, bottom.z);
     p.needsUpdate = true;
   };
@@ -128,9 +132,19 @@ export function trapGeometry(sprung = false) {
     for (let side = -1; side <= 1; side += 2) {
       for (let i = 0; i < 5; i++) {
         const x = -0.6 + i * 0.3;
-        const tilt = sprung ? side * -0.25 : side * 0.9;
+        const tilt = sprung ? side * -0.72 : side * 1.12;
         parts.push(place(spike(0.05, 0.55, WOOD, '#e3c9a0', 5), [x, 0.12, side * 0.7], [tilt, 0, 0]));
       }
+    }
+    // Central pressure plate, cross braces, and transport handles.
+    parts.push(part(new THREE.BoxGeometry(0.42, 0.045, 0.48), WOOD_LIGHT, [0, 0.13, 0]));
+    for (const x of [-0.14, 0.14]) parts.push(part(new THREE.BoxGeometry(0.015, 0.008, 0.43), WOOD_DARK, [x, 0.157, 0]));
+    for (const side of [-1, 1]) {
+      parts.push(part(new THREE.CylinderGeometry(0.027, 0.027, 1.2, 6), ROPE, [0, 0.075, 0], [0, side * 0.75, Math.PI / 2]));
+      parts.push(tube([
+        new THREE.Vector3(side * 0.8, 0.13, -0.18), new THREE.Vector3(side * 0.99, 0.18, -0.18),
+        new THREE.Vector3(side * 0.99, 0.18, 0.18), new THREE.Vector3(side * 0.8, 0.13, 0.18),
+      ], () => 0.032, { radial: 6, color: () => ROPE }));
     }
     // rope lashings at the corners + trigger cord
     for (const [x, z] of [[0.8, 0.75], [-0.8, 0.75], [0.8, -0.75], [-0.8, -0.75]]) {

@@ -1,0 +1,50 @@
+import * as THREE from 'three';
+import { Renderer } from '../core/renderer.js';
+import { Viewmodel } from './viewmodel.js';
+import { PlayerModel } from '../models/playerModel.js';
+import { TOPS } from '../../shared/outfits.js';
+
+const gfx = new Renderer(document.querySelector('canvas'));
+gfx.scene.background = new THREE.Color('#709582');
+const vm = new Viewmodel(gfx, 0);
+const model = new PlayerModel(0);
+gfx.scene.add(model.root);
+gfx.camera.position.set(2, 1.3, -3);
+gfx.camera.lookAt(0, 0.9, 0);
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(30, 30).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ color: '#496a50', roughness: 1 }));
+gfx.scene.add(ground);
+const tool = document.querySelector('#tool');
+const outfit = document.querySelector('#outfit');
+TOPS.forEach((top, i) => outfit.add(new Option(top.name || top.id, i)));
+outfit.addEventListener('change', () => { const o = { top: +outfit.value, hat: 0, pants: 0 }; vm.setOutfit(o); model.setOutfit(o); });
+let drawing = false, mouseX = 0, mouseY = 0, last = performance.now();
+const primary = document.querySelector('#primary');
+primary.addEventListener('pointerdown', (e) => {
+  primary.setPointerCapture(e.pointerId);
+  if (tool.value === 'bow') drawing = true;
+  else if (tool.value === 'spear') vm.stab();
+  else if (tool.value === 'fruit') vm.eat('mango', 1);
+  else vm.place();
+});
+const release = () => { if (drawing) { drawing = false; vm.release(); } };
+primary.addEventListener('pointerup', release);
+primary.addEventListener('pointercancel', release);
+tool.addEventListener('change', release);
+document.querySelector('#throw').addEventListener('click', () => { if (tool.value === 'spear') vm.throwSpear(); });
+document.addEventListener('pointermove', (e) => { mouseX += e.movementX; mouseY += e.movementY; });
+function frame(now) {
+  const dt = Math.min(0.05, (now - last) / 1000); last = now;
+  const sprint = document.querySelector('#sprint').checked;
+  const walk = document.querySelector('#walk').checked || sprint;
+  vm.setTool(tool.value, { fruitType: 'mango' });
+  vm.setDraw(drawing ? Math.min(1, vm.draw + dt) : 0);
+  vm.update(dt, { speed: walk ? (sprint ? 8 : 5) : 0, sprint, grounded: true, lookX: mouseX, lookY: mouseY });
+  mouseX = mouseY = 0;
+  const remote = document.querySelector('#remote').checked;
+  vm.root.visible = !remote;
+  model.root.visible = remote;
+  model.animate(dt, { spd: walk ? 5 : 0, pitch: 0, eq: tool.value, drawing, eating: false, attacking: vm.stabT > 0.7, carry: 0, alive: true, grounded: true });
+  gfx.render();
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);

@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <link rel="icon" href="data:,">
+  <title>Weapon workshop — Dinosaur Island</title>
+  <style>
+    body { margin:0; background:#294037; color:#f3ead6; font:14px system-ui; overflow:hidden }
+    canvas { display:block }
+    nav { position:absolute; top:18px; left:18px; display:flex; flex-wrap:wrap; gap:8px; max-width:calc(100% - 36px) }
+    button, select, label { border:1px solid #b8aa83; border-radius:5px; padding:9px 12px; background:#24382f; color:#f3ead6; font:inherit }
+    button { cursor:pointer } button:focus-visible, select:focus-visible { outline:2px solid #f3ead6; outline-offset:3px }
+    p { position:absolute; bottom:12px; left:18px; max-width:calc(100% - 36px) }
+    #cross { position:absolute; left:50%; top:50%; width:8px; height:8px; border:1px solid #f3ead6; border-radius:50%; transform:translate(-50%,-50%); pointer-events:none }
+  </style>
+  <script type="importmap">{"imports":{"three":"/vendor/three/build/three.module.js","three/addons/":"/vendor/three/examples/jsm/"}}</script>
+</head>
+<body>
+  <nav aria-label="Weapon preview controls">
+    <select id="tool" aria-label="Weapon"><option>spear</option><option>bow</option><option>trap</option><option>bait</option><option>fruit</option></select>
+    <button id="primary">Use / hold to draw</button><button id="throw">Throw spear</button>
+    <label><input id="walk" type="checkbox"> Walk</label><label><input id="sprint" type="checkbox"> Sprint</label>
+    <select id="outfit" aria-label="Outfit"></select><label><input id="remote" type="checkbox"> Co-op model</label>
+  </nav>
+  <div id="cross"></div><p>Move the pointer to inspect camera lag. Switch tools, hold the bow string, or inspect the co-op pose.</p>
+  <canvas id="game"></canvas><script type="module" src="./weapon-preview.js"></script>
+</body>
+</html>

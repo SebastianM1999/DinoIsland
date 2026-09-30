@@ -8,7 +8,7 @@ import * as THREE from 'three';
 import { CONFIG } from '../../shared/config.js';
 import { HATS, TOPS, PANTS, defaultOutfit, sanitizeOutfit } from '../../shared/outfits.js';
 import { MAT, deform, paint, place, part, merge, mesh, blob, jitter } from './kit.js';
-import { spearGeometry, bowGeometry, trapGeometry, meatGeometry } from './weapons.js';
+import { spearGeometry, bowGeometry, trapGeometry, meatGeometry, arrowGeometry, makeBowString } from './weapons.js';
 
 const PACKS = [
   { pack: '#3d3c44', dark: '#2a2930', roll: '#6c8a3c' },
@@ -409,7 +409,16 @@ function neckGeometry(slot) {
 
 const HELD = {
   spear: () => mesh(spearGeometry()),
-  bow: () => mesh(bowGeometry()),
+  bow: () => {
+    const g = new THREE.Group();
+    g.add(mesh(bowGeometry()));
+    g.userData.string = makeBowString();
+    g.add(g.userData.string);
+    g.userData.arrow = mesh(arrowGeometry());
+    g.userData.arrow.rotation.x = -Math.PI / 2;
+    g.add(g.userData.arrow);
+    return g;
+  },
   trap: () => { const m = mesh(trapGeometry(false)); m.scale.setScalar(0.35); return m; },
   bait: () => mesh(meatGeometry(), MAT.glossy),
   fruit: null,
@@ -464,6 +473,11 @@ export class PlayerModel {
     this.armL.add(this.armMeshL);
     this.armR.add(this.armMeshR);
     this.hips.add(this.armL, this.armR);
+    this.toolRig = new THREE.Group();
+    this.hips.add(this.toolRig);
+    this.gripTarget = new THREE.Vector3();
+    this.armDirection = new THREE.Vector3();
+    this.armDown = new THREE.Vector3(0, -1, 0);
     this.hand = new THREE.Group();
     this.hand.position.set(0, -0.46, 0);
     this.armR.add(this.hand);
@@ -509,13 +523,19 @@ export class PlayerModel {
     if (!HELD[name]) return;
     if (!this.held[name]) {
       const m = HELD[name]();
-      if (name === 'spear') m.rotation.set(Math.PI / 2, 0, 0);
-      if (name === 'bow') m.rotation.set(0, Math.PI / 2, 0);
+      if (name === 'spear') m.rotation.set(-Math.PI / 2, 0, 0);
       if (name === 'bait') m.position.set(0, -0.05, 0);
-      this.hand.add(m);
+      if (name === 'bow' || name === 'trap') this.toolRig.add(m);
+      else this.hand.add(m);
       this.held[name] = m;
     }
     this.held[name].visible = true;
+  }
+
+  fitArm(arm, target) {
+    this.armDirection.subVectors(target, arm.position);
+    arm.scale.y = this.armDirection.length() / 0.46;
+    arm.quaternion.setFromUnitVectors(this.armDown, this.armDirection.normalize());
   }
 
   /**
@@ -557,6 +577,8 @@ export class PlayerModel {
     this.neck.rotation.y = Math.sin(this.time * 0.37) * 0.12 * (1 - w);
 
     // arms: swing when walking; right arm holds the tool forward
+    this.armL.scale.y = this.armR.scale.y = 1;
+    this.armL.rotation.y = this.armR.rotation.y = 0;
     this.armL.rotation.x = -sw * 0.7 * w;
     this.armL.rotation.z = -0.1;
     let rx = sw * 0.5 * w, rz = 0.1;
@@ -576,5 +598,27 @@ export class PlayerModel {
     } else this.eatT = 0;
     this.armR.rotation.x = rx;
     this.armR.rotation.z = rz;
+    // Shared grip targets keep both hands on the bow/trap in co-op views.
+    const held = this.held[s.eq];
+    if (held && (s.eq === 'bow' || s.eq === 'trap')) {
+      this.toolRig.position.set(s.eq === 'bow' ? -0.22 : 0, 0.20, -0.34);
+      this.toolRig.rotation.set(s.eq === 'bow' ? -s.pitch : 0.12, 0, 0);
+      this.toolRig.updateMatrix();
+      if (s.eq === 'bow') {
+        const pull = s.drawing ? 0.24 : 0;
+        held.userData.string.userData.setPull(pull);
+        held.userData.arrow.position.set(0, 0.065, 0.16 + pull);
+        held.userData.arrow.visible = s.drawing;
+        this.gripTarget.set(0, 0, 0).applyMatrix4(this.toolRig.matrix);
+        this.fitArm(this.armL, this.gripTarget);
+        this.gripTarget.set(0, 0.065, 0.16 + pull).applyMatrix4(this.toolRig.matrix);
+        this.fitArm(this.armR, this.gripTarget);
+      } else {
+        this.gripTarget.set(-0.99 * 0.35, 0.18 * 0.35, 0).applyMatrix4(this.toolRig.matrix);
+        this.fitArm(this.armL, this.gripTarget);
+        this.gripTarget.set(0.99 * 0.35, 0.18 * 0.35, 0).applyMatrix4(this.toolRig.matrix);
+        this.fitArm(this.armR, this.gripTarget);
+      }
+    }
   }
 }
