@@ -84,7 +84,8 @@ export const BIOMES = {
 
 /** The hand-authored level order; after the last one the biomes repeat, harder. */
 export const LEVELS = [
-  { name: 'Emerald Jungle', biome: 'jungle' },
+  // the first island only has raptors and pteranodons
+  { name: 'Emerald Jungle', biome: 'jungle', dinos: { brachio: 0, stego: 0 } },
   { name: 'Ashfall Isle', biome: 'volcano' },
 ];
 
@@ -99,7 +100,7 @@ export function levelDef(index) {
   const difficulty = 1 + i * 0.3;
   const biome = BIOMES[base.biome];
   const extra = Math.floor(i / 2);                       // one more predator group every two islands
-  const dinos = { ...biome.dinos };
+  const dinos = { ...biome.dinos, ...(loop === 0 ? base.dinos : {}) };  // per-island overrides only on the first pass
   dinos.raptor += extra;
   if (i >= 2) dinos.trex = Math.max(dinos.trex, 1);
   return {

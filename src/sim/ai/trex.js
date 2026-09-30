@@ -110,7 +110,10 @@ export const trexBrain = {
       case 'chase': {
         d.fl |= 1;
         d.chaseT += dt;
-        if (lost || d.chaseT > C.chaseTime || sys.distTo(d, target.x, target.z) > C.sightRadius * 1.6) {
+        // hiding between trees that are too close for its body works: it gives up
+        if (lost || d.chaseT > C.chaseTime || (d.blockedT || 0) > 3 || sys.distTo(d, target.x, target.z) > C.sightRadius * 1.6) {
+          if ((d.blockedT || 0) > 3) sys.roar(d);
+          d.blockedT = 0;
           d.mode = 'patrol';
           d.modeT = 0;
           d.targetId = null;

@@ -4,7 +4,7 @@
 
 import { CONFIG } from '../shared/config.js';
 import { EV, DS } from '../shared/protocol.js';
-import { resolveCircle } from '../shared/collision.js';
+import { resolveCircle, segmentColliders } from '../shared/collision.js';
 import { angleDiff, clamp } from '../shared/rng.js';
 import { brachioBrain } from './ai/brachio.js';
 import { stegoBrain } from './ai/stego.js';
@@ -18,11 +18,9 @@ const r3 = (v) => Math.round(v * 1000) / 1000;
 const TRACK_SPACING = { brachio: 1.3, stego: 1, raptor: 2.2, trex: 1.5 };
 const CARCASS_TIME = 90;
 const tmp = { x: 0, z: 0, hit: false };
-// Big animals only collide with big obstacles (they push through bushes and trees).
-const bigColliders = (world) => ({
-  circles: world.layout.colliders.circles.filter((c) => c.kind !== 'tree' && c.r > 0.9),
-  boxes: world.layout.colliders.boxes,
-});
+const push = { x: 0, z: 0, hit: false };
+/** Obstacles lower than this are stepped over (a T-Rex strides over a knee-high rock, a raptor does not). */
+const stepOver = (d) => Math.max(0.2, Math.min(1.2, d.radius * 0.35));
 
 export class DinoSystem {
   constructor(world) {
@@ -33,7 +31,6 @@ export class DinoSystem {
     this.groups = new Map();
     this.respawnQueue = [];
     this.colliders = world.layout.colliders;
-    this.bigColliders = bigColliders(world);
     this.hut = world.layout.hut.campfire;
     // harder islands: tougher and harder-hitting dinosaurs
     const diff = world.layout.level.difficulty;
@@ -50,11 +47,21 @@ export class DinoSystem {
   /** Create a dinosaur. `extra` is merged into its state (group, home, ...). */
   spawn(type, x, z, extra = {}) {
     const c = CONFIG.dinos[type];
+    // never spawn inside a tree: search outward in a spiral until the body fits
+    const yaw = Math.random() * Math.PI * 2;
+    if (type !== 'ptera') {
+      const probe = { type, radius: c.radius };
+      const x0 = x, z0 = z;
+      for (let k = 1; k < 40 && this.bodyBlocked(probe, x, z, yaw); k++) {
+        const a = k * 2.4, r = 0.6 * k;
+        x = x0 + Math.cos(a) * r; z = z0 + Math.sin(a) * r;
+      }
+    }
     const d = {
       id: this.world.id(),
       type,
       x, z, y: this.terrain.heightAt(x, z),
-      yaw: Math.random() * Math.PI * 2,
+      yaw,
       spd: 0,
       st: DS.IDLE,
       hp: Math.round(c.health * this.hpMul),
@@ -166,31 +173,26 @@ export class DinoSystem {
     const step = d.spd * dt;
     let fx = -Math.sin(d.yaw), fz = -Math.cos(d.yaw);
     const look = Math.max(2, d.radius * 1.5);
-    if (!this.walkable(d.x + fx * look, d.z + fz * look, d)) {
+    // ground and trees ahead: the body has to fit through, otherwise look for a way around
+    const open = (px, pz, yaw) => this.walkable(px, pz, d) && !this.bodyBlocked(d, px, pz, yaw);
+    if (!open(d.x + fx * look, d.z + fz * look, d.yaw)) {
       // probe left/right for a way around
       let found = false;
       for (const a of [0.5, -0.5, 1.0, -1.0, 1.6, -1.6, 2.4, -2.4]) {
         const yy = d.yaw + a * (d.avoidSide || 1);
         const px = d.x - Math.sin(yy) * look, pz = d.z - Math.cos(yy) * look;
-        if (this.walkable(px, pz, d)) {
+        if (open(px, pz, yy)) {
           d.yaw += clamp(a, -3 * dt, 3 * dt) * (d.avoidSide || 1);
           found = true;
           break;
         }
       }
-      if (!found) { d.spd *= 0.5; d.yaw += 2 * dt; return; }
+      if (!found) { d.spd *= 0.5; d.yaw += 2 * dt * (d.avoidSide || 1); this.#progress(d, 0, want, dt); return; }
       fx = -Math.sin(d.yaw); fz = -Math.cos(d.yaw);
     }
     let nx = d.x + fx * step, nz = d.z + fz * step;
-    if (!this.walkable(nx, nz, d)) { d.spd *= 0.5; return; }
-    const cols = d.radius > 1.5 ? this.bigColliders : this.colliders;
-    const gy = this.terrain.heightAt(nx, nz);
-    resolveCircle(nx, nz, Math.min(d.radius * 0.6, 1.8), cols, tmp, gy, gy + Math.max(1.5, d.radius * 2));
-    if (tmp.hit) {
-      nx = tmp.x; nz = tmp.z;
-      if (!d.avoidSide) d.avoidSide = Math.random() < 0.5 ? 1 : -1;
-    }
-    // keep a little personal space from other dinosaurs
+    if (!this.walkable(nx, nz, d)) { d.spd *= 0.5; this.#progress(d, 0, want, dt); return; }
+    // keep a little personal space from other dinosaurs (before the trees, so they can't push into a trunk)
     for (const o of this.list) {
       if (o === d || !o.alive || o.type === 'ptera') continue;
       const ox = nx - o.x, oz = nz - o.z;
@@ -201,9 +203,74 @@ export class DinoSystem {
         nx += ox * k; nz += oz * k;
       }
     }
+    // trees, rocks and the hut stop the whole body, not just its centre
+    if (this.resolveBody(d, nx, nz, d.yaw)) {
+      nx = push.x; nz = push.z;
+      if (!d.avoidSide) d.avoidSide = Math.random() < 0.5 ? 1 : -1;
+    }
     const moved = Math.hypot(nx - d.x, nz - d.z);
     d.x = nx; d.z = nz;
     d.trackDist += moved;
+    this.#progress(d, moved, want, dt);
+  }
+
+  /** Body footprint circles (world space) of `d` standing at (x, z) facing `yaw`. */
+  *bodyCircles(d, x, z, yaw) {
+    const fx = -Math.sin(yaw), fz = -Math.cos(yaw);
+    for (const [off, r] of CONFIG.dinos[d.type].body || [[0, d.radius * 0.6]]) yield [x + fx * off, z + fz * off, r];
+  }
+
+  /**
+   * Push the body at (x, z) out of static colliders (trees, rocks, hut).
+   * Result in `push`; returns true if anything was hit.
+   */
+  resolveBody(d, x, z, yaw) {
+    const gy = this.terrain.heightAt(x, z);
+    const y0 = gy + stepOver(d), y1 = gy + Math.max(1.5, d.radius);
+    let hit = false;
+    for (let iter = 0; iter < 3; iter++) {
+      // strongest push per axis over all body circles
+      let px = 0, pz = 0;
+      for (const [cx, cz, r] of this.bodyCircles(d, x, z, yaw)) {
+        resolveCircle(cx, cz, r, this.colliders, tmp, y0, y1);
+        if (!tmp.hit) continue;
+        const dx = tmp.x - cx, dz = tmp.z - cz;
+        if (Math.abs(dx) > Math.abs(px)) px = dx;
+        if (Math.abs(dz) > Math.abs(pz)) pz = dz;
+      }
+      if (!px && !pz) break;
+      x += px; z += pz;
+      hit = true;
+    }
+    push.x = x; push.z = z; push.hit = hit;
+    return hit;
+  }
+
+  /** Would the body (slightly slimmed, so brushing past a trunk is fine) overlap an obstacle at (x, z)? */
+  bodyBlocked(d, x, z, yaw) {
+    const gy = this.terrain.heightAt(x, z);
+    for (const [cx, cz, r] of this.bodyCircles(d, x, z, yaw)) {
+      resolveCircle(cx, cz, r * 0.85, this.colliders, tmp, gy + stepOver(d), gy + Math.max(1.5, d.radius));
+      if (tmp.hit) return true;
+    }
+    return false;
+  }
+
+  /**
+   * Track whether the animal gets anywhere. `d.blockedT` = seconds it has been
+   * wanting to move but barely moving (brains use it to give up a chase).
+   */
+  #progress(d, moved, want, dt) {
+    if (want < 0.3) { d.blockedT = 0; return; }
+    if (moved < want * dt * 0.3) {
+      d.blockedT = (d.blockedT || 0) + dt;
+      // try the other way round every couple of seconds
+      d.flipT = (d.flipT || 0) + dt;
+      if (d.flipT > 2) { d.flipT = 0; d.avoidSide = -(d.avoidSide || 1); }
+    } else {
+      d.blockedT = Math.max(0, (d.blockedT || 0) - dt * 2);
+      d.flipT = 0;
+    }
   }
 
   /** Stand still (decelerate). */
@@ -215,7 +282,18 @@ export class DinoSystem {
   }
 
   /** Damage a player with knockback away from the dinosaur (no animation cue). */
+  /** Is there a clear line (no trunk, rock or wall) from the animal's front to the player? */
+  canReach(d, p) {
+    if (d.type === 'ptera') return true; // dives from above
+    const body = CONFIG.dinos[d.type].body;
+    const front = body ? Math.max(...body.map(([off]) => off)) : 0;
+    const fx = -Math.sin(d.yaw), fz = -Math.cos(d.yaw);
+    const y = p.y + 1;
+    return segmentColliders(d.x + fx * front, y, d.z + fz * front, p.x, y, p.z, this.colliders, this.world.layout.groundAt) < 0;
+  }
+
   hitPlayer(d, p, dmg, knock = 6, down = 0) {
+    if (!this.canReach(d, p)) return; // the bite/tail hits the tree in between
     const dx = p.x - d.x, dz = p.z - d.z;
     const l = Math.hypot(dx, dz) || 1;
     this.world.hurtPlayer(p, dmg * this.dmgMul, { kx: (dx / l) * knock, kz: (dz / l) * knock, down,
@@ -245,7 +323,7 @@ export class DinoSystem {
     for (let i = 0; i < tries; i++) {
       const a = Math.random() * Math.PI * 2, r = Math.sqrt(Math.random()) * radius;
       const x = cx + Math.cos(a) * r, z = cz + Math.sin(a) * r;
-      if (this.walkable(x, z, d)) return { x, z };
+      if (this.walkable(x, z, d) && !this.bodyBlocked(d, x, z, Math.atan2(-(x - d.x), -(z - d.z)))) return { x, z };
     }
     return { x: d.home.x, z: d.home.z };
   }
@@ -324,6 +402,8 @@ export class DinoSystem {
         }
       } else {
         BRAINS[d.type].update(d, this, dt);
+        // turning on the spot can swing the body into a trunk: push it back out
+        if (d.type !== 'ptera' && this.resolveBody(d, d.x, d.z, d.yaw)) { d.x = push.x; d.z = push.z; }
       }
 
       if (d.type !== 'ptera' || d.grounded) d.y = this.terrain.heightAt(d.x, d.z);

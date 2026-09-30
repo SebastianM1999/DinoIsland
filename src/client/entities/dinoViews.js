@@ -178,6 +178,11 @@ export class DinoViews {
     this.hitDebug.visible = false;
     this.hitDebugMat = new THREE.MeshBasicMaterial({ color: 0x00e5ff, wireframe: true });
     this.hitDebugGeo = new THREE.SphereGeometry(1, 10, 6);
+    this.bodyDebug = new THREE.Group();
+    this.bodyDebug.visible = false;
+    game.gfx.scene.add(this.bodyDebug);
+    this.bodyDebugMat = new THREE.MeshBasicMaterial({ color: 0xffaa00, wireframe: true });
+    this.bodyDebugGeo = new THREE.CylinderGeometry(1, 1, 1.5, 14, 1, true);
     game.gfx.scene.add(this.hitDebug);
     this.ctx = { scene: game.gfx.scene, terrain: game.terrain, overlay: game.overlay, camera: game.gfx.camera, onStep: (v) => game.onDinoStep?.(v) };
     const net = game.net;
@@ -254,7 +259,7 @@ export class DinoViews {
 
   #updateHitDebug(cam) {
     const g = this.hitDebug;
-    g.visible = !!this.game.debug;
+    g.visible = this.bodyDebug.visible = !!this.game.debug;
     if (!g.visible) return;
     let i = 0;
     for (const v of this.map.values()) {
@@ -269,6 +274,23 @@ export class DinoViews {
       }
     }
     for (; i < g.children.length; i++) g.children[i].visible = false;
+
+    // body footprint used against trees (the same circles the server uses)
+    const b = this.bodyDebug;
+    let k = 0;
+    for (const v of this.map.values()) {
+      if (!v.alive || v.type === 'ptera' || v.pos.distanceToSquared(cam) > 90 * 90) continue;
+      const fx = -Math.sin(v.yaw), fz = -Math.cos(v.yaw);
+      for (const [off, r] of CONFIG.dinos[v.type].body || []) {
+        let m = b.children[k];
+        if (!m) b.add(m = new THREE.Mesh(this.bodyDebugGeo, this.bodyDebugMat));
+        m.visible = true;
+        m.position.set(v.pos.x + fx * off, v.pos.y + 0.75, v.pos.z + fz * off);
+        m.scale.set(r, 1, r);
+        k++;
+      }
+    }
+    for (; k < b.children.length; k++) b.children[k].visible = false;
   }
 
   spotVisibleDinosaurs() {

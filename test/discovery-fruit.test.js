@@ -42,7 +42,7 @@ test('a valid dinosaur sighting is shared with the co-op team and late joiners',
   const { id: firstId } = world.join('Scout');
   world.join('Partner');
   const player = world.players.get(firstId);
-  const dino = world.dinos.list.find((d) => d.type === 'brachio');
+  const dino = world.dinos.list.find((d) => d.type !== 'ptera');
   dino.x = world.layout.hut.campfire.x;
   dino.z = world.layout.hut.campfire.z;
   dino.y = world.terrain.heightAt(dino.x, dino.z);
@@ -50,7 +50,7 @@ test('a valid dinosaur sighting is shared with the co-op team and late joiners',
   player.z = dino.z + 5;
   player.y = world.terrain.heightAt(player.x, player.z);
   player.yaw = 0;
-  player.pitch = Math.atan2(dino.y + 5 - player.y - 1.62, 5);
+  player.pitch = Math.atan2(dino.y + (dino.type === 'brachio' ? 5 : dino.type === 'trex' ? 2.5 : 1) - player.y - 1.62, 5);
 
   world.receive(firstId, { t: MSG.ACT, a: ACT.SPOT, dino: dino.id });
   assert.ok(world.spottedDinos.has(dino.id));
