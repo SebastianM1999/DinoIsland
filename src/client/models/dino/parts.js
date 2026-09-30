@@ -236,13 +236,16 @@ export function sideEyes(head, { x, y, z, size, iris = '#2a1a10', lid = '#666', 
     place(eye(size, iris), [-x, y, z], [pitch, -Math.PI / 2 - yaw, 0]),
     place(eye(size, iris), [x, y, z], [pitch, Math.PI / 2 + yaw, 0]),
   ]);
-  head.add(mesh(eyes, MAT.glossy));
+  const eyeMesh = mesh(eyes, MAT.glossy);
+  eyeMesh.name = 'FaceEyes';
+  head.add(eyeMesh);
   // Lids: skin-colored caps centred on the eye height; scale.y blinks.
   const lidGroup = new THREE.Group();
   lidGroup.position.set(0, y, z);
   const capGeo = (sx) => place(blob(size * 1.12, size * 1.12, size * 1.0, lid, { w: 8, h: 6 }), [sx, 0, 0]);
   const lids = mesh(merge([capGeo(-x - size * 0.08), capGeo(x + size * 0.08)]));
   lids.castShadow = false;
+  lids.name = 'FaceEyelids';
   lidGroup.add(lids);
   lids.scale.y = 0.12;
   head.add(lidGroup);

@@ -19,6 +19,7 @@ import { SkinBuilder, loft, restPoint } from './skin.js';
 import { talon } from './theropod.js';
 import { countershade, sideEyes, birdFoot, tube, V } from './parts.js';
 import { DS } from '../../../shared/protocol.js';
+import { paintSkinDetails } from './skinStyle.js';
 
 const COL = {
   main: '#f3e4c0',
@@ -148,6 +149,10 @@ function buildWing(body, side) {
   const top = new THREE.Mesh(mkGeo((u, v, c) => {
     c.copy(cDark).lerp(cTeal, sm(0.0, 0.35, v) * 0.85 + sm(0, 0.3, 1 - u) * 0.15);
     c.lerp(cLight, sm(0.45, 0.8, v) * (1 - sm(0.9, 1.0, v) * 0.5));
+    // Clear finger rays and mottled bands remain attached to the membrane grid.
+    c.lerp(cDark, Math.pow(Math.max(0, Math.cos(u * Math.PI * 8)), 8) * v * .5);
+    c.lerp(cUnderCream, sm(.82, .96, v) * .65);
+    c.multiplyScalar(.93 + .07 * Math.sin(u * 37 + v * 9));
   }), MAT_TOP);
   const bot = new THREE.Mesh(mkGeo((u, v, c) => { c.copy(cUnder).lerp(cUnderCream, sm(0.3, 0.85, v)); }), MAT_BOT);
   // The two sides are coincident: only the top casts (both faces, see MAT_TOP.shadowSide) and
@@ -282,7 +287,7 @@ function buildHead(head, headColor) {
   });
   const nostrils = merge([-1, 1].map((s) => place(blob(0.011, 0.008, 0.03, '#3a2a1a', { w: 6, h: 4 }), [s * 0.028, skullY(-0.3) + 0.03, -0.3], [0.1, 0, 0])));
   head.add(mesh(merge([skull, crest, nostrils])));
-  const lids = sideEyes(head, { x: 0.078, y: 0.04, z: -0.005, size: 0.042, iris: '#e3a21c', lid: COL.back, yaw: 0.3 });
+  const lids = sideEyes(head, { x: 0.083, y: 0.04, z: -0.005, size: 0.054, iris: '#e3a21c', lid: COL.back, yaw: 0.3 });
 
   // lower jaw: a slim tube hanging off the mouth line
   const jaw = new THREE.Group();
@@ -475,6 +480,7 @@ function buildSkin(rig, { neckBase, tailBase, NECK, TAIL, headColor }) {
     skin.loft(loft(as, { radial: 14, segs: 5, color: armColor, capStart: true, capEnd: true, dome: 0.9 }));
   }
   rig.skin = skin.build();
+  paintSkinDetails(rig.skin.geometry, 'ptera', { preserve: true });
 }
 
 // ---------------------------------------------------------------------------

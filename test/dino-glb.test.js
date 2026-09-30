@@ -35,10 +35,17 @@ test('GLBs keep combat, independent skins, semantic clips and terrain animation 
     assert.notEqual(a.head, gltf.scene.getObjectByName('Head'));
     const animator = new DinoAnimator(a, SPECIES[type].anim), other = SPECIES[type].createAnimator(b);
     assert.notEqual(animator.mixer, other.mixer);
+    assert.ok(a.jaw, `${type}: missing movable jaw`);
+    assert.ok(a.model.getObjectByName('FaceEyes'), `${type}: missing visible eyes`);
+    for (const state of ['walk', 'run']) for (const track of a.clips[state].tracks) {
+      const size = track.getValueSize();
+      for (let i = 0; i < size; i++) assert.ok(Math.abs(track.values[i] - track.values[track.values.length - size + i]) < 1e-5,
+        `${type}: ${state} loop seam in ${track.name}`);
+    }
     let triangles = 0;
     a.root.traverse(o => {
       if (o.isMesh) {
-        triangles += o.geometry.index.count / 3;
+        triangles += (o.geometry.index?.count ?? o.geometry.attributes.position.count) / 3;
         assert.ok(o.geometry.attributes.color);
         assert.equal(o.material.flatShading, false);
       }
@@ -72,6 +79,31 @@ test('GLBs keep combat, independent skins, semantic clips and terrain animation 
     animator.update(.1, { speed: 1 });
     assert.equal(animator.state, 'walk');
     assert.ok(Math.abs(animator.actions.walk.timeScale - animator.actions.walk.getClip().duration / spec.walkStride) < 1e-6);
+    // An independent mixer must give the same leg rotations. Terrain overlays
+    // must not run a second solver on the pack's already-baked IK joints.
+    const reference = new THREE.AnimationMixer(b.model);
+    const action = reference.clipAction(b.clips.walk).play();
+    for (let i = 0; i < 60; i++) animator.update(1 / 60, { speed: 1, groundAt: () => 2 });
+    action.time = animator.actions.walk.time; reference.update(0);
+    for (let i = 0; i < a.legChains.length; i++) {
+      for (const joint of ['upper', 'lower', 'foot']) assert.ok(a.legChains[i][joint].quaternion.angleTo(b.legChains[i][joint].quaternion) < .001,
+        `${type}: ${joint} diverged from baked pose`);
+    }
+    reference.stopAllAction();
+    for (let i = 0; i < 120; i++) animator.update(1 / 60, {});
+    const closed = a.jaw.quaternion.clone();
+    for (let i = 0; i < 60; i++) animator.update(1 / 60, { pose: { roar: 1 } });
+    assert.ok(closed.angleTo(a.jaw.quaternion) > .25, `${type}: mouth fails to open`);
+    for (let i = 0; i < 120; i++) animator.update(1 / 60, {});
+    assert.ok(closed.angleTo(a.jaw.quaternion) < .02, `${type}: jaw overlay accumulates`);
+    let previous = a.legChains.map(leg => leg.lower.quaternion.clone());
+    for (let i = 0; i < 360; i++) {
+      animator.update(1 / 60, { speed: 10.2, groundAt: () => 2 });
+      if (i > 20) for (let j = 0; j < previous.length; j++) assert.ok(previous[j].angleTo(a.legChains[j].lower.quaternion) < .4,
+        `${type}: knee snaps during run`);
+      previous = a.legChains.map(leg => leg.lower.quaternion.clone());
+    }
+    assert.ok(animator.actions.run.timeScale / a.clips.run.duration <= spec.maxCadence + 1e-6);
     // Dead pose clamps instead of looping back to standing.
     for (let i = 0; i < 180; i++) animator.update(1 / 60, { dead: true });
     const deathTime = animator.actions.death.time;

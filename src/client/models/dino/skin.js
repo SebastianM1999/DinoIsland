@@ -122,14 +122,16 @@ export function loft(st, { up = new THREE.Vector3(0, 1, 0), radial = 20, segs = 
     for (let k = 0; k < radial; k++) {
       const k2 = (k + 1) % radial;
       const a = base[i] + k, b = base[i] + k2, c = base[i + 1] + k, d = base[i + 1] + k2;
-      idx.push(a, c, b, b, c, d);
+      // S = T × U makes the ring clockwise when viewed along the path.
+      // Keep the exterior front-facing, including the domed ends.
+      idx.push(a, b, c, b, d, c);
     }
   }
   const fan = (apex, ringStart, atEnd) => {
     const ai = vert(apex, apex.c.x, apex.c.y, apex.c.z, apex.t, 0);
     for (let k = 0; k < radial; k++) {
       const a = ringStart + k, b = ringStart + (k + 1) % radial;
-      if (atEnd) idx.push(a, ai, b); else idx.push(ai, a, b);
+      if (atEnd) idx.push(a, b, ai); else idx.push(ai, b, a);
     }
   };
   if (apexS) fan(apexS, base[0], false);

@@ -69,16 +69,17 @@ export function buildGLBDino(type) {
   model.position.y = -template.box.min.y * model.scale.y;
   root.add(tilt); tilt.add(body); body.add(model);
   const byName = new Map();
-  model.traverse(o => { if (o.isBone) byName.set(o.name.replace(/[.\s]/g, ''), o); });
+  model.traverse(o => byName.set(o.name.replace(/[.\s]/g, ''), o));
   const find = name => byName.get(name.replace(/[.\s]/g, ''));
   const list = names => names.map(find).filter(Boolean);
   const rig = { root, tilt, body, model, spec, clips: template.clips, isGLB: true,
     head: find(spec.bones.head), jaw: spec.bones.jaw ? find(spec.bones.jaw) : null,
-    neck: list(spec.bones.neck), tail: list(spec.bones.tail),
+    neck: list(spec.bones.neck), tail: list(spec.bones.tail), eyelids: [],
     feet: list(spec.bones.feet), hitZones: [] };
   rig.legChains = spec.bones.legs.map((name, i) => ({
     upper: find(name), lower: find(spec.bones.knees[i]), foot: find(spec.bones.feet[i]),
   })).filter(leg => leg.upper && leg.lower && leg.foot);
+  model.traverse(o => { if (o.name.startsWith('FaceEyelids')) rig.eyelids.push(o); });
   root.updateMatrixWorld(true);
   // Radii are metres, independent of the source asset's units/nonuniform fit.
   const add = (zone, bone, radius) => { if (bone) rig.hitZones.push({ zone, joint: bone, offset: new THREE.Vector3(), radius }); };
@@ -133,12 +134,9 @@ export class GLBDinoAnimator {
     }));
     this.state = null; this.phase = Math.random(); this.dead = 0; this.trapped = 0;
     this.c = {}; this.time = 0; this.tailAngle = 0; this.tailVelocity = 0;
-    this.layerBones = [...new Set([...rig.neck, rig.head, rig.jaw, ...rig.tail, ...rig.feet,
-      ...rig.legChains.flatMap(leg => [leg.upper, leg.lower])].filter(Boolean))];
+    this.layerBones = [...new Set([...rig.neck, rig.head, rig.jaw, ...rig.tail].filter(Boolean))];
     this.bases = new Map();
     this.v = new THREE.Vector3(); this.q = new THREE.Quaternion();
-    this.footOffsets = new Map();
-    this.ik = new GroundLegIK();
     this.axis = new THREE.Vector3();
     this.rootQuaternion = new THREE.Quaternion();
     this.boneQuaternion = new THREE.Quaternion();
@@ -176,14 +174,17 @@ export class GLBDinoAnimator {
     if (next !== this.state) {
       const previous = this.actions[this.state], action = this.actions[next];
       action.reset().setEffectiveWeight(1).setEffectiveTimeScale(1).play();
+      if (previous && ['walk', 'run'].includes(next) && ['walk', 'run'].includes(this.state))
+        action.time = previous.time / previous.getClip().duration * action.getClip().duration;
       if (previous) { previous.fadeOut(.18); action.fadeIn(.18); }
       this.state = next;
     }
     if (next === 'walk' || next === 'run') {
       const stride = next === 'walk' ? spec.walkStride : spec.runStride;
       const action = this.actions[next];
-      action.setEffectiveTimeScale(speed * action.getClip().duration / stride);
-      this.phase += Math.max(0, dist) / stride;
+      const cadence = Math.min(Math.max(0, speed) / stride, spec.maxCadence);
+      action.setEffectiveTimeScale(cadence * action.getClip().duration);
+      this.phase += cadence * dt;
     }
     this.mixer.update(dt);
     for (const bone of this.layerBones) {
@@ -209,7 +210,10 @@ export class GLBDinoAnimator {
       this.bend(r.head, UP, (look + .025 * Math.sin(this.time * 2) * this.c.alert) * live);
       this.bend(r.head, RIGHT, -.08 * Math.sin(this.time * 9) * this.c.roar * live);
     }
-    if (r.jaw) this.bend(r.jaw, RIGHT, -.4 * this.c.jaw * live);
+    if (r.jaw) r.jaw.rotateX(-.52 * Math.max(this.c.jaw, this.c.roar, this.c.attack) * live);
+    const blinkPhase = this.time % 4.7;
+    const blink = blinkPhase > 4.5 ? Math.sin((blinkPhase - 4.5) / .2 * Math.PI) : 0;
+    for (const lid of r.eyelids) lid.scale.y = .12 + .88 * Math.max(this.dead, blink);
     // Stable substepped spring: tail lags behind turns instead of snapping.
     const target = clamp(-yawRate * .10, -.35, .35) * live;
     for (let left = dt; left > 0;) {
@@ -219,61 +223,10 @@ export class GLBDinoAnimator {
     }
     r.tail.forEach((bone, i) => this.bend(bone, UP,
       (this.tailAngle + Math.sin(this.time * 1.8 - i * .5) * .018 * live) / r.tail.length));
-    // Ground-following contacts: correct only feet near the stance plane, retaining swing arcs.
-    r.root.updateMatrixWorld(true);
-    if (groundAt && live > .05) for (const leg of r.legChains) {
-      const foot = leg.foot;
-      foot.getWorldPosition(this.v);
-      const ground = groundAt(this.v.x, this.v.z);
-      const gap = this.v.y - r.root.position.y;
-      const contact = 1 - clamp(gap / (spec.height * .18), 0, 1);
-      const offset = damp(this.footOffsets.get(foot) || 0,
-        clamp(ground - this.v.y, -spec.height * .12, spec.height * .12) * contact * live, dt, 14);
-      this.footOffsets.set(foot, offset);
-      this.v.y += offset + Math.sin(this.time * 9 + r.feet.indexOf(foot) * Math.PI) * spec.height * .025 * this.trapped;
-      this.ik.solve(leg, this.v);
-      foot.parent.worldToLocal(this.v); foot.position.copy(this.v);
-    }
+    // These clips already contain the source IK result. Their root-parented
+    // foot targets are not knee children; solving that chain again twists legs.
+    // Ground pitch follows the terrain through the body above, retaining the
+    // baked foot poses rather than applying an incompatible second IK solver.
   }
   dispose() { this.mixer.stopAllAction(); this.mixer.uncacheRoot(this.rig.model); }
-}
-
-/** Two-bone solve in world space: keep segment lengths and the clip's knee plane. */
-class GroundLegIK {
-  constructor() {
-    for (const name of ['hip', 'knee', 'foot', 'direction', 'pole', 'desiredKnee', 'from', 'to'])
-      this[name] = new THREE.Vector3();
-    this.delta = new THREE.Quaternion(); this.world = new THREE.Quaternion();
-    this.parent = new THREE.Quaternion(); this.upperDelta = new THREE.Quaternion();
-  }
-  rotate(bone, from, to) {
-    if (from.lengthSq() < 1e-8 || to.lengthSq() < 1e-8) return;
-    this.delta.setFromUnitVectors(from.normalize(), to.normalize());
-    bone.getWorldQuaternion(this.world);
-    bone.parent.getWorldQuaternion(this.parent).invert();
-    bone.quaternion.copy(this.parent.multiply(this.delta).multiply(this.world));
-    bone.updateWorldMatrix(false, true);
-  }
-  solve({ upper, lower, foot }, target) {
-    upper.getWorldPosition(this.hip); lower.getWorldPosition(this.knee); foot.getWorldPosition(this.foot);
-    const l1 = this.hip.distanceTo(this.knee), l2 = this.knee.distanceTo(this.foot);
-    if (l1 < 1e-4 || l2 < 1e-4) return;
-    this.direction.copy(target).sub(this.hip);
-    const distance = clamp(this.direction.length(), Math.abs(l1-l2)+.0001, l1+l2-.0001);
-    this.direction.normalize();
-    this.pole.copy(this.knee).sub(this.hip);
-    this.pole.addScaledVector(this.direction, -this.pole.dot(this.direction));
-    if (this.pole.lengthSq() < 1e-8) this.pole.set(0, 0, 1).addScaledVector(this.direction, -this.direction.z);
-    this.pole.normalize();
-    const along = (l1*l1 - l2*l2 + distance*distance) / (2*distance);
-    const side = Math.sqrt(Math.max(0, l1*l1 - along*along));
-    this.desiredKnee.copy(this.hip).addScaledVector(this.direction, along).addScaledVector(this.pole, side);
-    this.from.copy(this.knee).sub(this.hip); this.to.copy(this.desiredKnee).sub(this.hip);
-    this.upperDelta.setFromUnitVectors(this.from.normalize(), this.to.normalize());
-    this.rotate(upper, this.from, this.to);
-    this.from.copy(this.foot).sub(this.knee).applyQuaternion(this.upperDelta);
-    lower.getWorldPosition(this.knee);
-    this.to.copy(target).sub(this.knee);
-    this.rotate(lower, this.from, this.to);
-  }
 }

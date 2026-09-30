@@ -1,8 +1,35 @@
 {
   "models": [
-    { "id": "dino-raptor", "file": "assets/models/dinos/raptor.glb", "source": "Quaternius Animated Dinosaur Pack / Velociraptor", "license": "CC0-1.0", "url": "https://quaternius.com/packs/animateddinosaurs.html", "triangles": 20608 },
-    { "id": "dino-trex", "file": "assets/models/dinos/trex.glb", "source": "Quaternius Animated Dinosaur Pack / T-Rex", "license": "CC0-1.0", "url": "https://quaternius.com/packs/animateddinosaurs.html", "triangles": 27968 },
-    { "id": "dino-stego", "file": "assets/models/dinos/stego.glb", "source": "Quaternius Animated Dinosaur Pack / Stegosaurus", "license": "CC0-1.0", "url": "https://quaternius.com/packs/animateddinosaurs.html", "triangles": 36752 },
-    { "id": "dino-brachio", "file": "assets/models/dinos/brachio.glb", "source": "Quaternius Animated Dinosaur Pack / Apatosaurus", "license": "CC0-1.0", "url": "https://quaternius.com/packs/animateddinosaurs.html", "triangles": 22960 }
+    {
+      "id": "dino-raptor",
+      "file": "assets/models/dinos/raptor.glb",
+      "source": "Quaternius Animated Dinosaur Pack / Velociraptor",
+      "license": "CC0-1.0",
+      "url": "https://quaternius.com/packs/animateddinosaurs.html",
+      "triangles": 27281
+    },
+    {
+      "id": "dino-trex",
+      "file": "assets/models/dinos/trex.glb",
+      "source": "Quaternius Animated Dinosaur Pack / T-Rex",
+      "license": "CC0-1.0",
+      "url": "https://quaternius.com/packs/animateddinosaurs.html",
+      "triangles": 25882
+    },
+    {
+      "id": "dino-stego",
+      "file": "assets/models/dinos/stego.glb",
+      "source": "Quaternius Animated Dinosaur Pack / Stegosaurus",
+      "license": "CC0-1.0",
+      "url": "https://quaternius.com/packs/animateddinosaurs.html",
+      "triangles": 41216
+    },
+    {
+      "id": "dino-brachio",
+      "file": "assets/models/dinos/brachio.glb",
+      "source": "Project-authored Brachiosaurus; scripts/build-brachio-glb.mjs",
+      "license": "Project source",
+      "triangles": 29588
+    }
   ]
 }

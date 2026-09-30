@@ -239,7 +239,7 @@ export function standPose(rig, params) {
   rig.tilt.position.set(0, 0, 0);
 }
 
-function buildHead(head, P, C) {
+export function buildHead(head, P, C) {
   const span = P.back + P.L;
   const zAt = (t) => P.back - t * span;
   const tAt = (z) => (P.back - z) / span;
@@ -302,11 +302,11 @@ function buildHead(head, P, C) {
   const TE = P.teeth;
   const ty = mY + TE.size * 0.15;
   const t0 = TE.from, t1 = TE.to;
-  for (const s of [-1, 1]) {
+  for (const s of TE.upper ? [-1, 1] : []) {
     parts.push(teethRow(V(s * rxAt(t0) * 0.86, ty, zAt(t0)), V(s * rxAt(t1) * 0.86, ty, zAt(t1)), TE.upper, TE.size, -1, C.tooth));
   }
   const tf = 0.975;
-  parts.push(teethRow(V(-rxAt(tf) * 0.55, ty, zAt(tf)), V(rxAt(tf) * 0.55, ty, zAt(tf)), TE.front, TE.size * 0.75, -1, C.tooth));
+  if (TE.front) parts.push(teethRow(V(-rxAt(tf) * 0.55, ty, zAt(tf)), V(rxAt(tf) * 0.55, ty, zAt(tf)), TE.front, TE.size * 0.75, -1, C.tooth));
   // dark throat backing so the open mouth doesn't look hollow
   parts.push(place(blob(P.W * 0.7, P.H * 0.55, P.H * 0.6, C.throat ?? '#5a2226', { w: 7, h: 5 }), [0, mY - P.H * 0.25, zAt(0.1)]));
   head.add(mesh(merge(parts)));
@@ -342,10 +342,10 @@ function buildHead(head, P, C) {
   jawGeo = deform(jawGeo, (v) => { if (v.y > 0) v.y *= 0.12; });
   const jparts = [jawGeo];
   const jt0 = TE.lowFrom, jt1 = TE.lowTo;
-  for (const s of [-1, 1]) {
+  for (const s of TE.lower ? [-1, 1] : []) {
     jparts.push(teethRow(V(s * jrx(jt0) * 0.8, -TE.size * 0.1, -jt0 * jLen), V(s * jrx(jt1) * 0.8, -TE.size * 0.1, -jt1 * jLen), TE.lower, TE.size * 0.9, 1, C.tooth));
   }
-  jparts.push(teethRow(V(-jrx(0.97) * 0.45, -TE.size * 0.1, -0.97 * jLen), V(jrx(0.97) * 0.45, -TE.size * 0.1, -0.97 * jLen), 2, TE.size * 0.7, 1, C.tooth));
+  if (TE.lower) jparts.push(teethRow(V(-jrx(0.97) * 0.45, -TE.size * 0.1, -0.97 * jLen), V(jrx(0.97) * 0.45, -TE.size * 0.1, -0.97 * jLen), 2, TE.size * 0.7, 1, C.tooth));
   // chin / throat pouch in cream
   jparts.push(place(blob(jrx(0.2) * 0.85, P.jawDepth * 0.7, jLen * 0.3, C.belly, { w: 8, h: 5 }), [0, -P.jawDepth * 0.75, -jLen * 0.22]));
   jaw.add(mesh(merge(jparts)));
