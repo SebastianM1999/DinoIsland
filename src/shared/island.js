@@ -179,8 +179,16 @@ function riverCarve(plan, x, z, h) {
     }
     return bed;
   }
-  // banks: sloped valley walls up to the natural ground
-  return Math.min(h, q.surface + 0.25 + (q.d - half) * (plan.river.kind === 'lava' ? 0.55 : 0.42));
+  // banks: sloped valley walls up to the natural ground ...
+  const bank = q.surface + 0.25 + (q.d - half) * (plan.river.kind === 'lava' ? 0.55 : 0.42);
+  let out = Math.min(h, bank);
+  // ... and never lower than the water beside it: a low natural levee keeps the
+  // river in its bed (except where it meets the sea, which is its mouth)
+  if (q.surface > 0.3 && q.d < half + 7) {
+    const levee = q.surface + 0.35 + (q.d - half) * 0.12;
+    out = Math.max(out, lerp(levee, out, smoothstep(half + 4, half + 7, q.d)));
+  }
+  return out;
 }
 
 /** Mountain paths: ramps spiralling up to the summit, cut into / built onto the slopes. */
@@ -196,11 +204,13 @@ function rampEffect(plan, x, z, h) {
       const d = Math.hypot(a.x + vx * u - x, a.z + vz * u - z);
       if (d < bd) { bd = d; by = lerp(a.y, b.y, u); }
     }
-    if (bd > r.width * 2.4) continue;
-    // flat walkway, then a bank blending back into the mountain
-    const w = 1 - smoothstep(r.width * 0.55, r.width * 2.4, bd);
-    const cut = bd < r.width * 0.55 ? by : lerp(h, by, w);
-    h = bd < r.width * 0.55 ? by : (h > by ? Math.max(by, cut) : Math.min(by, Math.max(h, cut)));
+    // the walkway breathes: wider and narrower stretches
+    const width = r.width * (0.8 + 0.35 * (valueNoise(x * 0.08, z * 0.08, plan.seed + 71) * 0.5 + 0.5));
+    if (bd > width * 2.6) continue;
+    // walkway, then a soft bank blending back into the mountain
+    const w = 1 - smoothstep(width * 0.5, width * 2.6, bd);
+    const cut = bd < width * 0.5 ? by : lerp(h, by, w * w * (3 - 2 * w));
+    h = bd < width * 0.5 ? by : (h > by ? Math.max(by, cut) : Math.min(by, Math.max(h, cut)));
   }
   return h;
 }
@@ -428,24 +438,29 @@ export function planIsland(levelIndex = 0, variant = 1) {
         const y = naturalHeight(plan, x, z);
         if (y > top.y) top = { x, z, y };
       }
-      const nRamps = f.main || f.height > 25 ? 2 : 1;
-      for (let q = 0; q < nRamps; q++) {
-        const a0 = rng() * TAU + q * Math.PI;
-        const R0 = f.radius * (f.stretch ? 1 : 1.02);
-        const turns = 1.15 + f.height / 90;
-        const pts = [];
-        const steps = 90;
-        const base = naturalHeight(plan, f.x + Math.cos(a0) * R0, f.z + Math.sin(a0) * R0);
-        for (let i = 0; i <= steps; i++) {
-          const t = i / steps;
-          const a = a0 + t * turns * TAU;
-          const r = R0 * (1 - t) + 2.5 * t;
-          const x = top.x + (f.x - top.x) * (1 - t) + Math.cos(a) * r;
-          const z = top.z + (f.z - top.z) * (1 - t) + Math.sin(a) * r;
-          pts.push({ x, z, y: lerp(base, top.y, smoothstep(0, 1, t) * 0.25 + t * 0.75) });
-        }
-        plan.ramps.push({ pts, width: 3.4, cx: f.x, cz: f.z, reach: R0 + 12, hill: f.id });
+      // one winding trail per mountain: it wanders around the flank at an
+      // uneven pace, with random bends and a varying radius – no perfect spiral
+      const a0 = rng() * TAU;
+      const dirSign = rng() < 0.5 ? -1 : 1;
+      const R0 = f.radius * (f.stretch ? 1 : rng.range(0.95, 1.1));
+      const turns = rng.range(0.9, 1.35) + f.height / 110;
+      const pts = [];
+      const steps = 110;
+      const base = naturalHeight(plan, f.x + Math.cos(a0) * R0, f.z + Math.sin(a0) * R0);
+      const s = plan.seed + f.id * 7;
+      for (let i = 0; i <= steps; i++) {
+        const t = i / steps;
+        // uneven angular speed (bends) + radius wobble
+        const a = a0 + dirSign * (t * turns * TAU + valueNoise(t * 4, 1.3, s) * 0.55);
+        const wob = 1 + valueNoise(t * 6, 7.1, s + 1) * 0.16;
+        const r = (R0 * (1 - t) + 3 * t) * wob;
+        const x = top.x + (f.x - top.x) * (1 - t) + Math.cos(a) * r;
+        const z = top.z + (f.z - top.z) * (1 - t) + Math.sin(a) * r;
+        // steady climb with small flats and steeper bits
+        const climb = t + valueNoise(t * 5, 3.7, s + 2) * 0.03;
+        pts.push({ x, z, y: lerp(base, top.y, clamp(smoothstep(0, 1, climb) * 0.25 + climb * 0.75, 0, 1)) });
       }
+      plan.ramps.push({ pts, width: rng.range(2.8, 3.6), cx: f.x, cz: f.z, reach: R0 * 1.2 + 12, hill: f.id });
     }
   }
 
@@ -510,7 +525,20 @@ export function planIsland(levelIndex = 0, variant = 1) {
       pts.push({ x, z });
     }
     pts.push({ x: plan.boat.x - 10, z: plan.boat.z });
-    plan.trail = pts;
+    // round the corners and let it wander a little between the waypoints
+    const smooth = [];
+    for (let i = 0; i < pts.length - 1; i++) {
+      const p0 = pts[Math.max(0, i - 1)], p1 = pts[i], p2 = pts[i + 1], p3 = pts[Math.min(pts.length - 1, i + 2)];
+      for (let k = 0; k < 6; k++) {
+        const t = k / 6, t2 = t * t, t3 = t2 * t;
+        const cr = (a, b, c, d) => 0.5 * ((2 * b) + (-a + c) * t + (2 * a - 5 * b + 4 * c - d) * t2 + (-a + 3 * b - 3 * c + d) * t3);
+        const x = cr(p0.x, p1.x, p2.x, p3.x), zz = cr(p0.z, p1.z, p2.z, p3.z);
+        const n = i > 0 && i < pts.length - 2 ? valueNoise(x * 0.05, zz * 0.05, plan.seed + 77) * 4 : 0;
+        smooth.push({ x, z: zz + n });
+      }
+    }
+    smooth.push(pts[pts.length - 1]);
+    plan.trail = smooth;
   }
 
   // --- sites: caves, ruins, nest, meadows (flat pads away from trail, river and each other)
@@ -518,7 +546,7 @@ export function planIsland(levelIndex = 0, variant = 1) {
     { x: plan.hut.x, z: plan.hut.z, r: 40 },
     { x: plan.boat.x, z: plan.boat.z, r: 30 },
     ...plan.pools.map((p) => ({ x: p.x, z: p.z, r: p.r + 14 })),
-    ...plan.hills.filter((h) => h.main || h.spur).map((h) => ({ x: h.x, z: h.z, r: h.radius * 0.7 })),
+    ...plan.hills.filter((h) => h.main || h.spur).map((h) => ({ x: h.x, z: h.z, r: h.radius * 0.7, hill: true })),
   ];
   if (plan.volcano) taken.push({ x: plan.volcano.x, z: plan.volcano.z, r: plan.volcano.radius * 0.72 });
   const fnN = (x, z) => poolEffect(plan, x, z, naturalHeight(plan, x, z));
@@ -538,14 +566,45 @@ export function planIsland(levelIndex = 0, variant = 1) {
   };
   const addPad = (s, r) => { plan.pads.push({ x: s.x, z: s.z, r, h: s.h }); };
   plan.sites.caves = [];
-  for (let i = 0; i < 2; i++) {
-    const s = findSpot(10, { maxSlope: 0.45 });
-    if (!s) continue;
-    // entrance faces the trail (roughly toward the island's centre line)
-    const rot = Math.atan2(s.x - 0, -(0 - s.z)) + rng.range(-0.4, 0.4);
-    const c = { x: s.x, z: s.z, y: s.h, rot, seed: rng.int(1, 9999) };
-    plan.sites.caves.push(c);
-    addPad(s, 11);
+  {
+    // caves are dug into the flank of a hill or mountain: the slope rises behind
+    // and around them, the entrance looks out over the lowland
+    const hosts = plan.hills.filter((h) => !h.spur && h.height > 7 && h.radius > 12).sort(() => rng() - 0.5);
+    const rampNear = (x, z, pad) => plan.ramps.some((r) => r.pts.some((p) => Math.hypot(p.x - x, p.z - z) < pad));
+    for (const f of hosts) {
+      if (plan.sites.caves.length >= 2) break;
+      for (let tries = 0; tries < 40; tries++) {
+        const a = rng() * TAU;
+        const ox = Math.cos(a), oz = Math.sin(a);
+        // walk outward from the hill until the ground is ~4-9 m above the foot
+        let spot = null;
+        for (let r = f.radius * 0.35; r < f.radius * 1.2; r += 1) {
+          const x = f.x + ox * r, z = f.z + oz * r;
+          const hIn = fnN(x, z), hOut = fnN(x + ox * 12, z + oz * 12);
+          if (hIn - hOut > 3.5 && hIn - hOut < 10 && hOut > 2.5) { spot = { x: x + ox * 3, z: z + oz * 3, h: fnN(x + ox * 10, z + oz * 10) }; }
+          if (hIn - hOut < 3.5 && spot) break;
+        }
+        if (!spot || !insideEllipse(plan, spot.x, spot.z, 0.82)) continue;
+        // (mountains themselves are fine hosts – only other sites and pools are in the way)
+        if (taken.some((t) => !t.hill && Math.hypot(t.x - spot.x, t.z - spot.z) < t.r + 9)) continue;
+        if (distToPolyline(plan.river.pts, spot.x, spot.z) < 18 || distToPolyline(plan.trail, spot.x, spot.z) < 10 || rampNear(spot.x, spot.z, 14)) continue;
+        // entrance (local -z) faces outward, away from the hill
+        const rot = Math.atan2(-ox, -oz);
+        plan.sites.caves.push({ x: spot.x, z: spot.z, y: spot.h, rot, seed: rng.int(1, 9999), host: f.id });
+        // flatten the floor and the approach in front, not the hill behind
+        plan.pads.push({ x: spot.x, z: spot.z, r: 7.5, h: spot.h });
+        plan.pads.push({ x: spot.x + ox * 7, z: spot.z + oz * 7, r: 6, h: spot.h });
+        taken.push({ x: spot.x, z: spot.z, r: 18 });
+        break;
+      }
+    }
+    // fallback: free-standing rock hill with a cave if no flank was found
+    while (plan.sites.caves.length < 2) {
+      const s = findSpot(10, { maxSlope: 0.45 });
+      if (!s) break;
+      plan.sites.caves.push({ x: s.x, z: s.z, y: s.h, rot: rng() * TAU, seed: rng.int(1, 9999) });
+      addPad(s, 11);
+    }
   }
   {
     const s = findSpot(12, { maxSlope: 0.35 });

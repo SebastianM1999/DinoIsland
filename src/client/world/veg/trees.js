@@ -47,7 +47,7 @@ export const MANGO_FRUIT_LOCAL = [
 
 /** World matrix of a layout tree (shared by vegetation + fruit plants). */
 const _q = new THREE.Quaternion(), _e = new THREE.Euler(), _p = new THREE.Vector3(), _s = new THREE.Vector3();
-export function treeMatrix(t, out = new THREE.Matrix4(), sink = TREE_SINK) {
+export function treeMatrix(t, out = new THREE.Matrix4(), sink = t.sink ?? TREE_SINK) {
   _e.set(t.lean, t.rot, t.lean * 0.5, 'YXZ');
   _q.setFromEuler(_e);
   _p.set(t.x, t.y - sink, t.z);

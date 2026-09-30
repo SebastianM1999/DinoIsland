@@ -90,7 +90,7 @@ export const TREE_SINK = 0.12;
  * Local -> world for a layout tree: scale, then Euler(lean, rot, lean/2, 'YXZ'),
  * then translate. Must match treeMatrix() in client/world/veg/trees.js.
  */
-export function treePoint(t, [x, y, z], sink = TREE_SINK) {
+export function treePoint(t, [x, y, z], sink = t.sink ?? TREE_SINK) {
   x *= t.scale; y *= t.scale; z *= t.scale;
   const c = t.lean * 0.5, a = t.lean, b = t.rot;
   let x1 = x * Math.cos(c) - y * Math.sin(c), y1 = x * Math.sin(c) + y * Math.cos(c);    // Z

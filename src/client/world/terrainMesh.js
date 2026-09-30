@@ -86,9 +86,11 @@ export function buildTerrainMesh(terrain, layout) {
     }
 
     const pd = layout.distToPath(x, z);
-    const pathW = 1.7 + fbm(x * 0.12, z * 0.12, 2, S + 92) * 0.5;
-    base.copy(P.dirt).lerp(P.dirtDark, 0.25 + noise * 0.3);
-    color.lerp(base, (1 - smoothstep(pathW - 0.35, pathW + 1.5, pd)) * 0.9);
+    // trails are worn-in, not painted: varying width, patchy, fading in and out
+    const pathW = 1.3 + fbm(x * 0.09, z * 0.09, 2, S + 92) * 0.9;
+    const worn = smoothstep(-0.35, 0.35, fbm(x * 0.06 + 3, z * 0.06, 3, S + 89)) * 0.55 + 0.2;
+    base.copy(P.dirt).lerp(P.dirtDark, 0.25 + noise * 0.3).lerp(color, 0.25);
+    color.lerp(base, (1 - smoothstep(pathW - 0.5, pathW + 1.8, pd + fbm(x * 0.4, z * 0.4, 2, S + 88) * 0.8)) * worn);
     const hd = Math.hypot(x - hut.campfire.x, z - hut.campfire.z);
     color.lerp(base, (1 - smoothstep(6, 13, hd)) * 0.9);
     // fine speckle so large areas never look flat

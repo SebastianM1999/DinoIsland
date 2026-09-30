@@ -4,7 +4,7 @@
 // for AI, relic pickups and the boat.
 
 import { makeRng, fbm, smoothstep } from './rng.js';
-import { TRUNKS, treeColliders } from './treeShapes.js';
+import { TRUNKS, TREE_SINK, treeColliders } from './treeShapes.js';
 import { placeRock, rockSurfaceAt, PEBBLE_SCALE } from './rockShapes.js';
 import { RELIC_FOR_SITE } from './relics.js';
 import { caveColliders, caveInterior, caveMouth } from './caveShape.js';
@@ -122,7 +122,20 @@ export function buildLayout(terrain) {
       }
     }
     if (bottom && top) {
-      layout.waterfall = { top, bottom, dirX: -dir.x, dirZ: -dir.z, width: 5, kind: 'water' };
+      // The water springs from a cave in the cliff face (about a third of the way
+      // down from the rim), not from the flat mountain top.
+      const drop = top.y - pool.level;
+      let src = top;
+      for (let d = 0; d < 80; d += 0.25) {
+        const x = pool.x + dir.x * d, z = pool.z + dir.z * d;
+        if (terrain.heightAt(x, z) > pool.level + drop * 0.62) {
+          src = { x: x + dir.x * 0.9, z: z + dir.z * 0.9, y: pool.level + drop * 0.62 };
+          break;
+        }
+      }
+      const width = 4.5;
+      const source = { x: src.x, y: src.y, z: src.z, rot: Math.atan2(dir.x, dir.z), width };
+      layout.waterfall = { top: { x: src.x, y: src.y, z: src.z }, bottom, dirX: -dir.x, dirZ: -dir.z, width, kind: 'water', source };
       layout.waterfalls.push(layout.waterfall);
     }
   }
@@ -273,6 +286,16 @@ export function buildLayout(terrain) {
   const addTree = (type, x, z, scale, spacing) => {
     const y = terrain.heightAt(x, z);
     const t = { id: treeId++, type, x, z, y, scale, rot: rng() * TAU, lean: rng.range(-0.12, 0.12), hue: rng() };
+    // on a slope the uphill side of the trunk would bury and the downhill side float:
+    // sink the tree by the drop across its foot (roots, buttresses included)
+    const shape = TRUNKS[type][t.id % TRUNKS[type].length];
+    const footR = Math.max(shape.r(0), ...(shape.base || []).map((b) => b[1] * 0.7)) * scale;
+    let lo = Infinity;
+    for (let k = 0; k < 8; k++) {
+      const a = (k / 8) * TAU;
+      lo = Math.min(lo, terrain.heightAt(x + Math.cos(a) * footR, z + Math.sin(a) * footR));
+    }
+    t.sink = TREE_SINK + Math.max(0, y - lo) + 0.05;
     layout.trees.push(t);
     reserve(x, z, spacing * 2.2);
     circles.push(...treeColliders(t));
