@@ -6,7 +6,9 @@
 import * as THREE from 'three';
 import { paint, place, part, merge, mesh, blob, deform } from '../kit.js';
 import { Rig } from './rig.js';
-import { countershade, chain, sideEyes, teethRow, tube, spike, roundFoot, V } from './parts.js';
+import { SkinBuilder, loft, restPoint } from './skin.js';
+import { jointChain, standPose } from './theropod.js';
+import { countershade, sideEyes, teethRow, tube, spike, roundFoot, V } from './parts.js';
 import { DS } from '../../../shared/protocol.js';
 
 const COL = {
@@ -114,60 +116,25 @@ export function buildStego() {
   const body = rig.body;
   body.position.set(0, 1.95, 0);
 
-  // ---- torso: heavy arched back peaking over the hips
   const chest = new THREE.Group();
   body.add(chest);
   rig.chest = chest;
-  const z0 = TORSO[0][0], z1 = TORSO[TORSO.length - 1][0];
-  const bodyColor = countershade({ main: COL.main, back: COL.back, belly: COL.belly, stripe: COL.stripe, stripes: 6, stripeWidth: 0.26, bellyFrom: 2.05, backTo: 0.7 });
-  const torso = tube(TORSO.map((r) => V(0, r[1], r[0])), (t) => {
-    const p = prof(z0 + (z1 - z0) * t);
-    return [p[3], p[2]];
-  }, { radial: 12, color: bodyColor, smoothColors: true });
-  const bulges = [];
-  for (const s of [-1, 1]) {
-    bulges.push(place(blob(0.36, 0.62, 0.72, COL.main, { w: 8, h: 6 }), [s * 0.66, -0.02, 0.62]));   // thigh muscle
-    bulges.push(place(blob(0.27, 0.48, 0.48, COL.main, { w: 8, h: 6 }), [s * 0.55, -0.22, -1.1]));      // shoulder
-  }
-  chest.add(mesh(merge([torso, ...bulges])));
 
-  // ---- back plates (two alternating rows, big over the hips)
-  const plates = [];
-  const plateH = (z) => 0.34 + 0.8 * Math.exp(-(((z - 0.35) / 1.25) ** 2));
-  const zs = [-1.55, -1.1, -0.62, -0.12, 0.38, 0.88, 1.36];
-  zs.forEach((z, i) => {
-    for (const s of [-1, 1]) {
-      const zz = z + (s > 0 ? 0.24 : 0);
-      const h = plateH(zz) * (s > 0 ? 0.94 : 1);
-      const p = prof(zz);
-      plates.push(place(plateGeo(h, h * 0.9), [s * 0.11, p[1] + p[2] - 0.12, zz], [0, 0, -s * 0.13]));
-    }
-  });
-  body.add(mesh(merge(plates)));
-
-  // ---- legs
+  // ---------------------------------------------------------------- skeleton
+  // legs: rigid stubby feet on the joints, the soft leg is part of the skin
   const mkLeg = (x, y, z, l1, l2, r1, r2, front) => {
     const hip = new THREE.Group();
     hip.position.set(x, y, z);
     body.add(hip);
-    const thighGeo = tube([V(0, 0.4, 0), V(0, -l1 * 0.5, 0), V(0, -l1 - r2 * 0.5, 0)], (t) => [r1 * (1.1 - t * 0.4), r1 * 1.2 * (1.1 - t * 0.4)], {
-      radial: 9, up: V(0, 0, -1), color: (t, a) => (Math.abs(((a + Math.PI) % (Math.PI * 2)) - Math.PI) > 2.4 && t > 0.15 && t < 0.4 ? COL.belly : COL.leg),
-    });
-    hip.add(mesh(thighGeo));
     const knee = new THREE.Group();
     knee.position.y = -l1;
     hip.add(knee);
-    const shinGeo = tube([V(0, r2 * 0.5, 0), V(0, -l2 * 0.5, 0), V(0, -l2 + 0.04, 0)], (t) => r2 * (1.05 - t * 0.15), {
-      radial: 8, up: V(0, 0, -1), color: (t) => (t > 0.7 ? COL.legDark : COL.leg),
-    });
-    // knee ball keeps the bent joint rounded
-    knee.add(mesh(merge([shinGeo, place(blob(r2 * 1.12, r2 * 1.15, r2 * 1.12, COL.leg), [0, 0, 0])])));
     const foot = new THREE.Group();
     foot.position.y = -l2;
     knee.add(foot);
     const footH = 0.2;
     foot.add(mesh(stubbyFoot(r2 * 1.12, footH, front ? 4 : 3, COL.legDark, COL.nail)));
-    return { hip, knee, foot, l1, l2, footH, kneeDir: front ? -1 : 1, front };
+    return { hip, knee, foot, l1, l2, r1, r2, footH, kneeDir: front ? -1 : 1, front };
   };
   // hind: hip joint ~1.75 m above ground; front legs shorter
   const LH = mkLeg(-0.66, -0.2, 0.62, 0.86, 0.8, 0.36, 0.25, false);
@@ -177,18 +144,18 @@ export function buildStego() {
   LH.offset = 0; LF.offset = 0.25; RH.offset = 0.5; RF.offset = 0.75;   // lateral sequence
   rig.legs.push(LH, LF, RH, RF);
 
-  // ---- neck (short, sloping down) with small plates
+  // ---- neck (short, sloping down)
   const neckBase = new THREE.Group();
   neckBase.position.set(0, -0.32, -1.62);
   body.add(neckBase);
-  const neckColor = countershade({ main: COL.main, back: COL.back, belly: COL.belly, bellyFrom: 1.9, backTo: 0.65 });
   const neckSegs = [
-    { len: 0.5, r0: [0.44, 0.44], r1: [0.35, 0.34], rx: -0.42 },
-    { len: 0.45, r0: [0.35, 0.34], r1: [0.27, 0.26], rx: -0.14 },
+    { len: 0.5, r: 0.41, rx: -0.42 },
+    { len: 0.45, r: 0.32, rx: -0.14 },
   ];
-  neckSegs[0].ex = [place(plateGeo(0.3, 0.26), [-0.08, 0.33, -0.12], [0, 0, 0.12]), place(plateGeo(0.26, 0.22), [0.08, 0.3, 0.1], [0, 0, -0.12])];
-  neckSegs[1].ex = [place(plateGeo(0.22, 0.2), [-0.07, 0.24, -0.18], [0, 0, 0.12]), place(plateGeo(0.19, 0.18), [0.07, 0.23, 0.02], [0, 0, -0.12])];
-  rig.neck = chain(neckBase, neckSegs, { dir: 'fwd', color: neckColor, radial: 10, capFirst: false });
+  rig.neck = jointChain(neckBase, neckSegs, 'fwd');
+  // small plates on the neck (rigid, on their joints)
+  rig.neck[0].add(mesh(merge([place(plateGeo(0.3, 0.26), [-0.08, 0.36, -0.14], [0, 0, 0.12]), place(plateGeo(0.26, 0.22), [0.08, 0.33, 0.1], [0, 0, -0.12])])));
+  rig.neck[1].add(mesh(merge([place(plateGeo(0.22, 0.2), [-0.07, 0.27, -0.2], [0, 0, 0.12]), place(plateGeo(0.19, 0.18), [0.07, 0.26, 0.02], [0, 0, -0.12])])));
 
   // ---- head: small, low, beaked
   const head = new THREE.Group();
@@ -198,7 +165,7 @@ export function buildStego() {
   rig.head = head;
   const headColor = countershade({ main: COL.main, back: COL.back, belly: COL.belly, bellyFrom: 2.0, backTo: 0.8 });
   const skull = tube([V(0, 0.02, 0.2), V(0, 0.04, -0.18), V(0, -0.0, -0.48), V(0, -0.05, -0.64)],
-    (t) => [0.22 - t * 0.11, 0.22 - t * 0.12], { radial: 10, color: headColor });
+    (t) => [0.22 - t * 0.11, 0.22 - t * 0.12], { radial: 12, color: headColor });
   const beak = place(deform(spike(0.12, 0.2, COL.beak, COL.beakTip, 7), (v) => { v.x *= 0.9; v.z *= 0.6; }), [0, -0.07, -0.6], [-Math.PI / 2 - 0.25, 0, 0]);
   const nostrils = merge([
     place(blob(0.035, 0.025, 0.05, '#2c3614'), [-0.07, 0.04, -0.55]),
@@ -226,26 +193,38 @@ export function buildStego() {
   const tailBase = new THREE.Group();
   tailBase.position.set(0, -0.06, 1.66);
   body.add(tailBase);
-  const tailColor = countershade({ main: COL.main, back: COL.back, belly: COL.belly, stripe: COL.stripe, stripes: 6, stripeWidth: 0.3, bellyFrom: 2.2, backTo: 0.7 });
   const tr = [0.5, 0.42, 0.34, 0.26, 0.19, 0.13, 0.07];
   const tl = [0.55, 0.52, 0.5, 0.46, 0.44, 0.42];
   const trx = [0.1, -0.06, -0.06, -0.04, -0.02, 0];
-  const tailSegs = [];
-  for (let i = 0; i < 6; i++) tailSegs.push({ len: tl[i], r0: [tr[i], tr[i] * 1.05], r1: [tr[i + 1], tr[i + 1] * 1.05], rx: trx[i] });
-  // tail plates (continuing the two rows, shrinking)
+  rig.tail = jointChain(tailBase, tl.map((len, i) => ({ len, rx: trx[i] })), 'back');
+  // tail plates (continuing the two rows, shrinking), rigid on their joints
   const tp = [[0.5, 0.44], [0.36, 0.3], [0.24]];
   tp.forEach((hs, i) => {
-    tailSegs[i].ex = hs.map((h, k) => {
+    const ex = hs.map((h, k) => {
       const s = k === 0 ? -1 : 1;
       const z = k === 0 ? 0.08 : 0.3;
       const r = tr[i] + (tr[i + 1] - tr[i]) * (z / tl[i]);
       return place(plateGeo(h, h * 0.9, 0.3), [s * 0.08, r * 1.05 - 0.07, z], [0, 0, -s * 0.13]);
     });
+    rig.tail[i].add(mesh(merge(ex)));
   });
   // thagomizer: four spikes, two pairs, pointing out, up and back
-  tailSegs[4].ex = [-1, 1].map((s) => place(tailSpike(0.68, 0.075, V(s * 0.8, 0.5, 0.35)), [s * 0.1, 0.06, 0.3]));
-  tailSegs[5].ex = [-1, 1].map((s) => place(tailSpike(0.6, 0.065, V(s * 0.75, 0.45, 0.6)), [s * 0.07, 0.04, 0.22]));
-  rig.tail = chain(tailBase, tailSegs, { dir: 'back', color: tailColor, radial: 9, capFirst: false });
+  rig.tail[4].add(mesh(merge([-1, 1].map((s) => place(tailSpike(0.68, 0.075, V(s * 0.8, 0.5, 0.35)), [s * 0.1, 0.06, 0.3])))));
+  rig.tail[5].add(mesh(merge([-1, 1].map((s) => place(tailSpike(0.6, 0.065, V(s * 0.75, 0.45, 0.6)), [s * 0.07, 0.04, 0.22])))));
+
+  // ---- back plates (two alternating rows, big over the hips), rigid on the body
+  const plateH = (z) => 0.34 + 0.8 * Math.exp(-(((z - 0.35) / 1.25) ** 2));
+  const plates = [];
+  const zs = [-1.55, -1.1, -0.62, -0.12, 0.38, 0.88, 1.36];
+  zs.forEach((z) => {
+    for (const s of [-1, 1]) {
+      const zz = z + (s > 0 ? 0.24 : 0);
+      const h = plateH(zz) * (s > 0 ? 0.94 : 1);
+      const p = prof(zz);
+      plates.push(place(plateGeo(h, h * 0.9), [s * 0.11, p[1] + p[2] - 0.12, zz], [0, 0, -s * 0.13]));
+    }
+  });
+  body.add(mesh(merge(plates)));
 
   // ---- hit zones: plates on top (protect from above/behind), flanks + neck are weak spots
   rig.hitZones.push({ zone: 'head', joint: head, offset: V(0, 0.02, -0.3), radius: 0.36 });
@@ -270,7 +249,59 @@ export function buildStego() {
   }
   rig.tail.forEach((j, i) => rig.hitZones.push({ zone: 'tail', joint: j, offset: V(0, 0, tl[i] * 0.5), radius: Math.max(0.22, tr[i] * 0.95) }));
 
-  return rig.finalize();
+  rig.finalize({ gaps: false });
+  standPose(rig, STEGO_ANIM);
+
+  // ---------------------------------------------------------------- skin
+  const at = (obj, x = 0, y = 0, z = 0) => restPoint(rig.root, obj, [x, y, z]);
+  const st = [];
+  const add = (p, rx, ry, bone, rb = ry) => st.push({ p, rx, ry, rb, bone });
+  // head end: the neck runs into the back of the skull
+  add(at(head, 0, 0.0, -0.02), 0.18, 0.18, head);
+  add(at(head, 0, 0.02, 0.17), 0.22, 0.22, head);
+  // neck (stations at the middle of each bone)
+  for (let i = neckSegs.length - 1; i >= 0; i--) {
+    const g = neckSegs[i];
+    add(at(rig.neck[i], 0, 0, -g.len * 0.5), g.r, g.r, rig.neck[i], g.r * 1.05);
+  }
+  add(at(neckBase), 0.5, 0.5, chest, 0.54);
+  // torso, front to back
+  for (const z of [-1.15, -0.75, -0.35, 0.05, 0.45, 0.85, 1.2]) {
+    const p = prof(z);
+    add(at(body, 0, p[1], z), p[3], p[2], z < -0.3 ? chest : body, p[2] * 1.05);
+  }
+  // tail
+  add(at(tailBase), tr[0], tr[0] * 1.05, body, tr[0] * 1.08);
+  tl.forEach((len, i) => {
+    const r = (tr[i] + tr[i + 1]) / 2;
+    add(at(rig.tail[i], 0, 0, len * 0.5), r, r * 1.05, rig.tail[i]);
+  });
+  add(at(rig.tail[5], 0, 0, tl[5]), tr[6], tr[6] * 1.05, rig.tail[5]);
+
+  const bodyColor = countershade({ main: COL.main, back: COL.back, belly: COL.belly, stripe: COL.stripe, stripes: 13, stripeWidth: 0.26, bellyFrom: 2.05, backTo: 0.7, stripePhase: 0.3 });
+  const skin = new SkinBuilder(rig.root);
+  skin.loft(loft(st, { radial: 24, segs: 7, color: bodyColor, capStart: true, capEnd: true, dome: 0.8 }));
+
+  // legs: muscular thigh / shoulder buried in the body, slim shin, cuff into the foot
+  const legColor = (t) => (t < 0.22 ? COL.main : t > 0.7 ? COL.legDark : COL.leg);
+  for (const leg of rig.legs) {
+    const { l1, l2, r1, r2 } = leg;
+    const ls = [];
+    const push = (p, rx, ry, bone, rb = ry) => ls.push({ p, rx, ry, rb, bone });
+    // two stations per bone: the bone stays firm, the skin only blends across the knee
+    push(at(leg.hip, 0, r1 * 0.75, 0), r1 * 1.0, r1 * 1.25, body, r1 * 1.15);
+    push(at(leg.hip, 0, -l1 * 0.16, 0), r1 * 1.05, r1 * 1.2, leg.hip, r1 * 1.15);
+    push(at(leg.hip, 0, -l1 * 0.58, 0), r1 * 0.78, r1 * 0.85, leg.hip);
+    push(at(leg.hip, 0, -l1 * 0.92, 0), r2 * 1.3, r2 * 1.35, leg.hip);
+    push(at(leg.knee, 0, -l2 * 0.1, 0), r2 * 1.3, r2 * 1.35, leg.knee);
+    push(at(leg.knee, 0, -l2 * 0.5, 0), r2 * 0.95, r2 * 0.98, leg.knee);
+    push(at(leg.knee, 0, -l2 * 0.9, 0), r2 * 1.05, r2 * 1.05, leg.knee);
+    push(at(leg.foot, 0, -leg.footH * 0.25, 0), r2 * 1.05, r2 * 1.05, leg.foot);
+    skin.loft(loft(ls, { up: V(0, 0, -1), radial: 16, segs: 6, color: legColor, dome: 0.7 }));
+  }
+  rig.skin = skin.build();
+  rig.fillHitGaps();
+  return rig;
 }
 
 const damp = (cur, target, rate, dt) => cur + (target - cur) * (1 - Math.exp(-rate * dt));

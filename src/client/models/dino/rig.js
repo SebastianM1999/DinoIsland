@@ -255,6 +255,9 @@ export class DinoAnimator {
     this.nextBlink = 1 + Math.random() * 3;
     this.dead = 0;
     this.trapped = 0;
+    this.deadT = 0;          // time since death (drives the fall)
+    this.bounce = 0;         // little rebound when the body hits the ground
+    this.atkT = -1;          // attack timeline (-1 = not attacking)
     // smoothed pose controls (0..1 unless noted)
     this.c = { neckRaise: 0, headDown: 0, jaw: 0, crouch: 0, attack: 0, alert: 0, lookYaw: 0, lookPitch: 0, charge: 0, tailSwing: 0, roar: 0 };
     this.target = { ...this.c };
@@ -283,11 +286,33 @@ export class DinoAnimator {
     this.runBlend = damp(this.runBlend, runT, 4, dt);
     this.amp = damp(this.amp, s.speed > 0.15 ? 1 : 0, 5, dt);
     this.yawRate = damp(this.yawRate, s.yawRate || 0, 3, dt);
-    this.dead = damp(this.dead, s.dead ? 1 : 0, 1.6, dt);
+    // death: the body tips, accelerates and thumps down with a small rebound
+    if (s.dead) {
+      this.deadT += dt;
+      const t = Math.min(1, this.deadT / 0.8);
+      this.dead = Math.max(this.dead, t * t);
+      this.bounce = this.deadT > 0.8 ? Math.sin((this.deadT - 0.8) * 16) * Math.exp(-(this.deadT - 0.8) * 7) * 0.06 : 0;
+    } else {
+      this.deadT = 0;
+      this.bounce = 0;
+      this.dead = damp(this.dead, 0, 1.6, dt);
+    }
     this.trapped = damp(this.trapped, s.trapped ? 1 : 0, 6, dt);
     Object.assign(this.target, { neckRaise: 0, headDown: 0, jaw: 0, crouch: 0, attack: 0, alert: 0, lookYaw: 0, lookPitch: 0, charge: 0, tailSwing: 0, roar: 0 }, s.pose || {});
     for (const k in this.c) this.c[k] = damp(this.c[k], this.target[k], k === 'attack' || k === 'tailSwing' ? 14 : 5, dt);
     const c = this.c;
+    // attack timeline: wind-up (pull back) -> fast strike (overshoot) -> hold -> recover
+    if (this.target.attack > 0.5 && this.atkT < 0) this.atkT = 0;
+    if (this.atkT >= 0) {
+      this.atkT += dt;
+      const t = this.atkT;
+      c.attack = t < 0.16 ? -0.35 * smooth01(t / 0.16)
+        : t < 0.27 ? -0.35 + 1.5 * smooth01((t - 0.16) / 0.11)
+        : t < 0.45 ? 1.15 - 0.15 * smooth01((t - 0.27) / 0.18)
+        : 1;
+      c.jaw = Math.max(c.jaw, t < 0.16 ? smooth01(t / 0.16) : 1);
+      if (t > 0.45 && this.target.attack < 0.5) this.atkT = -1;   // then damps back to 0
+    }
 
     // idle head wander
     this.idleLookT -= dt;
@@ -326,7 +351,7 @@ export class DinoAnimator {
     }
 
     // death roll onto the side
-    rig.tilt.rotation.z = this.dead * Math.PI * 0.46;
+    rig.tilt.rotation.z = this.dead * Math.PI * 0.46 - this.bounce;
     rig.tilt.position.y = -this.dead * rig.bodyRestY * 0.35;
 
     // ---- legs

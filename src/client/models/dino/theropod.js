@@ -63,7 +63,7 @@ export function theroFoot({ toeLen, r, h, color, pad, clawColor = '#efe4cc', cla
 }
 
 /** Joint chain without geometry (the skin covers it). dir: 'fwd' (-Z) or 'back' (+Z). */
-function jointChain(parent, segs, dir) {
+export function jointChain(parent, segs, dir) {
   const joints = [];
   let p = parent;
   segs.forEach((g, i) => {
@@ -227,7 +227,7 @@ function buildSkin(rig, S, { neckBase, tailBase }) {
 }
 
 /** Solve the leg IK once so the rest pose (and bounding box) is a proper stance. */
-function standPose(rig, params) {
+export function standPose(rig, params) {
   const a = new DinoAnimator(rig, params);
   a.update(0, { speed: 0, dist: 0, yawRate: 0, dead: false, trapped: false, groundAt: () => 0 });
   const keep = new Map();
