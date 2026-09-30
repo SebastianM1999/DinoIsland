@@ -38,6 +38,12 @@ function flyTo(sys, d, tx, ty, tz, speed, dt, agility = 2.2) {
   return len;
 }
 
+/** Top of a nest: never below the ground (or the sea) under it. */
+function nestHeight(sys, n) {
+  const ground = Math.max(sys.world.layout.groundAt(n.x, n.z), 0);
+  return Number.isFinite(n.y) ? Math.max(n.y, ground) : ground;
+}
+
 function pickTarget(sys, d) {
   const area = d.area;
   let best = null, bestScore = 0;
@@ -63,7 +69,7 @@ export const pteraBrain = {
     for (let i = 0; i < count; i++) {
       const n = nests[i % nests.length];
       const d = sys.spawn('ptera', n.x, n.z, { nest: n, area: areas[i % areas.length], slot: i });
-      d.y = n.y + 2;
+      d.y = nestHeight(sys, n) + 2;
     }
   },
 
@@ -72,7 +78,7 @@ export const pteraBrain = {
     const i = Math.floor(Math.random() * nests.length);
     const areas = areasOf(sys.world.layout.plan);
     const d = sys.spawn('ptera', nests[i].x, nests[i].z, { nest: nests[i], area: areas[i % areas.length], slot: i });
-    d.y = nests[i].y + 2;
+    d.y = nestHeight(sys, nests[i]) + 2;
   },
 
   init(d) {
@@ -156,7 +162,7 @@ export const pteraBrain = {
         d.grounded = false;
         d.st = DS.FLY;
         const a = d.carryingMeat ? d.nest : d.area;
-        const ty = d.carryingMeat ? d.nest.y + 6 : circleY(a.x, a.z);
+        const ty = d.carryingMeat ? nestHeight(sys, d.nest) + 6 : circleY(a.x, a.z);
         flyTo(sys, d, d.x + (a.x - d.x) * 0.3, ty, d.z + (a.z - d.z) * 0.3, C.flySpeed, dt, 1.6);
         if (d.y > ty - 6 || d.modeT > 6) {
           d.mode = d.carryingMeat ? 'return' : 'circle';
@@ -168,7 +174,7 @@ export const pteraBrain = {
       case 'return': {
         d.st = DS.FLY;
         const n = d.nest;
-        const dist = flyTo(sys, d, n.x, n.y + 2, n.z, C.flySpeed * 1.1, dt, 1.6);
+        const dist = flyTo(sys, d, n.x, nestHeight(sys, n) + 2, n.z, C.flySpeed * 1.1, dt, 1.6);
         if (dist < 4) {
           // the meat is gone for good once it reaches the nest
           d.carryingMeat = false;

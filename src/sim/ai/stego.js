@@ -40,6 +40,11 @@ export const stegoBrain = {
     d.wander = null;
   },
 
+  /** Nudged free by the dino system: graze a moment, then wander somewhere else. */
+  onStuck(d) {
+    if (d.mode === 'walk') { d.mode = 'graze'; d.modeT = 1 + Math.random() * 2; }
+  },
+
   onHurt(d, sys, byId) {
     d.anger = C.calmTime;
     if (sys.world.players.get(byId)) d.targetId = byId;

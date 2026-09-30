@@ -82,8 +82,7 @@ function spawnHerd(sys, zone) {
   const spawns = zone.spawns.length ? zone.spawns : [{ x: zone.x, z: zone.z }];
   for (let i = 0; i < C.herdSize; i++) {
     const s = spawns[i % spawns.length];
-    const d = sys.spawn('brachio', s.x + i * 4, s.z + i * 3, { group: herd.id, slot: i });
-    d.yaw = 0.8;
+    sys.spawn('brachio', s.x + i * 4, s.z + i * 3, { group: herd.id, slot: i });
   }
   return herd;
 }
@@ -106,6 +105,12 @@ export const brachioBrain = {
     d.defendT = 0;
     d.cool = 0;
     d.stompT = -1;
+  },
+
+  /** Nudged free by the dino system: the herd picks a new goal. */
+  onStuck(d, sys) {
+    const herd = herdOf(sys, d);
+    if (herd) { herd.target = null; herd.retarget = 0; }
   },
 
   onHurt(d, sys, byId) {

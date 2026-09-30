@@ -4,11 +4,12 @@
 // the server; everything else (health, loot) is server-authoritative.
 
 import { CONFIG } from '../../shared/config.js';
-import { resolveCircle } from '../../shared/collision.js';
+import { resolveCircle, penetration } from '../../shared/collision.js';
 import { settings } from '../core/settings.js';
 
 const P = CONFIG.player;
 const tmp = { x: 0, z: 0, hit: false };
+const tmp2 = { x: 0, z: 0, hit: false };
 /** Rock sides steeper than this (tan) can't be walked up once they are higher than a step. */
 const ROCK_WALK_SLOPE = 0.45;
 const C = P.creative;
@@ -199,12 +200,7 @@ export class PlayerController {
     const groundNow = this.groundAt(oldX, oldZ);
     this.#tryMove(this.vel.x * dt, 0, groundNow);
     this.#tryMove(0, this.vel.z * dt, groundNow);
-
-    resolveCircle(this.pos.x, this.pos.z, P.radius, this.colliders, tmp, this.pos.y + 0.05, this.pos.y + P.height);
-    if (tmp.hit) {
-      this.pos.x = tmp.x;
-      this.pos.z = tmp.z;
-    }
+    this.#collide(oldX, oldZ, groundNow);
     // world edge safety
     const lim = CONFIG.world.size / 2 - 5;
     this.pos.x = Math.max(-lim, Math.min(lim, this.pos.x));
@@ -238,32 +234,91 @@ export class PlayerController {
     }
   }
 
+  /**
+   * Trees, walls and props: push the body out (sliding along the surface) and
+   * take the velocity into the surface away, so pushing into a trunk neither
+   * bounces nor vibrates. If the push-out can't find a clean spot (a gap
+   * narrower than the body) or lands on ground we may not walk onto, the step
+   * is refused and the player simply stops.
+   */
+  #collide(oldX, oldZ, groundNow) {
+    const y0 = this.pos.y + 0.05, y1 = this.pos.y + P.height;
+    const cx = this.pos.x, cz = this.pos.z;
+    resolveCircle(cx, cz, P.radius, this.colliders, tmp, y0, y1);
+    if (!tmp.hit) return;
+    const nx = tmp.x - cx, nz = tmp.z - cz, nl = Math.hypot(nx, nz);
+    if (nl > 1e-6) {
+      const vn = (this.vel.x * nx + this.vel.z * nz) / nl;
+      if (vn < 0) { this.vel.x -= nx / nl * vn; this.vel.z -= nz / nl * vn; }
+    }
+    const depth = penetration(tmp.x, tmp.z, P.radius, this.colliders, y0, y1);
+    // the push-out may slide us sideways but never back against the step: that
+    // back-and-forth is what makes pushing into a notch vibrate
+    const sx = cx - oldX, sz = cz - oldZ;
+    const forward = (px, pz) => (px - oldX) * sx + (pz - oldZ) * sz >= -1e-9;
+    if (depth < 0.01 && forward(tmp.x, tmp.z) && this.#canStep(oldX, oldZ, tmp.x, tmp.z, groundNow)) {
+      this.pos.x = tmp.x;
+      this.pos.z = tmp.z;
+      return;
+    }
+    // wedged: try just the part of the step along the surface (slide out sideways)
+    if (nl > 1e-6) {
+      const sn = (sx * nx + sz * nz) / nl;
+      const tx = oldX + sx - nx / nl * sn, tz = oldZ + sz - nz / nl * sn;
+      if ((tx - oldX) ** 2 + (tz - oldZ) ** 2 > 1e-8) {
+        resolveCircle(tx, tz, P.radius, this.colliders, tmp2, y0, y1);
+        if (penetration(tmp2.x, tmp2.z, P.radius, this.colliders, y0, y1) < 0.01 && forward(tmp2.x, tmp2.z) &&
+            this.#canStep(oldX, oldZ, tmp2.x, tmp2.z, groundNow)) {
+          this.pos.x = tmp2.x;
+          this.pos.z = tmp2.z;
+          return;
+        }
+      }
+    }
+    // no clean spot ahead: stay where we were (unless that is inside something too)
+    const oldDepth = penetration(oldX, oldZ, P.radius, this.colliders, y0, y1);
+    if (oldDepth < 0.01 || depth >= oldDepth) {
+      this.pos.x = oldX;
+      this.pos.z = oldZ;
+    } else {
+      this.pos.x = tmp.x;
+      this.pos.z = tmp.z;
+    }
+  }
+
   #tryMove(dx, dz, groundNow) {
     if (dx === 0 && dz === 0) return;
-    const t = this.terrain;
     const nx = this.pos.x + dx, nz = this.pos.z + dz;
+    if (!this.#canStep(this.pos.x, this.pos.z, nx, nz, groundNow)) return;
+    this.pos.x = nx;
+    this.pos.z = nz;
+  }
+
+  /** May the player step from (fx, fz) to (nx, nz)? Slope, step height, rock sides and deep water. */
+  #canStep(fx, fz, nx, nz, groundNow) {
+    const t = this.terrain;
+    const dx = nx - fx, dz = nz - fz;
     const base = Math.max(groundNow, this.pos.y - 0.05);
     const gTerrain = t.heightAt(nx, nz);
     const rise = gTerrain - base;
     // in the air you may not drift onto steep terrain that is higher than where you took off
-    if (!this.onGround && gTerrain > groundNow + 0.3 && t.slopeAt(nx, nz) > P.maxWalkSlope) return;
+    if (!this.onGround && gTerrain > groundNow + 0.3 && t.slopeAt(nx, nz) > P.maxWalkSlope) return false;
     // steep uphill is a wall (cliffs); small steps are fine
     if (rise > 0.02) {
-      const slope = rise / Math.hypot(dx, dz);
-      if (slope > P.maxWalkSlope && rise > 0.05) return;
-      if (rise > P.stepHeight) return;
+      const slope = rise / Math.max(1e-6, Math.hypot(dx, dz));
+      if (slope > P.maxWalkSlope && rise > 0.05) return false;
+      if (rise > P.stepHeight) return false;
     }
     // rocks: step up to a step's height (ledges, low stones); higher up only flat
     // ground is walkable – steep rock sides and tall ledges need a jump
     const rock = this.rockSurfaceAt(nx, nz);
     const riseRock = rock.ledge - base;
     if (riseRock > 0.02) {
-      if (riseRock > P.stepHeight) return;
-      if (rock.h - gTerrain > P.stepHeight && rock.slope > ROCK_WALK_SLOPE) return;
+      if (riseRock > P.stepHeight) return false;
+      if (rock.h - gTerrain > P.stepHeight && rock.slope > ROCK_WALK_SLOPE) return false;
     }
     // do not walk out into deep water
-    if (!this.creative && t.waterDepthAt(nx, nz) > CONFIG.world.maxWadeDepth && t.waterDepthAt(nx, nz) > t.waterDepthAt(this.pos.x, this.pos.z)) return;
-    this.pos.x = nx;
-    this.pos.z = nz;
+    if (!this.creative && t.waterDepthAt(nx, nz) > CONFIG.world.maxWadeDepth && t.waterDepthAt(nx, nz) > t.waterDepthAt(fx, fz)) return false;
+    return true;
   }
 }

@@ -12,6 +12,7 @@ import { CONTRACTS } from '../../shared/missions.js';
 import { Renderer } from './renderer.js';
 import { Input } from '../input/input.js';
 import { PlayerController } from '../player/controller.js';
+import { StuckDetector } from '../player/stuck.js';
 import { buildTerrainMesh } from '../world/terrainMesh.js';
 import { buildSky } from '../world/sky.js';
 import { buildWater } from '../world/water.js';
@@ -52,6 +53,7 @@ export class Game {
     this.gfx.applyBiome(this.layout.biome.sky);
     this.input = reuse?.input ?? new Input(canvas);
     this.player = new PlayerController(this.terrain, this.layout.playerColliders, this.layout.rockSurfaceAt);
+    this.stuck = new StuckDetector((manual) => this.net.act(ACT.UNSTUCK, { manual }), (text) => this.hud?.toast(text, 'info'));
     this.time = 0;
     this.wasFlying = false;
     this.running = false;
@@ -259,6 +261,7 @@ export class Game {
       this.player.pos.y = m.y;
       this.player.pos.z = m.z;
       this.player.vel.x = this.player.vel.z = 0;
+      if (m.unstuck) { this.player.vel.y = 0; this.stuck.reset(this.player.pos); } else this.stuck.onCorrect(this.player.pos);
     });
     net.on(`ev:${EV.PLAYER_JOIN}`, (m) => this.remotes.add(m.player));
     net.on(`ev:${EV.PLAYER_LEAVE}`, (m) => this.remotes.remove(m.id));
@@ -434,6 +437,8 @@ export class Game {
       jump: canMove && input.isHeld('jump'),
       sprint: canMove && input.isHeld('sprint'),
     });
+    if (canMove && input.wasPressed('unstuck')) this.stuck.manual();
+    this.stuck.update(dt, p, canMove && ['forward', 'back', 'left', 'right'].some((a) => input.isHeld(a)), canMove);
     this.#updateCamera(dt);
 
     // network

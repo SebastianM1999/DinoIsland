@@ -39,6 +39,12 @@ export const raptorBrain = {
     d.flank = (d.slot % 3 - 1) * 0.9;   // approach angle offset for pack flanking
   },
 
+  /** Nudged free by the dino system: the pack wanders somewhere else. */
+  onStuck(d, sys) {
+    const pack = sys.groups.get(d.group);
+    if (pack) { pack.wander = null; pack.wanderT = 0; }
+  },
+
   onHurt(d, sys, byId) {
     const pack = sys.groups.get(d.group);
     if (pack && sys.world.players.get(byId)) pack.target = byId;

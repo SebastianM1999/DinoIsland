@@ -23,29 +23,82 @@ function circlesNear(colliders, x, z) {
   return grid.cells.get(Math.floor(x / CELL) * 4096 + Math.floor(z / CELL)) || [];
 }
 
+/** Resolver passes: each pass pushes out of every overlapping collider in turn. */
+const PASSES = 4;
+/** Overlap below this counts as touching, not penetrating (keeps resting contacts stable). */
+const SKIN = 1e-3;
+
+/** Overlap depth of circle (x, z, r) with one circle collider (<= 0: apart). */
+function circleDepth(c, x, z, r) {
+  const dx = x - c.x, dz = z - c.z, min = r + c.r;
+  if (dx > min || dx < -min || dz > min || dz < -min) return -1;
+  return min - Math.sqrt(dx * dx + dz * dz);
+}
+
+/** Overlap depth of circle (x, z, r) with one oriented box (<= 0: apart). */
+function boxDepth(b, x, z, r) {
+  const cos = Math.cos(b.rot), sin = Math.sin(b.rot);
+  const dx = x - b.x, dz = z - b.z;
+  const lx = dx * cos + dz * sin, lz = -dx * sin + dz * cos;
+  const ex = Math.abs(lx) - b.hw, ez = Math.abs(lz) - b.hd;
+  if (ex <= 0 && ez <= 0) return r - Math.max(ex, ez);          // centre inside
+  return r - Math.hypot(Math.max(ex, 0), Math.max(ez, 0));
+}
+
+const inSpan = (c, y0, y1) => c.bottom === undefined || !(y1 < c.bottom || y0 > c.top);
+
+/**
+ * Deepest overlap of the circle (x, z, r) with any collider (0 when free).
+ * Same height rules as resolveCircle.
+ */
+export function penetration(x, z, r, colliders, y0 = -Infinity, y1 = Infinity) {
+  let worst = 0;
+  const circles = r <= REACH ? circlesNear(colliders, x, z) : colliders.circles;
+  for (const c of circles) {
+    if (!inSpan(c, y0, y1)) continue;
+    const d = circleDepth(c, x, z, r);
+    if (d > worst) worst = d;
+  }
+  for (const b of colliders.boxes) {
+    const d = boxDepth(b, x, z, r);
+    if (d > worst) worst = d;
+  }
+  return worst;
+}
+
 /**
  * Push a circle (x, z, r) out of all colliders. Returns {x, z, hit}.
  * [y0, y1] is the mover's height span: circle colliders with a bottom/top
  * (tree trunk slices, rocks) only count where they overlap it.
+ *
+ * Several passes, so a push out of one collider into its neighbour gets
+ * corrected. When the mover is wedged between two circles (a gap narrower
+ * than the body), the result is the point touching both that is nearest to
+ * the input – the same spot every frame, so a player walking into the gap
+ * stops there instead of ping-ponging between the trunks.
  * @param {{circles:Array, boxes:Array}} colliders
  */
 export function resolveCircle(x, z, r, colliders, out = { x: 0, z: 0, hit: false }, y0 = -Infinity, y1 = Infinity) {
-  let hit = false;
-  const circles = r <= REACH ? circlesNear(colliders, x, z) : colliders.circles;
-  for (let iter = 0; iter < 2; iter++) {
+  const x0 = x, z0 = z;
+  let hit = false, clean = true;
+  for (let pass = 0; pass < PASSES; pass++) {
+    clean = true;
+    const circles = r <= REACH ? circlesNear(colliders, x, z) : colliders.circles;
     for (const c of circles) {
-      if (c.bottom !== undefined && (y1 < c.bottom || y0 > c.top)) continue;
+      if (!inSpan(c, y0, y1)) continue;
       const dx = x - c.x, dz = z - c.z;
       const min = r + c.r;
       if (dx > min || dx < -min || dz > min || dz < -min) continue;
       const d2 = dx * dx + dz * dz;
-      if (d2 < min * min) {
-        const d = Math.sqrt(d2) || 0.0001;
-        const push = min - d;
-        x += (dx / d) * push;
-        z += (dz / d) * push;
-        hit = true;
-      }
+      if (d2 >= min * min) continue;
+      const d = Math.sqrt(d2);
+      if (min - d <= SKIN * 0.5) continue;
+      clean = false;
+      hit = true;
+      if (d < 1e-6) { x += min; continue; }        // dead centre: any direction will do
+      const k = (min - d) / d;
+      x += dx * k;
+      z += dz * k;
     }
     for (const b of colliders.boxes) {
       const cos = Math.cos(b.rot), sin = Math.sin(b.rot);
@@ -55,8 +108,8 @@ export function resolveCircle(x, z, r, colliders, out = { x: 0, z: 0, hit: false
       const lz = -dx * sin + dz * cos;
       const cx = Math.max(-b.hw, Math.min(b.hw, lx));
       const cz = Math.max(-b.hd, Math.min(b.hd, lz));
-      let ex = lx - cx, ez = lz - cz;
-      let d2 = ex * ex + ez * ez;
+      const ex = lx - cx, ez = lz - cz;
+      const d2 = ex * ex + ez * ez;
       if (d2 >= r * r) continue;
       let nx, nz, push;
       if (d2 > 1e-8) {
@@ -68,16 +121,51 @@ export function resolveCircle(x, z, r, colliders, out = { x: 0, z: 0, hit: false
         if (px < pz) { nx = Math.sign(lx) || 1; nz = 0; push = px + r; }
         else { nx = 0; nz = Math.sign(lz) || 1; push = pz + r; }
       }
-      // back to world space
-      const wx = nx * cos - nz * sin;
-      const wz = nx * sin + nz * cos;
-      x += wx * push;
-      z += wz * push;
+      if (push <= SKIN * 0.5) continue;
+      clean = false;
       hit = true;
+      // back to world space
+      x += (nx * cos - nz * sin) * push;
+      z += (nx * sin + nz * cos) * push;
     }
+    if (clean) break;
+  }
+  if (!clean && penetration(x, z, r, colliders, y0, y1) > SKIN) {
+    const wedge = wedgePoint(x0, z0, r, colliders, y0, y1);
+    if (wedge) { x = wedge.x; z = wedge.z; }
   }
   out.x = x; out.z = z; out.hit = hit;
   return out;
+}
+
+/**
+ * Nearest free point to (x, z) that touches two overlapping circle colliders
+ * at once (the notch between two trunks), or null.
+ */
+function wedgePoint(x, z, r, colliders, y0, y1) {
+  const near = [];
+  for (const c of r <= REACH ? circlesNear(colliders, x, z) : colliders.circles) {
+    if (inSpan(c, y0, y1) && circleDepth(c, x, z, r + 0.5) > 0) near.push(c);
+  }
+  let best = null, bd = Infinity;
+  for (let i = 0; i < near.length; i++) {
+    for (let j = i + 1; j < near.length; j++) {
+      const a = near[i], b = near[j];
+      const ra = a.r + r + SKIN * 0.25, rb = b.r + r + SKIN * 0.25;
+      const dx = b.x - a.x, dz = b.z - a.z, d = Math.hypot(dx, dz);
+      if (d < 1e-6 || d > ra + rb || d < Math.abs(ra - rb)) continue;
+      const u = (ra * ra - rb * rb + d * d) / (2 * d);
+      const h = Math.sqrt(Math.max(0, ra * ra - u * u));
+      const mx = a.x + dx * u / d, mz = a.z + dz * u / d;
+      for (const s of [1, -1]) {
+        const px = mx - s * dz * h / d, pz = mz + s * dx * h / d;
+        const q = (px - x) ** 2 + (pz - z) ** 2;
+        if (q >= bd || penetration(px, pz, r, colliders, y0, y1) > SKIN) continue;
+        bd = q; best = { x: px, z: pz };
+      }
+    }
+  }
+  return best;
 }
 
 /**

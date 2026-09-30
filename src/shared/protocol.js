@@ -20,7 +20,7 @@
 //   pong    { c, now }
 //   snap    { now, p: [...PLAYER_FIELDS], d: [...DINO_FIELDS] }
 //   inv     { inv }                                     your private inventory changed
-//   correct { x, y, z }                                 rejected movement; reset prediction
+//   correct { x, y, z, unstuck? }                       rejected movement / unstuck move; reset prediction
 //   ev      { e: <event>, ...fields }                   see EV below
 
 export const MSG = {
@@ -55,6 +55,8 @@ export const ACT = {
   CREATIVE: 'creative', // { on }                              creative mode (invincible, flying)
   OUTFIT: 'outfit',     // { outfit }                          change clothes at the hut wardrobe
   REPAIR: 'repair',     // {}                                  repair the boat with the found parts
+  UNSTUCK: 'unstuck',   // { manual? }                         move me to the nearest free spot (auto: client stuck detector,
+                        //                                     manual: U key); server-validated and rate-limited
 };
 
 /** Server events (msg.e). */

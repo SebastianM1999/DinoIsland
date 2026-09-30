@@ -35,6 +35,12 @@ export const trexBrain = {
     d.nextRoar = 20 + Math.random() * 20;
   },
 
+  /** Nudged free by the dino system: skip the unreachable patrol point. */
+  onStuck(d, sys) {
+    const n = sys.world.layout.trexPatrol.length;
+    if (d.mode === 'patrol' && n) d.wp = (d.wp + 1) % n;
+  },
+
   onHurt(d, sys, byId) {
     const p = sys.world.players.get(byId);
     if (!p || d.mode === 'chase' || d.mode === 'bite') return;

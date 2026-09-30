@@ -4,7 +4,7 @@
 
 import { CONFIG } from '../shared/config.js';
 import { EV, DS } from '../shared/protocol.js';
-import { resolveCircle, segmentColliders } from '../shared/collision.js';
+import { resolveCircle, segmentColliders, penetration } from '../shared/collision.js';
 import { angleDiff, clamp } from '../shared/rng.js';
 import { brachioBrain } from './ai/brachio.js';
 import { stegoBrain } from './ai/stego.js';
@@ -20,7 +20,12 @@ const CARCASS_TIME = 90;
 const tmp = { x: 0, z: 0, hit: false };
 const push = { x: 0, z: 0, hit: false };
 /** Obstacles lower than this are stepped over (a T-Rex strides over a knee-high rock, a raptor does not). */
-const stepOver = (d) => Math.max(0.2, Math.min(1.2, d.radius * 0.35));
+const radiusOf = (d) => d.radius ?? CONFIG.dinos[d.type].radius;
+const stepOver = (d) => Math.max(0.2, Math.min(1.2, radiusOf(d) * 0.35));
+/** Stuck safety net: seconds of wanting to move without getting anywhere before a nudge. */
+const NUDGE_INSIDE = 2;     // standing inside a collider / on ground it can't stand on
+const NUDGE_BLOCKED = 6;    // blocked on free ground (goal unreachable)
+const EIGHT = [0, 1, 2, 3, 4, 5, 6, 7].map((k) => (k / 8) * Math.PI * 2);
 
 export class DinoSystem {
   constructor(world) {
@@ -47,15 +52,12 @@ export class DinoSystem {
   /** Create a dinosaur. `extra` is merged into its state (group, home, ...). */
   spawn(type, x, z, extra = {}) {
     const c = CONFIG.dinos[type];
-    // never spawn inside a tree: search outward in a spiral until the body fits
-    const yaw = Math.random() * Math.PI * 2;
+    // never spawn inside a tree, in water or on a cliff: search outward in a
+    // spiral for the nearest spot where the whole body fits and it can walk off
+    let yaw = Math.random() * Math.PI * 2;
     if (type !== 'ptera') {
-      const probe = { type, radius: c.radius };
-      const x0 = x, z0 = z;
-      for (let k = 1; k < 40 && this.bodyBlocked(probe, x, z, yaw); k++) {
-        const a = k * 2.4, r = 0.6 * k;
-        x = x0 + Math.cos(a) * r; z = z0 + Math.sin(a) * r;
-      }
+      const spot = this.findFreeSpot({ type, radius: c.radius }, x, z, { yaw });
+      if (spot) { x = spot.x; z = spot.z; yaw = spot.yaw; }
     }
     const d = {
       id: this.world.id(),
@@ -143,6 +145,7 @@ export class DinoSystem {
     const t = this.terrain;
     if (t.waterDepthAt(x, z) > (d.type === 'brachio' ? 1.2 : 0.35)) return false;
     if (t.slopeAt(x, z) > (d.type === 'raptor' ? 0.95 : 0.8)) return false;
+    if (t.lavaLevelAt(x, z) !== null) return false;
     const safe = CONFIG.player.hutHealRadius + 10;
     if ((x - this.hut.x) ** 2 + (z - this.hut.z) ** 2 < safe * safe) return false;
     return Math.abs(x) < CONFIG.world.size / 2 - 20 && Math.abs(z) < CONFIG.world.size / 2 - 20;
@@ -217,7 +220,7 @@ export class DinoSystem {
   /** Body footprint circles (world space) of `d` standing at (x, z) facing `yaw`. */
   *bodyCircles(d, x, z, yaw) {
     const fx = -Math.sin(yaw), fz = -Math.cos(yaw);
-    for (const [off, r] of CONFIG.dinos[d.type].body || [[0, d.radius * 0.6]]) yield [x + fx * off, z + fz * off, r];
+    for (const [off, r] of CONFIG.dinos[d.type].body || [[0, radiusOf(d) * 0.6]]) yield [x + fx * off, z + fz * off, r];
   }
 
   /**
@@ -247,13 +250,80 @@ export class DinoSystem {
   }
 
   /** Would the body (slightly slimmed, so brushing past a trunk is fine) overlap an obstacle at (x, z)? */
-  bodyBlocked(d, x, z, yaw) {
+  bodyBlocked(d, x, z, yaw, scale = 0.85) {
     const gy = this.terrain.heightAt(x, z);
+    const y0 = gy + stepOver(d), y1 = gy + Math.max(1.5, radiusOf(d));
     for (const [cx, cz, r] of this.bodyCircles(d, x, z, yaw)) {
-      resolveCircle(cx, cz, r * 0.85, this.colliders, tmp, gy + stepOver(d), gy + Math.max(1.5, d.radius));
-      if (tmp.hit) return true;
+      if (penetration(cx, cz, r * scale, this.colliders, y0, y1) > 0.01) return true;
     }
     return false;
+  }
+
+  /**
+   * Can `d` stand at (x, z) facing `yaw`? Every body circle on walkable ground
+   * (no water, lava or cliff under the head or tail either) and the full-size
+   * body clear of trees, rocks, cave walls, ruins, the boat and the hut.
+   */
+  standsFree(d, x, z, yaw) {
+    for (const [cx, cz] of this.bodyCircles(d, x, z, yaw)) if (!this.walkable(cx, cz, d)) return false;
+    return this.walkable(x, z, d) && !this.bodyBlocked(d, x, z, yaw, 1);
+  }
+
+  /** Directions (of 8) in which `d` at (x, z) could take a few steps (what move() probes). */
+  openDirections(d, x, z) {
+    const look = Math.max(2, radiusOf(d) * 1.5);
+    let n = 0;
+    for (const a of EIGHT) {
+      const px = x - Math.sin(a) * look, pz = z - Math.cos(a) * look;
+      if (this.walkable(px, pz, d) && !this.bodyBlocked(d, px, pz, a)) n++;
+    }
+    return n;
+  }
+
+  /**
+   * Nearest spot to (x, z) (spiral search) where `d` stands free and can walk
+   * away (at least 2 open directions). Returns { x, z, yaw } or null.
+   */
+  findFreeSpot(d, x, z, { yaw = d.yaw ?? 0, minDist = 0, maxDist = 50, step = 0.8 } = {}) {
+    const yaws = EIGHT.map((a) => yaw + a);
+    for (let r = minDist; r <= maxDist; r += step) {
+      const n = r < 1e-6 ? 1 : Math.max(6, Math.ceil((Math.PI * 2 * r) / step));
+      for (let i = 0; i < n; i++) {
+        const a = r * 0.37 + (i / n) * Math.PI * 2;
+        const px = x + Math.cos(a) * r, pz = z + Math.sin(a) * r;
+        if (!this.walkable(px, pz, d)) continue;
+        const fit = yaws.find((y) => this.standsFree(d, px, pz, y));
+        if (fit === undefined || this.openDirections(d, px, pz) < 2) continue;
+        return { x: px, z: pz, yaw: fit };
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Safety net: an animal that has wanted to move for a while without getting
+   * anywhere (wedged between trunks, in a cave wall, on a cliff) is nudged to
+   * the nearest free spot and picks a new goal.
+   */
+  #unstick(d) {
+    const blocked = d.blockedT || 0;
+    if (blocked <= 0) { d.stuckAt = null; return; }
+    if (!d.stuckAt) d.stuckAt = { x: d.x, z: d.z };
+    if (blocked < NUDGE_INSIDE) return;
+    const inside = !this.walkable(d.x, d.z, d) || this.bodyBlocked(d, d.x, d.z, d.yaw);
+    const wedged = blocked >= NUDGE_BLOCKED && Math.hypot(d.x - d.stuckAt.x, d.z - d.stuckAt.z) < 1.5;
+    if (!inside && !wedged) return;
+    // only teleport when it really can't walk off; a merely unreachable goal just gets replaced
+    if (inside || this.openDirections(d, d.x, d.z) < 2) {
+      const spot = this.findFreeSpot(d, d.x, d.z, { minDist: inside ? 0 : 1, maxDist: 30 });
+      if (spot) { d.x = spot.x; d.z = spot.z; d.yaw = spot.yaw; d.spd = 0; }
+    }
+    d.blockedT = 0;
+    d.flipT = 0;
+    d.stuckAt = null;
+    d.avoidSide = -(d.avoidSide || 1);
+    d.wander = null;
+    BRAINS[d.type].onStuck?.(d, this);
   }
 
   /**
@@ -323,9 +393,10 @@ export class DinoSystem {
     for (let i = 0; i < tries; i++) {
       const a = Math.random() * Math.PI * 2, r = Math.sqrt(Math.random()) * radius;
       const x = cx + Math.cos(a) * r, z = cz + Math.sin(a) * r;
-      if (this.walkable(x, z, d) && !this.bodyBlocked(d, x, z, Math.atan2(-(x - d.x), -(z - d.z)))) return { x, z };
+      if (this.walkable(x, z, d) && !this.bodyBlocked(d, x, z, Math.atan2(-(x - (d.x ?? cx)), -(z - (d.z ?? cz))))) return { x, z };
     }
-    return { x: d.home.x, z: d.home.z };
+    const home = d.home || { x: cx, z: cz };
+    return this.findFreeSpot(d, home.x, home.z, { maxDist: 30 }) || { x: home.x, z: home.z };
   }
 
   /** A point `dist` meters away from (fx, fz), walkable, as straight-away as possible. */
@@ -404,6 +475,7 @@ export class DinoSystem {
         BRAINS[d.type].update(d, this, dt);
         // turning on the spot can swing the body into a trunk: push it back out
         if (d.type !== 'ptera' && this.resolveBody(d, d.x, d.z, d.yaw)) { d.x = push.x; d.z = push.z; }
+        if (d.type !== 'ptera') this.#unstick(d);
       }
 
       if (d.type !== 'ptera' || d.grounded) d.y = this.terrain.heightAt(d.x, d.z);

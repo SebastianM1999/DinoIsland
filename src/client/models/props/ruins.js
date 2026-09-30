@@ -24,8 +24,10 @@ const V = (x, y, z) => new THREE.Vector3(x, y, z);
 function palette(biome) {
   const volcano = biome?.id === 'volcano';
   return volcano
-    ? { volcano, stone: ['#6d6468', '#5e565b', '#7a7074'].map((h) => new THREE.Color(h)), seam: new THREE.Color('#3a3438'), top: new THREE.Color(biome?.terrain?.ash || '#8f8a8c'), low: new THREE.Color(biome?.terrain?.scorch || '#2e2629'), rune: '#ff8a3a' }
-    : { volcano, stone: ['#bcb19c', '#aaa08d', '#c9bea8'].map((h) => new THREE.Color(h)), seam: new THREE.Color('#857b6a'), top: new THREE.Color(biome?.rocks?.moss || '#6fa845'), low: new THREE.Color('#5d7f3a'), rune: '#6fe3ff' };
+    ? { volcano, stone: ['#6d6468', '#5e565b', '#7a7074'].map((h) => new THREE.Color(h)), seam: new THREE.Color('#3a3438'), top: new THREE.Color(biome?.terrain?.ash || '#8f8a8c'), low: new THREE.Color(biome?.terrain?.scorch || '#2e2629'), rune: '#ff8a3a',
+      earth: ['#4a4144', '#5e5558', biome?.terrain?.ash || '#6f686c'].map((h) => new THREE.Color(h)) }
+    : { volcano, stone: ['#bcb19c', '#aaa08d', '#c9bea8'].map((h) => new THREE.Color(h)), seam: new THREE.Color('#857b6a'), top: new THREE.Color(biome?.rocks?.moss || '#6fa845'), low: new THREE.Color('#5d7f3a'), rune: '#6fe3ff',
+      earth: [biome?.terrain?.dirtDark || '#b0814c', biome?.terrain?.floor || '#4c9434', biome?.terrain?.grass || '#7cc34a'].map((h) => new THREE.Color(h)) };
 }
 
 export function buildRuins(r, biome) {
@@ -35,6 +37,8 @@ export function buildRuins(r, biome) {
   const seed = (r.seed ?? 1) | 0;
   const tmp = new THREE.Color();
   const std = [], leaf = [], glow = [];
+  const leafs = [];                                   // extra fern spots [x, z]
+  const ROOT2 = new THREE.Color('#8a6a4a');
 
   /** Stone painter in the piece's local frame; o = world-ish offset for noise. */
   const stone = (o = [0, 0, 0], shade = 1) => (c, n) => {
@@ -72,7 +76,7 @@ export function buildRuins(r, biome) {
 
   // ----------------------------------------------------------- pillars
   const shaftGeo = (h, radius, broken, s) => {
-    let g = new THREE.CylinderGeometry(radius * 0.92, radius, h, 36, Math.max(2, Math.round(h / 0.45)), false);
+    let g = new THREE.CylinderGeometry(radius * 0.92, radius, h, 36, Math.max(1, Math.round(h / 1.4)), false);
     g.translate(0, h / 2, 0);
     g = deform(g, (v) => {
       const a = Math.atan2(v.z, v.x);
@@ -96,12 +100,12 @@ export function buildRuins(r, biome) {
   const pillar = (p) => {
     const parts = [];
     parts.push(block(1.15, 0.32, 1.15, [0, 0.16, 0]));
-    parts.push(place(paint(new THREE.TorusGeometry(0.45, 0.07, 10, 36), stone([p.x, 0, p.z])), [0, 0.36, 0], [Math.PI / 2, 0, 0]));
+    parts.push(place(paint(new THREE.TorusGeometry(0.45, 0.07, 8, 28), stone([p.x, 0, p.z])), [0, 0.36, 0], [Math.PI / 2, 0, 0]));
     const h = p.h - 0.32;
     const broken = p.state !== 'full';
     parts.push(place(paint(shaftGeo(h - (broken ? 0 : 0.3), p.r, broken, p.x * 3.1), drumSeams(h)), [0, 0.32, 0]));
     if (!broken) {
-      parts.push(place(paint(new THREE.TorusGeometry(0.42, 0.08, 10, 36), stone([p.x, p.h, p.z])), [0, p.h - 0.34, 0], [Math.PI / 2, 0, 0]));
+      parts.push(place(paint(new THREE.TorusGeometry(0.42, 0.08, 8, 28), stone([p.x, p.h, p.z])), [0, p.h - 0.34, 0], [Math.PI / 2, 0, 0]));
       parts.push(block(1.05, 0.3, 1.05, [0, p.h - 0.15, 0]));
     }
     return merge(parts);
@@ -184,6 +188,7 @@ export function buildRuins(r, biome) {
   // --------------------------------------------------------- dressing
   if (!P.volcano) {
     const fern = fernGeometry();
+    for (const [x, z] of leafs) leaf.push(place(fern.clone(), [x, 0.02, z], [0, rng() * TAU, 0], 0.8 + rng() * 0.6));
     for (let k = 0; k < 9; k++) {
       const a = rng() * TAU, rr = 2 + rng() * 5.5;
       leaf.push(place(fern.clone(), [Math.cos(a) * rr, 0.02, Math.sin(a) * rr], [0, rng() * TAU, 0], 0.7 + rng() * 0.6));
@@ -192,6 +197,28 @@ export function buildRuins(r, biome) {
     for (let k = 0; k < 9; k++) {
       const a = rng() * TAU, rr = 1.5 + rng() * 5.5;
       std.push(place(blob(0.5 + rng() * 0.6, 0.12, 0.4 + rng() * 0.4, (c, n) => (n.y > 0.6 ? '#9a9496' : '#7a7476'), { w: 12, h: 6 }), [Math.cos(a) * rr, 0.02, Math.sin(a) * rr], [0, rng() * TAU, 0]));
+    }
+  }
+
+  function rootColor(t, a, p) {
+    const m = smoothstep(0.35, 0.95, Math.cos(a)) * (0.5 + 0.5 * noise3(p.x * 1.3, 0, p.z * 1.3, seed + 3));
+    tmp.set('#6b4f3a').lerp(ROOT2, 0.5 + 0.5 * noise3(p.x * 2, p.y * 2, p.z * 2, seed + 5));
+    return tmp.lerp(P.top, m * 0.8);
+  }
+  /** Creeper hanging over an edge: from the top (height h) down both faces. */
+  function drape(x, z, h, spread) {
+    const a = rng() * TAU;
+    for (const s of [-1, 1]) {
+      const ox = Math.cos(a) * spread * s, oz = Math.sin(a) * spread * s;
+      const len = h * (0.45 + rng() * 0.45);
+      const pts = [V(x, h + 0.04, z), V(x + ox * 0.9, h - len * 0.4, z + oz * 0.9), V(x + ox * 1.05, h - len, z + oz * 1.05)];
+      std.push(tube(pts, () => 0.03, { radial: 5, color: () => '#3f7a2c', capStart: false }));
+      for (let i = 1; i < 3; i++) {
+        const q = pts[i], l = Math.hypot(ox, oz) || 1;
+        leaf.push(leafStrip(arcPath(q, ox / l, oz / l, 0.22, 0.4, 1.2, 3), (t) => (t >= 1 ? 0.005 : 0.08 * Math.sin(Math.PI * (0.1 + 0.9 * t))), {
+          side: V(-oz / l, 0, ox / l), ridge: 0.3, serrate: 0, color: (t, hh) => (hh ? '#7cc545' : '#4e9a34'),
+        }));
+      }
     }
   }
 

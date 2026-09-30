@@ -21,6 +21,7 @@ import { lineBlocked } from '../shared/visibility.js';
 import { sanitizeOutfit, sameOutfit } from '../shared/outfits.js';
 import { planIsland } from '../shared/island.js';
 import { levelDef, LEVEL_COUNT } from '../shared/levels.js';
+import { findUnstuckSpot, goodSpot } from './unstuck.js';
 
 const P = CONFIG.player;
 const W = CONFIG.weapons;
@@ -30,6 +31,8 @@ const r3 = (v) => Math.round(v * 1000) / 1000;
 const dist2 = (ax, az, bx, bz) => (ax - bx) ** 2 + (az - bz) ** 2;
 const validVec = (v) => Array.isArray(v) && v.length === 3 && v.every((n) => Number.isFinite(n));
 const collisionResult = { x: 0, z: 0, hit: false };
+/** Seconds between two successful unstuck moves of one player. */
+const UNSTUCK_COOLDOWN = 5;
 
 export class ServerWorld {
   /**
@@ -293,6 +296,34 @@ export class ServerWorld {
     p.fl = (m.fl | 0) & 63;
   }
 
+  /**
+   * Move a stuck player to the nearest spot they can stand on and walk away
+   * from (see sim/unstuck.js); the hut spawn point when nothing is near.
+   * Automatic requests from a player who isn't actually stuck are ignored;
+   * a manual request (U key) then still nudges them a little.
+   */
+  unstuck(p, manual) {
+    if (!p.alive) return;
+    if (this.now < (p.nextUnstuckAt ?? 0)) {
+      if (manual) this.toast('Hang on – you can use "unstuck" again in a moment', 'info', p.id);
+      return;
+    }
+    const fine = goodSpot(this.terrain, this.layout, p.x, p.z) !== null;
+    if (fine && !manual) return;
+    let spot = findUnstuckSpot(this.terrain, this.layout, p.x, p.z, { minDist: fine ? 1.5 : 0 });
+    if (!spot) {
+      const sp = this.layout.spawnPoints[p.slot] || this.layout.spawnPoints[0];
+      spot = { x: sp.x, y: this.layout.groundAt(sp.x, sp.z), z: sp.z };
+    }
+    p.nextUnstuckAt = this.now + UNSTUCK_COOLDOWN;
+    p.x = spot.x; p.y = spot.y; p.z = spot.z;
+    p.lastMoveAt = this.now;
+    p.moveBudget = 3.5;
+    this.send(p.id, { t: MSG.CORRECT, x: r2(p.x), y: r2(p.y), z: r2(p.z), unstuck: 1 });
+    this.toast('Unstuck!', 'info', p.id);
+    this.log(`unstuck #${p.id} ${manual ? '(manual)' : '(auto)'} -> ${r2(p.x)}, ${r2(p.z)}`);
+  }
+
   near(p, x, z, range) { return dist2(p.x, p.z, x, z) <= range * range; }
 
   canSpotDino(p, d) {
@@ -511,6 +542,7 @@ export class ServerWorld {
         if (reason) this.toast(reason, 'crate', p.id);
         return;
       }
+      case ACT.UNSTUCK: return this.unstuck(p, !!m.manual);
       case ACT.REFILL: {
         const h = this.layout.hut.arrowRack;
         if (!p.alive || !this.near(p, h.x, h.z, 6)) return;
