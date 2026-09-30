@@ -1,6 +1,6 @@
 // Replace files, semantic clips and bone aliases here when changing asset providers.
 const bones = {
-  head: 'Head', neck: ['Neck'], body: 'Body', spine: ['Hips', 'Torso', 'Shoulders'],
+  head: 'Head', jaw: 'Jaw', neck: ['Neck'], body: 'Body', spine: ['Hips', 'Torso', 'Shoulders'],
   tail: ['Tail1', 'Tail2', 'Tail3', 'Tail4', 'Tail5'],
   legs: ['BackUpLegR', 'BackUpLegL', 'FrontUpLegR', 'FrontUpLegL'],
   feet: ['BackFootR', 'BackFootL', 'FrontFootR', 'FrontFootL'],
@@ -18,10 +18,11 @@ function model(species, source, height, length, walkStride, runStride, quadruped
   };
 }
 export const GLB_DINOS = {
-  raptor: model('raptor', 'Velociraptor', 1.4, 2.9, 1.6, 2.7),
-  trex: model('trex', 'TRex', 4.1, 11, 3.8, 5.5),
-  stego: model('stego', 'Stegosaurus', 4, 7.9, 2.3, 4.2, true),
-  brachio: model('brachio', 'Apatosaurus', 11, 19, 4.4, 6.5, true),
+  // Median grounded foot velocity × clip duration; see measure-dino-strides.mjs.
+  raptor: model('raptor', 'Velociraptor', 1.4, 2.9, 2.373, 2.207),
+  trex: model('trex', 'TRex', 4.1, 11, 6.262, 10.715),
+  stego: model('stego', 'Stegosaurus', 4, 7.9, 2.04, 3.629, true),
+  brachio: model('brachio', 'Apatosaurus', 11, 19, 3.246, 6.506, true),
 };
 // The long-neck needs a broader body when fitting Apatosaurus to brachio height.
 GLB_DINOS.brachio.width = 4;

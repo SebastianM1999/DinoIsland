@@ -1,0 +1,96 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs/promises';
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { GLB_DINOS } from '../src/client/models/dino/glbCatalog.js';
+import { buildGLBDino, registerDinoGLTF, preloadDinoModels } from '../src/client/models/dino/glbDino.js';
+import { SPECIES } from '../src/client/entities/dinoViews.js';
+import { DinoAnimator } from '../src/client/models/dino/rig.js';
+
+test('missing GLBs fall back and failed downloads are retried', async () => {
+  const originalFetch = globalThis.fetch, originalWarn = console.warn;
+  let calls = 0;
+  globalThis.fetch = async () => { calls++; return { ok: false, status: 404 }; };
+  console.warn = () => {};
+  try {
+    assert.ok((await preloadDinoModels()).every(r => !r.loaded));
+    assert.ok((await preloadDinoModels()).every(r => !r.loaded));
+    assert.equal(calls, 8);
+    assert.ok(!SPECIES.raptor.build().isGLB);
+  } finally { globalThis.fetch = originalFetch; console.warn = originalWarn; }
+});
+
+test('GLBs keep combat, independent skins, semantic clips and terrain animation working', async () => {
+  assert.equal(buildGLBDino('raptor'), null);
+  assert.equal(SPECIES.raptor.build().isGLB, undefined, 'synchronous fallback before preload');
+  const manifest = JSON.parse(await fs.readFile(new URL('../art/asset-manifest.json', import.meta.url)));
+  for (const [type, spec] of Object.entries(GLB_DINOS)) {
+    const bytes = await fs.readFile(new URL(`../assets/models/dinos/${type}.glb`, import.meta.url));
+    const gltf = await new GLTFLoader().parseAsync(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength), '');
+    registerDinoGLTF(type, gltf);
+    const a = SPECIES[type].build(), b = SPECIES[type].build();
+    assert.ok(a.isGLB);
+    assert.notEqual(a.head, b.head);
+    assert.notEqual(a.head, gltf.scene.getObjectByName('Head'));
+    const animator = new DinoAnimator(a, SPECIES[type].anim), other = SPECIES[type].createAnimator(b);
+    assert.notEqual(animator.mixer, other.mixer);
+    let triangles = 0;
+    a.root.traverse(o => {
+      if (o.isMesh) {
+        triangles += o.geometry.index.count / 3;
+        assert.ok(o.geometry.attributes.color);
+        assert.equal(o.material.flatShading, false);
+      }
+    });
+    assert.equal(triangles, manifest.models.find(m => m.id === `dino-${type}`).triangles);
+    assert.ok(triangles <= 60000);
+    const box = new THREE.Box3().setFromObject(a.root, true).getSize(new THREE.Vector3());
+    assert.ok(Math.abs(box.y - spec.height) < .01);
+    assert.ok(Math.abs(box.z - spec.length) < .01);
+    const zones = new Set(a.hitZones.map(hz => hz.zone));
+    for (const zone of ['head', 'neck', 'body', 'leg', 'tail']) assert.ok(zones.has(zone));
+    const states = [{}, { speed: 1 }, { speed: 8 }, { pose: { attack: 1 } },
+      { pose: { roar: 1 } }, { pose: { headDown: 1 } }, { pose: { alert: 1, neckRaise: 1 } },
+      { speed: 8, pose: { charge: 1 } }, { pose: { tailSwing: 1 } }, { trapped: true }, { dead: true }, {}];
+    a.root.position.set(12, 2, -6); a.root.rotation.y = .6;
+    for (const state of states) {
+      for (let frame = 0; frame < 100; frame++) {
+        animator.update(1 / 60, { groundAt: (x, z) => 2 + .05 * (x - 12) - .04 * (z + 6),
+          groundPitch: .12, yawRate: .7, lookTarget: new THREE.Vector3(15, 3, -14), ...state });
+        a.root.updateMatrixWorld(true);
+        a.root.traverse(o => {
+          assert.ok(o.matrixWorld.elements.every(Number.isFinite), `${type}: invalid ${o.name}`);
+        });
+      }
+      for (const s of a.hitSpheres([])) {
+        assert.ok(s.center.toArray().every(Number.isFinite));
+        assert.ok(s.radius > 0 && Number.isFinite(s.radius));
+      }
+    }
+    assert.equal(animator.state, 'idle', 'death can be reset in preview');
+    animator.update(.1, { speed: 1 });
+    assert.equal(animator.state, 'walk');
+    assert.ok(Math.abs(animator.actions.walk.timeScale - animator.actions.walk.getClip().duration / spec.walkStride) < 1e-6);
+    // Dead pose clamps instead of looping back to standing.
+    for (let i = 0; i < 180; i++) animator.update(1 / 60, { dead: true });
+    const deathTime = animator.actions.death.time;
+    animator.update(.1, { dead: true });
+    assert.equal(animator.actions.death.time, deathTime);
+    animator.dispose(); other.dispose();
+  }
+  assert.equal(SPECIES.ptera.build().isGLB, undefined);
+});
+
+test('preload reuses successfully registered models', async () => {
+  const originalFetch = globalThis.fetch, originalWarn = console.warn;
+  let calls = 0, warnings = 0;
+  globalThis.fetch = async () => { calls++; return { ok: false, status: 404 }; };
+  console.warn = () => { warnings++; };
+  try {
+    const result = await preloadDinoModels();
+    // Previous test has populated cache, so no successful model is refetched.
+    assert.ok(result.every(r => r.loaded));
+    assert.equal(calls, 0); assert.equal(warnings, 0);
+  } finally { globalThis.fetch = originalFetch; console.warn = originalWarn; }
+});

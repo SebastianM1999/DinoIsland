@@ -244,6 +244,7 @@ export class DinoAnimator {
    * @param {object} params species tuning (see DEFAULTS)
    */
   constructor(rig, params = {}) {
+    if (rig.createAnimator) return rig.createAnimator();
     this.rig = rig;
     this.p = { ...DEFAULTS, ...params };
     this.phase = Math.random();

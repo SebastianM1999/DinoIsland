@@ -73,7 +73,8 @@ export function buildGLBDino(type) {
   const find = name => byName.get(name.replace(/[.\s]/g, ''));
   const list = names => names.map(find).filter(Boolean);
   const rig = { root, tilt, body, model, spec, clips: template.clips, isGLB: true,
-    head: find(spec.bones.head), neck: list(spec.bones.neck), tail: list(spec.bones.tail),
+    head: find(spec.bones.head), jaw: spec.bones.jaw ? find(spec.bones.jaw) : null,
+    neck: list(spec.bones.neck), tail: list(spec.bones.tail),
     feet: list(spec.bones.feet), hitZones: [] };
   rig.legChains = spec.bones.legs.map((name, i) => ({
     upper: find(name), lower: find(spec.bones.knees[i]), foot: find(spec.bones.feet[i]),
@@ -125,14 +126,14 @@ export class GLBDinoAnimator {
     this.mixer = new THREE.AnimationMixer(rig.model);
     this.actions = Object.fromEntries(Object.entries(rig.clips).map(([state, clip]) => {
       const action = this.mixer.clipAction(clip);
-      if (state === 'death' || state === 'attack') {
+      if (state === 'death' || state === 'attack' || state === 'hurt') {
         action.setLoop(THREE.LoopOnce, 1); action.clampWhenFinished = true;
       }
       return [state, action];
     }));
     this.state = null; this.phase = Math.random(); this.dead = 0; this.trapped = 0;
     this.c = {}; this.time = 0; this.tailAngle = 0; this.tailVelocity = 0;
-    this.layerBones = [...new Set([...rig.neck, rig.head, ...rig.tail, ...rig.feet,
+    this.layerBones = [...new Set([...rig.neck, rig.head, rig.jaw, ...rig.tail, ...rig.feet,
       ...rig.legChains.flatMap(leg => [leg.upper, leg.lower])].filter(Boolean))];
     this.bases = new Map();
     this.v = new THREE.Vector3(); this.q = new THREE.Quaternion();
@@ -163,6 +164,12 @@ export class GLBDinoAnimator {
       this.c[k] = damp(this.c[k] || 0, pose[k] || 0, dt);
     let next = dead ? 'death' : pose.attack || pose.tailSwing ? 'attack'
       : trapped || speed < .08 ? 'idle' : speed > spec.runThreshold || pose.charge ? 'run' : 'walk';
+    // Additional provider clips need only catalog entries; Quaternius uses overlays.
+    if (!dead && !trapped && next !== 'attack') {
+      if (hurt > .5 && this.actions.hurt) next = 'hurt';
+      else if (pose.roar && this.actions.roar) next = 'roar';
+      else if (pose.headDown && this.actions.eat) next = 'eat';
+    }
     // Complete each triggered attack even when the server's short pulse ends.
     const currentAttack = this.actions.attack;
     if (!dead && !trapped && this.state === 'attack' && currentAttack.time < currentAttack.getClip().duration) next = 'attack';
@@ -202,6 +209,7 @@ export class GLBDinoAnimator {
       this.bend(r.head, UP, (look + .025 * Math.sin(this.time * 2) * this.c.alert) * live);
       this.bend(r.head, RIGHT, -.08 * Math.sin(this.time * 9) * this.c.roar * live);
     }
+    if (r.jaw) this.bend(r.jaw, RIGHT, -.4 * this.c.jaw * live);
     // Stable substepped spring: tail lags behind turns instead of snapping.
     const target = clamp(-yawRate * .10, -.35, .35) * live;
     for (let left = dt; left > 0;) {

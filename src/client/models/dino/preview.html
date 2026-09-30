@@ -21,18 +21,20 @@
        Renders one species on a flat ground with the shared animator. -->
   <div id="ui"></div>
   <div id="info"></div>
+  <div id="perf" style="position:fixed;right:8px;bottom:40px;background:#fff8;padding:4px 8px;color:#1f2a44"></div>
   <script type="module">
     import * as THREE from 'three';
-    import { DinoAnimator } from './rig.js';
+    import { SPECIES } from '../../entities/dinoViews.js';
+    import { preloadDinoModels } from './glbDino.js';
 
     const qs = new URLSearchParams(location.search);
-    const type = qs.get('type') || 'brachio';
-    const names = { brachio: 'Brachio', raptor: 'Raptor', stego: 'Stego', ptera: 'Ptera', trex: 'Trex' };
-    const mod = await import(`./${type}.js`);
-    const N = names[type];
-    const build = mod[`build${N}`];
-    const ANIM = mod[`${N.toUpperCase()}_ANIM`];
-    const extra = mod[`${type}ExtraUpdate`];
+    const type = SPECIES[qs.get('type')] ? qs.get('type') : 'brachio';
+    document.getElementById('info').textContent = 'Loading dinosaur models…';
+    await preloadDinoModels();
+    const species = SPECIES[type];
+    const build = species.build;
+    const ANIM = species.anim;
+    const extra = species.extraUpdate;
 
     const renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
@@ -61,7 +63,16 @@
 
     const rig = build();
     scene.add(rig.root);
-    const anim = new DinoAnimator(rig, ANIM);
+    const anim = species.createAnimator(rig);
+    // ?count=20 provides a repeatable skin/mixer/render performance scene.
+    const count = Math.min(20, Math.max(1, Number(qs.get('count')) || 1));
+    const copies = [];
+    for (let i = 1; i < count; i++) {
+      const copy = build();
+      copy.root.position.set((i % 5 - 2) * 4, 0, (Math.floor(i / 5) + 1) * 5);
+      scene.add(copy.root);
+      copies.push({ rig: copy, anim: species.createAnimator(copy), st: 0, spd: 0, pos: copy.root.position });
+    }
     const box = new THREE.Box3().setFromObject(rig.root, true);   // precise: skinned vertices, not culling bounds
     const size = box.getSize(new THREE.Vector3());
     const camera = new THREE.PerspectiveCamera(45, innerWidth / innerHeight, 0.1, 500);
@@ -75,6 +86,11 @@
     let view = qs.get('view') || 'side';
     let orbit = qs.get('orbit') === '1';
     const ui = document.getElementById('ui');
+    const select = document.createElement('select');
+    select.setAttribute('aria-label', 'Dinosaur species');
+    for (const name of Object.keys(SPECIES)) select.add(new Option(name, name, false, name === type));
+    select.onchange = () => { qs.set('type', select.value); qs.set('state', state); location.search = qs; };
+    ui.appendChild(select);
     const btns = {};
     for (const s of STATES) {
       const b = document.createElement('button');
@@ -102,11 +118,15 @@
     const speeds = { idle: 0, walk: ANIM.walkSpeed ?? 2, run: ANIM.runSpeed ?? 6, charge: ANIM.runSpeed ?? 6, fly: 11, dive: 20, landed: 0 };
     const clock = new THREE.Clock();
     let t = 0;
+    const frameSamples = [];
+    const updateSamples = [];
     const fakeView = { rig, anim, st: 0, spd: 0, pos: rig.root.position, yaw: 0, time: 0 };
     const DSMAP = { idle: 0, walk: 1, run: 2, alert: 4, attack: 5, charge: 6, tail: 7, trapped: 9, dead: 10, fly: 11, dive: 12, landed: 13, roar: 14, graze: 15 };
     function loop() {
       requestAnimationFrame(loop);
-      const dt = Math.min(clock.getDelta(), 0.05);
+      const rawDelta = clock.getDelta();
+      const dt = Math.min(rawDelta, 0.05);
+      const frameStart = performance.now();
       t += dt;
       const speed = speeds[state] ?? 0;
       const pose = {};
@@ -122,6 +142,14 @@
       fakeView.spd = speed;
       fakeView.time = t;
       extra?.(fakeView, dt);
+      for (const copy of copies) {
+        copy.anim.update(dt, { speed, dist: speed * dt, yawRate: 0, dead: state === 'dead', trapped: state === 'trapped', groundAt: () => 0, groundPitch: 0, pose });
+        copy.st = fakeView.st; copy.spd = speed;
+        extra?.(copy, dt);
+      }
+      updateSamples.push(performance.now() - frameStart);
+      frameSamples.push(rawDelta * 1000);
+      if (frameSamples.length > 180) { frameSamples.shift(); updateSamples.shift(); }
       const a = orbit ? t * 0.4 : { side: Math.PI / 2, front: 0, back: Math.PI, top: 0.001, 'three-quarter': Math.PI / 4 }[view];
       const cy = view === 'top' ? R : size.y * 0.55;
       if (focus === 'head' && rig.head) {
@@ -133,6 +161,10 @@
       }
       camera.lookAt(_fp);
       renderer.render(scene, camera);
+      if (frameSamples.length % 30 === 0) {
+        const avg = values => values.reduce((a, b) => a + b, 0) / values.length;
+        document.getElementById('perf').textContent = `${rig.isGLB ? 'GLB' : 'Procedural'} · ${count} dinos · frame ${avg(frameSamples).toFixed(1)} ms · animation ${avg(updateSamples).toFixed(2)} ms · ${renderer.info.render.triangles.toLocaleString()} rendered tris`;
+      }
     }
     loop();
     addEventListener('resize', () => { renderer.setSize(innerWidth, innerHeight); camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); });
