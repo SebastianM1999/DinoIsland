@@ -21,6 +21,35 @@ const _qr = new THREE.Quaternion();
 const TAU = Math.PI * 2;
 
 const damp = (cur, target, rate, dt) => cur + (target - cur) * (1 - Math.exp(-rate * dt));
+
+/**
+ * Follow-through chain (tail, neck): every link is a damped spring chasing
+ * the angle of the link before it, so motion starts at the base and travels
+ * out to the tip with lag and a little overshoot – a whip, not a stiff stick.
+ * Angles are "world bend relative to the body"; a joint's local rotation is
+ * the difference to its parent link.
+ */
+class SpringChain {
+  constructor(n, { freq = 5, falloff = 0.45, zeta = 0.55 } = {}) {
+    this.a = new Float32Array(n + 1);   // a[0] = driven base angle
+    this.v = new Float32Array(n + 1);
+    this.freq = freq; this.falloff = falloff; this.zeta = zeta;
+  }
+  step(base, dt) {
+    const n = this.a.length - 1;
+    this.a[0] = 0;
+    const h = Math.min(dt, 1 / 30);
+    for (let i = 1; i <= n; i++) {
+      // each link adds its share of the bend on top of the (lagging) link before
+      const w = TAU * this.freq * (1 - this.falloff * (i - 1) / Math.max(1, n - 1));
+      const acc = w * w * (this.a[i - 1] + base / n - this.a[i]) - 2 * this.zeta * w * this.v[i];
+      this.v[i] += acc * h;
+      this.a[i] += this.v[i] * h;
+    }
+  }
+  /** Local rotation of joint i (0-based): its bend relative to the previous link (the body for i = 0). */
+  local(i) { return this.a[i + 1] - this.a[i]; }
+}
 const smooth01 = (t) => t * t * (3 - 2 * t);
 
 /**
@@ -60,8 +89,11 @@ export class Rig {
     this.rest = new Map();           // joint -> rest Euler (captured by finalize)
   }
 
-  /** Capture the rest pose after building; also leg rest positions. */
-  finalize() {
+  /**
+   * Capture the rest pose after building; also leg rest positions.
+   * Pass { gaps: false } when a skin is added afterwards (then call fillHitGaps()).
+   */
+  finalize({ gaps = true } = {}) {
     this.root.updateMatrixWorld(true);
     this.root.traverse((o) => {
       this.rest.set(o, o.rotation.clone());
@@ -78,7 +110,7 @@ export class Rig {
       leg.hipHeight = _v.y;
     }
     this.bodyRestY = this.body.position.y;
-    this.#fillHitGaps();
+    if (gaps) this.fillHitGaps();
     return this;
   }
 
@@ -88,8 +120,9 @@ export class Rig {
    * to the joint that carries that geometry so they follow the animation. Each
    * new sphere inherits the zone of the nearest hand-placed sphere.
    */
-  #fillHitGaps() {
+  fillHitGaps() {
     if (!this.hitZones.length) return;
+    this.root.updateMatrixWorld(true);
     const base = this.hitSpheres([]).map((s) => ({ zone: s.zone, center: s.center.clone(), radius: s.radius }));
     const size = new THREE.Box3().setFromObject(this.root).getSize(_w);
     const tol = Math.min(0.2, Math.max(0.05, Math.max(size.x, size.y, size.z) * 0.02));
@@ -108,14 +141,22 @@ export class Rig {
     this.root.traverse((o) => {
       const pos = o.isMesh && o.visible && o.geometry.attributes.position;
       if (!pos || pos.usage === THREE.DynamicDrawUsage) return; // skip rebuilt geometry (wing membranes)
-      const step = Math.max(1, Math.floor(pos.count / 1500));
+      const si = o.isSkinnedMesh && o.geometry.attributes.skinIndex, sw = si && o.geometry.attributes.skinWeight;
+      const step = Math.max(1, Math.floor(pos.count / (si ? 4000 : 1500)));
       for (let i = 0; i < pos.count; i += step) {
         const p = new THREE.Vector3().fromBufferAttribute(pos, i);
-        o.localToWorld(p);
+        o.localToWorld(p);   // rest pose: the skin is undeformed
         const n = nearest(p);
         if (n.d <= tol) continue;
-        if (!groups.has(o.parent)) groups.set(o.parent, []);
-        groups.get(o.parent).push({ local: o.parent.worldToLocal(p.clone()), zone: n.s.zone });
+        // a skinned vertex belongs to the bone with the biggest weight
+        let joint = o.parent;
+        if (si) {
+          let best = 0;
+          for (let k = 1; k < 4; k++) if (sw.getComponent(i, k) > sw.getComponent(i, best)) best = k;
+          joint = o.skeleton.bones[si.getComponent(i, best)];
+        }
+        if (!groups.has(joint)) groups.set(joint, []);
+        groups.get(joint).push({ local: joint.worldToLocal(p.clone()), zone: n.s.zone });
       }
     });
 
@@ -191,6 +232,10 @@ const DEFAULTS = {
   headLook: 0.6,
   neckDip: 0.2,          // how far each neck joint bends down for headDown (grazing)
   jawOpen: 0.55,
+  hipYaw: 0.05,          // pelvis turns with each stride (the swinging leg's hip goes forward)
+  shift: 0.5,            // sideways weight shift over the stance leg (fraction of bob)
+  tailFreq: 3.2,         // follow-through spring frequency at the tail base (Hz)
+  neckFreq: 4.5,
 };
 
 export class DinoAnimator {
@@ -215,6 +260,11 @@ export class DinoAnimator {
     this.target = { ...this.c };
     this.idleLookT = 0;
     this.idleLook = 0;
+    this.tailYaw = new SpringChain(rig.tail.length, { freq: this.p.tailFreq, falloff: 0.55 });
+    this.tailPitch = new SpringChain(rig.tail.length, { freq: this.p.tailFreq * 1.3, falloff: 0.5, zeta: 0.45 });
+    this.neckYaw = new SpringChain(rig.neck.length + 1, { freq: this.p.neckFreq, falloff: 0.3, zeta: 0.7 });
+    this.prevBob = 0;
+    this.shiftT = Math.random() * 10;
   }
 
   /**
@@ -261,9 +311,15 @@ export class DinoAnimator {
     const breathe = Math.sin(this.time * (1.6 + this.runBlend * 2)) * p.breathe * (1 + this.runBlend);
     const struggle = this.trapped * Math.sin(this.time * 17) * 0.05;
     rig.body.position.y = rig.bodyRestY + (gaitBob * amp * (1 + this.runBlend * 0.5) - c.crouch * rig.bodyRestY * 0.12 - this.trapped * rig.bodyRestY * 0.1);
-    rig.body.rotation.z = rig.restZ(rig.body) + Math.sin(this.phase * TAU) * p.sway * amp + struggle;
+    // pelvis: rolls and shifts over the stance leg, turns with the stride;
+    // standing, it slowly shifts its weight from one leg to the other
+    const idleShift = Math.sin(this.time * 0.35 + this.shiftT) * (1 - amp) * (1 - this.dead);
+    const stepSide = Math.sin(this.phase * TAU);
+    const hipYaw = Math.cos(this.phase * TAU) * p.hipYaw * amp * (1 - this.runBlend * 0.4);
+    rig.body.position.x = (stepSide * amp * p.bob * p.shift + idleShift * p.bob * 0.5) * (p.gait === 'biped' ? 1 : 0.5);
+    rig.body.rotation.z = rig.restZ(rig.body) + stepSide * p.sway * amp + idleShift * p.sway * 0.6 + struggle;
     rig.body.rotation.x = rig.restX(rig.body) + (s.groundPitch || 0) + c.charge * 0.12 - c.attack * 0.08 + this.runBlend * amp * 0.05;
-    rig.body.rotation.y = -this.yawRate * 0.08;
+    rig.body.rotation.y = -this.yawRate * 0.08 + hipYaw;
     if (rig.chest) {
       const b = 1 + breathe;
       rig.chest.scale.set(b, 1 + breathe * 0.6, 1);
@@ -277,24 +333,34 @@ export class DinoAnimator {
     rig.root.updateMatrixWorld(true);
     for (const leg of rig.legs) this.#leg(leg, amp, L, duty, s, scale);
 
-    // ---- tail: follow-through + sway
+    // ---- tail: spring follow-through driven from the hips
+    // yaw: counter-swings the pelvis turn, lags behind turns, lazy idle sway
+    // pitch: bounces against the body bob (heavy tails lag the most)
     const n = rig.tail.length;
+    const live = 1 - this.dead * 0.85;
+    const lazy = Math.sin(this.time * 0.8) * p.tailSway * 2.2 * (1 - amp * 0.6);
+    // (the input is the total bend over the whole tail)
+    this.tailYaw.step((-hipYaw * 1.6 - this.yawRate * p.tailFollow + lazy) * live * n * 0.3, dt);
+    const bobVel = dt > 0 ? (gaitBob - this.prevBob) / dt : 0;
+    this.prevBob = gaitBob;
+    this.tailPitch.step(bobVel * amp * 0.12 * live * n * 0.3, dt);
     for (let i = 0; i < n; i++) {
       const j = rig.tail[i];
       const k = (i + 1) / n;
-      const wave = Math.sin(this.time * (1.3 + amp * 1.5) - i * 0.55) * p.tailSway * (0.4 + amp * 0.6);
-      j.rotation.y = rig.restY(j) + (-this.yawRate * p.tailFollow * k + wave * k) * (1 - this.dead * 0.8)
+      j.rotation.y = rig.restY(j) + this.tailYaw.local(i)
         + c.tailSwing * 0.45 * Math.sin(k * 1.2);
-      j.rotation.x = rig.restX(j) + Math.sin(this.phase * TAU * 2 - i * 0.5) * 0.025 * amp + this.dead * 0.04 - c.tailSwing * 0.02;
+      j.rotation.x = rig.restX(j) + this.tailPitch.local(i) * 0.6 + this.dead * 0.04 - c.tailSwing * 0.02;
     }
 
     // ---- neck + head
     const nn = rig.neck.length;
     const look = (c.lookYaw + this.idleLook + this.yawRate * p.neckFollow) * p.headLook;
+    // the neck bends into the look a link at a time (base first)
+    this.neckYaw.step(look, dt);
     for (let i = 0; i < nn; i++) {
       const j = rig.neck[i];
       const k = (i + 1) / nn;
-      j.rotation.y = rig.restY(j) + look / Math.max(1, nn) * (0.6 + k);
+      j.rotation.y = rig.restY(j) + this.neckYaw.local(nn - i) * (0.6 + k);
       j.rotation.x = rig.restX(j)
         + c.neckRaise * 0.14
         - c.headDown * p.neckDip

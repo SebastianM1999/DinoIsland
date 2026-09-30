@@ -6,6 +6,7 @@
 import * as THREE from 'three';
 import { MAT, paint, place, part, merge, mesh, blob, deform } from '../kit.js';
 import { Rig, DinoAnimator } from './rig.js';
+import { SkinBuilder, loft, restPoint } from './skin.js';
 import { countershade, chain, sideEyes, teethRow, tube, spike, V } from './parts.js';
 import { DS } from '../../../shared/protocol.js';
 
@@ -61,51 +62,38 @@ export function theroFoot({ toeLen, r, h, color, pad, clawColor = '#efe4cc', cla
   return merge(parts);
 }
 
+/** Joint chain without geometry (the skin covers it). dir: 'fwd' (-Z) or 'back' (+Z). */
+function jointChain(parent, segs, dir) {
+  const joints = [];
+  let p = parent;
+  segs.forEach((g, i) => {
+    const j = new THREE.Group();
+    if (i > 0) j.position.z = (dir === 'fwd' ? -1 : 1) * segs[i - 1].len;
+    j.rotation.set(g.rx || 0, g.ry || 0, g.rz || 0);
+    p.add(j);
+    joints.push(j);
+    p = j;
+  });
+  return joints;
+}
+
 /** Fill the rig with a theropod built from spec S (see raptor.js / trex.js). */
 export function buildTheropod(S) {
   const C = S.col;
   const rig = new Rig();
   const body = rig.body;
   body.position.set(0, S.hipY, 0);
-
-  // ---------------------------------------------------------------- torso
   const chest = new THREE.Group();
   body.add(chest);
   rig.chest = chest;
-  const T = S.torso;
-  const bodyColor = countershade({ main: C.main, back: C.back, belly: C.belly, stripe: C.stripe, stripes: T.stripes, stripeWidth: T.stripeWidth ?? 0.4, bellyFrom: T.bellyFrom ?? 2.05, backTo: 0.7, stripePhase: 0.3 });
-  let torso = tube(T.path.map((p) => V(0, p[0], p[1])), (t) => T.radius(t), { radial: T.radial ?? 12, color: bodyColor, smoothColors: true });
-  // deeper, rounder belly
-  torso = deform(torso, (v) => {
-    if (v.y < T.bellyY) v.y = T.bellyY + (v.y - T.bellyY) * (T.bellyDrop ?? 1.15);
-  });
-  const torsoParts = [torso];
-  // hip + shoulder muscle bulges hide the thigh tops
-  const cMain = new THREE.Color(C.main), cStripe = new THREE.Color(C.stripe), cOut = new THREE.Color();
-  const soft = (e0, e1, v) => { const k = clamp01((v - e0) / (e1 - e0)); return k * k * (3 - 2 * k); };
-  for (const s of [-1, 1]) {
-    // hip muscle bulge with two soft, slanted dark stripes painted on its outer side
-    const b = T.hipBulge.r;
-    const hip = blob(b[0], b[1], b[2], (c) => {
-      const out = soft(0.1, 0.55, (c.x * s) / b[0]);
-      const u = c.z / b[2] + c.y / b[1] * 0.55 + 0.25;
-      const band = Math.max(1 - soft(0.08, 0.2, Math.abs(u + 0.05)), 1 - soft(0.08, 0.2, Math.abs(u - 0.6)));
-      const k = band * out * soft(-0.7, -0.2, c.y / b[1]) * 0.85;
-      return cOut.copy(cMain).lerp(cStripe, k);
-    }, { w: 14, h: 10 });
-    torsoParts.push(place(hip, [s * T.hipBulge.x, T.hipBulge.y, T.hipBulge.z]));
-  }
-  chest.add(mesh(merge(torsoParts)));
 
-  // ---------------------------------------------------------------- neck
+  // ---------------------------------------------------------------- skeleton
   const N = S.neck;
   const neckBase = new THREE.Group();
   neckBase.position.set(0, N.base[0], N.base[1]);
-  body.add(neckBase);
-  const neckColor = countershade({ main: C.main, back: C.back, belly: C.belly, stripe: C.stripe, stripes: N.stripes ?? 2, stripeWidth: 0.3, bellyFrom: N.bellyFrom ?? 1.75, backTo: 0.65, stripePhase: 0.55 });
-  rig.neck = chain(neckBase, N.segs, { dir: 'fwd', color: neckColor, radial: N.radial ?? 10, capFirst: false });
+  chest.add(neckBase);
+  rig.neck = jointChain(neckBase, N.segs, 'fwd');
 
-  // ---------------------------------------------------------------- head
   const head = new THREE.Group();
   head.position.set(0, 0, -N.segs[N.segs.length - 1].len);
   head.rotation.x = S.head.rest;
@@ -115,25 +103,15 @@ export function buildTheropod(S) {
   rig.jaw = jaw;
   rig.eyelids.push(lids);
 
-  // ---------------------------------------------------------------- tail
   const TL = S.tail;
   const tailBase = new THREE.Group();
   tailBase.position.set(0, TL.base[0], TL.base[1]);
   body.add(tailBase);
-  const tailColor = countershade({ main: C.main, back: C.back, belly: C.belly, stripe: C.stripe, stripes: TL.stripes, stripeWidth: TL.stripeWidth ?? 0.42, bellyFrom: 2.25, backTo: 0.7, stripePhase: 0.15 });
-  const tailSegs = [];
-  for (let i = 0; i < TL.len.length; i++) {
-    const r0 = TL.r[i], r1 = TL.r[i + 1];
-    tailSegs.push({ len: TL.len[i], r0: [r0, r0 * TL.flat], r1: [r1, r1 * TL.flat], rx: TL.rx[i] });
-  }
-  rig.tail = chain(tailBase, tailSegs, { dir: 'back', color: tailColor, radial: TL.radial ?? 9, capFirst: false });
+  rig.tail = jointChain(tailBase, TL.len.map((len, i) => ({ len, rx: TL.rx[i] })), 'back');
 
-  // ---------------------------------------------------------------- legs
   for (const side of [-1, 1]) rig.legs.push(buildLeg(body, S.leg, side, C));
   rig.legs[0].offset = 0;
   rig.legs[1].offset = 0.5;
-
-  // ---------------------------------------------------------------- arms
   for (const side of [-1, 1]) rig.arms.push(buildArm(chest, S.arm, side, C));
 
   // ---------------------------------------------------------------- hit zones
@@ -148,11 +126,104 @@ export function buildTheropod(S) {
   }
   rig.tail.slice(0, 4).forEach((j, i) => rig.hitZones.push({ zone: 'tail', joint: j, offset: V(0, 0, TL.len[i] * 0.5), radius: TL.r[i] * 1.05 }));
 
-  rig.finalize();
+  rig.finalize({ gaps: false });
   // feet stand slightly in front of the hip joints (under the centre of mass)
   for (const leg of rig.legs) leg.restZ -= S.leg.footForward || 0;
   standPose(rig, S.anim);
+
+  // ---------------------------------------------------------------- skin
+  buildSkin(rig, S, { neckBase, tailBase });
+  rig.fillHitGaps();
   return rig;
+}
+
+/**
+ * The soft body as one skinned surface: head -> neck -> torso -> tail in one
+ * loft, plus a loft per leg (thigh top buried in the hips) and per arm.
+ */
+function buildSkin(rig, S, { neckBase, tailBase }) {
+  const C = S.col, T = S.torso, N = S.neck, TL = S.tail, H = S.head, L = S.leg, A = S.arm;
+  const root = rig.root, body = rig.body, chest = rig.chest, head = rig.head;
+  const at = (obj, x = 0, y = 0, z = 0) => restPoint(root, obj, [x, y, z]);
+  const pair = (r) => (Array.isArray(r) ? r : [r, r]);
+  const st = [];
+  const add = (p, rx, ry, bone, rb = ry) => st.push({ p, rx, ry, rb, bone });
+
+  // head: the neck runs into the back of the skull (hidden inside it)
+  const cy = H.mouthY + H.H * 0.75;
+  add(at(head, 0, cy, -H.L * 0.28), H.W * 0.7, H.H * 0.6, head);
+  add(at(head, 0, cy - H.H * 0.05, H.back * 0.2), H.W * 0.92, H.H * 0.88, head, H.H * 1.0);
+  // neck, head end first (stations at the middle of each bone)
+  for (let i = N.segs.length - 1; i >= 0; i--) {
+    const g = N.segs[i];
+    const r0 = pair(g.r0), r1 = pair(g.r1);
+    add(at(rig.neck[i], 0, 0, -g.len * 0.5), (r0[0] + r1[0]) / 2, (r0[1] + r1[1]) / 2, rig.neck[i], (r0[1] + r1[1]) / 2 * 1.08);
+  }
+  const nb = pair(N.segs[0].r0);
+  add(at(neckBase), nb[0] * 1.05, nb[1], chest, nb[1] * 1.15);
+  // torso, front to back, between the neck base and the tail base
+  const nbz = at(neckBase).z, tbz = at(tailBase).z;
+  const curve = new THREE.CatmullRomCurve3(T.path.map((q) => V(0, q[0], q[1])));
+  for (let k = 8; k >= 0; k--) {
+    const u = k / 8;
+    const q = curve.getPoint(u);
+    const p = at(body, 0, q.y, q.z);
+    if (p.z < nbz + (tbz - nbz) * 0.12 || p.z > tbz - (tbz - nbz) * 0.1) continue;
+    const [rx, ry] = pair(T.radius(u));
+    add(p, rx, ry, q.z < 0 ? chest : body, ry * (T.bellyDrop ?? 1.15));
+  }
+  // tail
+  add(at(tailBase), TL.r[0] * 1.05, TL.r[0] * TL.flat, body, TL.r[0] * TL.flat * 1.05);
+  TL.len.forEach((len, i) => {
+    const r = (TL.r[i] + TL.r[i + 1]) / 2;
+    add(at(rig.tail[i], 0, 0, len * 0.5), r, r * TL.flat, rig.tail[i]);
+  });
+  const last = rig.tail.length - 1;
+  add(at(rig.tail[last], 0, 0, TL.len[last]), TL.r[last + 1], TL.r[last + 1] * TL.flat, rig.tail[last]);
+
+  const stripes = (T.stripes ?? 5) + (TL.stripes ?? 8) + (N.stripes ?? 2);
+  const bodyColor = countershade({ main: C.main, back: C.back, belly: C.belly, stripe: C.stripe, stripes, stripeWidth: T.stripeWidth ?? 0.4, bellyFrom: T.bellyFrom ?? 2.0, backTo: 0.72, stripePhase: 0.2 });
+  const skin = new SkinBuilder(root);
+  skin.loft(loft(st, { radial: T.radial ? T.radial * 2 : 24, segs: 7, color: bodyColor, capStart: true, capEnd: true, dome: 0.8 }));
+
+  // legs: drumstick thigh buried in the hip, slim shin, metatarsus into the foot
+  const legColor = (t, a) => {
+    const aa = vang(a); // 0 = front, PI = back
+    const stripeK = L.thighStripes && t < 0.42 && aa > 1.3 && ((t * 7 + 0.2) % 1) < 0.35;
+    if (stripeK) return C.stripe;
+    if (t < 0.15) return C.main;
+    return t > 0.7 ? C.legDark : C.leg;
+  };
+  for (const leg of rig.legs) {
+    const ls = [];
+    const push = (p, rx, ry, bone, rb = ry) => ls.push({ p, rx, ry, rb, bone });
+    // two stations per bone (near both ends): the bone stays firm, the skin
+    // only blends across the knee / ankle instead of bending like a hose
+    const tr = L.thighR * (L.thighBulk ?? 1);
+    push(at(leg.hip, 0, tr * 0.8, tr * 0.2), tr * 0.8, tr * 0.85, body);
+    push(at(leg.hip, 0, -L.l1 * 0.18, -tr * 0.08), tr * 0.95, tr * 1.1, leg.hip);
+    push(at(leg.hip, 0, -L.l1 * 0.55, -tr * 0.02), tr * 0.72, tr * 0.86, leg.hip);
+    push(at(leg.hip, 0, -L.l1 * 0.9, 0), L.shinR * 1.25, L.shinR * 1.4, leg.hip);
+    push(at(leg.knee, 0, -L.l2 * 0.14, L.shinR * 0.1), L.shinR * 1.12, L.shinR * 1.25, leg.knee);
+    push(at(leg.knee, 0, -L.l2 * 0.55, L.shinR * 0.05), L.shinR * 0.9, L.shinR * 1.0, leg.knee);
+    push(at(leg.knee, 0, -L.l2 * 0.9, 0), L.metaR * 1.4, L.metaR * 1.5, leg.knee);
+    push(at(leg.ankle, 0, -L.l3 * 0.15, 0), L.metaR * 1.2, L.metaR * 1.3, leg.ankle);
+    push(at(leg.ankle, 0, -L.l3 * 0.85, 0), L.metaR * 0.95, L.metaR * 1.05, leg.ankle);
+    push(at(leg.foot, 0, -L.footH0 * 0.4, -L.metaR * 0.3), L.metaR * 1.15, L.metaR * 0.95, leg.foot);
+    skin.loft(loft(ls, { up: V(0, 0, -1), radial: 16, segs: 6, color: legColor, dome: 0.7 }));
+  }
+  // arms: shoulder buried in the chest
+  for (const sh of rig.arms) {
+    const elbow = sh.children.find((c) => c.name === 'elbow');
+    const as = [];
+    const push = (p, r, bone) => as.push({ p, rx: r, ry: r, rb: r, bone });
+    push(at(sh, 0, A.r * 1.6, 0), A.r * 1.3, chest);
+    push(at(sh, 0, -A.upper * 0.45, 0), A.r * 1.1, sh);
+    push(at(elbow, 0, -A.fore * 0.45, 0), A.r * 0.85, elbow);
+    push(at(elbow, 0, -A.fore * 0.92, 0), A.r * 0.75, elbow);
+    skin.loft(loft(as, { up: V(0, 0, -1), radial: 12, segs: 5, color: (t, a) => (vang(a) < 1.2 && t < 0.6 ? C.main : C.leg), dome: 0.6 }));
+  }
+  rig.skin = skin.build();
 }
 
 /** Solve the leg IK once so the rest pose (and bounding box) is a proper stance. */
@@ -285,36 +356,12 @@ function buildLeg(body, L, side, C) {
   const hip = new THREE.Group();
   hip.position.set(side * L.x, L.y, L.z);
   body.add(hip);
-  const legColor = (stripes) => (t, a) => {
-    const aa = vang(a); // 0 = front (-Z), PI = back
-    if (stripes && aa > 1.25 && ((t * stripes + 0.15) % 1) < 0.3) return C.stripe;
-    if (aa < 0.5 && t < 0.5) return C.main;
-    return t > 0.85 ? C.legDark : C.leg;
-  };
-  // thigh: muscular drumstick, overlaps up into the hip bulge
-  const thigh = tube([V(0, L.thighR * 0.6, L.thighR * 0.1), V(0, -L.l1 * 0.4, -L.thighR * 0.12), V(0, -L.l1, 0)],
-    (t) => { const k = t < 0.35 ? 1 : 1 - (t - 0.35) * 0.95; return [L.thighR * k * 0.82, L.thighR * k]; },
-    { radial: L.radial ?? 9, up: V(0, 0, -1), color: legColor(L.thighStripes ?? 3) });
-  hip.add(mesh(thigh));
-
   const knee = new THREE.Group();
   knee.position.y = -L.l1;
   hip.add(knee);
-  const shin = tube([V(0, L.shinR * 0.9, 0), V(0, -L.l2 * 0.35, L.shinR * 0.15), V(0, -L.l2, 0)],
-    (t) => [L.shinR * (1.05 - t * 0.45), L.shinR * (1.15 - t * 0.5)],
-    { radial: L.radial ?? 9, up: V(0, 0, -1), color: legColor(0) });
-  const kneeCap = place(blob(L.shinR * 0.95, L.shinR * 1.0, L.shinR * 1.05, C.leg, { w: 7, h: 5 }), [0, 0, -L.shinR * 0.2]);
-  knee.add(mesh(merge([shin, kneeCap])));
-
   const ankle = new THREE.Group();
   ankle.position.y = -L.l2;
   knee.add(ankle);
-  const meta = tube([V(0, L.metaR * 0.6, 0), V(0, -L.l3 * 0.5, 0), V(0, -L.l3 + L.metaR * 0.3, 0)],
-    (t) => [L.metaR * (1.05 - t * 0.15), L.metaR * (1.2 - t * 0.25)],
-    { radial: 7, up: V(0, 0, -1), color: () => C.legDark });
-  const ankleKnob = place(blob(L.metaR * 1.3, L.metaR * 1.3, L.metaR * 1.4, C.legDark, { w: 6, h: 5 }), [0, 0, L.metaR * 0.1]);
-  ankle.add(mesh(merge([meta, ankleKnob])));
-
   const foot = new THREE.Group();
   foot.position.y = -L.l3;
   ankle.add(foot);
@@ -331,24 +378,21 @@ function buildArm(chest, A, side, C) {
   sh.rotation.set(A.rest, 0, side * A.splay);
   sh.userData.side = side < 0 ? 0 : Math.PI;
   chest.add(sh);
-  const upper = tube([V(0, A.r * 0.8, 0), V(0, -A.upper * 0.5, 0), V(0, -A.upper, 0)], (t) => A.r * (1.15 - t * 0.35),
-    { radial: 7, up: V(0, 0, -1), color: (t, a) => (vang(a) < 1.2 ? C.main : C.leg) });
-  sh.add(mesh(upper));
   const elbow = new THREE.Group();
+  elbow.name = 'elbow';
   elbow.position.y = -A.upper;
   elbow.rotation.x = A.elbow;
   sh.add(elbow);
-  const fore = tube([V(0, A.r * 0.7, 0), V(0, -A.fore * 0.5, 0), V(0, -A.fore, 0)], (t) => A.r * (0.9 - t * 0.3),
-    { radial: 7, up: V(0, 0, -1), color: () => C.leg });
-  const hand = [fore];
+  // hand: fingers + claws (the forearm itself is part of the skin)
+  const hand = [];
   const n = A.fingers;
   for (let i = 0; i < n; i++) {
     const k = n === 1 ? 0 : i / (n - 1) - 0.5;
     const fl = A.finger * (1 - Math.abs(k) * 0.3);
-    const f = tube([V(0, 0, 0), V(0, -fl * 0.6, -fl * 0.15), V(0, -fl, -fl * 0.1)], (t) => A.r * 0.38 * (1 - t * 0.3),
+    const f = tube([V(0, fl * 0.2, 0), V(0, -fl * 0.6, -fl * 0.15), V(0, -fl, -fl * 0.1)], (t) => A.r * 0.4 * (1 - t * 0.3),
       { radial: 5, up: V(0, 0, -1), color: () => C.leg });
     const c = place(talon(A.claw, A.r * 0.26, C.claw, C.clawTip), [0, -fl, -fl * 0.1], [-1.1, 0, 0]);
-    hand.push(place(merge([f, c]), [k * A.r * 1.3 * side, -A.fore * 0.95, 0], [0.25, 0, k * 0.4]));
+    hand.push(place(merge([f, c]), [k * A.r * 1.3 * side, -A.fore * 0.9, 0], [0.25, 0, k * 0.4]));
   }
   elbow.add(mesh(merge(hand)));
   return sh;

@@ -96,7 +96,7 @@ const SPEC = {
   leg: {
     x: 0.1, y: -0.02, z: 0.04,
     l1: 0.38, l2: 0.43, l3: 0.24, metaAngle: 0.35,
-    thighR: 0.12, shinR: 0.055, metaR: 0.028,
+    thighR: 0.12, thighBulk: 1.15, shinR: 0.06, metaR: 0.03,
     toeLen: 0.12, toeR: 0.02, footH0: 0.035,
     sickle: true, footForward: 0.05, thighStripes: 3, radial: 8,
   },

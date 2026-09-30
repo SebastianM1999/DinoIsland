@@ -62,7 +62,7 @@
     const rig = build();
     scene.add(rig.root);
     const anim = new DinoAnimator(rig, ANIM);
-    const box = new THREE.Box3().setFromObject(rig.root);
+    const box = new THREE.Box3().setFromObject(rig.root, true);   // precise: skinned vertices, not culling bounds
     const size = box.getSize(new THREE.Vector3());
     const camera = new THREE.PerspectiveCamera(45, innerWidth / innerHeight, 0.1, 500);
     const zoom = parseFloat(qs.get('zoom') || '1');
