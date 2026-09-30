@@ -70,10 +70,12 @@ export class Mission {
       { text: `Repair the boat on the east beach (${found}/${relics.length} parts)`, done: repaired },
       { text: `Set sail together (${this.atBoat}/${Math.max(1, this.alive)} at the boat)`, done: this.phase === 'sailing' },
     ];
+    const won = this.phase === 'sailing' && L.last;
     return {
-      level: { index: L.index, number: L.number, name: L.name, biome: L.biome.id },
+      level: { index: L.index, number: L.number, name: L.name, biome: L.biome.id, last: L.last },
       step: this.phase,
-      title: this.phase === 'sailing' ? 'Island complete!' : `Island ${L.number}: ${L.name}`,
+      title: won ? 'You escaped Dinosaur Island!' : this.phase === 'sailing' ? 'Island complete!' : `Island ${L.number}: ${L.name}`,
+      won,
       objectives,
       relics,
       boat: { repaired },
@@ -153,8 +155,9 @@ export class Mission {
         this.phase = 'sailing';
         this.completedIn = Math.round(w.now - this.startedAt);
         this.islandsDone++;
-        this.doneTimer = SAIL_DELAY;
-        w.toast('All aboard! Setting sail for the next island…', 'quest');
+        const last = w.layout.level.last;
+        this.doneTimer = last ? SAIL_DELAY * 2.5 : SAIL_DELAY;
+        w.toast(last ? 'All aboard! You escaped Dinosaur Island – well done!' : 'All aboard! Setting sail for the next island…', 'quest');
         this.onEvent('island');
         this.broadcast();
       }

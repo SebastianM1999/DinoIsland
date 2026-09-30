@@ -664,15 +664,19 @@ export class Hud {
     const sig = JSON.stringify(info || {});
     if (this._c.win === sig && !this.$win.hidden) return;
     this._c.win = sig;
-    const store = info.store || {};
-    const items = LOOT_KEYS.filter((k) => store[k] > 0)
-      .map((k) => `<li>${icon(k)}<b>${store[k]}</b><span class="sr"> ${esc(lootName(k))}</span></li>`).join('');
-    this.$win.innerHTML = `<div class="hud-win-card brush">
+    this.$win.innerHTML = info.won
+      ? `<div class="hud-win-card brush">
       <span class="hud-win-ic">${icon('trophy')}</span>
-      <h2>Expedition complete!</h2>
-      <p>The team made it back to the hut with the loot.</p>
+      <h2>You escaped Dinosaur Island!</h2>
+      <p>The boat is repaired and the whole team is aboard. Thanks for playing!</p>
+      ${info.completedIn != null ? `<p class="hud-win-time">${icon('clock')} ${fmtTime(info.completedIn)} on the last island</p>` : ''}
+      <p>A new adventure starts on a fresh first island in a moment…</p>
+    </div>`
+      : `<div class="hud-win-card brush">
+      <span class="hud-win-ic">${icon('boat')}</span>
+      <h2>Island complete!</h2>
+      <p>All aboard – sailing to island ${esc(info.next ?? '')}…</p>
       ${info.completedIn != null ? `<p class="hud-win-time">${icon('clock')} ${fmtTime(info.completedIn)}</p>` : ''}
-      ${items ? `<ul class="hud-win-store">${items}</ul>` : ''}
     </div>`;
     this.$win.hidden = false;
   }

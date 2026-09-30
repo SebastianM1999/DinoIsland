@@ -316,7 +316,7 @@ export function planIsland(levelIndex = 0, variant = 1) {
   const plan = {
     level, biome, seed, variant,
     // the first island is a small tutorial island; later ones grow to full size
-    k: levelIndex === 0 ? 0.52 : Math.min(1, 0.74 + levelIndex * 0.13),
+    k: level.index === 0 ? 0.52 : 0.87,
     A: 0,
     B: 0,
     ramps: [],

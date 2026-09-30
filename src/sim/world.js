@@ -20,7 +20,7 @@ import { makeRng } from '../shared/rng.js';
 import { lineBlocked } from '../shared/visibility.js';
 import { sanitizeOutfit, sameOutfit } from '../shared/outfits.js';
 import { planIsland } from '../shared/island.js';
-import { levelDef } from '../shared/levels.js';
+import { levelDef, LEVEL_COUNT } from '../shared/levels.js';
 
 const P = CONFIG.player;
 const W = CONFIG.weapons;
@@ -67,9 +67,9 @@ export class ServerWorld {
     this.log(`island ${level + 1} "${levelDef(level).name}" variant ${variant}`);
   }
 
-  /** The team set sail: build the next island and send everyone there. */
+  /** The team set sail: build the next island (after the last one: a fresh first island). */
   nextLevel() {
-    this.#loadLevel(this.levelIndex + 1);
+    this.#loadLevel(this.levelIndex + 1 < LEVEL_COUNT ? this.levelIndex + 1 : 0);
     this.mission.startIsland();
     this.dinos.spawnAll();
     const caps = this.caps();

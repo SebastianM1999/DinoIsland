@@ -288,7 +288,7 @@ export class Game {
       this.mission = m.mission;
       this.#showMission();
       this.boatPanel.setMission(m.mission);
-      this.hud.missionComplete(m.mission.complete, { completedIn: m.mission.completedIn, store: this.store });
+      this.hud.missionComplete(m.mission.complete, { completedIn: m.mission.completedIn, won: m.mission.won, next: m.mission.level?.number + 1 });
     });
     net.on(`ev:${EV.STORE}`, (m) => { this.store = m.store; });
     net.on(`ev:${EV.HURT}`, (m) => {

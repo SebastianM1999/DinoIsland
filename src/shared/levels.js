@@ -82,34 +82,31 @@ export const BIOMES = {
   },
 };
 
-/** The hand-authored level order; after the last one the biomes repeat, harder. */
+/** The islands, in order. Sailing away from the last one wins the game. */
 export const LEVELS = [
   // the first island only has raptors and pteranodons
   { name: 'Emerald Jungle', biome: 'jungle', dinos: { brachio: 0, stego: 0 } },
   { name: 'Ashfall Isle', biome: 'volcano' },
 ];
 
+export const LEVEL_COUNT = LEVELS.length;
+
 /**
- * Full definition of level `index` (0-based).
- * difficulty scales dinosaur health/damage and adds extra packs.
+ * Full definition of level `index` (0-based, clamped to the existing islands).
+ * difficulty scales dinosaur health/damage.
  */
 export function levelDef(index) {
-  const i = Math.max(0, index | 0);
-  const base = LEVELS[i % LEVELS.length];
-  const loop = Math.floor(i / LEVELS.length);
-  const difficulty = 1 + i * 0.3;
+  const i = Math.min(LEVEL_COUNT - 1, Math.max(0, index | 0));
+  const base = LEVELS[i];
   const biome = BIOMES[base.biome];
-  const extra = Math.floor(i / 2);                       // one more predator group every two islands
-  const dinos = { ...biome.dinos, ...(loop === 0 ? base.dinos : {}) };  // per-island overrides only on the first pass
-  dinos.raptor += extra;
-  if (i >= 2) dinos.trex = Math.max(dinos.trex, 1);
   return {
     index: i,
     number: i + 1,
-    name: loop ? `${base.name} ${['', 'II', 'III', 'IV', 'V'][loop] || loop + 1}` : base.name,
+    name: base.name,
     biome,
-    difficulty,
-    dinos,
+    difficulty: 1 + i * 0.3,
+    dinos: { ...biome.dinos, ...base.dinos },
     relicCount: 3,
+    last: i === LEVEL_COUNT - 1,
   };
 }
