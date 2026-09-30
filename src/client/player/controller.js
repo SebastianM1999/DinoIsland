@@ -13,6 +13,7 @@ const tmp2 = { x: 0, z: 0, hit: false };
 /** Rock sides steeper than this (tan) can't be walked up once they are higher than a step. */
 const ROCK_WALK_SLOPE = 0.45;
 const C = P.creative;
+const SW = P.swim;
 
 export class PlayerController {
   /**
@@ -41,11 +42,15 @@ export class PlayerController {
     this.distance = 0;                  // distance walked, for footsteps/head bob
     this.landImpact = 0;
     this.inWater = 0;
-    this.creative = false;              // invincible (server) + may fly
+    this.swimming = false;              // afloat in a river or lake
+    this.creative = false;             // invincible (server) + may fly
     this.flying = false;
     this.clock = 0;
     this.lastJumpTap = -Infinity;
     this.prevJump = false;
+    /** Primeval Grove barrier (set by the game): { x, z, r, mayEnter(), onBlocked() } or null. */
+    this.barrier = null;
+    this.barrierHit = false;
   }
 
   setCreative(on) {
@@ -132,8 +137,15 @@ export class PlayerController {
 
     const depth = t.waterDepthAt(this.pos.x, this.pos.z);
     this.inWater = depth;
+    // swimming: deep water of the island's rivers and lakes floats you (never the sea)
+    const lake = t.inlandWaterLevelAt(this.pos.x, this.pos.z);
+    const floatY = lake !== null && lake - t.heightAt(this.pos.x, this.pos.z) > SW.depth ? lake - SW.float : null;
+    this.swimming = !flying && floatY !== null && this.pos.y <= floatY + 0.3;
+    if (this.swimming) this.sprinting = false;
     const waterSlow = depth > 0.2 ? Math.max(0.55, 1 - depth * 0.35) : 1;
-    let speed = flying ? C.flySpeed : (this.sprinting ? P.sprintSpeed : P.walkSpeed) * this.speedFactor * waterSlow;
+    let speed = flying ? C.flySpeed
+      : this.swimming ? SW.speed * this.speedFactor
+      : (this.sprinting ? P.sprintSpeed : P.walkSpeed) * this.speedFactor * waterSlow;
 
     let wx = 0, wz = 0;
     if (moving) {
@@ -144,11 +156,11 @@ export class PlayerController {
       wz = (-nx * sin + nz * cos) * speed;
     }
 
-    const accel = (this.onGround || flying ? P.accel : P.accel * P.airControl) * dt;
+    const accel = (this.onGround || flying ? P.accel : this.swimming ? P.accel * 0.4 : P.accel * P.airControl) * dt;
     if (controllable || !this.onGround) {
       const ax = wx - this.vel.x, az = wz - this.vel.z;
       const al = Math.hypot(ax, az);
-      if (this.onGround || flying || moving) {
+      if (this.onGround || flying || this.swimming || moving) {
         const k = al > accel ? accel / al : 1;
         this.vel.x += ax * k;
         this.vel.z += az * k;
@@ -186,11 +198,14 @@ export class PlayerController {
       this.staminaDelay = P.staminaRegenDelay;
     }
 
-    // --- gravity (flying: Space up, Shift down, otherwise hover)
+    // --- gravity (flying: Space up, Shift down, otherwise hover; swimming: bob at the surface)
     if (flying) {
       const want = ((intent.jump ? 1 : 0) - (intent.sprint ? 1 : 0)) * C.flyVertical;
       const dv = want - this.vel.y, max = P.accel * dt;
       this.vel.y += Math.max(-max, Math.min(max, dv));
+    } else if (this.swimming) {
+      const bob = Math.sin(this.clock * 2.2) * 0.04;
+      this.vel.y += ((floatY + bob - this.pos.y) * 4 - this.vel.y) * Math.min(1, dt * 6);
     } else {
       this.vel.y -= P.gravity * dt;
     }
@@ -198,9 +213,11 @@ export class PlayerController {
     // --- horizontal move with slope + water limits (axis separated so we slide)
     const oldX = this.pos.x, oldZ = this.pos.z;
     const groundNow = this.groundAt(oldX, oldZ);
+    this.barrierHit = false;
     this.#tryMove(this.vel.x * dt, 0, groundNow);
     this.#tryMove(0, this.vel.z * dt, groundNow);
     this.#collide(oldX, oldZ, groundNow);
+    if (this.barrierHit && controllable) this.barrier.onBlocked?.();
     // world edge safety
     const lim = CONFIG.world.size / 2 - 5;
     this.pos.x = Math.max(-lim, Math.min(lim, this.pos.x));
@@ -218,6 +235,11 @@ export class PlayerController {
       // touching the ground ends the flight
       if (this.pos.y <= ground && this.vel.y <= 0) this.flying = false;
       else if (this.pos.y > ground) { this.onGround = false; return; }
+    }
+    // afloat: the river/lake holds you up until the bottom comes up under your feet
+    if (this.swimming && this.pos.y > ground) {
+      this.onGround = false;
+      return;
     }
     // swimming-ish: water holds you up a little in deep spots
     if (this.pos.y <= ground) {
@@ -298,13 +320,23 @@ export class PlayerController {
   #canStep(fx, fz, nx, nz, groundNow) {
     const t = this.terrain;
     const dx = nx - fx, dz = nz - fz;
+    // the Primeval Grove's barrier (see shared/grove.js): no step that ends inside and doesn't lead out
+    const b = this.barrier;
+    if (b && !b.mayEnter()) {
+      const R = b.r + P.radius;
+      const dn = (nx - b.x) ** 2 + (nz - b.z) ** 2;
+      if (dn < R * R && dn <= (fx - b.x) ** 2 + (fz - b.z) ** 2) { this.barrierHit = true; return false; }
+    }
     const base = Math.max(groundNow, this.pos.y - 0.05);
     const gTerrain = t.heightAt(nx, nz);
     const rise = gTerrain - base;
+    // swimmers (and waders) pull themselves out onto a bank up to SW.bank above
+    // their feet – not up a cliff face
+    const climbOut = (this.swimming || t.waterDepthAt(fx, fz) > 0.5) && rise <= SW.bank && t.slopeAt(nx, nz) < 2.5;
     // in the air you may not drift onto steep terrain that is higher than where you took off
-    if (!this.onGround && gTerrain > groundNow + 0.3 && t.slopeAt(nx, nz) > P.maxWalkSlope) return false;
+    if (!climbOut && !this.onGround && gTerrain > groundNow + 0.3 && t.slopeAt(nx, nz) > P.maxWalkSlope) return false;
     // steep uphill is a wall (cliffs); small steps are fine
-    if (rise > 0.02) {
+    if (rise > 0.02 && !climbOut) {
       const slope = rise / Math.max(1e-6, Math.hypot(dx, dz));
       if (slope > P.maxWalkSlope && rise > 0.05) return false;
       if (rise > P.stepHeight) return false;
@@ -317,8 +349,8 @@ export class PlayerController {
       if (riseRock > P.stepHeight) return false;
       if (rock.h - gTerrain > P.stepHeight && rock.slope > ROCK_WALK_SLOPE) return false;
     }
-    // do not walk out into deep water
-    if (!this.creative && t.waterDepthAt(nx, nz) > CONFIG.world.maxWadeDepth && t.waterDepthAt(nx, nz) > t.waterDepthAt(fx, fz)) return false;
+    // do not walk out into the deep sea (rivers and lakes you can swim in)
+    if (!this.creative && t.seaDepthAt(nx, nz) > CONFIG.world.maxWadeDepth && t.seaDepthAt(nx, nz) > t.seaDepthAt(fx, fz)) return false;
     return true;
   }
 }

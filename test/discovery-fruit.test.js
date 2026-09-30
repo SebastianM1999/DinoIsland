@@ -42,7 +42,7 @@ test('a valid dinosaur sighting is shared with the co-op team and late joiners',
   const { id: firstId } = world.join('Scout');
   world.join('Partner');
   const player = world.players.get(firstId);
-  const dino = world.dinos.list.find((d) => d.type !== 'ptera');
+  const dino = world.dinos.list.find((d) => d.type !== 'ptera' && !d.leash);
   dino.x = world.layout.hut.campfire.x;
   dino.z = world.layout.hut.campfire.z;
   dino.y = world.terrain.heightAt(dino.x, dino.z);

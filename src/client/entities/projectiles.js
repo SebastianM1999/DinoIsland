@@ -7,6 +7,7 @@ import * as THREE from 'three';
 import { CONFIG } from '../../shared/config.js';
 import { EV, ACT } from '../../shared/protocol.js';
 import { segmentSphere, segmentColliders } from '../../shared/collision.js';
+import { groveEntry } from '../../shared/grove.js';
 import { mesh } from '../models/kit.js';
 import { arrowGeometry, spearGeometry } from '../models/weapons.js';
 
@@ -84,6 +85,22 @@ export class Projectiles {
         const lead = p.kind === 'spear' ? 1.25 : 0.8;
         const dir = _d.copy(p.vel).normalize();
         const ta = _ta.copy(_a).addScaledVector(dir, lead), tb = _tb.copy(_b).addScaledVector(dir, lead);
+
+        // the Primeval Grove's barrier: nothing flies in from outside
+        const gb = groveEntry(this.game.layout, ta.x, ta.z, tb.x, tb.z);
+        if (gb >= 0) {
+          const hp = ta.clone().lerp(tb, gb);
+          this.game.onGroveBarrierHit?.(hp.clone());
+          // it drops just outside, where it can be picked up again
+          const h = Math.hypot(dir.x, dir.z) || 1;
+          hp.x -= (dir.x / h) * 1.6; hp.z -= (dir.z / h) * 1.6;
+          p.pos.copy(hp).addScaledVector(dir, -lead);
+          p.vel.set(0, -1, 0);
+          this.orient(p);
+          p.done = true;
+          if (p.own) this.land(p, hp, groundAt(hp.x, hp.z));
+          break;
+        }
 
         // dinosaurs
         let hit = null;

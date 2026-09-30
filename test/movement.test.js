@@ -15,6 +15,8 @@ const flat = {
   gradientAt: () => ({ x: 0, z: 0 }),
   slopeAt: () => 0,
   waterDepthAt: () => 0,
+  inlandWaterLevelAt: () => null,
+  seaDepthAt: () => 0,
 };
 
 function walk(colliders, start, yaw, frames = 240, intent = { forward: true }) {

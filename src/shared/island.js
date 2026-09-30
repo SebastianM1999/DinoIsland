@@ -12,6 +12,7 @@
 import { CONFIG } from './config.js';
 import { makeRng, fbm, valueNoise, clamp, smoothstep, lerp } from './rng.js';
 import { levelDef } from './levels.js';
+import { GROVE } from './grove.js';
 
 const TAU = Math.PI * 2;
 
@@ -19,6 +20,8 @@ const TAU = Math.PI * 2;
 export const WORLD = { size: CONFIG.world.size, segments: CONFIG.world.segments, seaLevel: CONFIG.world.seaLevel };
 
 export const HUT_GROUND = 2.6;
+/** Caves are disabled until they are reworked (see planIsland). */
+export const CAVES_ENABLED = false;
 
 /** Stable seed for (level, variant). */
 export function islandSeed(levelIndex, variant) {
@@ -605,8 +608,53 @@ export function planIsland(levelIndex = 0, variant = 1) {
     return null;
   };
   const addPad = (s, r) => { plan.pads.push({ x: s.x, z: s.z, r, h: s.h }); };
+
+  // the Primeval Grove (first island): a wide hollow, placed right after the
+  // caves (they need the hill flanks) and before the other sites, so it gets
+  // the room it needs. The island is narrow, so the trail and the river may
+  // pass close by – just not through it.
+  const placeGrove = () => {
+    const spotFor = (r, relaxed = 0) => {
+      let best = null;
+      const gap = [4, 1.5, 0.5][relaxed];
+      for (let i = 0; i < 3000; i++) {
+        const x = rng.range(-A * 0.74, A * 0.74), z = rng.range(-B * 0.64, B * 0.64);
+        if (!insideEllipse(plan, x, z, relaxed ? 0.84 : 0.8)) continue;
+        if (taken.some((t) => Math.hypot(t.x - x, t.z - z) < (relaxed && t.hill ? t.r * 0.8 : t.r) + r)) continue;
+        if (distToPolyline(plan.trail, x, z) < r + gap || distToPolyline(plan.river.pts, x, z) < r + gap + 1) continue;
+        if (plan.ramps.some((rp) => rp.pts.some((p) => Math.hypot(p.x - x, p.z - z) < r + 6))) continue;
+        // the flattening must not shave a cave's hillside away
+        if (plan.sites.caves.some((c) => Math.hypot(c.x - x, c.z - z) < r * [1.3, 1.1, 1][relaxed] + [12, 8, 6][relaxed])) continue;
+        const h = fnN(x, z);
+        if (h < 2.5 || h > (relaxed ? 22 : 18)) continue;
+        // how much the flattening would have to move: prefer the gentlest hollow
+        let lo = Infinity, hi = -Infinity;
+        for (let k = 0; k < 16; k++) {
+          const a = (k / 16) * TAU;
+          for (const f of [0.5, 1]) {
+            const hh = fnN(x + Math.cos(a) * r * f, z + Math.sin(a) * r * f);
+            lo = Math.min(lo, hh); hi = Math.max(hi, hh);
+          }
+        }
+        if (lo < 1.2 || hi - lo > [10, 14, 18][relaxed]) continue;
+        if (!best || hi - lo < best.rough) best = { x, z, h, rough: hi - lo };
+      }
+      return best;
+    };
+    const tries = [[GROVE.radius, 0], [GROVE.radius - 4, 0], [GROVE.radius - 8, 0], [GROVE.radius - 4, 1], [GROVE.radius - 8, 1], [GROVE.radius - 8, 2], [GROVE.radius - 12, 2]];
+    for (const [r, relaxed] of tries) {
+      const s = spotFor(r, relaxed);
+      if (!s) continue;
+      plan.sites.grove = { x: s.x, z: s.z, y: s.h, r };
+      taken.push({ x: s.x, z: s.z, r: r + 8 });
+      addPad(s, r * 0.75);
+      return;
+    }
+  };
   plan.sites.caves = [];
-  {
+  // Caves are switched off for now (their look and hitboxes need rework); the
+  // generator, shapes (caveShape.js) and models (props/cave.js) stay for later.
+  if (CAVES_ENABLED) {
     // caves are dug into the flank of a hill or mountain: the slope rises behind
     // and around them, the entrance looks out over the lowland
     const hosts = plan.hills.filter((h) => !h.spur && h.height > 7 && h.radius > 12).sort(() => rng() - 0.5);
@@ -646,6 +694,7 @@ export function planIsland(levelIndex = 0, variant = 1) {
       addPad(s, 11);
     }
   }
+  if (level.grove) placeGrove();
   {
     const s = findSpot(12, { maxSlope: 0.35 });
     if (s) { plan.sites.ruins = { x: s.x, z: s.z, y: s.h, rot: rng() * TAU, seed: rng.int(1, 9999) }; addPad(s, 13); }

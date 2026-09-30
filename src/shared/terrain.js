@@ -89,6 +89,18 @@ export class Terrain {
     return w === null ? 0 : w - this.heightAt(x, z);
   }
 
+  /** Surface of the island's own water (river, lake, pools – not the sea) at (x, z), or null. */
+  inlandWaterLevelAt(x, z) {
+    return this.#flowLevelAt(x, z, this.heightAt(x, z), 'water');
+  }
+
+  /** Depth of the open sea at (x, z): 0 on land and in rivers/pools. Players may swim inland only. */
+  seaDepthAt(x, z) {
+    const g = this.heightAt(x, z);
+    if (this.#flowLevelAt(x, z, g, 'water') !== null) return 0;
+    return g < CONFIG.world.seaLevel ? CONFIG.world.seaLevel - g : 0;
+  }
+
   /** True if a land creature may stand here (no deep water, no lava, not too steep). */
   isWalkable(x, z, maxDepth = 0.3, maxSlope = 1.2) {
     if (this.waterDepthAt(x, z) > maxDepth) return false;

@@ -25,7 +25,8 @@ test('movement accepts normal updates and corrects teleports', () => {
 test('spear hits require a nearby, forward hit point and respect cooldown', () => {
   const { world, player } = setup();
   player.yaw = 0; // facing north (-z)
-  const d = world.dinos.list.find((dino) => dino.type !== 'ptera');
+  // (not the Primeval Grove's titan – it can't be hurt from outside the grove)
+  const d = world.dinos.list.find((dino) => dino.type !== 'ptera' && !dino.leash);
   d.x = player.x; d.z = player.z - 3; d.y = player.y;
   const p = [player.x, player.y + CONFIG.player.eyeHeight, player.z - 3];
   const hit = { t: MSG.ACT, a: ACT.MELEE, dino: d.id, zone: 'body', p };
@@ -41,7 +42,7 @@ test('spear hits require a nearby, forward hit point and respect cooldown', () =
 
 test('arrow damage needs a plausible ballistic path and target', () => {
   const { world, player } = setup();
-  const d = world.dinos.list.find((dino) => dino.type !== 'ptera');
+  const d = world.dinos.list.find((dino) => dino.type !== 'ptera' && !dino.leash);
   d.x = player.x; d.z = player.z - 6; d.y = player.y;
   const o = [player.x, player.y + CONFIG.player.eyeHeight, player.z];
   const v = [0, 0, -30];

@@ -23,6 +23,7 @@ import { sanitizeOutfit, sameOutfit } from '../shared/outfits.js';
 import { planIsland } from '../shared/island.js';
 import { levelDef, LEVEL_COUNT } from '../shared/levels.js';
 import { findUnstuckSpot, goodSpot } from './unstuck.js';
+import { insideGrove, mayEnterGrove } from '../shared/grove.js';
 
 const P = CONFIG.player;
 const W = CONFIG.weapons;
@@ -284,10 +285,11 @@ export class ServerWorld {
     const lim = CONFIG.world.size / 2 - 5;
     const ground = this.layout.groundAt(x, z);
     resolveCircle(x, z, P.radius, this.layout.playerColliders, collisionResult, y + 0.05, y + P.height);
-    const blocked = Math.hypot(collisionResult.x - x, collisionResult.z - z) > 0.6;
+    const blocked = Math.hypot(collisionResult.x - x, collisionResult.z - z) > 0.6 || this.groveBlocks(p, x, z);
     if (distance > p.moveBudget + 0.05 || Math.abs(x) > lim || Math.abs(z) > lim ||
         !Number.isFinite(ground) || y < ground - 2 || y > ground + (creative ? P.creative.maxHeight + 5 : 20) ||
-        (!creative && this.terrain.waterDepthAt(x, z) > CONFIG.world.maxWadeDepth + 0.2) || blocked) {
+        // rivers and lakes may be swum; only the open sea is off-limits
+        (!creative && this.terrain.seaDepthAt(x, z) > CONFIG.world.maxWadeDepth + 0.2) || blocked) {
       this.send(p.id, { t: MSG.CORRECT, x: r2(p.x), y: r2(p.y), z: r2(p.z) });
       return;
     }
@@ -326,6 +328,17 @@ export class ServerWorld {
     this.send(p.id, { t: MSG.CORRECT, x: r2(p.x), y: r2(p.y), z: r2(p.z), unstuck: 1 });
     this.toast('Unstuck!', 'info', p.id);
     this.log(`unstuck #${p.id} ${manual ? '(manual)' : '(auto)'} -> ${r2(p.x)}, ${r2(p.z)}`);
+  }
+
+  /**
+   * The Primeval Grove's barrier: a step that ends inside the grove and doesn't
+   * lead further out is refused unless the player may enter (mayEnterGrove –
+   * TODO(grove-unlock): becomes the skill check). Walking out always works.
+   */
+  groveBlocks(p, x, z) {
+    const g = this.layout.grove;
+    if (!g || mayEnterGrove(p) || !insideGrove(this.layout, x, z, P.radius)) return false;
+    return dist2(x, z, g.x, g.z) <= dist2(p.x, p.z, g.x, g.z);
   }
 
   near(p, x, z, range) { return dist2(p.x, p.z, x, z) <= range * range; }
@@ -406,8 +419,8 @@ export class ServerWorld {
         const [x, y, z] = m.p;
         const d = m.dino != null ? this.dinos.get(m.dino) : null;
         if (d && d.alive) {
-          const reach = d.type === 'ptera' ? 9 : d.radius + 4;
-          const maxHeight = { brachio: 17, trex: 12, stego: 7, raptor: 5, ptera: 6 }[d.type];
+          const reach = d.type === 'ptera' ? 9 : d.radius + 4 * (d.scale || 1);
+          const maxHeight = { brachio: 17, trex: 12, stego: 7, raptor: 5, ptera: 6 }[d.type] * (d.scale || 1);
           if (dist2(x, z, d.x, d.z) > reach * reach || Math.abs(y - d.y) > maxHeight) return;
           if (proj.kind === 'arrow') {
             const dmg = W.bow.damage * (0.45 + 0.55 * Math.min(1, proj.pw));
@@ -419,6 +432,8 @@ export class ServerWorld {
           }
           return;
         }
+        // nothing from outside comes to rest inside the grove (it couldn't be picked up)
+        if (insideGrove(this.layout, x, z, 1) && !insideGrove(this.layout, p.x, p.z)) return;
         if (Math.abs(y - this.layout.groundAt(x, z)) <= 2) this.spawnItem(proj.kind, x, z, 1, y);
         return;
       }
@@ -574,8 +589,8 @@ export class ServerWorld {
     const fy = Math.sin(p.pitch);
     const fz = -Math.cos(p.yaw) * Math.cos(p.pitch);
     if ((vx * fx + vy * fy + vz * fz) / distance < 0.4) return false;
-    const reach = d.type === 'ptera' ? 8 : d.radius + 3;
-    return dist2(x, z, d.x, d.z) <= reach * reach && Math.abs(y - d.y) < 17;
+    const reach = d.type === 'ptera' ? 8 : d.radius + 3 * (d.scale || 1);
+    return dist2(x, z, d.x, d.z) <= reach * reach && Math.abs(y - d.y) < 17 * (d.scale || 1);
   }
 
   validProjectileLanding(proj, point) {

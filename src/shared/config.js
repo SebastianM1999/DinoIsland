@@ -40,6 +40,13 @@ export const CONFIG = {
     staminaRegen: 18,
     staminaRegenDelay: 0.8,
     jumpStaminaCost: 8,
+    // Swimming in the island's rivers and lakes (never the open sea).
+    swim: {
+      depth: 1.25,           // water deeper than this (at the feet) floats you
+      float: 1.32,           // how far the feet hang below the surface (eyes just above it)
+      speed: 3.1,            // m/s, sprint does not help
+      bank: 1.1,             // how high a bank you can climb out onto from the water
+    },
     // Creative mode: invincible, endless stamina, double-tap Space to fly.
     creative: {
       flySpeed: 14,          // horizontal m/s while flying
@@ -85,8 +92,9 @@ export const CONFIG = {
       startArrows: 12,
       arrowLifetime: 60,     // seconds an arrow stays on the ground as pickup
     },
-    pistol: { damage: 26, range: 85, cooldown: 0.28, magazine: 12, reserve: 48, reloadTime: 1.25 },
-    rifle: { damage: 19, range: 140, cooldown: 0.12, magazine: 30, reserve: 90, reloadTime: 1.65 },
+    // spread: random cone half-angle (radians) of each shot; moving adds up to spreadMove on top
+    pistol: { damage: 26, range: 85, cooldown: 0.28, magazine: 12, reserve: 48, reloadTime: 1.25, spread: 0.012, spreadMove: 0.02 },
+    rifle: { damage: 19, range: 140, cooldown: 0.12, magazine: 30, reserve: 90, reloadTime: 1.65, spread: 0.02, spreadMove: 0.025 },
     trap: {
       startCount: 2,
       maxCount: 3,

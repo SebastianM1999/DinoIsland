@@ -589,15 +589,19 @@ export class Hud {
     }, ms);
   }
 
-  /** Tracking hint. The bubble is built once; a changing distance only updates the number. */
-  hint(text, meters = null) {
+  /** Hint bubble under the compass (dino alert, tracks). Built once; a changing distance only updates the number. */
+  hint(text, meters = null, iconId = 'track') {
     if (text == null) {
       if (this._c.hintText !== null) { this._c.hintText = null; this.$hint.hidden = true; }
       return;
     }
     if (!this._hintEls) {
-      this.$hint.innerHTML = `<span class="hud-hint-bubble brush"><span class="hud-hint-ic">${icon('track')}</span><span class="hud-hint-t"></span><b class="hud-hint-m"></b></span>`;
-      this._hintEls = { text: this.$hint.querySelector('.hud-hint-t'), m: this.$hint.querySelector('.hud-hint-m') };
+      this.$hint.innerHTML = `<span class="hud-hint-bubble brush"><span class="hud-hint-ic"></span><span class="hud-hint-t"></span><b class="hud-hint-m"></b></span>`;
+      this._hintEls = { ic: this.$hint.querySelector('.hud-hint-ic'), text: this.$hint.querySelector('.hud-hint-t'), m: this.$hint.querySelector('.hud-hint-m') };
+    }
+    if (this._c.hintIcon !== iconId) {
+      this._c.hintIcon = iconId;
+      this._hintEls.ic.innerHTML = icon(iconId);
     }
     if (this._c.hintText !== text) {
       this._c.hintText = text;

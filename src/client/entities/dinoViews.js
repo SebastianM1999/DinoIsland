@@ -8,6 +8,7 @@ import { MSG, EV, DS, ACT } from '../../shared/protocol.js';
 import { angleDiff } from '../../shared/rng.js';
 import { raySphere } from '../../shared/collision.js';
 import { lineBlocked } from '../../shared/visibility.js';
+import { groveEntry } from '../../shared/grove.js';
 import { InterpBuffer } from '../net/interp.js';
 import { DinoAnimator } from '../models/dino/rig.js';
 import { buildBrachio, BRACHIO_ANIM, brachioExtraUpdate } from '../models/dino/brachio.js';
@@ -45,6 +46,9 @@ class DinoView {
     this.anim = sp.createAnimator(this.rig);
     this.sp = sp;
     this.root = this.rig.root;
+    // oversized animals (the Primeval Grove's titan)
+    this.scale = desc.sc || 1;
+    if (this.scale !== 1) this.root.scale.multiplyScalar(this.scale);
     this.buf = new InterpBuffer([YAW]);
     this.pos = new THREE.Vector3(desc.x, desc.y, desc.z);
     this.yaw = desc.yaw;
@@ -68,7 +72,7 @@ class DinoView {
     const bar = document.createElement('div');
     bar.className = 'dino-bar';
     bar.innerHTML = `<span class="db-name"></span><span class="db-hp"><i></i></span>`;
-    bar.querySelector('.db-name').textContent = CONFIG.dinos[desc.type].name;
+    bar.querySelector('.db-name').textContent = desc.name || CONFIG.dinos[desc.type].name;
     bar.hidden = true;
     ctx.overlay.appendChild(bar);
     this.bar = bar;
@@ -112,9 +116,10 @@ class DinoView {
     this.roarT = Math.max(0, this.roarT - dt);
     this.flinch = Math.max(0, this.flinch - dt * 4);
     const pose = this.pose();
+    // gait in model units: a bigger animal takes proportionally longer strides
     this.anim.update(dt, {
-      speed: dist / Math.max(dt, 1e-4),
-      dist,
+      speed: dist / Math.max(dt, 1e-4) / this.scale,
+      dist: dist / this.scale,
       yawRate,
       dead: !this.alive,
       trapped: this.st === DS.TRAPPED,
@@ -337,6 +342,9 @@ export class DinoViews {
    */
   raycast(origin, dir, maxDist) {
     let best = null;
+    // aiming from outside into the Primeval Grove: the barrier stops the ray
+    const g = groveEntry(this.game.layout, origin.x, origin.z, origin.x + dir.x * maxDist, origin.z + dir.z * maxDist);
+    if (g >= 0) maxDist *= g;
     for (const v of this.map.values()) {
       if (!v.alive) continue;
       if (v.pos.distanceTo(origin) > maxDist + 25) continue;

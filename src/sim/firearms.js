@@ -37,8 +37,8 @@ export function gunAction(world, player, message) {
     const along = delta.reduce((sum, n, i) => sum + n * message.dir[i], 0);
     const lateral = Math.hypot(...delta.map((n, i) => n - message.dir[i] * along));
     const available = Math.hypot(...end.map((n, i) => n - message.o[i]));
-    const reach = dino.type === 'ptera' ? 9 : dino.radius + 4;
-    const height = { brachio: 17, trex: 12, stego: 7, raptor: 5, ptera: 6 }[dino.type];
+    const reach = dino.type === 'ptera' ? 9 : dino.radius + 4 * (dino.scale || 1);
+    const height = { brachio: 17, trex: 12, stego: 7, raptor: 5, ptera: 6 }[dino.type] * (dino.scale || 1);
     if (along > 0 && along <= available + 0.05 && lateral < 0.15 &&
       Math.hypot(message.p[0] - dino.x, message.p[2] - dino.z) <= reach && Math.abs(message.p[1] - dino.y) <= height) {
       end = message.p;

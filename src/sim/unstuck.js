@@ -4,6 +4,7 @@
 
 import { CONFIG } from '../shared/config.js';
 import { penetration } from '../shared/collision.js';
+import { insideGrove } from '../shared/grove.js';
 
 const P = CONFIG.player;
 const MAX_SLOPE = P.maxWalkSlope * 0.7;
@@ -18,6 +19,7 @@ export function standable(terrain, layout, x, z) {
   const lim = CONFIG.world.size / 2 - 6;
   if (Math.abs(x) > lim || Math.abs(z) > lim) return null;
   if (terrain.waterDepthAt(x, z) > 0.2 || terrain.lavaLevelAt(x, z) !== null) return null;
+  if (insideGrove(layout, x, z, P.radius + 0.3)) return null;   // never "unstick" anyone into the grove
   const g = layout.groundAt(x, z);
   if (!Number.isFinite(g)) return null;
   // on bare terrain the controller slides where the gradient is too steep

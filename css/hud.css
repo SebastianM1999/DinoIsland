@@ -777,10 +777,12 @@
 
 /* ------------------------------------------------------------ mission board */
 .hud-board {
-  width: min(78em, 96vw);
-  max-height: 92vh;
-  overflow: auto;
-  padding: 1.1em 1.4em 1.4em;
+  /* never scrolls: the whole board scales with the window height instead */
+  font-size: clamp(10px, 1.62vh, 16px);
+  width: min(80em, 96vw);
+  max-height: 97vh;
+  overflow: hidden;
+  padding: 0.9em 1.3em 1.1em;
 }
 /* wooden board: plank background with a darker frame */
 .hud-board.brush::before {
@@ -795,11 +797,11 @@
   align-items: center;
   flex-wrap: wrap;
   gap: 0.3em 1.4em;
-  margin: 0.3em 0.4em 1em;
+  margin: 0.1em 0.4em 0.6em;
 }
 .board-head h2 {
   display: flex; align-items: center; gap: 0.4em;
-  font-size: 1.9em; font-weight: 800;
+  font-size: 1.6em; font-weight: 800;
   color: #fff4dc;
   text-shadow: 0 0.12em 0 rgba(40, 20, 8, 0.6);
 }
@@ -814,7 +816,7 @@
 }
 .board-note {
   position: relative;
-  padding: 1.2em 1.1em 1em;
+  padding: 0.85em 0.95em 0.75em;
   border-radius: 0.3em;
   background: linear-gradient(170deg, #fff8e6, #f3e3bf);
   color: #3a2a1c;
@@ -822,7 +824,9 @@
   transform: rotate(var(--tilt, -0.8deg));
 }
 .board-note h3, .board-note h4 { color: #2c1f14; font-weight: 800; margin: 0; }
-.board-note p { color: #5a4532; font-weight: 600; font-size: 0.92em; }
+.board-note p { color: #5a4532; font-weight: 600; font-size: 0.86em; line-height: 1.3; }
+/* ticket texts stay short: at most three lines */
+.board-card > p:not(.board-reward) { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; margin: 0; }
 .board-pin {
   position: absolute;
   top: -0.45em;
@@ -867,22 +871,22 @@
   background: linear-gradient(90deg, #7ccb45, #4fa82f);
   transition: width 0.4s ease;
 }
-.board-foot { display: flex; align-items: center; gap: 0.35em; margin-top: 0.8em !important; }
+.board-foot { display: flex; align-items: center; gap: 0.35em; margin-top: 0.5em !important; }
 .board-foot svg, .board-reward svg { width: 1.15em; height: 1.15em; flex: none; }
 .board-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(15.5em, 1fr));
-  gap: 1.1em 0.9em;
+  grid-template-columns: repeat(auto-fill, minmax(13.5em, 1fr));
+  gap: 0.8em 0.75em;
 }
-.board-card { display: grid; gap: 0.45em; align-content: start; }
+.board-card { display: grid; gap: 0.3em; align-content: start; }
 .board-card header { display: flex; align-items: center; gap: 0.5em; }
-.board-ic { width: 2em; height: 2em; flex: none; }
-.board-card h4 { font-size: 1.1em; }
+.board-ic { width: 1.7em; height: 1.7em; flex: none; }
+.board-card h4 { font-size: 1.02em; line-height: 1.15; }
 .board-reward { display: flex; align-items: center; gap: 0.35em; font-weight: 800 !important; color: #8a5a12 !important; }
 .board-track {
   justify-self: start;
-  font: 800 0.9em/1 var(--font);
-  padding: 0.45em 0.9em;
+  font: 800 0.85em/1 var(--font);
+  padding: 0.35em 0.8em;
   border: 0;
   border-radius: 0.5em;
   background: #2f3d62;
@@ -910,23 +914,23 @@
   opacity: 0.85;
 }
 /* main quest banner (boat parts) */
-.board-quest { --tilt: -0.4deg; margin: 0 0.3em 1.3em; }
+.board-quest { --tilt: -0.4deg; margin: 0 0.3em 0.9em; }
 .board-quest-top { display: flex; gap: 1.2em; align-items: flex-end; justify-content: space-between; flex-wrap: wrap; }
 .board-quest .board-kicker { text-transform: uppercase; letter-spacing: 0.08em; font-size: 0.78em; font-weight: 800; color: #b5561f; }
-.board-quest h3 { display: flex; align-items: center; gap: 0.35em; font-size: 1.45em; margin: 0.1em 0 0.25em; }
+.board-quest h3 { display: flex; align-items: center; gap: 0.35em; font-size: 1.3em; margin: 0.05em 0 0.15em; }
 .board-quest h3 svg { width: 1.3em; height: 1.3em; }
 .board-quest-score { display: flex; align-items: center; gap: 0.6em; min-width: 14em; }
 .board-quest-score b { font-weight: 800; color: #3a2a1c; font-variant-numeric: tabular-nums; }
-.board-parts { list-style: none; padding: 0; margin: 0.8em 0 0.6em; display: grid; grid-template-columns: repeat(auto-fit, minmax(13em, 1fr)); gap: 0.6em; }
+.board-parts { list-style: none; padding: 0; margin: 0.5em 0 0.4em; display: grid; grid-template-columns: repeat(auto-fit, minmax(13em, 1fr)); gap: 0.5em; }
 .board-part {
   display: flex; align-items: center; gap: 0.6em;
-  padding: 0.5em 0.7em;
+  padding: 0.35em 0.6em;
   border-radius: 0.5em;
   background: rgba(90, 60, 30, 0.09);
   border: 0.13em dashed rgba(90, 60, 30, 0.35);
 }
 .board-part.is-found { background: rgba(124, 203, 69, 0.18); border: 0.13em solid #6bb33c; }
-.board-part-ic { width: 2.2em; height: 2.2em; flex: none; filter: drop-shadow(0 0.1em 0 rgba(40, 20, 8, 0.25)); }
+.board-part-ic { width: 1.8em; height: 1.8em; flex: none; filter: drop-shadow(0 0.1em 0 rgba(40, 20, 8, 0.25)); }
 .board-part:not(.is-found) .board-part-ic { filter: grayscale(0.6) opacity(0.7); }
 .board-part-txt { display: grid; flex: 1; line-height: 1.2; }
 .board-part-txt b { color: #2c1f14; font-weight: 800; }
@@ -936,11 +940,12 @@
 .board-steps { margin: 0.2em 0 0 !important; }
 
 /* active (left) and done (right) columns */
-.board-cols { display: grid; grid-template-columns: 1.55fr 1fr; gap: 1.2em; align-items: start; }
+/* active tickets use the full width (few rows); done ones form a compact strip below */
+.board-cols { display: grid; grid-template-columns: 1fr; gap: 0.7em; align-items: start; }
 .board-col-title {
   display: flex; align-items: center; gap: 0.5em;
-  margin: 0 0.3em 0.8em;
-  color: #fff4dc; font-size: 1.15em; font-weight: 800;
+  margin: 0 0.3em 0.5em;
+  color: #fff4dc; font-size: 1.05em; font-weight: 800;
   text-shadow: 0 0.1em 0 rgba(40, 20, 8, 0.6);
 }
 .board-col-title b {
@@ -948,25 +953,23 @@
   background: rgba(40, 20, 8, 0.45); text-align: center; font-size: 0.85em;
 }
 .board-col-done {
-  padding: 0.8em 0.7em 1em;
+  padding: 0.6em 0.6em 0.7em;
   border-radius: 0.6em;
   background: rgba(40, 20, 8, 0.28);
   box-shadow: inset 0 0 0 0.12em rgba(255, 230, 190, 0.12);
 }
-.board-done-list { display: grid; gap: 0.8em; }
+.board-done-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(15em, 1fr)); gap: 0.5em; }
 .board-done {
   --tilt: 0.6deg;
   display: flex; align-items: center; gap: 0.7em;
-  padding: 0.8em 4.8em 0.8em 0.9em;
+  padding: 0.55em 4.6em 0.55em 0.8em;
   filter: saturate(0.9);
 }
 .board-done h4 { font-size: 1em; }
 .board-done .board-reward { margin: 0.15em 0 0; }
 .board-done .board-stamp { right: 0.6em; bottom: auto; top: 50%; margin-top: -0.8em; font-size: 1em; }
 .board-empty { color: #f3dcb5; font-weight: 700; margin: 0.4em 0.3em; }
-@media (max-width: 900px) {
-  .board-cols { grid-template-columns: 1fr; }
-}
+
 
 /* ---------------------------------------------------------------- boat dialog */
 .hud-boat { width: min(38em, 94vw); }
@@ -997,6 +1000,44 @@
 .hud-boat .wd-btn svg { width: 1.3em; height: 1.3em; }
 .hud-boat .wd-btn:disabled { opacity: 0.5; cursor: default; }
 .hud-boat button { cursor: url('../assets/cursor-hand.svg') 12 3, pointer; }
+
+/* ---------------------------------------------------------------- primeval grove prompt */
+.hud-grove { width: min(30em, 92vw); }
+.hud-grove button { cursor: url('../assets/cursor-hand.svg') 12 3, pointer; }
+.grove-head { display: flex; align-items: center; gap: 0.6em; margin-bottom: 0.7em; }
+.grove-head h2 { font-size: 1.7em; font-weight: 800; text-shadow: var(--shadow-text); }
+.grove-badge {
+  width: 1.8em; height: 1.8em; flex: none;
+  display: grid; place-items: center;
+  border-radius: 50%;
+  font-weight: 900; font-size: 1.1em;
+  color: #2a1a06; background: var(--yellow);
+  box-shadow: 0 0 0 0.18em rgba(255, 201, 51, 0.3);
+}
+.grove-warn h2 { color: var(--yellow); }
+.grove-hint .grove-badge { background: var(--blue); color: #08263a; box-shadow: 0 0 0 0.18em rgba(63, 179, 255, 0.3); }
+.grove-hint h2 { color: var(--blue); }
+.grove-text { margin: 0 0 0.6em; line-height: 1.4; font-weight: 600; }
+.grove-text b { color: var(--cream); }
+.grove-ask { margin: 0; font-weight: 800; font-size: 1.1em; }
+.grove-avatar {
+  width: 2.2em; height: 2.2em; flex: none;
+  display: grid; place-items: center;
+  border-radius: 50%;
+  color: var(--navy); background: var(--cream);
+}
+.grove-avatar svg { width: 1.5em; height: 1.5em; }
+/* the explorer's line reads as speech, not as a system message */
+.grove-line {
+  margin: 0;
+  padding: 0.8em 1em;
+  border-radius: 0.8em;
+  background: rgba(10, 15, 28, 0.5);
+  border-left: 0.3em solid var(--cream);
+  font-size: 1.1em;
+  font-weight: 700;
+  line-height: 1.45;
+}
 
 /* ---------------------------------------------------------------- wardrobe */
 .hud-wardrobe { width: min(60em, 96vw); }

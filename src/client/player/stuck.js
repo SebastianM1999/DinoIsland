@@ -91,7 +91,8 @@ export class StuckDetector {
       this.noProgressT = 0;
     }
     this.slideT = p.sliding ? this.slideT + dt : 0;
-    this.deepT = p.inWater > CONFIG.world.maxWadeDepth + 0.1 ? this.deepT + dt : 0;
+    // stranded in deep water that isn't swimmable (swimming in rivers/lakes is fine)
+    this.deepT = p.inWater > CONFIG.world.maxWadeDepth + 0.1 && !p.swimming ? this.deepT + dt : 0;
 
     if (!this.hinted && (this.noProgressT > STUCK.HINT_TIME || this.slideT > STUCK.HINT_TIME)) {
       this.hinted = true;

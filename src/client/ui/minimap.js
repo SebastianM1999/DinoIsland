@@ -102,6 +102,20 @@ export function buildMapBase(terrain, layout, res = 640) {
       ctx.fill();
     }
   }
+  // the Primeval Grove: a violet, dashed ring – visible, but clearly off-limits
+  if (layout?.grove) {
+    const g = layout.grove;
+    const cx = (g.x + half) / mpp, cz = (g.z + half) / mpp, r = g.r / mpp;
+    ctx.fillStyle = 'rgba(93, 79, 143, 0.35)';
+    ctx.beginPath();
+    ctx.arc(cx, cz, r, 0, TAU);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(190, 170, 255, 0.9)';
+    ctx.lineWidth = Math.max(1, 1.8 / mpp);
+    ctx.setLineDash([Math.max(2, 4 / mpp), Math.max(2, 3 / mpp)]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
   // island extent, so the big map can zoom to it
   const island = layout?.plan ? { A: layout.plan.A, B: layout.plan.B } : null;
   return { canvas: cv, size, half, res, mpp, island };

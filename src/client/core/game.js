@@ -34,6 +34,10 @@ import { Wardrobe } from '../ui/wardrobe.js';
 import { BoatPanel } from '../ui/boatPanel.js';
 import { Relics } from '../entities/relics.js';
 import { buildSites } from '../world/sites.js';
+import { buildGrove } from '../world/grove.js';
+import { buildLogs } from '../world/logs.js';
+import { GrovePrompt } from '../ui/grovePrompt.js';
+import { mayEnterGrove, GROVE_STONE_REACH } from '../../shared/grove.js';
 
 export class Game {
   /**
@@ -53,6 +57,17 @@ export class Game {
     this.gfx.applyBiome(this.layout.biome.sky);
     this.input = reuse?.input ?? new Input(canvas);
     this.player = new PlayerController(this.terrain, this.layout.playerColliders, this.layout.rockSurfaceAt);
+    // Primeval Grove: an invisible wall until the player may enter (TODO(grove-unlock) in shared/grove.js)
+    const grove = this.layout.grove;
+    if (grove) {
+      this.groveArmed = true;
+      this.player.barrier = {
+        // just outside the standing stones, so walking up to the ring always meets the barrier (and the prompt)
+        x: grove.x, z: grove.z, r: grove.r + GROVE_STONE_REACH,
+        mayEnter: () => mayEnterGrove(this.player),
+        onBlocked: () => this.#onGroveBlocked(),
+      };
+    }
     this.stuck = new StuckDetector((manual) => this.net.act(ACT.UNSTUCK, { manual }), (text) => this.hud?.toast(text, 'info'));
     this.time = 0;
     this.wasFlying = false;
@@ -84,12 +99,14 @@ export class Game {
       else if (action === 'board') open = this.hud.toggleBoard();
       else if (action === 'wardrobe') open = this.hud.togglePanel('wardrobe');
       else if (action === 'boat') open = this.hud.togglePanel('boat');
+      else if (action === 'grove') open = this.hud.togglePanel('grove');
       else {
         this.hud.toggleInventory(false);
         this.hud.toggleMap(false);
         this.hud.toggleBoard(false);
         this.hud.togglePanel('wardrobe', false);
         this.hud.togglePanel('boat', false);
+        if (this.hud.isExtraOpen('grove')) this.hud.togglePanel('grove', false);
         open = false;
       }
       this.onPanelChange?.(open);
@@ -135,6 +152,11 @@ export class Game {
       onClose: () => this.input.onPanelToggle('close'),
     });
     this.hud.addPanel('boat', { el: this.boatPanel.el, onOpen: () => this.boatPanel.onOpen() });
+    this.grovePrompt = new GrovePrompt({
+      onClose: () => this.input.onPanelToggle('close'),
+      speaker: () => this.me.name,
+    });
+    this.hud.addPanel('grove', { el: this.grovePrompt.el, onOpen: () => this.grovePrompt.onOpen() });
     this.boatPanel.setMission(this.mission);
     this.sites.boat.setRepaired?.(!!w.world.boat?.repaired);
     this.sites.boat.setParts?.((w.world.relics || []).filter((r) => r.found).map((r) => r.kind));
@@ -155,8 +177,10 @@ export class Game {
     this.fruitPlants = buildFruitPlants(this.terrain, this.layout);
     this.hut = buildHut(this.terrain, this.layout);
     this.sites = buildSites(this.terrain, this.layout);
-    scene.add(this.sky.group, this.water.group, this.vegetation.group, this.rocks.group, this.fruitPlants.group, this.hut.group, this.sites.group);
-    this.worldUpdaters = [this.sky, this.water, this.vegetation, this.fruitPlants, this.hut, this.sites];
+    this.grove = buildGrove(this.terrain, this.layout);
+    this.logs = buildLogs(this.terrain, this.layout);
+    scene.add(this.sky.group, this.water.group, this.vegetation.group, this.rocks.group, this.fruitPlants.group, this.hut.group, this.sites.group, this.grove.group, this.logs.group);
+    this.worldUpdaters = [this.sky, this.water, this.vegetation, this.fruitPlants, this.hut, this.sites, this.grove];
 
     // Debug view of colliders (F3).
     this.debugGroup = new THREE.Group();
@@ -212,6 +236,23 @@ export class Game {
       ? [...m.objectives, { text: `${CONTRACTS[i].title}: ${c.progress}/${CONTRACTS[i].goal}`, done: c.done }]
       : m.objectives;
     this.hud.setMission({ ...m, objectives });
+  }
+
+  /**
+   * The player walked into the Primeval Grove's barrier: the curtain lights up
+   * and (once per approach) the warning prompt opens. It re-arms when the
+   * player has stepped back from the stones.
+   */
+  #onGroveBlocked() {
+    this.grove?.flash();
+    if (!this.groveArmed || !this.me?.alive || this.hud.isPanelOpen()) return;
+    this.groveArmed = false;
+    this.input.onPanelToggle('grove');
+  }
+
+  /** A projectile or shot hit the grove's barrier at world point `pt`. */
+  onGroveBarrierHit(pt) {
+    this.grove?.strike(pt);
   }
 
   /** E at the hut wardrobe. */
@@ -439,6 +480,9 @@ export class Game {
       sprint: canMove && input.isHeld('sprint'),
     });
     if (canMove && input.wasPressed('unstuck')) this.stuck.manual();
+    // the grove prompt shows again once the player has stepped back from the stones
+    const gv = this.layout.grove;
+    if (gv && !this.groveArmed && Math.hypot(p.pos.x - gv.x, p.pos.z - gv.z) > gv.r + GROVE_STONE_REACH + 2.5) this.groveArmed = true;
     this.stuck.update(dt, p, canMove && ['forward', 'back', 'left', 'right'].some((a) => input.isHeld(a)), canMove);
     this.#updateCamera(dt);
 

@@ -7,6 +7,7 @@ import * as THREE from 'three';
 import { CONFIG } from '../../shared/config.js';
 import { ACT, EV, PF, EQUIP } from '../../shared/protocol.js';
 import { shotEnd } from '../../shared/gunshots.js';
+import { insideGrove } from '../../shared/grove.js';
 import { segmentColliders } from '../../shared/collision.js';
 import { GunEffects } from '../entities/gunEffects.js';
 import { Viewmodel } from './viewmodel.js';
@@ -15,6 +16,8 @@ import { trapGeometry, meatGeometry } from '../models/weapons.js';
 
 const W = CONFIG.weapons;
 const P = CONFIG.player;
+/** Warn about dinosaurs (all but the Brachiosaurus) closer than this (m). */
+const DINO_ALERT_RANGE = 50;
 const LOOT_KEYS = Object.keys(CONFIG.loot);
 const SLOT_LABEL = { spear: 'Spear', bow: 'Bow', trap: 'Trap', bait: 'Meat bait', fruit: 'Fruit', pistol: 'P-19 pistol', rifle: 'M4A1 rifle' };
 const _fwd = new THREE.Vector3();
@@ -161,7 +164,8 @@ export class PlayerActions {
     if (tool !== 'bow' && this.drawing) { this.drawing = false; this.drawT = 0; }
     this.gunEffects.update(dt);
     this.reloadT = this.inv.reloading ? this.reloadT + dt : 0;
-    this.vm.setGunPose(canAct && input.isHeld('secondary'), this.inv.reloading === tool ? Math.min(0.98, this.reloadT / W[tool].reloadTime) : 0);
+    // guns are always fired from the hip (no aim-down-sights)
+    this.vm.setGunPose(false, this.inv.reloading === tool ? Math.min(0.98, this.reloadT / W[tool].reloadTime) : 0);
     this.vm.setDraw(this.drawing ? this.drawT / W.bow.maxDrawTime : 0);
 
     // placement tools with a ghost preview
@@ -266,11 +270,20 @@ export class PlayerActions {
 
   shootGun() {
     const g = this.game, tool = this.tool;
-    const { origin, dir } = this.aim();
+    const aim = this.aim();
+    const origin = aim.origin;
+    // bullets spread in a small cone (wider while moving), so a gun is no laser
+    const spec = W[tool];
+    const move = Math.min(1, g.player.moveSpeed / P.sprintSpeed);
+    const cone = spec.spread + spec.spreadMove * move;
+    const r = cone * Math.sqrt(Math.random()), a = Math.random() * Math.PI * 2;
+    const dir = aim.dir.clone().addScaledVector(aim.right, Math.cos(a) * r).addScaledVector(aim.up, Math.sin(a) * r).normalize();
     const blocked = new THREE.Vector3(...shotEnd(g, origin.toArray(), dir.toArray(), W[tool].range));
     const candidate = g.dinos.raycast(origin, dir, W[tool].range);
     const hit = candidate && candidate.dist <= blocked.distanceTo(origin) ? candidate : null;
     const end = hit ? hit.point : blocked;
+    // the shot died on the Primeval Grove's barrier: show the ripple there
+    if (!hit && insideGrove(g.layout, blocked.x, blocked.z, 0.05) && !insideGrove(g.layout, origin.x, origin.z)) g.onGroveBarrierHit?.(blocked);
     g.net.act(ACT.SHOT, { kind: tool, o: origin.toArray(), dir: dir.toArray(),
       ...(hit ? { dino: hit.view.id, p: hit.point.toArray(), zone: hit.zone } : {}) });
     // Position the tracer at the rendered muzzle, transformed into world space.
@@ -473,26 +486,23 @@ export class PlayerActions {
     this.updateHint();
   }
 
-  /** Tracking hint: fresh tracks nearby tell you where the animal went. */
+  /**
+   * Dinosaur alert: the nearest dangerous animal (every species except the
+   * peaceful Brachiosaurus) within DINO_ALERT_RANGE metres, with its distance.
+   */
   updateHint() {
     const g = this.game;
     const pos = g.player.pos;
-    const step = g.mission?.step ?? 0;
     const hud = g.hud;
     if (!g.me.alive) return hud.hint(null);
-    const track = g.tracks.nearest('brachio', pos, 12);
-    const near = g.dinos.nearest('brachio', pos);
-    if (track && near && step <= 1) {
-      hud.hint('Fresh Brachiosaurus tracks – follow them!', Math.round(near.dist));
-    } else if (near && near.dist < 90 && step <= 1 && g.dinos.spotted.has(near.view.id)) {
-      // only animals the team has actually spotted – no hidden-dinosaur radar
-      hud.hint('Brachiosaurus nearby', Math.round(near.dist));
-    } else if (step === 3) {
-      const h = g.layout.hut;
-      hud.hint('Bring the loot back to the hut', Math.round(Math.hypot(h.x - pos.x, h.z - pos.z)));
-    } else {
-      hud.hint(null);
+    let near = null, best = DINO_ALERT_RANGE;
+    for (const v of g.dinos.map.values()) {
+      if (!v.alive || v.type === 'brachio') continue;
+      const d = Math.hypot(v.pos.x - pos.x, v.pos.z - pos.z);
+      if (d < best) { best = d; near = v; }
     }
+    if (near) hud.hint(`${CONFIG.dinos[near.type].name} nearby!`, best, 'dino');
+    else hud.hint(null);
   }
 
   compassMarkers(bearing, out) {

@@ -2,7 +2,7 @@
 // many generated islands of both levels.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { planIsland } from '../src/shared/island.js';
+import { planIsland, CAVES_ENABLED } from '../src/shared/island.js';
 import { Terrain } from '../src/shared/terrain.js';
 import { buildLayout } from '../src/shared/layout.js';
 import { TRUNKS } from '../src/shared/treeShapes.js';
@@ -44,7 +44,7 @@ test('waterfalls spring from a cliff face, not from the mountain top', () => {
   }
 });
 
-test('caves sit in the flank of a hill or mountain', () => {
+test('caves sit in the flank of a hill or mountain', { skip: !CAVES_ENABLED && 'caves are disabled for now' }, () => {
   let caves = 0, hosted = 0;
   for (const { plan, terrain } of islands) {
     for (const c of plan.sites.caves) {

@@ -3,6 +3,7 @@
 
 import { CONFIG } from '../../shared/config.js';
 import { DS } from '../../shared/protocol.js';
+import { GROVE, titanScale } from '../../shared/grove.js';
 
 const C = CONFIG.dinos.brachio;
 const PF_SPRINT = 1;
@@ -87,9 +88,30 @@ function spawnHerd(sys, zone) {
   return herd;
 }
 
+/**
+ * The Primeval Grove's titan: one oversized, very tough Brachiosaurus leashed
+ * to the middle of the grove (see shared/grove.js). It is a "herd of one" so
+ * all the usual grazing/wandering/fleeing behaviour applies inside its pen.
+ */
+function spawnTitan(sys, grove) {
+  const T = GROVE.titan;
+  const scale = titanScale(grove);
+  // r: how far its centre may wander (the tail stays inside the stones);
+  // bound: no part of its body passes this
+  const leash = { x: grove.x, z: grove.z, r: Math.max(3, grove.r - T.tail * scale * 0.9), bound: grove.r - 1 };
+  const herd = newHerd(sys, { x: grove.x, z: grove.z, radius: leash.r, spawns: [], titan: true });
+  const d = sys.spawn('brachio', grove.x, grove.z, {
+    group: herd.id, slot: 0, leash, scale, title: T.name,
+    radius: C.radius * scale, home: { x: grove.x, z: grove.z },
+  });
+  d.maxHp = d.hp = Math.round(d.hp * T.healthMul);
+  return herd;
+}
+
 export const brachioBrain = {
   spawnInitial(sys) {
     for (const zone of sys.world.layout.dinoZones.brachio) spawnHerd(sys, zone);
+    if (sys.world.layout.grove) spawnTitan(sys, sys.world.layout.grove);
   },
 
   respawn(sys, r) {
@@ -97,7 +119,9 @@ export const brachioBrain = {
     const alive = sys.list.some((d) => d.type === 'brachio' && d.alive && d.group === r.group);
     const pending = sys.respawnQueue.some((q) => q.type === 'brachio' && q.group === r.group);
     const zone = sys.groups.get(r.group)?.zone || sys.world.layout.dinoZones.brachio[0];
-    if (!alive && !pending && zone) spawnHerd(sys, zone);
+    if (alive || pending || !zone) return;
+    if (zone.titan) spawnTitan(sys, sys.world.layout.grove);
+    else spawnHerd(sys, zone);
   },
 
   init(d) {
@@ -157,7 +181,7 @@ export const brachioBrain = {
       } else {
         herd.retarget -= dt;
         if (!herd.target || herd.retarget <= 0 || sys.distTo(d, herd.target.x, herd.target.z) < 6) {
-          herd.target = sys.randomWalkablePoint(d, herd.zone.x, herd.zone.z, herd.zone.radius + 25);
+          herd.target = sys.randomWalkablePoint(d, herd.zone.x, herd.zone.z, herd.zone.radius + (herd.zone.titan ? 0 : 25));
           herd.retarget = 25 + Math.random() * 20;
           herd.graze = 5 + Math.random() * 6;    // stop and graze on arrival
         }

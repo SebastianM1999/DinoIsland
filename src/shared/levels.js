@@ -11,7 +11,7 @@ export const BIOMES = {
   jungle: {
     id: 'jungle',
     name: 'Jungle',
-    sites: ['cave', 'waterfall', 'peak', 'nest', 'river', 'ruins'],
+    sites: ['waterfall', 'peak', 'nest', 'river', 'ruins'],   // (caves are disabled for now)
     river: 'water',
     vegetation: {
       treeDensity: 1.35,            // multiplier on the jungle density field
@@ -47,7 +47,7 @@ export const BIOMES = {
   volcano: {
     id: 'volcano',
     name: 'Volcano',
-    sites: ['cave', 'peak', 'nest', 'ruins', 'lava'],
+    sites: ['peak', 'nest', 'ruins', 'lava'],
     river: 'lava',
     vegetation: {
       treeDensity: 0.55,
@@ -84,8 +84,9 @@ export const BIOMES = {
 
 /** The islands, in order. Sailing away from the last one wins the game. */
 export const LEVELS = [
-  // the first island only has raptors and pteranodons
-  { name: 'Emerald Jungle', biome: 'jungle', dinos: { brachio: 0, stego: 0 } },
+  // the first island only has raptors and pteranodons – plus the giant locked
+  // away in the Primeval Grove (shared/grove.js), a teaser for later islands
+  { name: 'Emerald Jungle', biome: 'jungle', dinos: { brachio: 0, stego: 0 }, grove: true },
   { name: 'Ashfall Isle', biome: 'volcano' },
 ];
 
@@ -107,6 +108,7 @@ export function levelDef(index) {
     difficulty: 1 + i * 0.3,
     dinos: { ...biome.dinos, ...base.dinos },
     relicCount: 3,
+    grove: !!base.grove,
     last: i === LEVEL_COUNT - 1,
   };
 }

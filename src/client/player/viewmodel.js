@@ -57,10 +57,10 @@ export class Viewmodel {
     this.lHand.add(this.lArm, this.lPalm);
     this.root.add(this.lHand);
 
-    // spear: grip in the right hand, pointing forward, a bit up and left
+    // spear: grip in the right hand, the stone tip pointing at the middle of the
+    // screen (the crosshair), where stabs and throws go
     this.spear = mesh(spearGeometry(), MAT.standard, { cast: false });
-    // aim the stone tip just right of the crosshair, like the reference
-    this.spearDir = V(-0.14, 0.45, -0.88).normalize();
+    this.spearDir = V(0, -0.02, -2.2).sub(this.rHandRest).normalize();
     this.spear.quaternion.setFromUnitVectors(V(0, 1, 0), this.spearDir);
     this.spear.position.set(0, 0, 0);
     this.rPalm.quaternion.copy(this.spear.quaternion);

@@ -6,6 +6,7 @@ import { CONFIG } from '../shared/config.js';
 import { EV, DS } from '../shared/protocol.js';
 import { resolveCircle, segmentColliders, penetration } from '../shared/collision.js';
 import { angleDiff, clamp } from '../shared/rng.js';
+import { insideGrove } from '../shared/grove.js';
 import { brachioBrain } from './ai/brachio.js';
 import { stegoBrain } from './ai/stego.js';
 import { raptorBrain } from './ai/raptor.js';
@@ -56,7 +57,8 @@ export class DinoSystem {
     // spiral for the nearest spot where the whole body fits and it can walk off
     let yaw = Math.random() * Math.PI * 2;
     if (type !== 'ptera') {
-      const spot = this.findFreeSpot({ type, radius: c.radius }, x, z, { yaw });
+      const probe = { type, radius: extra.radius ?? c.radius, scale: extra.scale, leash: extra.leash };
+      const spot = this.findFreeSpot(probe, x, z, { yaw, maxDist: extra.leash ? extra.leash.r + 1 : 50 });
       if (spot) { x = spot.x; z = spot.z; yaw = spot.yaw; }
     }
     const d = {
@@ -95,7 +97,10 @@ export class DinoSystem {
   }
 
   describe(d) {
-    return { id: d.id, type: d.type, x: r2(d.x), y: r2(d.y), z: r2(d.z), yaw: r3(d.yaw), st: d.st, hp: Math.ceil(d.hp), maxHp: d.maxHp, alive: d.alive, fl: d.fl };
+    const desc = { id: d.id, type: d.type, x: r2(d.x), y: r2(d.y), z: r2(d.z), yaw: r3(d.yaw), st: d.st, hp: Math.ceil(d.hp), maxHp: d.maxHp, alive: d.alive, fl: d.fl };
+    if (d.scale) desc.sc = d.scale;       // oversized animal (the grove's titan)
+    if (d.title) desc.name = d.title;
+    return desc;
   }
 
   describeAll() { return this.list.map((d) => this.describe(d)); }
@@ -143,6 +148,11 @@ export class DinoSystem {
   /** Is this spot fine for a land animal? Keeps dinosaurs out of water, cliffs and the hut clearing. */
   walkable(x, z, d) {
     const t = this.terrain;
+    // the grove's titan never leaves its pen (no part of its body crosses the
+    // stones; its centre is held by the leash in move()); everyone else stays out
+    if (d.leash) {
+      if ((x - d.leash.x) ** 2 + (z - d.leash.z) ** 2 > d.leash.bound * d.leash.bound) return false;
+    } else if (insideGrove(this.world.layout, x, z, 3)) return false;
     if (t.waterDepthAt(x, z) > (d.type === 'brachio' ? 1.2 : 0.35)) return false;
     if (t.slopeAt(x, z) > (d.type === 'raptor' ? 0.95 : 0.8)) return false;
     if (t.lavaLevelAt(x, z) !== null) return false;
@@ -194,7 +204,7 @@ export class DinoSystem {
       fx = -Math.sin(d.yaw); fz = -Math.cos(d.yaw);
     }
     let nx = d.x + fx * step, nz = d.z + fz * step;
-    if (!this.walkable(nx, nz, d)) { d.spd *= 0.5; this.#progress(d, 0, want, dt); return; }
+    if (!this.walkable(nx, nz, d) || this.#pastLeash(d, nx, nz)) { d.spd *= 0.5; d.yaw += 1.5 * dt * (d.avoidSide || 1); this.#progress(d, 0, want, dt); return; }
     // keep a little personal space from other dinosaurs (before the trees, so they can't push into a trunk)
     for (const o of this.list) {
       if (o === d || !o.alive || o.type === 'ptera') continue;
@@ -217,10 +227,18 @@ export class DinoSystem {
     this.#progress(d, moved, want, dt);
   }
 
+  /** Would a step to (x, z) take a leashed animal's centre further beyond its leash? */
+  #pastLeash(d, x, z) {
+    const L = d.leash;
+    if (!L) return false;
+    const dn = (x - L.x) ** 2 + (z - L.z) ** 2;
+    return dn > L.r * L.r && dn > (d.x - L.x) ** 2 + (d.z - L.z) ** 2;
+  }
+
   /** Body footprint circles (world space) of `d` standing at (x, z) facing `yaw`. */
   *bodyCircles(d, x, z, yaw) {
-    const fx = -Math.sin(yaw), fz = -Math.cos(yaw);
-    for (const [off, r] of CONFIG.dinos[d.type].body || [[0, radiusOf(d) * 0.6]]) yield [x + fx * off, z + fz * off, r];
+    const fx = -Math.sin(yaw), fz = -Math.cos(yaw), s = d.scale || 1;
+    for (const [off, r] of CONFIG.dinos[d.type].body || [[0, radiusOf(d) * 0.6 / s]]) yield [x + fx * off * s, z + fz * off * s, r * s];
   }
 
   /**
@@ -414,6 +432,12 @@ export class DinoSystem {
 
   damage(d, amount, zone, byId, weapon) {
     if (!d.alive) return;
+    // The grove's titan can only be hurt by someone standing inside the grove:
+    // shots, throws and stabs from outside stop at the barrier.
+    if (d.leash) {
+      const p = this.world.players.get(byId);
+      if (!p || !insideGrove(this.world.layout, p.x, p.z)) return;
+    }
     const Z = CONFIG.hitZones;
     let mult = Z[zone] ?? 1;
     const hitZone = zone in Z ? zone : 'body';
@@ -476,6 +500,11 @@ export class DinoSystem {
         // turning on the spot can swing the body into a trunk: push it back out
         if (d.type !== 'ptera' && this.resolveBody(d, d.x, d.z, d.yaw)) { d.x = push.x; d.z = push.z; }
         if (d.type !== 'ptera') this.#unstick(d);
+        // hard leash: whatever pushed it (other animals, the unstuck nudge), it stays in its pen
+        if (d.leash) {
+          const dx = d.x - d.leash.x, dz = d.z - d.leash.z, l = Math.hypot(dx, dz);
+          if (l > d.leash.r) { d.x = d.leash.x + (dx / l) * d.leash.r; d.z = d.leash.z + (dz / l) * d.leash.r; }
+        }
       }
 
       if (d.type !== 'ptera' || d.grounded) d.y = this.terrain.heightAt(d.x, d.z);

@@ -10,6 +10,7 @@ import { RELIC_FOR_SITE } from './relics.js';
 import { caveColliders, caveInterior, caveMouth, caveRockPiles } from './caveShape.js';
 import { ruinsColliders, ruinsCenter, RUINS_ALTAR_TOP } from './ruinsShape.js';
 import { boatColliders, boatInteractPoint } from './boatShape.js';
+import { insideGrove } from './grove.js';
 
 const TAU = Math.PI * 2;
 
@@ -62,6 +63,8 @@ export function buildLayout(terrain) {
     nest: null,
     relics: [],
     seaStacks: [],
+    grove: null,
+    logs: [],               // fallen trees: { x, z, rot, len, r, yA, yB, roots, dead }
   };
   const circles = layout.colliders.circles;
   const boxes = layout.colliders.boxes;
@@ -228,6 +231,37 @@ export function buildLayout(terrain) {
     reserve(n.x, n.z, 5);
   }
 
+  // ------------------------------------------------------ primeval grove
+  // A ring of old standing stones around a hollow of giant plants (shared/grove.js).
+  // Ordinary trees, rocks, bushes and fruit stay out, so the view in stays open.
+  if (plan.sites.grove) {
+    const gv = plan.sites.grove;
+    const rg = makeRng(S ^ 0x6a07e);
+    const grove = { x: gv.x, z: gv.z, r: gv.r, y: terrain.heightAt(gv.x, gv.z), stones: [], glow: [] };
+    layout.grove = grove;
+    reserve(gv.x, gv.z, gv.r + 6);           // plus a clearing around the stones to look in from
+    // standing stones just outside the barrier, low enough to look over, with gaps to look through
+    const n = Math.round((TAU * gv.r) / 6.5);
+    for (let k = 0; k < n; k++) {
+      const a = (k / n) * TAU + rg.range(-0.08, 0.08);
+      const rr = gv.r + 0.9 + rg.range(-0.3, 0.3);
+      const x = gv.x + Math.cos(a) * rr, z = gv.z + Math.sin(a) * rr;
+      const y = terrain.heightAt(x, z);
+      const h = k % 5 === 0 ? rg.range(4.2, 5.2) : rg.range(2.3, 3.6);
+      const w = rg.range(0.9, 1.4);
+      grove.stones.push({ x, z, y, h, w, rot: a + rg.range(-0.25, 0.25), tilt: rg.range(-0.08, 0.08), runes: k % 2 === 0 });
+      circles.push({ x, z, r: w * 0.75, bottom: y - 1, top: y + h, kind: 'grove' });
+    }
+    // glowing flora on the floor (visual only)
+    for (let i = 0; i < 90; i++) {
+      const a = rg() * TAU, rr = Math.sqrt(rg()) * gv.r * 0.95;
+      const x = gv.x + Math.cos(a) * rr, z = gv.z + Math.sin(a) * rr;
+      if (!dry(x, z, 0.8)) continue;
+      grove.glow.push({ x, z, y: terrain.heightAt(x, z), s: rg.range(0.6, 1.4), kind: rg() < 0.55 ? 'shroom' : 'bloom', hue: rg(), rot: rg() * TAU });
+    }
+  }
+  const outsideGrove = (x, z, pad = 0) => !insideGrove(layout, x, z, pad);
+
   // ------------------------------------------------------------- relics
   const findDryNear = (cx, cz, maxR, pred = () => true) => {
     // strict first (flat, matches pred), then relaxed – but never in water or lava
@@ -235,7 +269,7 @@ export function buildLayout(terrain) {
       for (let k = 0; k < 600; k++) {
         const a = rng() * TAU, r = (k / 600) * R2;
         const x = cx + Math.cos(a) * r, z = cz + Math.sin(a) * r;
-        if (dry(x, z, 0.8) && terrain.slopeAt(x, z) < slope && (!usePred || pred(x, z))) return { x, z };
+        if (dry(x, z, 0.8) && terrain.slopeAt(x, z) < slope && outsideGrove(x, z, 4) && (!usePred || pred(x, z))) return { x, z };
       }
     }
     return { x: cx, z: cz };
@@ -345,6 +379,67 @@ export function buildLayout(terrain) {
     const spacing = type === 'giant' ? 1.8 : type === 'palm' || type === 'dead' || type === 'banana' ? 0.35 : type === 'bamboo' ? 0.6 : 0.55;
     if (type === 'giant' && (!free(x, z, 7) || dens < 0.5)) continue;
     addTree(type, x, z, scale, spacing);
+  }
+
+  // Around the grove: a few giant trees just outside the stones frame it, their
+  // crowns towering over the jungle (inside, the giant needs the room).
+  if (layout.grove) {
+    const gv = layout.grove;
+    const rg = makeRng(S ^ 0x7ee5);
+    let placed = 0;
+    for (let i = 0; i < 600 && placed < 4; i++) {
+      const a = rg() * TAU, rr = gv.r + rg.range(8, 12);
+      const x = gv.x + Math.cos(a) * rr, z = gv.z + Math.sin(a) * rr;
+      if (!dry(x, z, 1.5) || !clearOfSites(x, z, 2) || !free(x, z, 3) || terrain.slopeAt(x, z) > 0.5) continue;
+      if (layout.trees.some((t) => t.grove && Math.hypot(t.x - x, t.z - z) < gv.r)) continue;
+      const t = addTree(placed % 2 ? 'kapok' : 'giant', x, z, rg.range(1.0, 1.15), 0.5);
+      t.grove = true;
+      placed++;
+    }
+    // oversized ferns and big-leaf plants (visual only): low along the stones so
+    // the view in stays open, towering deeper inside, a clearing around the giant
+    for (let i = 0; i < 120; i++) {
+      const a = rg() * TAU, f = Math.sqrt(rg()), rr = f * gv.r * 0.97;
+      const x = gv.x + Math.cos(a) * rr, z = gv.z + Math.sin(a) * rr;
+      if (!dry(x, z, 0.8) || f < 0.45) continue;
+      const scale = f > 0.72 ? rg.range(0.6, 1.0) : rg() < 0.25 ? rg.range(2.2, 3.0) : rg.range(1.1, 1.7);
+      layout.bushes.push({ type: rg() < 0.55 ? 'fern' : 'bigleaf', x, z, y: terrain.heightAt(x, z), scale, rot: rg() * TAU, hue: 0.9 + rg() * 0.1, grove: true });
+    }
+  }
+
+  // -------------------------------------------------------- fallen trees
+  // Old trunks lying on the forest floor: low obstacles you can jump over (dead
+  // grey ones on the volcano island). Their collider is a row of low circles
+  // along the trunk, so the body blocks while a jump clears it.
+  {
+    const rl = makeRng(S ^ 0x10c5);
+    const want = volcanic ? 14 : 24;
+    for (let i = 0; i < 6000 && layout.logs.length < want; i++) {
+      const x = rl.range(-plan.A * 0.9, plan.A * 0.9), z = rl.range(-plan.B * 0.9, plan.B * 0.9);
+      if (!inside(x, z, 0.9) || nearHut(x, z, 10) || nearBoat(x, z, 6) || !outsideGrove(x, z, 12)) continue;
+      const len = rl.range(5, 11), r = rl.range(0.35, 0.6), rot = rl() * TAU;
+      const dx = Math.cos(rot), dz = Math.sin(rot);
+      // the whole trunk: dry, fairly flat, clear of paths, water and anything standing
+      const pts = [];
+      let ok = true;
+      for (let k = 0, n = Math.ceil(len / 1.1); k <= n && ok; k++) {
+        const t = k / n - 0.5;
+        const px = x + dx * len * t, pz = z + dz * len * t;
+        if (!dry(px, pz, 0.8) || terrain.slopeAt(px, pz) > 0.45 || distToPath(px, pz) < 2.5 || riverDist(px, pz) < 2.5 || poolDist(px, pz) < 3 || !free(px, pz, r + 0.4)) ok = false;
+        pts.push({ x: px, z: pz, t, g: terrain.heightAt(px, pz) });
+      }
+      if (!ok) continue;
+      // it rests on its ends: the ground in between may not bulge up through it
+      const yA = pts[0].g + r * 0.75, yB = pts[pts.length - 1].g + r * 0.75;
+      if (pts.some((p) => p.g + r * 0.4 > yA + (yB - yA) * (p.t + 0.5))) continue;
+      if (Math.abs(yA - yB) > len * 0.25) continue;
+      layout.logs.push({ id: layout.logs.length, x, z, rot, len, r, yA, yB, roots: rl() < 0.6, dead: volcanic || rl() < 0.15, hue: rl() });
+      for (const p of pts) {
+        const top = yA + (yB - yA) * (p.t + 0.5) + r * 0.9;
+        circles.push({ x: p.x, z: p.z, r: r * 0.95, bottom: p.g - 0.6, top, kind: 'log' });
+        reserve(p.x, p.z, r + 0.5);
+      }
+    }
   }
 
   // -------------------------------------------------------------- rocks
@@ -463,7 +558,7 @@ export function buildLayout(terrain) {
     for (let k = 0; k < 500 && pts.length < n; k++) {
       const a = rng() * TAU, r = Math.sqrt(rng()) * radius;
       const x = cx + Math.cos(a) * r, z = cz + Math.sin(a) * r;
-      if (dry(x, z, 1.2) && terrain.slopeAt(x, z) < 0.5 && !nearHut(x, z, 40)) pts.push({ x, z });
+      if (dry(x, z, 1.2) && terrain.slopeAt(x, z) < 0.5 && !nearHut(x, z, 40) && outsideGrove(x, z, 6)) pts.push({ x, z });
     }
     return pts;
   };
@@ -471,7 +566,7 @@ export function buildLayout(terrain) {
     for (let i = 0; i < 800; i++) {
       const x = rng.range(-plan.A * 0.75, plan.A * 0.75), z = rng.range(-plan.B * 0.7, plan.B * 0.7);
       if (!inside(x, z, 0.8) || !dry(x, z, 2) || terrain.slopeAt(x, z) > 0.45) continue;
-      if (Math.hypot(x - hf.x, z - hf.z) < minHut || nearBoat(x, z, 25) || !pred(x, z)) continue;
+      if (Math.hypot(x - hf.x, z - hf.z) < minHut || nearBoat(x, z, 25) || !outsideGrove(x, z, 25) || !pred(x, z)) continue;
       return { x, z };
     }
     return { x: 0, z: 0 };
