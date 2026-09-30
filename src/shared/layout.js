@@ -301,9 +301,11 @@ export function buildLayout(terrain) {
     const shape = TRUNKS[type][t.id % TRUNKS[type].length];
     const footR = Math.max(shape.r(0), ...(shape.base || []).map((b) => b[1] * 0.7)) * scale;
     let lo = Infinity;
-    for (let k = 0; k < 8; k++) {
-      const a = (k / 8) * TAU;
-      lo = Math.min(lo, terrain.heightAt(x + Math.cos(a) * footR, z + Math.sin(a) * footR));
+    for (const rr of [footR, shape.r(0) * scale, footR * 0.5]) {
+      for (let k = 0; k < 8; k++) {
+        const a = (k / 8) * TAU;
+        lo = Math.min(lo, terrain.heightAt(x + Math.cos(a) * rr, z + Math.sin(a) * rr));
+      }
     }
     t.sink = TREE_SINK + Math.max(0, y - lo) + 0.05;
     layout.trees.push(t);
@@ -319,7 +321,7 @@ export function buildLayout(terrain) {
       const a = rng() * TAU, k = rng.range(0.82, 1.0);
       const x = Math.cos(a) * plan.A * k, z = Math.sin(a) * plan.B * k;
       const h = terrain.heightAt(x, z);
-      if (h < 0.7 || h > 3.2 || !dry(x, z) || nearHut(x, z, 6) || nearBoat(x, z, 10) || terrain.slopeAt(x, z) > 0.5) continue;
+      if (h < 0.7 || h > 3.2 || !dry(x, z) || nearHut(x, z, 6) || nearBoat(x, z, 10) || terrain.slopeAt(x, z) > 0.5 || distToPath(x, z) < 3) continue;
       if (!free(x, z, 2.5)) continue;
       addTree(rng.pick(beachTypes), x, z, rng.range(0.85, 1.25), 0.35);
     }

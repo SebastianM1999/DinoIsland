@@ -229,9 +229,17 @@ function padEffect(plan, x, z, h) {
 export function islandHeight(plan, x, z) {
   let h = naturalHeight(plan, x, z);
   h = poolEffect(plan, x, z, h);
-  h = rampEffect(plan, x, z, h);
-  h = riverCarve(plan, x, z, h);       // rivers cut through mountain paths, never dammed by them
+  h = riverCarve(plan, x, z, h);
+  // mountain paths win over the wide river valley walls (so the valley never
+  // bites a cliff out of a trail), but give way right at the water: a path
+  // never dams a river, it dips down to cross it
+  const q = plan.ramps.length ? riverQuery(plan, x, z, 12) : null;
+  const keep = q ? smoothstep(q.width / 2 + 1.5, q.width / 2 + 8, q.d) : 1;
+  const hr = h;
+  if (keep > 0) h = lerp(h, rampEffect(plan, x, z, h), keep);
   h = padEffect(plan, x, z, h);
+  // paths and flattened sites never dig the river's levee away
+  if (q && q.d >= q.width / 2 && q.surface > 0.3) h = Math.max(h, Math.min(hr, q.surface + 0.35 + (q.d - q.width / 2) * 0.12));
   return h;
 }
 
@@ -440,14 +448,28 @@ export function planIsland(levelIndex = 0, variant = 1) {
       }
       // one winding trail per mountain: it wanders around the flank at an
       // uneven pace, with random bends and a varying radius – no perfect spiral
-      const a0 = rng() * TAU;
+      // The trail starts at the foot of the mountain, away from the hut and boat
+      // clearings, and keeps clear of the waterfall cliff; a few tries, then the
+      // best one is kept.
+      const wpool = plan.pools.find((p) => p.kind === 'water');
+      const cliff = wpool && plan.waterfallDir
+        ? { x: wpool.x + plan.waterfallDir.x * (wpool.r + 6), z: wpool.z + plan.waterfallDir.z * (wpool.r + 6) } : null;
+      let best = null;
+      for (let attempt = 0; attempt < 12; attempt++) {
+      let a0 = rng() * TAU;
       const dirSign = rng() < 0.5 ? -1 : 1;
       const R0 = f.radius * (f.stretch ? 1 : rng.range(0.95, 1.1));
-      const turns = rng.range(0.9, 1.35) + f.height / 110;
+      let turns = rng.range(0.9, 1.35) + f.height / 110;
+      // the waterfall is on this mountain's own flank: wind most of the way
+      // around, starting beside the cliff and ending before coming back to it
+      if (cliff && attempt >= 6) {
+        a0 = Math.atan2(cliff.z - f.z, cliff.x - f.x) + dirSign * rng.range(0.55, 0.75);
+        turns = rng.range(0.68, 0.8);
+      }
       const pts = [];
       const steps = 110;
       const base = naturalHeight(plan, f.x + Math.cos(a0) * R0, f.z + Math.sin(a0) * R0);
-      const s = plan.seed + f.id * 7;
+      const s = plan.seed + f.id * 7 + attempt * 13;
       for (let i = 0; i <= steps; i++) {
         const t = i / steps;
         // uneven angular speed (bends) + radius wobble
@@ -460,7 +482,16 @@ export function planIsland(levelIndex = 0, variant = 1) {
         const climb = t + valueNoise(t * 5, 3.7, s + 2) * 0.03;
         pts.push({ x, z, y: lerp(base, top.y, clamp(smoothstep(0, 1, climb) * 0.25 + climb * 0.75, 0, 1)) });
       }
-      plan.ramps.push({ pts, width: rng.range(2.8, 3.6), cx: f.x, cz: f.z, reach: R0 * 1.2 + 12, hill: f.id });
+      const p0 = pts[0];
+      let bad = 0;
+      if (Math.hypot(p0.x - plan.hut.x, p0.z - plan.hut.z) < plan.hut.radius * 1.8 + 10) bad++;
+      if (Math.hypot(p0.x - plan.boat.x, p0.z - plan.boat.z) < 30) bad++;
+      if (cliff && pts.some((p) => Math.hypot(p.x - cliff.x, p.z - cliff.z) < 14)) bad += 2;
+      const ramp = { pts, width: rng.range(4.6, 5.4), cx: f.x, cz: f.z, reach: R0 * 1.2 + 12, hill: f.id };
+      if (!best || bad < best.bad) best = { ramp, bad };
+      if (!bad) break;
+      }
+      plan.ramps.push(best.ramp);
     }
   }
 
@@ -489,6 +520,13 @@ export function planIsland(levelIndex = 0, variant = 1) {
       { x: pool.x + east * (along + 40 * K), z: side * B * 1.3 },
     ];
     plan.river = traceFlow(plan, start, goals, { kind: 'water', width0: 6.5, width1: 13, surface0: pool.level, stopAt: 'sea' });
+  }
+  // a river cutting through a side hill would chop its mountain path into
+  // cliffs: that hill simply has no path (the main mountain always keeps its own)
+  {
+    const halfW = Math.max(...plan.river.pts.map((p) => p.w)) / 2;
+    plan.ramps = plan.ramps.filter((r) => r.hill === plan.mainPeak?.id ||
+      r.pts.every((p) => distToPolyline(plan.river.pts, p.x, p.z) > halfW + 10));
   }
   // a sandbank in the middle of the (water) river: the river widens around a small sand island
   if (plan.river.kind === 'water') {
@@ -559,6 +597,8 @@ export function planIsland(levelIndex = 0, variant = 1) {
       if (h < minH || h > maxH || slopeOf(fnN, x, z, r * 0.5) > maxSlope) continue;
       if (distToPolyline(plan.trail, x, z) < trailGap + r) continue;
       if (distToPolyline(plan.river.pts, x, z) < riverGap + r) continue;
+      // a flattened site must not cut a cliff into a mountain path
+      if (plan.ramps.some((rp) => rp.pts.some((p) => Math.hypot(p.x - x, p.z - z) < r * 1.8 + 6))) continue;
       taken.push({ x, z, r: r + 8 });
       return { x, z, h };
     }
@@ -587,7 +627,7 @@ export function planIsland(levelIndex = 0, variant = 1) {
         if (!spot || !insideEllipse(plan, spot.x, spot.z, 0.82)) continue;
         // (mountains themselves are fine hosts – only other sites and pools are in the way)
         if (taken.some((t) => !t.hill && Math.hypot(t.x - spot.x, t.z - spot.z) < t.r + 9)) continue;
-        if (distToPolyline(plan.river.pts, spot.x, spot.z) < 18 || distToPolyline(plan.trail, spot.x, spot.z) < 10 || rampNear(spot.x, spot.z, 14)) continue;
+        if (distToPolyline(plan.river.pts, spot.x, spot.z) < 18 || distToPolyline(plan.trail, spot.x, spot.z) < 10 || rampNear(spot.x, spot.z, 19)) continue;
         // entrance (local -z) faces outward, away from the hill
         const rot = Math.atan2(-ox, -oz);
         plan.sites.caves.push({ x: spot.x, z: spot.z, y: spot.h, rot, seed: rng.int(1, 9999), host: f.id });

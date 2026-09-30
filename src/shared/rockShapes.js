@@ -105,6 +105,14 @@ export function placeRock(r, terrain) {
   r.by = r.y - r.scale * (0.12 + Math.min(0.35, slope * 0.3)) * (r.sink ?? 1);
   const maxRad = Math.max(...t.rad[t.rad.length - 2]);
   r.R = maxRad * Math.max(r.fx, r.fz);
+  // on a slope the downhill side of the foot would hang in the air: sink the
+  // rock until its foot touches the lowest ground under it
+  let lo = Infinity;
+  for (let k = 0; k < 12; k++) {
+    const a = (k / 12) * TAU;
+    lo = Math.min(lo, terrain.heightAt(r.x + Math.cos(a) * r.R * 0.85, r.z + Math.sin(a) * r.R * 0.85));
+  }
+  r.by = Math.min(r.by, lo - 0.05);
   r.top = r.by + t.top * r.fy;
   return r;
 }

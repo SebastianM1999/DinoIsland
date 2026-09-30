@@ -6,6 +6,7 @@ import { planIsland } from '../src/shared/island.js';
 import { Terrain } from '../src/shared/terrain.js';
 import { buildLayout } from '../src/shared/layout.js';
 import { TRUNKS } from '../src/shared/treeShapes.js';
+import { CONFIG } from '../src/shared/config.js';
 
 const islands = [];
 for (const level of [0, 1]) {
@@ -79,4 +80,33 @@ test('boat parts are dry, reachable and not covered by plants', () => {
       assert.ok(!layout.bushes.some((b) => Math.hypot(b.x - r.x, b.z - r.z) < 2), `${r.kind} under a bush`);
     }
   }
+});
+
+test('mountain paths are walkable from the foot to the top', () => {
+  for (const { plan, terrain, level, variant } of islands) {
+    for (const r of plan.ramps) {
+      for (let i = 1; i < r.pts.length; i++) {
+        const a = r.pts[i - 1], b = r.pts[i];
+        const s = Math.abs(terrain.heightAt(b.x, b.z) - terrain.heightAt(a.x, a.z)) / Math.max(1, Math.hypot(b.x - a.x, b.z - a.z));
+        assert.ok(s <= CONFIG.player.maxWalkSlope + 0.35, `L${level} v${variant}: path on hill ${r.hill} too steep at ${i} (${s.toFixed(2)})`);
+      }
+    }
+  }
+});
+
+test('rocks sit on the ground and nothing grows on the paths', () => {
+  let floating = 0, rocks = 0;
+  for (const { layout, terrain } of islands) {
+    for (const r of layout.rocks) {
+      rocks++;
+      let lo = Infinity;
+      for (let k = 0; k < 12; k++) {
+        const a = (k / 12) * Math.PI * 2;
+        lo = Math.min(lo, terrain.heightAt(r.x + Math.cos(a) * r.R * 0.85, r.z + Math.sin(a) * r.R * 0.85));
+      }
+      if (r.by > lo + 0.1) floating++;
+    }
+    for (const t of layout.trees) assert.ok(layout.distToPath(t.x, t.z) > 1.8, `${t.type} on a path`);
+  }
+  assert.ok(floating / rocks < 0.002, `${floating}/${rocks} rocks float`);
 });
