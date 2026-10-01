@@ -35,12 +35,13 @@ test('GLBs keep combat, independent skins, semantic clips and terrain animation 
     assert.notEqual(a.head, gltf.scene.getObjectByName('Head'));
     const animator = new DinoAnimator(a, SPECIES[type].anim), other = SPECIES[type].createAnimator(b);
     assert.notEqual(animator.mixer, other.mixer);
-    assert.equal(!!a.jaw, type === 'brachio' || type === 'raptor', `${type}: preserve the existing head anatomy`);
-    // The project raptor's and brachio's eyes are part of their authored meshes.
-    if (type !== 'raptor' && type !== 'brachio') assert.ok(a.model.getObjectByName('FaceEyes'), `${type}: missing visible eyes`);
+    // Blender-authored species have opening jaws and eyes built into their meshes.
+    const authored = ['raptor', 'brachio', 'trex'].includes(type);
+    assert.equal(!!a.jaw, authored, `${type}: preserve the existing head anatomy`);
+    if (!authored) assert.ok(a.model.getObjectByName('FaceEyes'), `${type}: missing visible eyes`);
     assert.equal(a.model.getObjectByName('DetailedFace'), undefined, 'no replacement facial geometry');
     if (type !== 'brachio') {
-      const sourceTriangles = { raptor: 53128, trex: 27968, stego: 36752 };
+      const sourceTriangles = { raptor: 53128, trex: 50440, stego: 36752 };
       let skinTriangles = 0;
       a.model.traverse(o => { if (o.isSkinnedMesh) skinTriangles += o.geometry.index.count / 3; });
       assert.equal(skinTriangles, sourceTriangles[type], 'integrated head/body surface remains complete');

@@ -20,7 +20,7 @@ function model(species, source, height, length, walkStride, runStride, quadruped
 export const GLB_DINOS = {
   // Median grounded foot velocity × clip duration; see measure-dino-strides.mjs.
   raptor: model('raptor', 'Velociraptor', 1.675, 3.037, 1.818, 4.09),
-  trex: model('trex', 'TRex', 4.1, 11, 6.262, 10.715),
+  trex: model('trex', 'TRex', 5.808, 11, 4.719, 7.928),
   stego: model('stego', 'Stegosaurus', 4, 7.9, 2.04, 3.629, true),
   brachio: model('brachio', 'Brachiosaurus', 13.007, 18.514, 2.714, 5.333, true),
 };
@@ -34,6 +34,9 @@ GLB_DINOS.brachio.bones = { ...GLB_DINOS.brachio.bones,
 GLB_DINOS.raptor.bones = { ...GLB_DINOS.raptor.bones,
   jaw: 'Jaw', neck: ['Neck1', 'Neck2'], spine: ['Body', 'Torso'],
   feet: ['BackToesR', 'BackToesL'], knees: ['BackLowLegR', 'BackLowLegL'] };
+// Project T-Rex (art/sources/trex/trex.blend): same theropod rig plus a roar clip.
+GLB_DINOS.trex.bones = { ...GLB_DINOS.raptor.bones };
+GLB_DINOS.trex.clips.roar = 'TRex_Roar';
 GLB_DINOS.stego.width = 2.4;
 // Cycles per second, bounded independently of unusually short source run strides.
 GLB_DINOS.raptor.maxCadence = 2.4;

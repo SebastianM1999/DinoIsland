@@ -6,8 +6,8 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { paintSkinDetails } from '../src/client/models/dino/skinStyle.js';
 import { exportGLB } from './glb-export.mjs';
 
-// The raptor is project-authored in art/sources/raptor/raptor.blend and already has eyes.
-for (const type of ['trex', 'stego']) {
+// Raptor and T-Rex are project-authored in art/sources/<type>/<type>.blend and already have eyes.
+for (const type of ['stego']) {
   const path = new URL(`../assets/models/dinos/${type}.glb`, import.meta.url);
   const bytes = await fs.readFile(path);
   const gltf = await new GLTFLoader().parseAsync(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength), '');

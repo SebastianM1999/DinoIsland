@@ -10,10 +10,9 @@
     {
       "id": "dino-trex",
       "file": "assets/models/dinos/trex.glb",
-      "source": "Quaternius Animated Dinosaur Pack / T-Rex",
-      "license": "CC0-1.0",
-      "url": "https://quaternius.com/packs/animateddinosaurs.html",
-      "triangles": 28672
+      "source": "Project-authored T-Rex; art/sources/trex/trex.blend (build scripts in its text blocks)",
+      "license": "Project source",
+      "triangles": 50440
     },
     {
       "id": "dino-stego",
