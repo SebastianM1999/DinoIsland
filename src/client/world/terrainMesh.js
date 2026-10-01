@@ -5,16 +5,18 @@
 
 import * as THREE from 'three';
 import { fbm, smoothstep } from '../../shared/rng.js';
+import { BIOMES } from '../../shared/levels.js';
+import { causewayQuery } from '../../shared/bossArena.js';
 
 const JUNGLE = {
   sandDry: '#f6d08a', sand: '#efc176', sandWet: '#d9a862', seabed: '#e2bd7a', seabedDeep: '#b99a68',
   grass: '#7cc34a', grassLight: '#95d256', grassDark: '#5ea83a', floor: '#4c9434', high: '#86c650',
   rock: '#aa9fb4', rockDark: '#8d82a0', rockWarm: '#b59c90', dirt: '#c9985c', dirtDark: '#b0814c', riverbed: '#b3a27a',
 };
-// Primeval Grove floor (see world/grove.js)
-const GROVE_MOSS = new THREE.Color('#2f7a62');
-const GROVE_MOSS_LIGHT = new THREE.Color('#3f9a78');
-const GROVE_VIOLET = new THREE.Color('#5d4f8f');
+// Boss arena ground (see world/bossArena.js): the volcano island's darkest stone
+const VOLCANO = Object.fromEntries(['rock', 'rockDark', 'ash', 'scorch'].map((k) => [k, new THREE.Color(BIOMES.volcano.terrain[k]).multiplyScalar(0.7)]));
+const EMBER = new THREE.Color('#7a2a12');
+const CAUSEWAY = new THREE.Color('#6a5f62');
 
 /**
  * @param {import('../../shared/terrain.js').Terrain} terrain
@@ -29,7 +31,7 @@ export function buildTerrainMesh(terrain, layout) {
   const P = Object.fromEntries(Object.entries({ ...JUNGLE, ...layout.biome.terrain }).map(([k, v]) => [k, new THREE.Color(v)]));
   const hut = layout.hut;
   const v = plan.volcano;
-  const grove = layout.grove;
+  const arena = layout.bossArena;
 
   const color = new THREE.Color();
   const base = new THREE.Color();
@@ -98,14 +100,21 @@ export function buildTerrainMesh(terrain, layout) {
     color.lerp(base, (1 - smoothstep(pathW - 0.5, pathW + 1.8, pd + fbm(x * 0.4, z * 0.4, 2, S + 88) * 0.8)) * worn);
     const hd = Math.hypot(x - hut.campfire.x, z - hut.campfire.z);
     color.lerp(base, (1 - smoothstep(6, 13, hd)) * 0.9);
-    // the Primeval Grove: deep teal moss with violet patches, fading out past the stones
-    if (grove) {
-      const gd = Math.hypot(x - grove.x, z - grove.z);
-      const k = 1 - smoothstep(grove.r - 1, grove.r + 5, gd);
+    // the boss arena: dark basalt and ash like the volcano island, glowing-hot
+    // scorch along the lava, a dark causeway – fading into the beach outside
+    if (arena) {
+      const ad = Math.hypot(x - arena.center.x, z - arena.center.z);
+      const k = 1 - smoothstep(arena.outerR - 4, arena.outerR + 10, ad);
       if (k > 0) {
-        base.copy(GROVE_MOSS).lerp(GROVE_MOSS_LIGHT, smoothstep(0.3, 0.8, noise));
-        base.lerp(GROVE_VIOLET, smoothstep(0.55, 0.85, fbm(x * 0.09 + 3, z * 0.09, 2, S + 71) * 0.5 + 0.5) * 0.6);
-        color.lerp(base, k * 0.9);
+        const ashN = fbm(x * 0.06 + 5, z * 0.06, 3, S + 61) * 0.5 + 0.5;
+        base.copy(VOLCANO.rock).lerp(VOLCANO.rockDark, smoothstep(0.3, 0.7, ashN)).lerp(VOLCANO.ash, smoothstep(0.6, 0.9, ashN) * 0.6);
+        base.lerp(VOLCANO.scorch, smoothstep(0.8, 1.4, slope) * 0.5);
+        const hot = lava !== null || terrain.lavaLevelAt(x + 3, z) !== null || terrain.lavaLevelAt(x - 3, z) !== null
+          || terrain.lavaLevelAt(x, z + 3) !== null || terrain.lavaLevelAt(x, z - 3) !== null;
+        if (hot) base.lerp(EMBER, 0.35).lerp(VOLCANO.scorch, 0.4);
+        // the causeway: lighter, ash-grey basalt so the way across stands out from the dark rim
+        if (causewayQuery(arena, x, z).d < arena.causewayW / 2 + 0.6) base.copy(CAUSEWAY).lerp(VOLCANO.ash, 0.2 + noise * 0.3);
+        color.lerp(base, k);
       }
     }
     // fine speckle so large areas never look flat

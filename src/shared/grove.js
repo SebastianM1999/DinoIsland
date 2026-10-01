@@ -1,12 +1,14 @@
-// The Primeval Grove: a walled-off, overgrown hollow on the first island where
-// an ancient, oversized Brachiosaurus lives. It is a teaser for later islands:
-// players can look in over the standing stones but can't enter yet, and
-// nothing they throw or shoot from outside gets past its barrier.
+// The giant's pen (still called "grove" in the code): the boss arena's plateau
+// out in the lava beside the boat on the first island (shared/bossArena.js),
+// where an ancient, oversized Brachiosaurus lives. It is a teaser for later
+// islands: players can walk the causeway and look in over the basalt columns
+// but can't enter yet, and nothing they throw or shoot from outside gets past
+// its barrier. layout.grove = { x, z, r, y } is the plateau.
 // Shared by client (visuals, prompt, movement) and server (validation, AI).
 
 export const GROVE = {
-  name: 'Primeval Grove',
-  /** Radius of the barrier (m); the flattened hollow reaches a bit further. */
+  name: 'Ashen Maw',
+  /** Largest barrier radius (m) – the plateau (BOSS_ARENA.plateauR) is this or smaller. */
   radius: 28,
   /**
    * The skill a later island will teach. Only the hint text uses it so far.

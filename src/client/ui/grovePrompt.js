@@ -1,5 +1,5 @@
-// The Primeval Grove prompt: shown when the player walks into the grove's
-// barrier. A system warning (Yes / No); on Yes the explorer admits they are
+// The giant's pen prompt (the boss arena's plateau, see shared/grove.js):
+// shown when the player walks into its barrier at the end of the causeway. A system warning (Yes / No); on Yes the explorer admits they are
 // too scared to go in, then a hint explains what unlocks the grove.
 //
 // TODO(grove-unlock): once the skill/unlock system exists, players who have
@@ -42,7 +42,7 @@ export class GrovePrompt {
           <span class="grove-badge" aria-hidden="true">!</span>
           <h2 id="grove-title">Warning</h2>
         </header>
-        <p class="grove-text">Beyond these old stones lies the <b>${esc(GROVE.name)}</b>. Something ancient and enormous lives in there.</p>
+        <p class="grove-text">Beyond these burning stones lies the <b>${esc(GROVE.name)}</b>. Something ancient and enormous lives out there in the lava.</p>
         <p class="grove-ask">Do you really want to enter?</p>
         <footer class="wd-foot">
           <button type="button" class="wd-btn wd-primary" data-act="yes">Yes</button>

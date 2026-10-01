@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import { CONFIG } from '../../shared/config.js';
 
 const R = CONFIG.render;
+const _tmpColor = new THREE.Color();
 
 export class Renderer {
   constructor(canvas) {
@@ -52,6 +53,28 @@ export class Renderer {
     this.hemi.groundColor.set(sky.hemiGround);
     this.hemi.intensity = sky.hemiIntensity ?? 1.6;
     this.renderer.toneMappingExposure = sky.exposure ?? 1.05;
+  }
+
+  /**
+   * Blend the biome look from sky `a` toward sky `b` by k (0..1) – a local mood,
+   * e.g. the boss arena's ash and glow on the jungle island. k = 0 is plain `a`.
+   */
+  blendBiome(a, b, k) {
+    if (!a || !b) return;
+    if (k <= 0) { this.applyBiome(a); return; }
+    const L = (x, y, d) => (x ?? d) + ((y ?? d) - (x ?? d)) * k;
+    const col = (target, x, y) => target.set(x).lerp(_tmpColor.set(y), k);
+    col(this.scene.fog.color, a.fog, b.fog);
+    this.scene.fog.near = L(a.fogNear, b.fogNear, R.fogNear);
+    this.scene.fog.far = L(a.fogFar, b.fogFar, R.fogFar);
+    if (!(this.scene.background instanceof THREE.Color)) this.scene.background = new THREE.Color();
+    col(this.scene.background, a.background, b.background);
+    col(this.sun.color, a.sun, b.sun);
+    this.sun.intensity = L(a.sunIntensity, b.sunIntensity, 2.6);
+    col(this.hemi.color, a.hemiSky, b.hemiSky);
+    col(this.hemi.groundColor, a.hemiGround, b.hemiGround);
+    this.hemi.intensity = L(a.hemiIntensity, b.hemiIntensity, 1.6);
+    this.renderer.toneMappingExposure = L(a.exposure, b.exposure, 1.05);
   }
 
   #setupLights() {

@@ -38,6 +38,17 @@ import { buildGrove } from '../world/grove.js';
 import { buildLogs } from '../world/logs.js';
 import { GrovePrompt } from '../ui/grovePrompt.js';
 import { mayEnterGrove, GROVE_STONE_REACH } from '../../shared/grove.js';
+import { buildBossArena } from '../world/bossArena.js';
+import { BIOMES } from '../../shared/levels.js';
+
+/** The air over the boss arena: the volcano island's ash, darker and redder. */
+const BOSS_SKY = {
+  ...BIOMES.volcano.sky,
+  background: '#3a2626', fog: '#4a2a26', fogNear: 25, fogFar: 170,
+  top: '#1c1418', horizon: '#7a3424', cloud: '#5a3a36',
+  sun: '#ff8a5a', sunIntensity: 1.25, hemiSky: '#6a5a6e', hemiGround: '#8a2e1a', hemiIntensity: 1.0,
+  exposure: 0.95,
+};
 
 export class Game {
   /**
@@ -179,8 +190,10 @@ export class Game {
     this.sites = buildSites(this.terrain, this.layout);
     this.grove = buildGrove(this.terrain, this.layout);
     this.logs = buildLogs(this.terrain, this.layout);
-    scene.add(this.sky.group, this.water.group, this.vegetation.group, this.rocks.group, this.fruitPlants.group, this.hut.group, this.sites.group, this.grove.group, this.logs.group);
-    this.worldUpdaters = [this.sky, this.water, this.vegetation, this.fruitPlants, this.hut, this.sites, this.grove];
+    this.bossArena = buildBossArena(this.terrain, this.layout);
+    scene.add(this.sky.group, this.water.group, this.vegetation.group, this.rocks.group, this.fruitPlants.group, this.hut.group, this.sites.group, this.grove.group, this.logs.group, this.bossArena.group);
+    this.worldUpdaters = [this.sky, this.water, this.vegetation, this.fruitPlants, this.hut, this.sites, this.grove, this.bossArena];
+    this.moodK = 0;
 
     // Debug view of colliders (F3).
     this.debugGroup = new THREE.Group();
@@ -504,10 +517,27 @@ export class Game {
 
     WIND.uTime.value = this.time;
     const cam = this.gfx.camera.position;
+    this.#mood(dt, cam);
     for (const u of this.worldUpdaters) u.update?.(dt, this.time, cam);
     for (const sys of this.systems) sys.update?.(dt, renderTime);
     this.#updateHud(dt);
     this.#updateAudio(dt);
+  }
+
+  /**
+   * The boss arena darkens the air around it: sky, fog and light ease toward
+   * the volcano island's ash and glow as the camera nears the islet, and back.
+   */
+  #mood(dt, cam) {
+    const a = this.layout.bossArena;
+    if (!a) return;
+    const d = Math.hypot(cam.x - a.center.x, cam.z - a.center.z);
+    const want = 1 - THREE.MathUtils.smoothstep(d, a.lakeR, a.outerR + 45);
+    const k = this.moodK + (want - this.moodK) * Math.min(1, dt * 2.5);
+    if (Math.abs(k - this.moodK) < 1e-4 && (k === 0 || Math.abs(want - k) < 1e-4)) return;
+    this.moodK = Math.abs(k - want) < 1e-3 ? want : k;
+    this.gfx.blendBiome(this.layout.biome.sky, BOSS_SKY, this.moodK);
+    this.sky.mood?.(this.moodK, BOSS_SKY);
   }
 
   #updateAudio(dt) {

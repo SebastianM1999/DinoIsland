@@ -439,7 +439,7 @@ export function buildWater(terrain, layout = {}, sunDir = new THREE.Vector3(-0.4
     const mat = lava
       ? lavaMaterial({ mode: 0, center: [pool.x, pool.z] })
       : waterMaterial({ waveAmp: 0.05, ripple: 0.18, alpha: [0.5, 0.92] });
-    const rad = pool.r * 1.4;
+    const rad = pool.disc ?? pool.r * 1.4;
     const mesh = new THREE.Mesh(discGeometry(rad, 56, Math.max(6, Math.min(16, Math.round(rad / 3)))), mat);
     mesh.position.set(pool.x, level, pool.z);
     mesh.renderOrder = 2;

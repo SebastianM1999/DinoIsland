@@ -118,6 +118,7 @@ export function buildSky(gfx, layout = null) {
     vertexColors: true, roughness: 1, fog: false,
     emissive: cloudCol.clone().lerp(horizon, 0.15), emissiveIntensity: volcanic ? 0.7 : 0.9,
   });
+  const cloudEmissive = cloudMat.emissive.clone(), cloudGlow = cloudMat.emissiveIntensity;
   const cloudGeos = [];
   for (let v = 0; v < 4; v++) {
     const parts = [];
@@ -242,6 +243,27 @@ export function buildSky(gfx, layout = null) {
     group,
     /** Colors this sky was built with (the integrator may reuse them for fog/background). */
     colors: { zenith, horizon, background, cloud: cloudCol, sun: sunCol, fog: C(sky.fog, DEFAULT_SKY.fog) },
+    /**
+     * Darken the dome toward `dark` (a biome sky: top / horizon) by k (0..1):
+     * the local mood near the boss arena. k = 0 restores this sky.
+     */
+    mood(k, dark) {
+      const u = skyMat.uniforms;
+      if (k <= 0 || !dark) {
+        u.uZenith.value.copy(zenith);
+        u.uHorizon.value.copy(horizon);
+        u.uGround.value.copy(horizon).lerp(background, 0.5);
+        cloudMat.emissive.copy(cloudEmissive);
+        cloudMat.emissiveIntensity = cloudGlow;
+        return;
+      }
+      u.uZenith.value.copy(zenith).lerp(C(dark.top, DEFAULT_SKY.top), k);
+      u.uHorizon.value.copy(horizon).lerp(C(dark.horizon, DEFAULT_SKY.horizon), k);
+      u.uGround.value.copy(u.uHorizon.value).lerp(C(dark.background, DEFAULT_SKY.background), 0.5);
+      // clouds turn to ash: smoky grey lit red from below
+      cloudMat.emissive.copy(cloudEmissive).lerp(C(dark.cloud, DEFAULT_SKY.cloud), k);
+      cloudMat.emissiveIntensity = cloudGlow * (1 - k * 0.75);
+    },
     update(dt, time, camPos) {
       if (camPos) dome.position.copy(camPos);
       for (const c of group.userData.clouds) {

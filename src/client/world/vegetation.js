@@ -6,6 +6,7 @@
 import * as THREE from 'three';
 import { CONFIG } from '../../shared/config.js';
 import { makeRng, fbm, smoothstep } from '../../shared/rng.js';
+import { insideBossArena } from '../../shared/bossArena.js';
 import { MAT } from '../models/kit.js';
 import { treeGeometry, treeMatrix, TREE_WIND, TREE_VARIANTS } from './veg/trees.js';
 import * as plants from './veg/plants.js';
@@ -114,6 +115,7 @@ export function buildVegetation(terrain, layout) {
     if (Math.hypot(x - camp.x, z - camp.z) < 10) return null;
     for (const c of layout.caves) if (Math.hypot(x - c.x, z - c.z) < 7.5) return null;
     if (layout.ruins && Math.hypot(x - layout.ruins.x, z - layout.ruins.z) < 6) return null;
+    if (insideBossArena(layout, x, z, 6)) return null;                 // bare basalt and ash
     if (terrain.slopeAt(x, z) > 0.7) return null;
     if (layout.distToPath(x, z) < 2.2) return null;
     return h;

@@ -7,6 +7,7 @@ import { EV, DS } from '../shared/protocol.js';
 import { resolveCircle, segmentColliders, penetration } from '../shared/collision.js';
 import { angleDiff, clamp } from '../shared/rng.js';
 import { insideGrove } from '../shared/grove.js';
+import { insideBossArena } from '../shared/bossArena.js';
 import { brachioBrain } from './ai/brachio.js';
 import { stegoBrain } from './ai/stego.js';
 import { raptorBrain } from './ai/raptor.js';
@@ -152,7 +153,10 @@ export class DinoSystem {
     // stones; its centre is held by the leash in move()); everyone else stays out
     if (d.leash) {
       if ((x - d.leash.x) ** 2 + (z - d.leash.z) ** 2 > d.leash.bound * d.leash.bound) return false;
-    } else if (insideGrove(this.world.layout, x, z, 3)) return false;
+    } else if (insideGrove(this.world.layout, x, z, 3) || insideBossArena(this.world.layout, x, z, 4)) {
+      // everyone else stays off the boss arena's islet (the titan's home)
+      return false;
+    }
     if (t.waterDepthAt(x, z) > (d.type === 'brachio' ? 1.2 : 0.35)) return false;
     if (t.slopeAt(x, z) > (d.type === 'raptor' ? 0.95 : 0.8)) return false;
     if (t.lavaLevelAt(x, z) !== null) return false;

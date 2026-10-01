@@ -12,6 +12,7 @@ import { ruinsColliders, ruinsCenter, RUINS_ALTAR_TOP } from './ruinsShape.js';
 import { boatColliders, boatInteractPoint } from './boatShape.js';
 import { insideGrove } from './grove.js';
 import { standTop } from './collision.js';
+import { causewayQuery, insideBossArena } from './bossArena.js';
 
 const TAU = Math.PI * 2;
 
@@ -55,7 +56,7 @@ export function buildLayout(terrain) {
     nests: [],
     trexPatrol: [],
     path: [],
-    pools: plan.pools.map((p) => ({ x: p.x, z: p.z, r: p.r, level: p.level, kind: p.kind })),
+    pools: plan.pools.map((p) => ({ x: p.x, z: p.z, r: p.r, level: p.level, kind: p.kind, disc: p.disc })),
     rivers: plan.river ? [{ kind: plan.river.kind, pts: plan.river.pts.map((p) => ({ ...p })) }] : [],
     waterfalls: [],
     waterfall: null,
@@ -66,6 +67,7 @@ export function buildLayout(terrain) {
     relics: [],
     seaStacks: [],
     grove: null,
+    bossArena: null,        // the lava islet beside the boat (first island), see shared/bossArena.js
     logs: [],               // fallen trees: { x, z, rot, len, r, yA, yB, roots, dead }
   };
   const circles = layout.colliders.circles;
@@ -233,36 +235,95 @@ export function buildLayout(terrain) {
     reserve(n.x, n.z, 5);
   }
 
-  // ------------------------------------------------------ primeval grove
-  // A ring of old standing stones around a hollow of giant plants (shared/grove.js).
-  // Ordinary trees, rocks, bushes and fruit stay out, so the view in stays open.
+  // ------------------------------------------------------ the giant's pen
+  // The old Primeval Grove (shared/grove.js) is now the boss arena's plateau:
+  // its edge is the barrier, the giant Brachiosaurus lives on it. Its look
+  // comes with the arena (below and client/world/bossArena.js).
   if (plan.sites.grove) {
     const gv = plan.sites.grove;
-    const rg = makeRng(S ^ 0x6a07e);
-    const grove = { x: gv.x, z: gv.z, r: gv.r, y: terrain.heightAt(gv.x, gv.z), stones: [], glow: [] };
-    layout.grove = grove;
-    reserve(gv.x, gv.z, gv.r + 6);           // plus a clearing around the stones to look in from
-    // standing stones just outside the barrier, low enough to look over, with gaps to look through
-    const n = Math.round((TAU * gv.r) / 6.5);
-    for (let k = 0; k < n; k++) {
-      const a = (k / n) * TAU + rg.range(-0.08, 0.08);
-      const rr = gv.r + 0.9 + rg.range(-0.3, 0.3);
-      const x = gv.x + Math.cos(a) * rr, z = gv.z + Math.sin(a) * rr;
-      const y = terrain.heightAt(x, z);
-      const h = k % 5 === 0 ? rg.range(4.2, 5.2) : rg.range(2.3, 3.6);
-      const w = rg.range(0.9, 1.4);
-      grove.stones.push({ x, z, y, h, w, rot: a + rg.range(-0.25, 0.25), tilt: rg.range(-0.08, 0.08), runes: k % 2 === 0 });
-      circles.push({ x, z, r: w * 0.75, bottom: y - 1, top: y + h, kind: 'grove' });
-    }
-    // glowing flora on the floor (visual only)
-    for (let i = 0; i < 90; i++) {
-      const a = rg() * TAU, rr = Math.sqrt(rg()) * gv.r * 0.95;
-      const x = gv.x + Math.cos(a) * rr, z = gv.z + Math.sin(a) * rr;
-      if (!dry(x, z, 0.8)) continue;
-      grove.glow.push({ x, z, y: terrain.heightAt(x, z), s: rg.range(0.6, 1.4), kind: rg() < 0.55 ? 'shroom' : 'bloom', hue: rg(), rot: rg() * TAU });
-    }
+    layout.grove = { x: gv.x, z: gv.z, r: gv.r, y: terrain.heightAt(gv.x, gv.z) };
   }
   const outsideGrove = (x, z, pad = 0) => !insideGrove(layout, x, z, pad);
+
+  // --------------------------------------------------------- boss arena
+  // The lava islet beside the boat (shared/bossArena.js): obsidian spires on the
+  // rim, a rune gate at the causeway, basalt columns round the plateau, charred
+  // trees and bones. Nothing else grows here.
+  if (plan.bossArena) {
+    const pa = plan.bossArena;
+    const ra = makeRng(S ^ 0xb055);
+    const groundAt = (x, z) => terrain.heightAt(x, z);
+    const arena = {
+      ...pa,
+      spawn: { ...pa.spawn, y: groundAt(pa.spawn.x, pa.spawn.z) },
+      spires: [], columns: [], deadTrees: [], bones: [], gate: null,
+    };
+    layout.bossArena = arena;
+    const half = pa.causewayW / 2;
+    const offCauseway = (x, z, pad) => causewayQuery(pa, x, z).d > half + pad;
+    reserve(pa.center.x, pa.center.z, pa.outerR + 3);
+    for (const p of pa.path) reserve(p.x, p.z, half + 3);
+    // keep the beach walk from the boat to the gate clear too
+    for (let k = 0; k <= 6; k++) reserve(plan.boat.x + (pa.start.x - plan.boat.x) * k / 6, plan.boat.z + (pa.start.z - plan.boat.z) * k / 6, 4);
+    // the gate: two rough pillars either side of the causeway start, a cracked lintel over them
+    {
+      const g0 = pa.path[0], g1 = pa.path[1];
+      const dx = g1.x - g0.x, dz = g1.z - g0.z, dl = Math.hypot(dx, dz);
+      const gx = g0.x + dx / dl * 3, gz = g0.z + dz / dl * 3;
+      const span = pa.causewayW + 2.2;
+      arena.gate = { x: gx, z: gz, y: groundAt(gx, gz), rot: Math.atan2(dx, dz), span, h: 5.6 };
+      for (const s of [-1, 1]) {
+        const px = gx + (-dz / dl) * s * span / 2, pz = gz + (dx / dl) * s * span / 2;
+        circles.push({ x: px, z: pz, r: 0.95, top: arena.gate.y + arena.gate.h + 0.8, kind: 'boss' });
+      }
+    }
+    // obsidian spires on the rim (never on the causeway's pass)
+    for (let i = 0; i < 900 && arena.spires.length < 48; i++) {
+      const a = ra() * TAU, rr = ra.range(pa.lakeR + 4, pa.outerR - 5);
+      const x = pa.center.x + Math.cos(a) * rr, z = pa.center.z + Math.sin(a) * rr;
+      if (!offCauseway(x, z, 5) || terrain.heightAt(x, z) < pa.lava.level + 0.6) continue;
+      if (arena.spires.some((s) => Math.hypot(s.x - x, s.z - z) < s.r + 2.6)) continue;
+      const r = ra.range(0.7, 1.5), h = ra.range(3, 9) * (ra() < 0.2 ? 1.5 : 1);
+      arena.spires.push({ x, z, y: groundAt(x, z), r, h, rot: ra() * TAU, tiltX: ra.range(-0.18, 0.18), tiltZ: ra.range(-0.18, 0.18) });
+      circles.push({ x, z, r: r * 0.85, top: groundAt(x, z) + h, kind: 'boss' });
+    }
+    // charred dead trees between them
+    for (let i = 0; i < 400 && arena.deadTrees.length < 12; i++) {
+      const a = ra() * TAU, rr = ra.range(pa.lakeR + 5, pa.outerR - 7);
+      const x = pa.center.x + Math.cos(a) * rr, z = pa.center.z + Math.sin(a) * rr;
+      if (!offCauseway(x, z, 5) || [...arena.spires, ...arena.deadTrees].some((s) => Math.hypot(s.x - x, s.z - z) < 3)) continue;
+      arena.deadTrees.push({ x, z, y: groundAt(x, z), h: ra.range(4, 7), rot: ra() * TAU, lean: ra.range(-0.15, 0.15), seed: ra.int(1, 999) });
+      circles.push({ x, z, r: 0.35, top: groundAt(x, z) + 5, kind: 'boss' });
+    }
+    // basalt columns ringing the plateau just outside the giant's barrier (the
+    // old grove's standing stones): the pen inside stays open for the giant
+    {
+      const n = 44;
+      for (let k = 0; k < n; k++) {
+        const a = (k / n) * TAU + ra.range(-0.05, 0.05);
+        const rr = pa.plateauR + ra.range(0.7, 1.4);
+        const x = pa.plateau.x + Math.cos(a) * rr, z = pa.plateau.z + Math.sin(a) * rr;
+        if (!offCauseway(x, z, 2.5)) continue;
+        if (ra() < 0.25) continue;                            // gaps to look through
+        const r = ra.range(0.55, 0.9), h = ra() < 0.6 ? ra.range(0.4, 1.1) : ra.range(1.8, 3.4);
+        const y = groundAt(x, z);
+        arena.columns.push({ x, z, y, r, h, rot: ra() * TAU });
+        circles.push({ x, z, r: r * 0.95, top: y + h, kind: 'boss', stand: true });
+      }
+    }
+    // bones and skulls strewn over the plateau and the rim (visual only)
+    for (let i = 0; i < 40; i++) {
+      const onPlateau = i < 22;
+      const a = ra() * TAU;
+      const c = onPlateau ? pa.plateau : pa.center;
+      const rr = onPlateau ? ra.range(3, pa.plateauR - 1) : ra.range(pa.lakeR + 4, pa.outerR - 6);
+      const x = c.x + Math.cos(a) * rr, z = c.z + Math.sin(a) * rr;
+      if (!offCauseway(x, z, 0.5) || terrain.lavaLevelAt(x, z) !== null) continue;
+      arena.bones.push({ x, z, y: groundAt(x, z), rot: ra() * TAU, kind: ra() < 0.35 ? 'skull' : 'rib', s: ra.range(0.8, 1.5) });
+    }
+    // the giant Brachiosaurus (sim/ai/brachio.js spawnTitan) spawns at
+    // arena.spawn = the plateau centre = layout.grove: always the same spot beside the boat
+  }
 
   // ------------------------------------------------------------- relics
   const findDryNear = (cx, cz, maxR, pred = () => true) => {
@@ -383,32 +444,6 @@ export function buildLayout(terrain) {
     addTree(type, x, z, scale, spacing);
   }
 
-  // Around the grove: a few giant trees just outside the stones frame it, their
-  // crowns towering over the jungle (inside, the giant needs the room).
-  if (layout.grove) {
-    const gv = layout.grove;
-    const rg = makeRng(S ^ 0x7ee5);
-    let placed = 0;
-    for (let i = 0; i < 600 && placed < 4; i++) {
-      const a = rg() * TAU, rr = gv.r + rg.range(8, 12);
-      const x = gv.x + Math.cos(a) * rr, z = gv.z + Math.sin(a) * rr;
-      if (!dry(x, z, 1.5) || !clearOfSites(x, z, 2) || !free(x, z, 3) || terrain.slopeAt(x, z) > 0.5) continue;
-      if (layout.trees.some((t) => t.grove && Math.hypot(t.x - x, t.z - z) < gv.r)) continue;
-      const t = addTree(placed % 2 ? 'kapok' : 'giant', x, z, rg.range(1.0, 1.15), 0.5);
-      t.grove = true;
-      placed++;
-    }
-    // oversized ferns and big-leaf plants (visual only): low along the stones so
-    // the view in stays open, towering deeper inside, a clearing around the giant
-    for (let i = 0; i < 120; i++) {
-      const a = rg() * TAU, f = Math.sqrt(rg()), rr = f * gv.r * 0.97;
-      const x = gv.x + Math.cos(a) * rr, z = gv.z + Math.sin(a) * rr;
-      if (!dry(x, z, 0.8) || f < 0.45) continue;
-      const scale = f > 0.72 ? rg.range(0.6, 1.0) : rg() < 0.25 ? rg.range(2.2, 3.0) : rg.range(1.1, 1.7);
-      layout.bushes.push({ type: rg() < 0.55 ? 'fern' : 'bigleaf', x, z, y: terrain.heightAt(x, z), scale, rot: rg() * TAU, hue: 0.9 + rg() * 0.1, grove: true });
-    }
-  }
-
   // -------------------------------------------------------- fallen trees
   // Old trunks lying on the forest floor: low obstacles you step or jump onto
   // and walk along (dead grey ones on the volcano island). Their collider is a
@@ -499,7 +534,8 @@ export function buildLayout(terrain) {
     if (Math.abs(Math.cos(a)) > 0.92) continue;           // keep the hut and boat views open
     const f = rng.range(1.12, 1.26);
     const x = Math.cos(a) * (plan.A * f), z = Math.sin(a) * (plan.B * f + 20);
-    layout.seaStacks.push({ x, z, y: terrain.heightAt(x, z), height: rng.range(12, 26), radius: rng.range(5, 9), rot: rng() * TAU });
+    const stack = { x, z, y: terrain.heightAt(x, z), height: rng.range(12, 26), radius: rng.range(5, 9), rot: rng() * TAU };
+    if (!insideBossArena(layout, x, z, stack.radius + 6)) layout.seaStacks.push(stack);
   }
 
   // ------------------------------------------------------ bushes (visual)
