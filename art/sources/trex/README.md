@@ -16,13 +16,15 @@ wider, much deeper T-Rex skull (`MAPP`). The model is authored at raptor scale
 | `tbody` | skin-modifier skeleton: horizontal trunk, thick neck, massive thighs, 3-toed feet, tiny 2-finger arms |
 | `thead` | blunt boxy skull with brow ridge, jaw muscles, nasal bumps, brow hornlets, amber eyes, two rows of teeth |
 | `tparts` | foot and hand claws, low bony scutes along neck/back/tail |
-| `tpaint` | olive back, ochre flanks with dark tiger stripes, cream throat/belly, dark eye mask, pink mouth |
+| `tpaint` | grey hide (`rex_skin` in `tlib`): dark back, grey flanks, dark mottling, cream throat/belly, dark eye mask, pink mouth; teeth rooted in the measured gum line |
 | `trig` / `tskin` | theropod rig (same bone names as the raptor) with IK feet; rigid head/jaw parts |
 | `tanim` | Idle, Walk, Run, Attack (bite + head shake), Roar (loops while the game roars), Death |
 | `texport` | samples clips, deform-only export rig, `TRex_*` actions, GLB export |
 
-References: classic ochre/olive striped T-Rex side profile, and a front view with
-bony knobs over the eyes, cream underside and a wide pink mouth.
+References: classic T-Rex side profile (proportions), and a grey front view with
+bony knobs over the eyes, cream underside and a wide pink mouth. The game's
+lighting is darker than Blender's preview; judge colours in the dino preview page
+(`/src/client/models/dino/preview.html?type=trex`).
 
 The game adds its own jaw-open overlay to attack/roar, so the clips keep the jaw
 at ~0.5 rad. Strides at 11 m (walk 4.719 m, run 7.928 m) are measured from the
