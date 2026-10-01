@@ -45,12 +45,17 @@ test('every selected asset is bundled with provenance and the expected audio hea
     const asset = documented.get(url);
     assert.ok(asset, `missing provenance: ${url}`);
     assert.ok(registry.sources[asset.source].page.startsWith('https://'));
-    assert.equal(registry.sources[asset.source].license, url.includes('/music/') ? 'CC-BY-4.0' : 'CC0-1.0');
+    assert.equal(registry.sources[asset.source].license, url.includes('/music/') ? 'CC-BY-4.0' : url.includes('/el-') ? 'ElevenLabs-terms' : 'CC0-1.0');
+    if (url.includes('/el-')) {
+      assert.equal(registry.sources[asset.source].model, 'eleven_text_to_sound_v2');
+      assert.ok(registry.sources[asset.source].prompt);
+    }
     if (url.includes('/music/')) assert.equal(asset.loopStart, musicLoopStart(url));
     const bytes = await fs.readFile(new URL('..'+url, import.meta.url));
     assert.equal(bytes.toString('ascii', 0, 4), url.endsWith('.wav') ? 'RIFF' : 'OggS');
   }
-  assert.equal(expected.size, registry.assets.length);
+  // Older recorded shots are retained locally; all active files must be documented.
+  assert.ok(expected.size <= registry.assets.length);
   const credits = await fs.readFile(new URL('../assets/audio/CREDITS.md', import.meta.url), 'utf8');
   assert.match(credits, /Scott Buckley/);
   assert.match(credits, /creativecommons.org\/licenses\/by\/4.0/);

@@ -10,12 +10,12 @@ export const FOOTSTEPS = {
 };
 
 export const EFFECTS = {
-  pistol: group('pistol', 2, 0.8, 1, 0.015), rifle: group('rifle', 2, 0.85, 1, 0.015),
+  pistol: group('el-pistol', 1, 0.8, 1, 0.015), rifle: group('el-m4', 1, 0.85, 1, 0.015),
   empty: group('empty', 1, 0.25), reload: group('reload', 2, 0.3),
-  bow: group('bow', 2, 0.5), bowDraw: group('bow-draw', 2, 0.22),
-  swing: group('swish', 3, 0.4, 1.1), throw: group('swish', 3, 0.45, 0.85),
-  hit: group('hit', 3, 0.55), hitWeak: group('hit', 3, 0.65, 1.15),
-  thunk: group('thunk', 3, 0.35), bite: group('hit', 3, 0.45, 0.8),
+  bow: group('el-bow', 1, 0.5), bowDraw: group('bow-draw', 2, 0.22),
+  swing: group('swish', 3, 0.4, 1.1), throw: group('el-spear', 1, 0.45, 1),
+  hit: group('el-impact', 1, 0.55), hitWeak: group('el-impact', 1, 0.65, 1.15),
+  thunk: group('el-impact', 1, 0.35, 0.9), bite: group('hit', 3, 0.45, 0.8),
   waterStep: FOOTSTEPS.water, splash: group('water', 2, 0.35),
   splashBig: group('water', 2, 0.5, 0.75), plop: group('water', 2, 0.12, 1.6),
   roar_trex: group('trex', 3, 0.75, 0.85, 0.04),

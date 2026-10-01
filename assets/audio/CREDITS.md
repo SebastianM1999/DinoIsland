@@ -22,7 +22,16 @@ descriptions as requested on his source pages.
 
 ## Sound effects
 
-All selected sound effects are [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/):
+Pistol shot, single M4 shot, spear throw, bow release, and weapon impact were
+generated with [ElevenLabs Sound Effects](https://elevenlabs.io/sound-effects)
+(`eleven_text_to_sound_v2`). They are governed by the generating account's
+[ElevenLabs terms](https://elevenlabs.io/terms-of-use), **not CC0**. Generation
+prompts and settings are recorded in `sources.json`. Prepared files are mono,
+silence trimmed, peak balanced, and given 2ms edge fades. Original generations
+are cached locally; the API key is never included in the game.
+
+The remaining recorded effects (and retained previous weapon recordings) are
+[CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/):
 
 - Fantozzi — [Footsteps (Grass/Sand & Stone)](https://opengameart.org/content/fantozzis-footsteps-grasssand-stone).
 - TinyWorlds — [Different steps on wood, stone, leaves, gravel and mud](https://opengameart.org/content/different-steps-on-wood-stone-leaves-gravel-and-mud).
@@ -49,3 +58,8 @@ Run `python scripts/prepare-audio.py` with `numpy`, `soundfile`,
 `imageio-ffmpeg`, and `7z` installed. Source archives are cached under
 `.cache/audio-sources`; only prepared assets are shipped. `sources.json`
 records each asset's original filename, author, license, URL, and edits.
+
+Run `python scripts/generate-weapon-audio.py` to prepare the generated weapon
+effects. It reads a local `.env` or `ELEVENLABS_API_KEY` environment variable
+and reuses cached original MP3s under `.cache/elevenlabs-sfx`. It generates only
+missing originals, so repeated preparation does not spend additional credits.

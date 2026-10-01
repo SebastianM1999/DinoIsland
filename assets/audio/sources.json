@@ -119,6 +119,61 @@
       "license": "CC-BY-4.0",
       "page": "https://www.scottbuckley.com.au/library/simulacra/",
       "download": "https://www.scottbuckley.com.au/library/wp-content/uploads/2025/03/Simulacra.mp3"
+    },
+    "el-pistol": {
+      "author": "Generated with ElevenLabs",
+      "license": "ElevenLabs-terms",
+      "page": "https://elevenlabs.io/sound-effects",
+      "terms": "https://elevenlabs.io/terms-of-use",
+      "model": "eleven_text_to_sound_v2",
+      "prompt": "Exactly one isolated realistic pistol gunshot, close first-person perspective: immediate sharp explosive crack and a brief low punch, short natural outdoor decay. Single shot only, no burst, no reload, no shell bouncing, no voices, no music, no background ambience. Clean dry game sound effect.",
+      "duration_seconds": 1.2,
+      "prompt_influence": 0.75,
+      "loop": false
+    },
+    "el-m4": {
+      "author": "Generated with ElevenLabs",
+      "license": "ElevenLabs-terms",
+      "page": "https://elevenlabs.io/sound-effects",
+      "terms": "https://elevenlabs.io/terms-of-use",
+      "model": "eleven_text_to_sound_v2",
+      "prompt": "Exactly one isolated M4 carbine 5.56 rifle gunshot, close first-person perspective: immediate crisp supersonic crack, punchy compact report, very short outdoor decay. One single round only, not automatic fire or a burst. No reload, no shell bouncing, no voices, no music, no background ambience. Clean dry game sound effect suitable for repeating at automatic fire cadence.",
+      "duration_seconds": 1.0,
+      "prompt_influence": 0.75,
+      "loop": false
+    },
+    "el-spear": {
+      "author": "Generated with ElevenLabs",
+      "license": "ElevenLabs-terms",
+      "page": "https://elevenlabs.io/sound-effects",
+      "terms": "https://elevenlabs.io/terms-of-use",
+      "model": "eleven_text_to_sound_v2",
+      "prompt": "One isolated fast spear throwing whoosh: a heavy wooden shaft rapidly sweeps past the listener through air, immediate forceful swish with low weight and a short airy tail. Only the launch whoosh, no impact, no grunt, no footsteps, no music or background ambience. Clean dry first-person game sound effect.",
+      "duration_seconds": 0.7,
+      "prompt_influence": 0.75,
+      "loop": false
+    },
+    "el-bow": {
+      "author": "Generated with ElevenLabs",
+      "license": "ElevenLabs-terms",
+      "page": "https://elevenlabs.io/sound-effects",
+      "terms": "https://elevenlabs.io/terms-of-use",
+      "model": "eleven_text_to_sound_v2",
+      "prompt": "One isolated wooden hunting bow releasing a single arrow: immediate tight string snap and warm elastic twang, followed by a very brief arrow air swish. Release only, no long drawing sound, no impact, no voice, no music or background ambience. Clean dry close first-person game sound effect.",
+      "duration_seconds": 0.8,
+      "prompt_influence": 0.75,
+      "loop": false
+    },
+    "el-impact": {
+      "author": "Generated with ElevenLabs",
+      "license": "ElevenLabs-terms",
+      "page": "https://elevenlabs.io/sound-effects",
+      "terms": "https://elevenlabs.io/terms-of-use",
+      "model": "eleven_text_to_sound_v2",
+      "prompt": "One isolated compact weapon impact: a spear or arrow strikes a dense resistant surface with a sharp short crack and a weighty dull thud underneath. Immediate attack, very short decay. No metallic ringing, no ricochet, no voice, no splatter, no music or background ambience. Clean dry game hit sound effect.",
+      "duration_seconds": 0.7,
+      "prompt_influence": 0.75,
+      "loop": false
     }
   },
   "assets": [
@@ -777,6 +832,56 @@
       ],
       "loopStart": 2,
       "edits": "Full track, two-second tail/head crossfade (loop starts at 2s), level balanced, Ogg Vorbis."
+    },
+    {
+      "file": "sfx/el-pistol-1.wav",
+      "source": "el-pistol",
+      "original": ".cache/elevenlabs-sfx/el-pistol.mp3",
+      "segment": [
+        0.0,
+        0.6451473922902494
+      ],
+      "edits": "Mono, silence trimmed, peak balanced to 0.65, 2ms edge fades, PCM16 WAV."
+    },
+    {
+      "file": "sfx/el-m4-1.wav",
+      "source": "el-m4",
+      "original": ".cache/elevenlabs-sfx/el-m4.mp3",
+      "segment": [
+        0.0,
+        0.38222222222222224
+      ],
+      "edits": "Mono, silence trimmed, peak balanced to 0.65, 2ms edge fades, PCM16 WAV."
+    },
+    {
+      "file": "sfx/el-spear-1.wav",
+      "source": "el-spear",
+      "original": ".cache/elevenlabs-sfx/el-spear.mp3",
+      "segment": [
+        0.0,
+        0.4310430839002268
+      ],
+      "edits": "Mono, silence trimmed, peak balanced to 0.65, 2ms edge fades, PCM16 WAV."
+    },
+    {
+      "file": "sfx/el-bow-1.wav",
+      "source": "el-bow",
+      "original": ".cache/elevenlabs-sfx/el-bow.mp3",
+      "segment": [
+        0.0,
+        0.31780045351473923
+      ],
+      "edits": "Mono, silence trimmed, peak balanced to 0.65, 2ms edge fades, PCM16 WAV."
+    },
+    {
+      "file": "sfx/el-impact-1.wav",
+      "source": "el-impact",
+      "original": ".cache/elevenlabs-sfx/el-impact.mp3",
+      "segment": [
+        0.0,
+        0.45294784580498865
+      ],
+      "edits": "Mono, silence trimmed, peak balanced to 0.65, 2ms edge fades, PCM16 WAV."
     }
   ]
 }

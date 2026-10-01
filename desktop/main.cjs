@@ -38,7 +38,7 @@ async function launch() {
     }
     try {
       const link = new URL(url);
-      const creditHosts = ['opengameart.org', 'freesound.org', 'kenney.nl', 'www.scottbuckley.com.au', 'creativecommons.org'];
+      const creditHosts = ['opengameart.org', 'freesound.org', 'kenney.nl', 'www.scottbuckley.com.au', 'creativecommons.org', 'elevenlabs.io'];
       if (link.protocol === 'https:' && creditHosts.includes(link.hostname)) {
         void shell.openExternal(url).catch(error => console.error('Could not open audio credit:', error));
       }

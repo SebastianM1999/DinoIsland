@@ -185,7 +185,14 @@ def prepare():
     write_effect('brachio-2', 'trex', 'trex.mp3', .2, 1.7)
     prepare_music()
     metadata = {key: {'author': a, 'license': l, 'page': p, 'download': u} for key,(a,l,p,u) in SOURCES.items()}
-    (OUT / 'sources.json').write_text(json.dumps({'sources': metadata, 'assets': records}, indent=2)+'\n', encoding='utf-8')
+    # Generated effects are prepared separately; rebuilding CC recordings must
+    # preserve their provenance rather than silently relabel them as CC0.
+    manifest_path = OUT / 'sources.json'
+    existing = json.loads(manifest_path.read_text(encoding='utf-8')) if manifest_path.exists() else {}
+    generated = {key: value for key, value in existing.get('sources', {}).items() if value.get('license') == 'ElevenLabs-terms'}
+    metadata.update(generated)
+    records.extend(asset for asset in existing.get('assets', []) if asset.get('source') in generated)
+    manifest_path.write_text(json.dumps({'sources': metadata, 'assets': records}, indent=2)+'\n', encoding='utf-8')
     print(f'Prepared {len(records)} assets ({sum(p.stat().st_size for p in OUT.rglob("*") if p.is_file())/1024/1024:.1f} MiB)')
 
 

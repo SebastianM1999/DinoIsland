@@ -76,7 +76,10 @@ export function initSettings({ onClose } = {}) {
     <p>All music released under <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a>.
     Music level balanced and encoded as Ogg Vorbis. Scott Buckley tracks crossfaded for looping;
     Forest Exploration uses the original loop.
-    <a href="/assets/audio/CREDITS.md" target="_blank" rel="noopener">All sound effect credits and modification notices</a>.</p>`;
+    <a href="/assets/audio/CREDITS.md" target="_blank" rel="noopener">All sound effect credits and modification notices</a>.</p>
+    <p>Pistol, M4, spear throw, bow release and weapon impact generated with
+    <a href="https://elevenlabs.io/sound-effects" target="_blank" rel="noopener">ElevenLabs Sound Effects</a>,
+    under the generating account's <a href="https://elevenlabs.io/terms-of-use" target="_blank" rel="noopener">ElevenLabs terms</a>.</p>`;
   panel.append(credits);
 
   function selectTab(name) {

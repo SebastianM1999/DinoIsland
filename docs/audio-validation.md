@@ -2,7 +2,7 @@
 
 Implemented on `codex/island-audio`, October 1, 2026.
 
-- 65 prepared audio assets, approximately 24.7 MiB: 59 mono WAV effects and
+- 70 prepared audio assets, approximately 24.9 MiB: 64 mono WAV effects and
   six stereo Ogg music tracks. Source filenames, licenses, and edits are
   recorded in `assets/audio/sources.json`.
 - `npm test`: 93 passed, one existing skip, zero failures. Includes eleven audio
@@ -46,3 +46,28 @@ These checks validate playback and lifecycle behavior, not subjective listening
 quality. Music and creature pitch profiles may benefit from a listening
 pass. Ash uses gravel, and reload/dinosaur footfalls use adapted metal/wood
 foley. UI cues and ambient soundscapes retain their existing synthesis.
+
+## ElevenLabs weapon effects
+
+Five effects generated on October 1, 2026 with `eleven_text_to_sound_v2`:
+pistol shot, single M4 shot, spear throw, bow release, and compact weapon impact.
+Generated assets use ElevenLabs account terms rather than CC0. Prompts and
+preparation edits are recorded in `assets/audio/sources.json`; originals are
+cached in `.cache/elevenlabs-sfx`. The local API key remains in ignored `.env`.
+
+The catalog uses these effects for pistol/rifle, spear release, bow release,
+and normal/weak/world impacts. Recorded bites, large footsteps, bow handling,
+and spear melee swings keep their earlier recordings. Previous recorded
+weapon shots are retained locally but are no longer selected by the catalog.
+
+Chromium and Electron both decoded all five assets and played all seven effect
+aliases through HRTF panners at the requested position, with no failed assets.
+Master and SFX mute gains fell below 0.001. An offline mix of 40 M4 rounds at
+10 rounds per second plus pistol, impact, bow and spear effects peaked at
+0.4912. These are objective playback checks, not a subjective audition.
+
+The full suite initially exposed a seed-dependent failure in
+`fruit plant visuals show exactly the remaining harvests`: its randomly
+generated map had no berry spot. That test passed in the isolated rerun.
+The final `npm test` run passed: 93 passed, one existing skip, zero failures.
+Re-running the generator reused all five cached originals without API requests.
