@@ -3,7 +3,9 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import { SampleBank, SamplePicker } from '../src/client/audio/samples.js';
 import { IslandMusic, MUSIC_FADE } from '../src/client/audio/music.js';
-import { EFFECTS, FOOTSTEPS, ISLAND_MUSIC } from '../src/client/audio/catalog.js';
+import { EFFECTS, FOOTSTEPS, ISLAND_MUSIC, MENU_MUSIC, BOSS_MUSIC, musicLoopStart } from '../src/client/audio/catalog.js';
+import { inBossMusicArea } from '../src/client/audio/region.js';
+import { planBossArena } from '../src/shared/bossArena.js';
 import { footstepSurface, woodSupports } from '../src/client/audio/surface.js';
 import { StepCadence } from '../src/client/audio/steps.js';
 import { createGameServer } from '../server/index.js';
@@ -37,12 +39,14 @@ test('every selected asset is bundled with provenance and the expected audio hea
   const registry = JSON.parse(await fs.readFile(new URL('../assets/audio/sources.json', import.meta.url)));
   const expected = new Set([...Object.values(EFFECTS), ...Object.values(FOOTSTEPS)].flatMap(group => group.files));
   for (const music of Object.values(ISLAND_MUSIC)) for (const url of Object.values(music)) expected.add(url);
+  expected.add(MENU_MUSIC); expected.add(BOSS_MUSIC);
   const documented = new Map(registry.assets.map(asset => ['/assets/audio/'+asset.file, asset]));
   for (const url of expected) {
     const asset = documented.get(url);
     assert.ok(asset, `missing provenance: ${url}`);
     assert.ok(registry.sources[asset.source].page.startsWith('https://'));
-    assert.equal(registry.sources[asset.source].license, url.includes('volcano-') ? 'CC-BY-4.0' : 'CC0-1.0');
+    assert.equal(registry.sources[asset.source].license, url.includes('/music/') ? 'CC-BY-4.0' : 'CC0-1.0');
+    if (url.includes('/music/')) assert.equal(asset.loopStart, musicLoopStart(url));
     const bytes = await fs.readFile(new URL('..'+url, import.meta.url));
     assert.equal(bytes.toString('ascii', 0, 4), url.endsWith('.wav') ? 'RIFF' : 'OggS');
   }
@@ -51,6 +55,10 @@ test('every selected asset is bundled with provenance and the expected audio hea
   assert.match(credits, /Scott Buckley/);
   assert.match(credits, /creativecommons.org\/licenses\/by\/4.0/);
   assert.match(credits, /modified versions/);
+  const visible = await fs.readFile(new URL('../src/client/ui/menus.js', import.meta.url), 'utf8');
+  for (const title of ['Forest Exploration', 'Shadows and Dust', 'Call To Adventure', 'Escape Velocity', 'Eyes In The Void', 'Simulacra']) {
+    assert.ok(credits.includes(title)); assert.ok(visible.includes(title));
+  }
 });
 
 test('sample downloads and decodes deduplicate; HTTP/decode failures return fallback without retry storms', async () => {
@@ -144,6 +152,62 @@ function terrainFixture() {
     set(values) { ({ height = height, slope = slope, water = water, density = density, path = path } = values); player.pos.y = height; },
     surface() { return footstepSurface(player,terrain,layout,woodSupports(layout)); } };
 }
+
+test('boss music covers the arena and entire causeway without changing the island danger hold', async () => {
+  const arena = planBossArena({ boat: { x: 100, z: 20 } });
+  const layout = { bossArena: arena };
+  assert.equal(inBossMusicArea({}, arena.start), false);
+  assert.equal(inBossMusicArea(layout, arena.center), true);
+  assert.equal(inBossMusicArea(layout, arena.plateau), true);
+  for (const point of arena.path) assert.equal(inBossMusicArea(layout, point), true);
+  assert.equal(inBossMusicArea(layout, { x: -1000, z: -1000 }), false);
+  const middle = arena.path[2];
+  const edge = { x: middle.x + arena.v.x * (arena.causewayW / 2 + 2), z: middle.z + arena.v.z * (arena.causewayW / 2 + 2) };
+  assert.equal(inBossMusicArea(layout, edge), false);
+  assert.equal(inBossMusicArea(layout, edge, true), true);
+
+  const ctx = context();
+  const music = new IslandMusic(ctx, { load: async url => url, forget() {} }, {});
+  music.start(); await settle();
+  music.update(false, true); await settle();
+  assert.equal(music.mode, 'boss'); assert.equal(music.target, BOSS_MUSIC);
+  assert.equal(music.current.source.loopStart, 2);
+  assert.equal(music.dangerUntil, 0);
+  ctx.currentTime = 1; music.update(true, true);
+  ctx.currentTime = 2; music.update(false, false); await settle();
+  assert.equal(music.target, ISLAND_MUSIC.jungle.danger);
+  ctx.currentTime = 5; music.update(false, false); await settle();
+  assert.equal(music.target, ISLAND_MUSIC.jungle.calm);
+  assert.equal(music.current.source.loopStart, 0);
+});
+
+test('menu, boss and island changes reject late loads and crossfade the shared context', async () => {
+  const ctx = context(), loads = new Map();
+  const music = new IslandMusic(ctx, { load(url) {
+    if (!loads.has(url)) loads.set(url, deferred());
+    return loads.get(url).promise;
+  }, forget() {} }, {});
+  music.startMenu();
+  assert.equal(music.target, MENU_MUSIC);
+  music.setIsland('jungle'); music.start();
+  loads.get(MENU_MUSIC).resolve('late-menu');
+  loads.get(ISLAND_MUSIC.jungle.calm).resolve('forest');
+  await settle(); assert.equal(ctx.sources.length, 1);
+  assert.equal(music.current.source.buffer, 'forest');
+  music.update(false, true);
+  music.setIsland('volcano'); music.start();
+  loads.get(BOSS_MUSIC).resolve('late-boss');
+  loads.get(ISLAND_MUSIC.volcano.calm).resolve('shadows');
+  await settle(); assert.equal(ctx.sources.length, 2);
+  assert.equal(music.current.source.buffer, 'shadows');
+  assert.equal(ctx.sources[0].stopped, MUSIC_FADE + .01);
+  music.startMenu(); await settle();
+  assert.equal(music.current.source.buffer, 'late-menu');
+  music.update(true, true);
+  assert.equal(music.target, MENU_MUSIC);
+  music.stop();
+  assert.equal(music.active, false);
+});
 
 test('footsteps distinguish terrain and choose actual elevated support above water', () => {
   const f = terrainFixture();

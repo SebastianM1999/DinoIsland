@@ -30,6 +30,7 @@ import { Items } from '../entities/items.js';
 import { Projectiles } from '../entities/projectiles.js';
 import { PlayerActions } from '../player/actions.js';
 import { GameAudio } from '../audio/audio.js';
+import { inBossMusicArea } from '../audio/region.js';
 import { footstepSurface, woodSupports } from '../audio/surface.js';
 import { StepCadence } from '../audio/steps.js';
 import { settings } from './settings.js';
@@ -67,7 +68,7 @@ export class Game {
     this.terrain = new Terrain(planIsland(lv.index, lv.variant));
     this.layout = buildLayout(this.terrain);
     this.gfx = reuse?.gfx ?? new Renderer(canvas);
-    if (reuse) this.gfx.reset();
+    if (reuse?.gfx) this.gfx.reset();
     this.gfx.applyBiome(this.layout.biome.sky);
     this.input = reuse?.input ?? new Input(canvas);
     this.player = new PlayerController(this.terrain, this.layout.playerColliders, this.layout.rockSurfaceAt);
@@ -576,7 +577,8 @@ export class Game {
     const plan = this.layout.plan;
     const rim = Math.hypot(p.pos.x / plan.A, p.pos.z / plan.B);
     const coast = Math.max(0, Math.min(1, (rim - 0.7) / 0.3)) * (g < 6 ? 1 : 0.3);
-    this.audio.update(dt, { coast, water: this.#waterSoundscape(cam.position), danger: this.#inDanger() });
+    this.bossMusicArea = inBossMusicArea(this.layout, p.pos, this.bossMusicArea);
+    this.audio.update(dt, { coast, water: this.#waterSoundscape(cam.position), danger: this.#inDanger(), bossArea: this.bossMusicArea });
   }
 
   /**

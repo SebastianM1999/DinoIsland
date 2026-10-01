@@ -66,13 +66,16 @@ export function initSettings({ onClose } = {}) {
   const credits = document.createElement('details');
   credits.className = 'audio-credits';
   credits.innerHTML = `<summary>Audio credits</summary>
-    <p>Emerald Jungle: <a href="https://opengameart.org/content/medieval-exploration" target="_blank" rel="noopener">Medieval: Exploration — RandomMind</a>
-    and <a href="https://opengameart.org/content/battle-theme-a" target="_blank" rel="noopener">Battle Theme A — cynicmusic</a> (CC0).</p>
-    <p>Ashfall Isle: <a href="https://www.scottbuckley.com.au/library/the-spaces-between/" target="_blank" rel="noopener">The Spaces Between</a>
-    and <a href="https://www.scottbuckley.com.au/library/the-encounter/" target="_blank" rel="noopener">The Encounter</a>
-    by Scott Buckley — <a href="https://www.scottbuckley.com.au" target="_blank" rel="noopener">www.scottbuckley.com.au</a>,
-    released under <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a>.</p>
-    <p>Music edited into excerpts, crossfaded for looping, and level balanced.
+    <p>Emerald Jungle exploration: <a href="https://opengameart.org/content/forest-exploration" target="_blank" rel="noopener">Forest Exploration — Tsorthan Grove</a>.</p>
+    <p>Music by Scott Buckley — <a href="https://www.scottbuckley.com.au" target="_blank" rel="noopener">www.scottbuckley.com.au</a>:<br>
+    Main menu: <a href="https://www.scottbuckley.com.au/library/call-to-adventure/" target="_blank" rel="noopener">Call To Adventure</a>.<br>
+    Emerald Jungle danger: <a href="https://www.scottbuckley.com.au/library/escape-velocity/" target="_blank" rel="noopener">Escape Velocity</a>.<br>
+    Ashfall Isle exploration: <a href="https://www.scottbuckley.com.au/library/shadows-and-dust/" target="_blank" rel="noopener">Shadows and Dust</a>.<br>
+    Ashfall Isle danger: <a href="https://www.scottbuckley.com.au/library/eyes-in-the-void/" target="_blank" rel="noopener">Eyes In The Void</a>.<br>
+    Boss arena and causeway: <a href="https://www.scottbuckley.com.au/library/simulacra/" target="_blank" rel="noopener">Simulacra</a>.</p>
+    <p>All music released under <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a>.
+    Music level balanced and encoded as Ogg Vorbis. Scott Buckley tracks crossfaded for looping;
+    Forest Exploration uses the original loop.
     <a href="/assets/audio/CREDITS.md" target="_blank" rel="noopener">All sound effect credits and modification notices</a>.</p>`;
   panel.append(credits);
 

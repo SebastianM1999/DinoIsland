@@ -84,29 +84,41 @@
       "page": "https://freesound.org/people/Ali_6868/sounds/384916/",
       "download": "https://cdn.freesound.org/previews/384/384916_984733-hq.mp3"
     },
-    "jungle": {
-      "author": "RandomMind",
-      "license": "CC0-1.0",
-      "page": "https://opengameart.org/content/medieval-exploration",
-      "download": "https://opengameart.org/sites/default/files/Exploration_0.mp3"
+    "forest": {
+      "author": "Tsorthan Grove",
+      "license": "CC-BY-4.0",
+      "page": "https://opengameart.org/content/forest-exploration",
+      "download": "https://opengameart.org/sites/default/files/forest_exploration_loop.flac"
     },
-    "battle": {
-      "author": "cynicmusic",
-      "license": "CC0-1.0",
-      "page": "https://opengameart.org/content/battle-theme-a",
-      "download": "https://opengameart.org/sites/default/files/battleThemeA.mp3"
-    },
-    "volcano": {
+    "shadows": {
       "author": "Scott Buckley",
       "license": "CC-BY-4.0",
-      "page": "https://www.scottbuckley.com.au/library/the-spaces-between/",
-      "download": "https://www.scottbuckley.com.au/library/wp-content/uploads/2019/07/sb_monomyth_6_thespacesbetween.mp3"
+      "page": "https://www.scottbuckley.com.au/library/shadows-and-dust/",
+      "download": "https://www.scottbuckley.com.au/library/wp-content/uploads/2023/11/ShadowsAndDust.mp3"
     },
-    "encounter": {
+    "adventure": {
       "author": "Scott Buckley",
       "license": "CC-BY-4.0",
-      "page": "https://www.scottbuckley.com.au/library/the-encounter/",
-      "download": "https://www.scottbuckley.com.au/library/wp-content/uploads/2019/07/sb_monomyth_7_theencounter.mp3"
+      "page": "https://www.scottbuckley.com.au/library/call-to-adventure/",
+      "download": "https://www.scottbuckley.com.au/library/wp-content/uploads/2023/01/CallToAdventure.mp3"
+    },
+    "escape": {
+      "author": "Scott Buckley",
+      "license": "CC-BY-4.0",
+      "page": "https://www.scottbuckley.com.au/library/escape-velocity/",
+      "download": "https://www.scottbuckley.com.au/library/wp-content/uploads/2023/04/EscapeVelocity.mp3"
+    },
+    "eyes": {
+      "author": "Scott Buckley",
+      "license": "CC-BY-4.0",
+      "page": "https://www.scottbuckley.com.au/library/eyes-in-the-void/",
+      "download": "https://www.scottbuckley.com.au/library/wp-content/uploads/2025/06/EyesInTheVoid.mp3"
+    },
+    "simulacra": {
+      "author": "Scott Buckley",
+      "license": "CC-BY-4.0",
+      "page": "https://www.scottbuckley.com.au/library/simulacra/",
+      "download": "https://www.scottbuckley.com.au/library/wp-content/uploads/2025/03/Simulacra.mp3"
     }
   },
   "assets": [
@@ -702,43 +714,69 @@
     },
     {
       "file": "music/jungle-calm.ogg",
-      "source": "jungle",
-      "original": "jungle.mp3",
+      "source": "forest",
+      "original": "forest.flac",
       "segment": [
-        15,
-        135
+        0,
+        85.32997916666666
       ],
-      "edits": "Excerpt, two-second circular crossfade, level balanced, Ogg Vorbis."
+      "loopStart": 0,
+      "edits": "Original seamless loop retained, level balanced, Ogg Vorbis."
     },
     {
       "file": "music/jungle-danger.ogg",
-      "source": "battle",
-      "original": "battle.mp3",
+      "source": "escape",
+      "original": "escape.mp3",
       "segment": [
-        2,
-        94
+        0,
+        270.53446712018143
       ],
-      "edits": "Excerpt, two-second circular crossfade, level balanced, Ogg Vorbis."
+      "loopStart": 2,
+      "edits": "Full track, two-second tail/head crossfade (loop starts at 2s), level balanced, Ogg Vorbis."
     },
     {
       "file": "music/volcano-calm.ogg",
-      "source": "volcano",
-      "original": "volcano.mp3",
+      "source": "shadows",
+      "original": "shadows.mp3",
       "segment": [
-        45,
-        165
+        0,
+        408.38
       ],
-      "edits": "Excerpt, two-second circular crossfade, level balanced, Ogg Vorbis."
+      "loopStart": 2,
+      "edits": "Full track, two-second tail/head crossfade (loop starts at 2s), level balanced, Ogg Vorbis."
     },
     {
       "file": "music/volcano-danger.ogg",
-      "source": "encounter",
-      "original": "encounter.mp3",
+      "source": "eyes",
+      "original": "eyes.mp3",
       "segment": [
-        140,
-        260
+        0,
+        264.06589569160997
       ],
-      "edits": "Excerpt, two-second circular crossfade, level balanced, Ogg Vorbis."
+      "loopStart": 2,
+      "edits": "Full track, two-second tail/head crossfade (loop starts at 2s), level balanced, Ogg Vorbis."
+    },
+    {
+      "file": "music/menu.ogg",
+      "source": "adventure",
+      "original": "adventure.mp3",
+      "segment": [
+        0,
+        259.8403628117914
+      ],
+      "loopStart": 2,
+      "edits": "Full track, two-second tail/head crossfade (loop starts at 2s), level balanced, Ogg Vorbis."
+    },
+    {
+      "file": "music/boss.ogg",
+      "source": "simulacra",
+      "original": "simulacra.mp3",
+      "segment": [
+        0,
+        234.30750566893425
+      ],
+      "loopStart": 2,
+      "edits": "Full track, two-second tail/head crossfade (loop starts at 2s), level balanced, Ogg Vorbis."
     }
   ]
 }

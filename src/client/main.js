@@ -6,6 +6,7 @@ import { CONFIG } from '../shared/config.js';
 import { ICON_SPRITE, initSettings, renderPause } from './ui/menus.js';
 import { savedOutfit } from './ui/wardrobe.js';
 import { preloadDinoModels } from './models/dino/glbDino.js';
+import { GameAudio } from './audio/audio.js';
 
 // SVG filter that gives HUD and menu panels their brush-stroke edges.
 document.body.insertAdjacentHTML('beforeend', `
@@ -28,6 +29,16 @@ const serverInput = $('server-url');
 const buttons = [$('btn-join'), $('btn-solo')];
 
 let game = null;
+let menuAudio = null;
+// Browsers unlock audio on a user gesture. Reuse this context in the game.
+function playMenuMusic() {
+  if (menu.hidden || !loading.hidden) return;
+  menuAudio ??= new GameAudio();
+  menuAudio.resume();
+  if (!menuAudio.islandMusic?.active) menuAudio.startMenuMusic();
+}
+document.addEventListener('pointerdown', playMenuMusic, { capture: true });
+document.addEventListener('keydown', playMenuMusic, { capture: true });
 const settingsUi = initSettings();
 
 /** Show or hide the pause card; refresh its expedition/team info when shown. */
@@ -49,6 +60,7 @@ function setBusy(busy, text = '') {
 }
 
 async function start(mode) {
+  playMenuMusic();
   const name = nameInput.value.trim() || 'Explorer';
   try { localStorage.setItem('di.name', name); } catch { /* storage may be blocked */ }
   setBusy(true, mode === 'online' ? 'Connecting…' : 'Starting…');
@@ -61,6 +73,7 @@ async function start(mode) {
     return;
   }
   menu.hidden = true;
+  menuAudio?.stopMusic();
   if (await launch(net)) setBusy(false, '');
 }
 
@@ -79,12 +92,13 @@ async function launch(net, reuse = null) {
       loadingText.textContent = `Loading dinosaurs… ${done}/${total}`;
     });
     loadingText.textContent = 'Building the island…';
-    game = new Game(canvas, net, reuse);
+    game = new Game(canvas, net, reuse ?? (menuAudio ? { audio: menuAudio } : null));
   } catch (err) {
     console.error(err);
     net.close();
     loading.hidden = true;
     menu.hidden = false;
+    menuAudio?.startMenuMusic();
     setBusy(false, `Could not start the game: ${err.message}`);
     return false;
   }
@@ -108,6 +122,7 @@ async function launch(net, reuse = null) {
 }
 
 function backToMenu(reason) {
+  game?.audio.stopMusic();
   // Simplest robust teardown: reload with the reason in the hash.
   location.hash = reason ? `msg=${encodeURIComponent(reason)}` : '';
   location.reload();

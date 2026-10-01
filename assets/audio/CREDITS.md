@@ -5,13 +5,17 @@ is required after installing the desktop game.
 
 ## Music
 
-- **Medieval: Exploration** by RandomMind — [source](https://opengameart.org/content/medieval-exploration), [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/). Emerald Jungle exploration.
-- **Battle Theme A** by cynicmusic — [source](https://opengameart.org/content/battle-theme-a), [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/). Emerald Jungle danger.
-- **The Spaces Between** by Scott Buckley — released under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). [www.scottbuckley.com.au](https://www.scottbuckley.com.au/library/the-spaces-between/). Ashfall Isle exploration.
-- **The Encounter** by Scott Buckley — released under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). [www.scottbuckley.com.au](https://www.scottbuckley.com.au/library/the-encounter/). Ashfall Isle danger.
+- **Forest Exploration** by Tsorthan Grove — released under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). [Source and author](https://opengameart.org/content/forest-exploration). Emerald Jungle exploration. Uses the author's original loop version.
+- **Escape Velocity** by Scott Buckley — released under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). [www.scottbuckley.com.au](https://www.scottbuckley.com.au/library/escape-velocity/). Emerald Jungle danger.
+- **Shadows and Dust** by Scott Buckley — released under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). [www.scottbuckley.com.au](https://www.scottbuckley.com.au/library/shadows-and-dust/). Ashfall Isle exploration.
+- **Eyes In The Void** by Scott Buckley — released under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). [www.scottbuckley.com.au](https://www.scottbuckley.com.au/library/eyes-in-the-void/). Ashfall Isle danger.
+- **Call To Adventure** by Scott Buckley — released under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). [www.scottbuckley.com.au](https://www.scottbuckley.com.au/library/call-to-adventure/). Main menu (starts after the first click or key press).
+- **Simulacra** by Scott Buckley — released under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). [www.scottbuckley.com.au](https://www.scottbuckley.com.au/library/simulacra/). Boss arena and its causeway, overriding ordinary island danger/exploration music.
 
-Music was edited into excerpts, joined with two-second circular crossfades,
-level balanced, and encoded as Ogg Vorbis. These are modified versions of the
+Full tracks are retained. Scott Buckley's tracks have two-second tail/head
+crossfades; playback repeats from 2s after the first play to join the loop.
+Forest Exploration retains its original seamless loop. All music was
+level balanced and encoded as Ogg Vorbis. These are modified versions of the
 original works, with no endorsement implied. The exact source segments are in
 `sources.json`. Videos using Scott Buckley's music should credit him in their
 descriptions as requested on his source pages.
