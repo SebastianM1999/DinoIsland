@@ -140,6 +140,7 @@ export class PlayerActions {
       if (canAct && input.wasPressed('secondary') && this.cooldown <= 0 && this.inv.spear) this.throwSpear();
     } else if (tool === 'bow') {
       if (canAct && input.isHeld('primary') && this.inv.arrows > 0 && this.cooldown <= 0) {
+        if (!this.drawing) g.audio?.play('bowDraw');
         this.drawing = true;
         this.drawT = Math.min(W.bow.maxDrawTime, this.drawT + dt);
       }

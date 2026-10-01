@@ -1,4 +1,4 @@
-const { app, BrowserWindow } = require('electron');
+const { app, BrowserWindow, shell } = require('electron');
 
 let server;
 let gameHost;
@@ -27,7 +27,24 @@ async function launch() {
     title: `Dinosaur Island — co-op port ${port}`,
     webPreferences: { nodeIntegration: false, contextIsolation: true, sandbox: true },
   });
-  win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+  win.webContents.setWindowOpenHandler(({ url }) => {
+    // Local credit notices are plain text. Artist and license pages open in
+    // the browser without granting those sites access to the game window.
+    if (url === `${localUrl}assets/audio/CREDITS.md`) {
+      return { action: 'allow', overrideBrowserWindowOptions: {
+        width: 860, height: 680, title: 'Dinosaur Island — audio credits',
+        webPreferences: { nodeIntegration: false, contextIsolation: true, sandbox: true },
+      } };
+    }
+    try {
+      const link = new URL(url);
+      const creditHosts = ['opengameart.org', 'freesound.org', 'kenney.nl', 'www.scottbuckley.com.au', 'creativecommons.org'];
+      if (link.protocol === 'https:' && creditHosts.includes(link.hostname)) {
+        void shell.openExternal(url).catch(error => console.error('Could not open audio credit:', error));
+      }
+    } catch { /* invalid URL */ }
+    return { action: 'deny' };
+  });
   win.webContents.on('page-title-updated', (event) => event.preventDefault());
   win.webContents.on('will-navigate', (event, url) => {
     if (!url.startsWith(localUrl)) event.preventDefault();

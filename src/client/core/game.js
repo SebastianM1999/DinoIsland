@@ -30,6 +30,8 @@ import { Items } from '../entities/items.js';
 import { Projectiles } from '../entities/projectiles.js';
 import { PlayerActions } from '../player/actions.js';
 import { GameAudio } from '../audio/audio.js';
+import { footstepSurface, woodSupports } from '../audio/surface.js';
+import { StepCadence } from '../audio/steps.js';
 import { settings } from './settings.js';
 import { Wardrobe } from '../ui/wardrobe.js';
 import { BoatPanel } from '../ui/boatPanel.js';
@@ -95,7 +97,9 @@ export class Game {
     document.body.appendChild(this.overlay);
 
     this.audio = reuse?.audio ?? new GameAudio();
-    this.stepDist = 0;
+    this.audio.setIsland(this.layout.biome.id);
+    this.woodSupports = woodSupports(this.layout);
+    this.stepCadence = new StepCadence();
     this.hud = new Hud(document.getElementById('hud'));
     this.hud.initMinimap(this.terrain, this.layout);
     try { this.hud.trackedContract = localStorage.getItem('di.tracked') || null; } catch { /* storage blocked */ }
@@ -419,6 +423,7 @@ export class Game {
   start() {
     this.audio.resume();
     this.audio.startAmbient();
+    this.audio.startMusic();
     this.running = true;
     this.input.enabled = true;
     this.hud.show(true);
@@ -433,6 +438,7 @@ export class Game {
   stop() {
     clearInterval(this.heartbeat);
     this.running = false;
+    this.audio.stopMusic();
     this.input.enabled = false;
     this.input.exitLock();
   }
@@ -557,14 +563,12 @@ export class Game {
     this.audio.setListener(cam.position, fwd, up);
     const p = this.player;
     // footsteps (in water: a splashing step and a ring on the surface)
-    const wet = p.inWater > 0.06 && !p.swimming;
-    this.stepDist += p.moveSpeed * dt * (p.onGround || p.swimming ? 1 : 0);
-    if (this.stepDist > (p.swimming ? 2.6 : p.sprinting ? 2.2 : 1.7)) {
-      this.stepDist = 0;
-      if (wet || p.swimming) {
+    if (this.stepCadence.update(p, dt)) {
+      const surface = footstepSurface(p, this.terrain, this.layout, this.woodSupports);
+      if (surface === 'water') {
         this.audio.play('waterStep', { vol: Math.min(1.4, 0.55 + p.inWater * 0.8) * (p.sprinting ? 1.25 : 1) * (p.swimming ? 0.7 : 1) });
         this.water.ripple(p.pos.x, p.pos.z, Math.min(1, 0.3 + p.inWater * 0.5));
-      } else this.audio.play('step', { vol: p.sprinting ? 1.3 : 1 });
+      } else this.audio.play('step', { surface, movement: p.sprinting ? 'run' : 'walk', vol: p.sprinting ? 1.3 : 1 });
     }
     this.#waterEvents(dt);
     // surf gets louder toward the coast

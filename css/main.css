@@ -450,6 +450,11 @@ kbd {
 .settings-tabs [role=tab][aria-selected=true] { background: #3a4a72; color: var(--ink); box-shadow: 0 2px 0 #1a233b; }
 .settings-tabs [role=tab]:focus-visible { outline: 3px solid var(--focus); outline-offset: 1px; }
 .settings-panel { min-height: 300px; }
+.audio-credits { margin-top: 12px; font-size: 0.85rem; line-height: 1.55; }
+.audio-credits[open] { max-height: 220px; overflow-y: auto; }
+.audio-credits summary { cursor: pointer; }
+.audio-credits a { color: #bde1ff; text-decoration: underline; }
+.audio-credits a:hover { color: #ffffff; }
 .settings-group {
   margin: 14px 0 4px;
   font-size: 0.85rem;

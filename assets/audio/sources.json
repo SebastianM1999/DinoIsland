@@ -1,0 +1,744 @@
+{
+  "sources": {
+    "feet": {
+      "author": "Fantozzi",
+      "license": "CC0-1.0",
+      "page": "https://opengameart.org/content/fantozzis-footsteps-grasssand-stone",
+      "download": "https://opengameart.org/sites/default/files/Fantozzi-footsteps.7z"
+    },
+    "steps": {
+      "author": "TinyWorlds",
+      "license": "CC0-1.0",
+      "page": "https://opengameart.org/content/different-steps-on-wood-stone-leaves-gravel-and-mud",
+      "download": "https://opengameart.org/sites/default/files/%5Bkdd%5DDifferentSteps_0.zip"
+    },
+    "firearms": {
+      "author": "Ben Jaszczak et al.",
+      "license": "CC0-1.0",
+      "page": "https://opengameart.org/content/the-free-firearm-sound-library",
+      "download": "https://opengameart.org/sites/default/files/Prepared%20SFX%20Library.7z"
+    },
+    "foley": {
+      "author": "Jan Schupke (Vehicle)",
+      "license": "CC0-1.0",
+      "page": "https://opengameart.org/content/fantasy-sound-effects-tinysized-sfx",
+      "download": "https://opengameart.org/sites/default/files/tinysized.zip"
+    },
+    "swish": {
+      "author": "qubodup",
+      "license": "CC0-1.0",
+      "page": "https://opengameart.org/content/swish-bamboo-stick-weapon-swhoshes",
+      "download": "https://opengameart.org/sites/default/files/swoshes.7z"
+    },
+    "impact": {
+      "author": "Kenney",
+      "license": "CC0-1.0",
+      "page": "https://kenney.nl/assets/impact-sounds",
+      "download": "https://kenney.nl/media/pages/assets/impact-sounds/87b4ddecda-1677589768/kenney_impact-sounds.zip"
+    },
+    "trex": {
+      "author": "CaveboyTup",
+      "license": "CC0-1.0",
+      "page": "https://opengameart.org/content/t-rex-calls",
+      "download": "https://opengameart.org/sites/default/files/t-rex_calls.mp3"
+    },
+    "snarl1": {
+      "author": "Darsycho",
+      "license": "CC0-1.0",
+      "page": "https://opengameart.org/content/monster-snarls",
+      "download": "https://opengameart.org/sites/default/files/monster-snarls_0.ogg"
+    },
+    "snarl2": {
+      "author": "Darsycho",
+      "license": "CC0-1.0",
+      "page": "https://opengameart.org/content/monster-snarls",
+      "download": "https://opengameart.org/sites/default/files/monster-snarls-2_0.ogg"
+    },
+    "snarl3": {
+      "author": "Darsycho",
+      "license": "CC0-1.0",
+      "page": "https://opengameart.org/content/monster-snarls",
+      "download": "https://opengameart.org/sites/default/files/monsters-snarls-3_0.ogg"
+    },
+    "water1": {
+      "author": "Peludo",
+      "license": "CC0-1.0",
+      "page": "https://opengameart.org/content/water-splash-and-sand-footsteps",
+      "download": "https://opengameart.org/sites/default/files/splash1_0.wav"
+    },
+    "water2": {
+      "author": "Peludo",
+      "license": "CC0-1.0",
+      "page": "https://opengameart.org/content/water-splash-and-sand-footsteps",
+      "download": "https://opengameart.org/sites/default/files/splash2_0.wav"
+    },
+    "bow1": {
+      "author": "Ali_6868",
+      "license": "CC0-1.0",
+      "page": "https://freesound.org/people/Ali_6868/sounds/384915/",
+      "download": "https://cdn.freesound.org/previews/384/384915_984733-hq.mp3"
+    },
+    "bow2": {
+      "author": "Ali_6868",
+      "license": "CC0-1.0",
+      "page": "https://freesound.org/people/Ali_6868/sounds/384916/",
+      "download": "https://cdn.freesound.org/previews/384/384916_984733-hq.mp3"
+    },
+    "jungle": {
+      "author": "RandomMind",
+      "license": "CC0-1.0",
+      "page": "https://opengameart.org/content/medieval-exploration",
+      "download": "https://opengameart.org/sites/default/files/Exploration_0.mp3"
+    },
+    "battle": {
+      "author": "cynicmusic",
+      "license": "CC0-1.0",
+      "page": "https://opengameart.org/content/battle-theme-a",
+      "download": "https://opengameart.org/sites/default/files/battleThemeA.mp3"
+    },
+    "volcano": {
+      "author": "Scott Buckley",
+      "license": "CC-BY-4.0",
+      "page": "https://www.scottbuckley.com.au/library/the-spaces-between/",
+      "download": "https://www.scottbuckley.com.au/library/wp-content/uploads/2019/07/sb_monomyth_6_thespacesbetween.mp3"
+    },
+    "encounter": {
+      "author": "Scott Buckley",
+      "license": "CC-BY-4.0",
+      "page": "https://www.scottbuckley.com.au/library/the-encounter/",
+      "download": "https://www.scottbuckley.com.au/library/wp-content/uploads/2019/07/sb_monomyth_7_theencounter.mp3"
+    }
+  },
+  "assets": [
+    {
+      "file": "sfx/sand-1.wav",
+      "source": "feet",
+      "original": "feet/Fantozzi-footsteps/flac/Fantozzi-SandL1.flac",
+      "segment": [
+        null,
+        null
+      ],
+      "edits": "Mono, silence trimmed, peak balanced, 4ms edge fades."
+    },
+    {
+      "file": "sfx/rock-1.wav",
+      "source": "feet",
+      "original": "feet/Fantozzi-footsteps/flac/Fantozzi-StoneL1.flac",
+      "segment": [
+        null,
+        null
+      ],
+      "edits": "Mono, silence trimmed, peak balanced, 4ms edge fades."
+    },
+    {
+      "file": "sfx/sand-2.wav",
+      "source": "feet",
+      "original": "feet/Fantozzi-footsteps/flac/Fantozzi-SandL2.flac",
+      "segment": [
+        null,
+        null
+      ],
+      "edits": "Mono, silence trimmed, peak balanced, 4ms edge fades."
+    },
+    {
+      "file": "sfx/rock-2.wav",
+      "source": "feet",
+      "original": "feet/Fantozzi-footsteps/flac/Fantozzi-StoneL2.flac",
+      "segment": [
+        null,
+        null
+      ],
+      "edits": "Mono, silence trimmed, peak balanced, 4ms edge fades."
+    },
+    {
+      "file": "sfx/sand-3.wav",
+      "source": "feet",
+      "original": "feet/Fantozzi-footsteps/flac/Fantozzi-SandL3.flac",
+      "segment": [
+        null,
+        null
+      ],
+      "edits": "Mono, silence trimmed, peak balanced, 4ms edge fades."
+    },
+    {
+      "file": "sfx/rock-3.wav",
+      "source": "feet",
+      "original": "feet/Fantozzi-footsteps/flac/Fantozzi-StoneL3.flac",
+      "segment": [
+        null,
+        null
+      ],
+      "edits": "Mono, silence trimmed, peak balanced, 4ms edge fades."
+    },
+    {
+      "file": "sfx/sand-4.wav",
+      "source": "feet",
+      "original": "feet/Fantozzi-footsteps/flac/Fantozzi-SandR1.flac",
+      "segment": [
+        null,
+        null
+      ],
+      "edits": "Mono, silence trimmed, peak balanced, 4ms edge fades."
+    },
+    {
+      "file": "sfx/rock-4.wav",
+      "source": "feet",
+      "original": "feet/Fantozzi-footsteps/flac/Fantozzi-StoneR1.flac",
+      "segment": [
+        null,
+        null
+      ],
+      "edits": "Mono, silence trimmed, peak balanced, 4ms edge fades."
+    },
+    {
+      "file": "sfx/sand-5.wav",
+      "source": "feet",
+      "original": "feet/Fantozzi-footsteps/flac/Fantozzi-SandR2.flac",
+      "segment": [
+        null,
+        null
+      ],
+      "edits": "Mono, silence trimmed, peak balanced, 4ms edge fades."
+    },
+    {
+      "file": "sfx/rock-5.wav",
+      "source": "feet",
+      "original": "feet/Fantozzi-footsteps/flac/Fantozzi-StoneR2.flac",
+      "segment": [
+        null,
+        null
+      ],
+      "edits": "Mono, silence trimmed, peak balanced, 4ms edge fades."
+    },
+    {
+      "file": "sfx/sand-6.wav",
+      "source": "feet",
+      "original": "feet/Fantozzi-footsteps/flac/Fantozzi-SandR3.flac",
+      "segment": [
+        null,
+        null
+      ],
+      "edits": "Mono, silence trimmed, peak balanced, 4ms edge fades."
+    },
+    {
+      "file": "sfx/rock-6.wav",
+      "source": "feet",
+      "original": "feet/Fantozzi-footsteps/flac/Fantozzi-StoneR3.flac",
+      "segment": [
+        null,
+        null
+      ],
+      "edits": "Mono, silence trimmed, peak balanced, 4ms edge fades."
+    },
+    {
+      "file": "sfx/grass-1.wav",
+      "source": "impact",
+      "original": "impact/Audio/footstep_grass_000.ogg",
+      "segment": [
+        null,
+        null
+      ],
+      "edits": "Mono, silence trimmed, peak balanced, 4ms edge fades."
+    },
+    {
+      "file": "sfx/grass-2.wav",
+      "source": "impact",
+      "original": "impact/Audio/footstep_grass_001.ogg",
+      "segment": [
+        null,
+        null
+      ],
+      "edits": "Mono, silence trimmed, peak balanced, 4ms edge fades."
+    },
+    {
+      "file": "sfx/grass-3.wav",
+      "source": "impact",
+      "original": "impact/Audio/footstep_grass_002.ogg",
+      "segment": [
+        null,
+        null
+      ],
+      "edits": "Mono, silence trimmed, peak balanced, 4ms edge fades."
+    },
+    {
+      "file": "sfx/grass-4.wav",
+      "source": "impact",
+      "original": "impact/Audio/footstep_grass_003.ogg",
+      "segment": [
+        null,
+        null
+      ],
+      "edits": "Mono, silence trimmed, peak balanced, 4ms edge fades."
+    },
+    {
+      "file": "sfx/grass-5.wav",
+      "source": "impact",
+      "original": "impact/Audio/footstep_grass_004.ogg",
+      "segment": [
+        null,
+        null
+      ],
+      "edits": "Mono, silence trimmed, peak balanced, 4ms edge fades."
+    },
+    {
+      "file": "sfx/wood-1.wav",
+      "source": "steps",
+      "original": "steps/wood01.ogg",
+      "segment": [
+        null,
+        null
+      ],
+      "edits": "Mono, silence trimmed, peak balanced, 4ms edge fades."
+    },
+    {
+      "file": "sfx/swish-1.wav",
+      "source": "swish",
+      "original": "swish/swosh-01.flac",
+      "segment": [
+        null,
+        null
+      ],
+      "edits": "Mono, silence trimmed, peak balanced, 4ms edge fades."
+    },
+    {
+      "file": "sfx/hit-1.wav",
+      "source": "impact",
+      "original": "impact/Audio/impactPunch_heavy_000.ogg",
+      "segment": [
+        null,
+        null
+      ],
+      "edits": "Mono, silence trimmed, peak balanced, 4ms edge fades."
+    },
+    {
+      "file": "sfx/thunk-1.wav",
+      "source": "impact",
+      "original": "impact/Audio/impactWood_medium_000.ogg",
+      "segment": [
+        null,
+        null
+      ],
+      "edits": "Mono, silence trimmed, peak balanced, 4ms edge fades."
+    },
+    {
+      "file": "sfx/wood-2.wav",
+      "source": "steps",
+      "original": "steps/wood02.ogg",
+      "segment": [
+        null,
+        null
+      ],
+      "edits": "Mono, silence trimmed, peak balanced, 4ms edge fades."
+    },
+    {
+      "file": "sfx/swish-2.wav",
+      "source": "swish",
+      "original": "swish/swosh-02.flac",
+      "segment": [
+        null,
+        null
+      ],
+      "edits": "Mono, silence trimmed, peak balanced, 4ms edge fades."
+    },
+    {
+      "file": "sfx/hit-2.wav",
+      "source": "impact",
+      "original": "impact/Audio/impactPunch_heavy_001.ogg",
+      "segment": [
+        null,
+        null
+      ],
+      "edits": "Mono, silence trimmed, peak balanced, 4ms edge fades."
+    },
+    {
+      "file": "sfx/thunk-2.wav",
+      "source": "impact",
+      "original": "impact/Audio/impactWood_medium_001.ogg",
+      "segment": [
+        null,
+        null
+      ],
+      "edits": "Mono, silence trimmed, peak balanced, 4ms edge fades."
+    },
+    {
+      "file": "sfx/wood-3.wav",
+      "source": "steps",
+      "original": "steps/wood03.ogg",
+      "segment": [
+        null,
+        null
+      ],
+      "edits": "Mono, silence trimmed, peak balanced, 4ms edge fades."
+    },
+    {
+      "file": "sfx/swish-3.wav",
+      "source": "swish",
+      "original": "swish/swosh-03.flac",
+      "segment": [
+        null,
+        null
+      ],
+      "edits": "Mono, silence trimmed, peak balanced, 4ms edge fades."
+    },
+    {
+      "file": "sfx/hit-3.wav",
+      "source": "impact",
+      "original": "impact/Audio/impactPunch_heavy_002.ogg",
+      "segment": [
+        null,
+        null
+      ],
+      "edits": "Mono, silence trimmed, peak balanced, 4ms edge fades."
+    },
+    {
+      "file": "sfx/thunk-3.wav",
+      "source": "impact",
+      "original": "impact/Audio/impactWood_medium_002.ogg",
+      "segment": [
+        null,
+        null
+      ],
+      "edits": "Mono, silence trimmed, peak balanced, 4ms edge fades."
+    },
+    {
+      "file": "sfx/leaves-1.wav",
+      "source": "steps",
+      "original": "steps/leaves01.ogg",
+      "segment": [
+        null,
+        null
+      ],
+      "edits": "Mono, silence trimmed, peak balanced, 4ms edge fades."
+    },
+    {
+      "file": "sfx/water-1.wav",
+      "source": "water1",
+      "original": "water1.wav",
+      "segment": [
+        null,
+        null
+      ],
+      "edits": "Mono, silence trimmed, peak balanced, 4ms edge fades."
+    },
+    {
+      "file": "sfx/reload-1.wav",
+      "source": "foley",
+      "original": "foley/sfx-cc0/handcuffs-metal-lock-01.wav",
+      "segment": [
+        null,
+        null
+      ],
+      "edits": "Mono, silence trimmed, peak balanced, 4ms edge fades."
+    },
+    {
+      "file": "sfx/bow-draw-1.wav",
+      "source": "foley",
+      "original": "foley/sfx-cc0/arrow-grab-from-quiver-01.wav",
+      "segment": [
+        null,
+        null
+      ],
+      "edits": "Mono, silence trimmed, peak balanced, 4ms edge fades."
+    },
+    {
+      "file": "sfx/leaves-2.wav",
+      "source": "steps",
+      "original": "steps/leaves02.ogg",
+      "segment": [
+        null,
+        null
+      ],
+      "edits": "Mono, silence trimmed, peak balanced, 4ms edge fades."
+    },
+    {
+      "file": "sfx/water-2.wav",
+      "source": "water2",
+      "original": "water2.wav",
+      "segment": [
+        null,
+        null
+      ],
+      "edits": "Mono, silence trimmed, peak balanced, 4ms edge fades."
+    },
+    {
+      "file": "sfx/reload-2.wav",
+      "source": "foley",
+      "original": "foley/sfx-cc0/handcuffs-metal-lock-02.wav",
+      "segment": [
+        null,
+        null
+      ],
+      "edits": "Mono, silence trimmed, peak balanced, 4ms edge fades."
+    },
+    {
+      "file": "sfx/bow-draw-2.wav",
+      "source": "foley",
+      "original": "foley/sfx-cc0/arrow-grab-from-quiver-02.wav",
+      "segment": [
+        null,
+        null
+      ],
+      "edits": "Mono, silence trimmed, peak balanced, 4ms edge fades."
+    },
+    {
+      "file": "sfx/gravel-1.wav",
+      "source": "steps",
+      "original": "steps/gravel.ogg",
+      "segment": [
+        null,
+        null
+      ],
+      "edits": "Mono, silence trimmed, peak balanced, 4ms edge fades."
+    },
+    {
+      "file": "sfx/mud-1.wav",
+      "source": "steps",
+      "original": "steps/mud02.ogg",
+      "segment": [
+        null,
+        null
+      ],
+      "edits": "Mono, silence trimmed, peak balanced, 4ms edge fades."
+    },
+    {
+      "file": "sfx/dirt-1.wav",
+      "source": "foley",
+      "original": "foley/sfx-cc0/soil-steps-01.wav",
+      "segment": [
+        0.13498866213151928,
+        0.38
+      ],
+      "edits": "Mono, silence trimmed, peak balanced, 4ms edge fades."
+    },
+    {
+      "file": "sfx/dirt-2.wav",
+      "source": "foley",
+      "original": "foley/sfx-cc0/soil-steps-01.wav",
+      "segment": [
+        0.7749886621315193,
+        1.04
+      ],
+      "edits": "Mono, silence trimmed, peak balanced, 4ms edge fades."
+    },
+    {
+      "file": "sfx/pistol-1.wav",
+      "source": "firearms",
+      "original": "firearms/Prepared SFX Library/1911/A_42P.wav",
+      "segment": [
+        0.915,
+        1.1
+      ],
+      "edits": "Mono, silence trimmed, peak balanced, 4ms edge fades."
+    },
+    {
+      "file": "sfx/pistol-2.wav",
+      "source": "firearms",
+      "original": "firearms/Prepared SFX Library/1911/A_42P.wav",
+      "segment": [
+        4.9749895833333335,
+        5.16
+      ],
+      "edits": "Mono, silence trimmed, peak balanced, 4ms edge fades."
+    },
+    {
+      "file": "sfx/rifle-1.wav",
+      "source": "firearms",
+      "original": "firearms/Prepared SFX Library/AR-15/D_32P.wav",
+      "segment": [
+        0.675,
+        0.88
+      ],
+      "edits": "Mono, silence trimmed, peak balanced, 4ms edge fades."
+    },
+    {
+      "file": "sfx/rifle-2.wav",
+      "source": "firearms",
+      "original": "firearms/Prepared SFX Library/AR-15/D_32P.wav",
+      "segment": [
+        5.614989583333333,
+        5.82
+      ],
+      "edits": "Mono, silence trimmed, peak balanced, 4ms edge fades."
+    },
+    {
+      "file": "sfx/empty-1.wav",
+      "source": "foley",
+      "original": "foley/sfx-cc0/handcuffs-metal-open-01.wav",
+      "segment": [
+        null,
+        null
+      ],
+      "edits": "Mono, silence trimmed, peak balanced, 4ms edge fades."
+    },
+    {
+      "file": "sfx/bow-1.wav",
+      "source": "bow1",
+      "original": "bow1.mp3",
+      "segment": [
+        null,
+        null
+      ],
+      "edits": "Mono, silence trimmed, peak balanced, 4ms edge fades."
+    },
+    {
+      "file": "sfx/bow-2.wav",
+      "source": "bow2",
+      "original": "bow2.mp3",
+      "segment": [
+        null,
+        null
+      ],
+      "edits": "Mono, silence trimmed, peak balanced, 4ms edge fades."
+    },
+    {
+      "file": "sfx/trex-1.wav",
+      "source": "trex",
+      "original": "trex.mp3",
+      "segment": [
+        0.27497916666666666,
+        1.58
+      ],
+      "edits": "Mono, silence trimmed, peak balanced, 4ms edge fades."
+    },
+    {
+      "file": "sfx/trex-2.wav",
+      "source": "trex",
+      "original": "trex.mp3",
+      "segment": [
+        2.395,
+        3.42
+      ],
+      "edits": "Mono, silence trimmed, peak balanced, 4ms edge fades."
+    },
+    {
+      "file": "sfx/trex-3.wav",
+      "source": "trex",
+      "original": "trex.mp3",
+      "segment": [
+        4.255,
+        9.18
+      ],
+      "edits": "Mono, silence trimmed, peak balanced, 4ms edge fades."
+    },
+    {
+      "file": "sfx/raptor-1.wav",
+      "source": "snarl2",
+      "original": "snarl2.ogg",
+      "segment": [
+        0.2749886621315193,
+        2.2749886621315194
+      ],
+      "edits": "Mono, silence trimmed, peak balanced, 4ms edge fades."
+    },
+    {
+      "file": "sfx/raptor-2.wav",
+      "source": "snarl2",
+      "original": "snarl2.ogg",
+      "segment": [
+        4.57498866213152,
+        6.57498866213152
+      ],
+      "edits": "Mono, silence trimmed, peak balanced, 4ms edge fades."
+    },
+    {
+      "file": "sfx/ptera-1.wav",
+      "source": "snarl3",
+      "original": "snarl3.ogg",
+      "segment": [
+        0.2749886621315193,
+        1.94
+      ],
+      "edits": "Mono, silence trimmed, peak balanced, 4ms edge fades."
+    },
+    {
+      "file": "sfx/ptera-2.wav",
+      "source": "snarl3",
+      "original": "snarl3.ogg",
+      "segment": [
+        2.914988662131519,
+        5.16
+      ],
+      "edits": "Mono, silence trimmed, peak balanced, 4ms edge fades."
+    },
+    {
+      "file": "sfx/stego-1.wav",
+      "source": "snarl1",
+      "original": "snarl1.ogg",
+      "segment": [
+        0.13498866213151928,
+        3.1349886621315193
+      ],
+      "edits": "Mono, silence trimmed, peak balanced, 4ms edge fades."
+    },
+    {
+      "file": "sfx/stego-2.wav",
+      "source": "snarl1",
+      "original": "snarl1.ogg",
+      "segment": [
+        4.934988662131519,
+        7.934988662131519
+      ],
+      "edits": "Mono, silence trimmed, peak balanced, 4ms edge fades."
+    },
+    {
+      "file": "sfx/brachio-1.wav",
+      "source": "trex",
+      "original": "trex.mp3",
+      "segment": [
+        15.7,
+        18.5
+      ],
+      "edits": "Mono, silence trimmed, peak balanced, 4ms edge fades."
+    },
+    {
+      "file": "sfx/brachio-2.wav",
+      "source": "trex",
+      "original": "trex.mp3",
+      "segment": [
+        0.2,
+        1.7
+      ],
+      "edits": "Mono, silence trimmed, peak balanced, 4ms edge fades."
+    },
+    {
+      "file": "music/jungle-calm.ogg",
+      "source": "jungle",
+      "original": "jungle.mp3",
+      "segment": [
+        15,
+        135
+      ],
+      "edits": "Excerpt, two-second circular crossfade, level balanced, Ogg Vorbis."
+    },
+    {
+      "file": "music/jungle-danger.ogg",
+      "source": "battle",
+      "original": "battle.mp3",
+      "segment": [
+        2,
+        94
+      ],
+      "edits": "Excerpt, two-second circular crossfade, level balanced, Ogg Vorbis."
+    },
+    {
+      "file": "music/volcano-calm.ogg",
+      "source": "volcano",
+      "original": "volcano.mp3",
+      "segment": [
+        45,
+        165
+      ],
+      "edits": "Excerpt, two-second circular crossfade, level balanced, Ogg Vorbis."
+    },
+    {
+      "file": "music/volcano-danger.ogg",
+      "source": "encounter",
+      "original": "encounter.mp3",
+      "segment": [
+        140,
+        260
+      ],
+      "edits": "Excerpt, two-second circular crossfade, level balanced, Ogg Vorbis."
+    }
+  ]
+}

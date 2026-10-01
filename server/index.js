@@ -25,6 +25,10 @@ const MIME = {
   '.txt': 'text/plain; charset=utf-8',
   '.webmanifest': 'application/manifest+json',
   '.glb': 'model/gltf-binary',
+  '.wav': 'audio/wav',
+  '.ogg': 'audio/ogg',
+  '.mp3': 'audio/mpeg',
+  '.md': 'text/plain; charset=utf-8',
 };
 
 // Only these top-level folders are public; /vendor/three maps into node_modules.

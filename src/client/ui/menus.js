@@ -63,6 +63,19 @@ export function initSettings({ onClose } = {}) {
     }
   });
 
+  const credits = document.createElement('details');
+  credits.className = 'audio-credits';
+  credits.innerHTML = `<summary>Audio credits</summary>
+    <p>Emerald Jungle: <a href="https://opengameart.org/content/medieval-exploration" target="_blank" rel="noopener">Medieval: Exploration — RandomMind</a>
+    and <a href="https://opengameart.org/content/battle-theme-a" target="_blank" rel="noopener">Battle Theme A — cynicmusic</a> (CC0).</p>
+    <p>Ashfall Isle: <a href="https://www.scottbuckley.com.au/library/the-spaces-between/" target="_blank" rel="noopener">The Spaces Between</a>
+    and <a href="https://www.scottbuckley.com.au/library/the-encounter/" target="_blank" rel="noopener">The Encounter</a>
+    by Scott Buckley — <a href="https://www.scottbuckley.com.au" target="_blank" rel="noopener">www.scottbuckley.com.au</a>,
+    released under <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a>.</p>
+    <p>Music edited into excerpts, crossfaded for looping, and level balanced.
+    <a href="/assets/audio/CREDITS.md" target="_blank" rel="noopener">All sound effect credits and modification notices</a>.</p>`;
+  panel.append(credits);
+
   function selectTab(name) {
     for (const k of Object.keys(tabs)) {
       tabs[k].setAttribute('aria-selected', String(k === name));

@@ -1,10 +1,13 @@
-// Procedural audio with the Web Audio API – no sound files. Short synthesized
-// effects (bow, hits, roars, footsteps, UI), 3D-positioned where it matters,
+// Recorded gameplay effects and island music with Web Audio. Synthesized
+// effects remain fallbacks and UI cues, 3D-positioned where it matters,
 // location-aware shore details, distance-driven water ambience (waterfall,
 // cascade, spring, river, pools, wading) and adaptive melodic music.
 
 import { CONFIG } from '../../shared/config.js';
 import { onSettings, audioGains } from '../core/settings.js';
+import { EFFECTS, FOOTSTEPS, effectGroup } from './catalog.js';
+import { SampleBank, SamplePicker } from './samples.js';
+import { IslandMusic } from './music.js';
 
 const A = CONFIG.audio;
 const smoothstep = (a, b, x) => { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
@@ -24,6 +27,10 @@ export class GameAudio {
     this.musicBus = this.ctx.createGain();
     this.musicBus.gain.value = A.musicVolume;
     this.musicBus.connect(this.master);
+    this.samples = new SampleBank(this.ctx);
+    this.samplePicker = new SamplePicker();
+    this.islandMusic = new IslandMusic(this.ctx, this.samples, this.musicBus);
+    void this.samples.preload([...Object.values(EFFECTS), ...Object.values(FOOTSTEPS)]);
     this.calmBus = this.ctx.createGain();
     this.dangerBus = this.ctx.createGain();
     this.calmBus.gain.value = 1;
@@ -58,6 +65,31 @@ export class GameAudio {
     if (this.ok && this.ctx.state !== 'running') this.ctx.resume().catch(() => {});
   }
 
+  setIsland(island) {
+    if (!this.ok) return;
+    this.islandMusic.setIsland(island);
+    this.dangerUntil = 0;
+    this.musicMode = 'calm';
+    this.nextNote = 0;
+    this.step = 0;
+  }
+
+  startMusic() {
+    if (this.ok) { this.musicOn = true; this.islandMusic.start(); }
+  }
+
+  stopMusic() {
+    if (!this.ok) return;
+    this.musicOn = false;
+    this.islandMusic.stop();
+    this.dangerUntil = 0;
+    // Scheduled fallback notes should also fade when leaving the game.
+    const t = this.ctx.currentTime;
+    this.calmBus.gain.setTargetAtTime(0, t, 0.15);
+    this.dangerBus.gain.setTargetAtTime(0, t, 0.15);
+    this.nextNote = 0;
+  }
+
   /** White noise, or brown noise (deep rumble: integrated white, for big water). */
   #makeNoise(seconds, kind = 'white') {
     const len = this.ctx.sampleRate * seconds;
@@ -90,6 +122,7 @@ export class GameAudio {
       p.maxDistance = 300;
       p.rolloffFactor = 1.1;
       p.positionX.value = pos.x; p.positionY.value = pos.y; p.positionZ.value = pos.z;
+      g.samplePanner = p;
       g.connect(p);
       p.connect(this.sfx);
     } else g.connect(this.sfx);
@@ -212,7 +245,7 @@ export class GameAudio {
 
   /**
    * @param {string} name
-   * @param {{pos?:{x:number,y:number,z:number}, vol?:number}} [o]
+   * @param {{pos?:{x:number,y:number,z:number}, vol?:number, surface?:string, movement?:string}} [o]
    */
   play(name, o = {}) {
     if (!this.ok || this.ctx.state !== 'running') return;
@@ -223,6 +256,20 @@ export class GameAudio {
     this.lastPlay.set(name, now);
     const t = now + 0.005;
     const out = this.#out(o.pos, o.vol ?? 1);
+    const group = effectGroup(name, o);
+    if (group) {
+      const sample = this.samplePicker.pick(`${name}:${o.surface || ''}`, group, this.samples);
+      if (sample) {
+        const source = this.ctx.createBufferSource();
+        source.buffer = sample.buffer;
+        source.playbackRate.value = sample.rate * (o.movement === 'run' ? 1.04 : 1);
+        out.gain.value *= sample.gain;
+        source.connect(out);
+        source.onended = () => { source.disconnect(); out.disconnect(); out.samplePanner?.disconnect(); };
+        source.start(t);
+        return;
+      }
+    }
     switch (name) {
       case 'pistol':
       case 'rifle':
@@ -234,6 +281,7 @@ export class GameAudio {
         this.#noise(t, name === 'empty' ? 0.035 : 0.16, out, { vol: 0.12, f0: 1800, f1: 600, q: 2 });
         break;
       case 'bow':
+      case 'bowDraw':
         this.#osc('triangle', 220, 120, t, 0.18, out, 0.5);
         this.#noise(t, 0.09, out, { vol: 0.16, f0: 2200, f1: 900, q: 3 });
         break;
@@ -565,7 +613,14 @@ export class GameAudio {
       this.calmBus.gain.setTargetAtTime(mode === 'calm' ? 1 : 0, t, 0.55);
       this.dangerBus.gain.setTargetAtTime(mode === 'danger' ? 1 : 0, t, 0.55);
     }
-    if (this.musicOn) this.#music(t);
+    if (this.musicOn) {
+      this.islandMusic.update(danger);
+      const fallback = !this.islandMusic.current;
+      this.calmBus.gain.setTargetAtTime(fallback && mode === 'calm' ? 1 : 0, t, 0.2);
+      this.dangerBus.gain.setTargetAtTime(fallback && mode === 'danger' ? 1 : 0, t, 0.2);
+      if (fallback) this.#music(t);
+      else this.nextNote = 0;
+    }
   }
 
   /** Two composed phrases with different harmony and pacing. */
