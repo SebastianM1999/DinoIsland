@@ -3,10 +3,9 @@
     {
       "id": "dino-raptor",
       "file": "assets/models/dinos/raptor.glb",
-      "source": "Quaternius Animated Dinosaur Pack / Velociraptor",
-      "license": "CC0-1.0",
-      "url": "https://quaternius.com/packs/animateddinosaurs.html",
-      "triangles": 21312
+      "source": "Project-authored Velociraptor; art/sources/raptor/raptor.blend (build scripts in its text blocks)",
+      "license": "Project source",
+      "triangles": 53128
     },
     {
       "id": "dino-trex",

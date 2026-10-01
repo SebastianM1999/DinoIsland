@@ -19,7 +19,7 @@ function model(species, source, height, length, walkStride, runStride, quadruped
 }
 export const GLB_DINOS = {
   // Median grounded foot velocity × clip duration; see measure-dino-strides.mjs.
-  raptor: model('raptor', 'Velociraptor', 1.4, 2.9, 2.373, 2.207),
+  raptor: model('raptor', 'Velociraptor', 1.675, 3.037, 1.818, 4.09),
   trex: model('trex', 'TRex', 4.1, 11, 6.262, 10.715),
   stego: model('stego', 'Stegosaurus', 4, 7.9, 2.04, 3.629, true),
   brachio: model('brachio', 'Brachiosaurus', 11, 19, 4.4, 7.5, true),
@@ -29,9 +29,14 @@ GLB_DINOS.brachio.bones = { ...GLB_DINOS.brachio.bones,
   jaw: 'FaceJaw',
   neck: Array.from({ length: 6 }, (_, i) => `Neck${i + 1}`),
   tail: Array.from({ length: 8 }, (_, i) => `Tail${i + 1}`), spine: ['Body', 'Shoulders'] };
+// Project raptor (art/sources/raptor/raptor.blend): opening jaw, two-bone neck,
+// toe bones as the planted contact points.
+GLB_DINOS.raptor.bones = { ...GLB_DINOS.raptor.bones,
+  jaw: 'Jaw', neck: ['Neck1', 'Neck2'], spine: ['Body', 'Torso'],
+  feet: ['BackToesR', 'BackToesL'], knees: ['BackLowLegR', 'BackLowLegL'] };
 GLB_DINOS.stego.width = 2.4;
 // Cycles per second, bounded independently of unusually short source run strides.
-GLB_DINOS.raptor.maxCadence = 1.9;
+GLB_DINOS.raptor.maxCadence = 2.4;
 GLB_DINOS.trex.maxCadence = 1.25;
 GLB_DINOS.stego.maxCadence = 1.35;
 GLB_DINOS.brachio.maxCadence = .9;

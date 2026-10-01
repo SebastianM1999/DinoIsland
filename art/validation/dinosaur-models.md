@@ -30,7 +30,7 @@ Branch: `codex/animated-dinosaur-models`. Local commits only; no push.
 
 | Species | Geometry source | Triangles | Height × length |
 | --- | --- | ---: | --- |
-| Raptor | Quaternius Velociraptor plus black eye dots | 21,312 | 1.4 × 2.9 m |
+| Raptor | Project Velociraptor from `art/sources/raptor/raptor.blend` (opening jaw, IK-baked clips) | 53,128 | 1.675 × 3.037 m |
 | T-Rex | Quaternius T-Rex plus black eye dots | 28,672 | 4.1 × 11 m |
 | Stego | Quaternius Stegosaurus plus black eye dots | 37,456 | 4 × 7.9 m |
 | Brachio | Project Brachiosaurus baked to GLB | 28,524 | 11 × 19 m |
