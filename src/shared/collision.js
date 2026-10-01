@@ -23,6 +23,25 @@ function circlesNear(colliders, x, z) {
   return grid.cells.get(Math.floor(x / CELL) * 4096 + Math.floor(z / CELL)) || [];
 }
 
+/** Boxes near (x, z), the same way (by their bounding circle). */
+function boxesNear(colliders, x, z) {
+  let grid = colliders._boxGrid;
+  if (!grid || grid.n !== colliders.boxes.length) {
+    grid = colliders._boxGrid = { n: colliders.boxes.length, cells: new Map() };
+    for (const b of colliders.boxes) {
+      const e = Math.hypot(b.hw, b.hd) + REACH;
+      for (let ix = Math.floor((b.x - e) / CELL); ix <= Math.floor((b.x + e) / CELL); ix++) {
+        for (let iz = Math.floor((b.z - e) / CELL); iz <= Math.floor((b.z + e) / CELL); iz++) {
+          const key = ix * 4096 + iz;
+          if (!grid.cells.has(key)) grid.cells.set(key, []);
+          grid.cells.get(key).push(b);
+        }
+      }
+    }
+  }
+  return grid.cells.get(Math.floor(x / CELL) * 4096 + Math.floor(z / CELL)) || [];
+}
+
 /** Resolver passes: each pass pushes out of every overlapping collider in turn. */
 const PASSES = 4;
 /** Overlap below this counts as touching, not penetrating (keeps resting contacts stable). */
@@ -45,21 +64,49 @@ function boxDepth(b, x, z, r) {
   return r - Math.hypot(Math.max(ex, 0), Math.max(ez, 0));
 }
 
-const inSpan = (c, y0, y1) => c.bottom === undefined || !(y1 < c.bottom || y0 > c.top);
+/**
+ * Does collider c block a mover spanning [y0, y1]? Colliders with a bottom
+ * only block where they overlap the span. `stand` colliders (fallen trunks,
+ * ruin stones) are ground you can stand on: their top counts as a step you
+ * walk up once it is no more than `climb` above y0.
+ */
+const inSpan = (c, y0, y1, climb = 0) =>
+  !(c.stand && c.top <= y0 + climb) && (c.bottom === undefined || !(y1 < c.bottom || y0 > c.top));
+
+/**
+ * Highest top of a `stand` collider under (x, z) – its footprint grown by
+ * `margin` – that is no higher than maxTop; -Infinity when there is none.
+ */
+export function standTop(colliders, x, z, margin = 0, maxTop = Infinity) {
+  let best = -Infinity;
+  for (const c of circlesNear(colliders, x, z)) {
+    if (!c.stand || c.top > maxTop || c.top <= best) continue;
+    const rr = c.r + margin;
+    if ((x - c.x) ** 2 + (z - c.z) ** 2 <= rr * rr) best = c.top;
+  }
+  for (const b of boxesNear(colliders, x, z)) {
+    if (!b.stand || b.top > maxTop || b.top <= best) continue;
+    const cos = Math.cos(b.rot), sin = Math.sin(b.rot);
+    const dx = x - b.x, dz = z - b.z;
+    if (Math.abs(dx * cos + dz * sin) <= b.hw + margin && Math.abs(-dx * sin + dz * cos) <= b.hd + margin) best = b.top;
+  }
+  return best;
+}
 
 /**
  * Deepest overlap of the circle (x, z, r) with any collider (0 when free).
  * Same height rules as resolveCircle.
  */
-export function penetration(x, z, r, colliders, y0 = -Infinity, y1 = Infinity) {
+export function penetration(x, z, r, colliders, y0 = -Infinity, y1 = Infinity, climb = 0) {
   let worst = 0;
   const circles = r <= REACH ? circlesNear(colliders, x, z) : colliders.circles;
   for (const c of circles) {
-    if (!inSpan(c, y0, y1)) continue;
+    if (!inSpan(c, y0, y1, climb)) continue;
     const d = circleDepth(c, x, z, r);
     if (d > worst) worst = d;
   }
-  for (const b of colliders.boxes) {
+  for (const b of r <= REACH ? boxesNear(colliders, x, z) : colliders.boxes) {
+    if (!inSpan(b, y0, y1, climb)) continue;
     const d = boxDepth(b, x, z, r);
     if (d > worst) worst = d;
   }
@@ -68,8 +115,9 @@ export function penetration(x, z, r, colliders, y0 = -Infinity, y1 = Infinity) {
 
 /**
  * Push a circle (x, z, r) out of all colliders. Returns {x, z, hit}.
- * [y0, y1] is the mover's height span: circle colliders with a bottom/top
- * (tree trunk slices, rocks) only count where they overlap it.
+ * [y0, y1] is the mover's height span: colliders with a bottom/top (tree
+ * trunk slices, rocks) only count where they overlap it, and `stand`
+ * colliders whose top is at most `climb` above y0 are stepped onto instead.
  *
  * Several passes, so a push out of one collider into its neighbour gets
  * corrected. When the mover is wedged between two circles (a gap narrower
@@ -78,14 +126,14 @@ export function penetration(x, z, r, colliders, y0 = -Infinity, y1 = Infinity) {
  * stops there instead of ping-ponging between the trunks.
  * @param {{circles:Array, boxes:Array}} colliders
  */
-export function resolveCircle(x, z, r, colliders, out = { x: 0, z: 0, hit: false }, y0 = -Infinity, y1 = Infinity) {
+export function resolveCircle(x, z, r, colliders, out = { x: 0, z: 0, hit: false }, y0 = -Infinity, y1 = Infinity, climb = 0) {
   const x0 = x, z0 = z;
   let hit = false, clean = true;
   for (let pass = 0; pass < PASSES; pass++) {
     clean = true;
     const circles = r <= REACH ? circlesNear(colliders, x, z) : colliders.circles;
     for (const c of circles) {
-      if (!inSpan(c, y0, y1)) continue;
+      if (!inSpan(c, y0, y1, climb)) continue;
       const dx = x - c.x, dz = z - c.z;
       const min = r + c.r;
       if (dx > min || dx < -min || dz > min || dz < -min) continue;
@@ -100,7 +148,8 @@ export function resolveCircle(x, z, r, colliders, out = { x: 0, z: 0, hit: false
       x += dx * k;
       z += dz * k;
     }
-    for (const b of colliders.boxes) {
+    for (const b of r <= REACH ? boxesNear(colliders, x, z) : colliders.boxes) {
+      if (!inSpan(b, y0, y1, climb)) continue;
       const cos = Math.cos(b.rot), sin = Math.sin(b.rot);
       const dx = x - b.x, dz = z - b.z;
       // into box space
@@ -130,8 +179,8 @@ export function resolveCircle(x, z, r, colliders, out = { x: 0, z: 0, hit: false
     }
     if (clean) break;
   }
-  if (!clean && penetration(x, z, r, colliders, y0, y1) > SKIN) {
-    const wedge = wedgePoint(x0, z0, r, colliders, y0, y1);
+  if (!clean && penetration(x, z, r, colliders, y0, y1, climb) > SKIN) {
+    const wedge = wedgePoint(x0, z0, r, colliders, y0, y1, climb);
     if (wedge) { x = wedge.x; z = wedge.z; }
   }
   out.x = x; out.z = z; out.hit = hit;
@@ -142,10 +191,10 @@ export function resolveCircle(x, z, r, colliders, out = { x: 0, z: 0, hit: false
  * Nearest free point to (x, z) that touches two overlapping circle colliders
  * at once (the notch between two trunks), or null.
  */
-function wedgePoint(x, z, r, colliders, y0, y1) {
+function wedgePoint(x, z, r, colliders, y0, y1, climb) {
   const near = [];
   for (const c of r <= REACH ? circlesNear(colliders, x, z) : colliders.circles) {
-    if (inSpan(c, y0, y1) && circleDepth(c, x, z, r + 0.5) > 0) near.push(c);
+    if (inSpan(c, y0, y1, climb) && circleDepth(c, x, z, r + 0.5) > 0) near.push(c);
   }
   let best = null, bd = Infinity;
   for (let i = 0; i < near.length; i++) {
@@ -160,7 +209,7 @@ function wedgePoint(x, z, r, colliders, y0, y1) {
       for (const s of [1, -1]) {
         const px = mx - s * dz * h / d, pz = mz + s * dx * h / d;
         const q = (px - x) ** 2 + (pz - z) ** 2;
-        if (q >= bd || penetration(px, pz, r, colliders, y0, y1) > SKIN) continue;
+        if (q >= bd || penetration(px, pz, r, colliders, y0, y1, climb) > SKIN) continue;
         bd = q; best = { x: px, z: pz };
       }
     }

@@ -11,12 +11,14 @@ import { caveColliders, caveInterior, caveMouth, caveRockPiles } from './caveSha
 import { ruinsColliders, ruinsCenter, RUINS_ALTAR_TOP } from './ruinsShape.js';
 import { boatColliders, boatInteractPoint } from './boatShape.js';
 import { insideGrove } from './grove.js';
+import { standTop } from './collision.js';
 
 const TAU = Math.PI * 2;
 
 /**
- * @typedef {{x:number,z:number,r:number,bottom?:number,top?:number,kind?:string}} CircleCollider
- * @typedef {{x:number,z:number,hw:number,hd:number,rot:number,top:number}} BoxCollider
+ * `stand`: its top is ground players can step or jump onto (collision.js).
+ * @typedef {{x:number,z:number,r:number,bottom?:number,top?:number,kind?:string,stand?:boolean}} CircleCollider
+ * @typedef {{x:number,z:number,hw:number,hd:number,rot:number,top:number,stand?:boolean}} BoxCollider
  */
 
 /** Weighted pick from { key: weight } with rng. */
@@ -408,16 +410,18 @@ export function buildLayout(terrain) {
   }
 
   // -------------------------------------------------------- fallen trees
-  // Old trunks lying on the forest floor: low obstacles you can jump over (dead
-  // grey ones on the volcano island). Their collider is a row of low circles
-  // along the trunk, so the body blocks while a jump clears it.
+  // Old trunks lying on the forest floor: low obstacles you step or jump onto
+  // and walk along (dead grey ones on the volcano island). Their collider is a
+  // row of `stand` boxes along the trunk – flat sides you slide along instead
+  // of catching in notches, solid to the body, ground under the feet
+  // (collision.js standTop) – plus the torn-up root plate.
   {
     const rl = makeRng(S ^ 0x10c5);
     const want = volcanic ? 14 : 24;
     for (let i = 0; i < 6000 && layout.logs.length < want; i++) {
       const x = rl.range(-plan.A * 0.9, plan.A * 0.9), z = rl.range(-plan.B * 0.9, plan.B * 0.9);
       if (!inside(x, z, 0.9) || nearHut(x, z, 10) || nearBoat(x, z, 6) || !outsideGrove(x, z, 12)) continue;
-      const len = rl.range(5, 11), r = rl.range(0.35, 0.6), rot = rl() * TAU;
+      const len = rl.range(5, 11), r = rl.range(0.3, 0.52), rot = rl() * TAU;
       const dx = Math.cos(rot), dz = Math.sin(rot);
       // the whole trunk: dry, fairly flat, clear of paths, water and anything standing
       const pts = [];
@@ -429,15 +433,29 @@ export function buildLayout(terrain) {
         pts.push({ x: px, z: pz, t, g: terrain.heightAt(px, pz) });
       }
       if (!ok) continue;
-      // it rests on its ends: the ground in between may not bulge up through it
-      const yA = pts[0].g + r * 0.75, yB = pts[pts.length - 1].g + r * 0.75;
-      if (pts.some((p) => p.g + r * 0.4 > yA + (yB - yA) * (p.t + 0.5))) continue;
+      // root plate end: room for the torn-up disc of roots too
+      const roots = rl() < 0.6;
+      if (roots && !free(x - dx * (len / 2 + r * 0.3), z - dz * (len / 2 + r * 0.3), r * 2.2)) continue;
+      // it rests on its ends, sunk in a little: the ground in between may not bulge
+      // up through it, nor drop away under it (a trunk over a hollow is too high to jump onto)
+      const yA = pts[0].g + r * 0.6, yB = pts[pts.length - 1].g + r * 0.6;
+      if (pts.some((p) => { const lift = yA + (yB - yA) * (p.t + 0.5) - p.g; return lift < r * 0.3 || lift > r * 0.9; })) continue;
       if (Math.abs(yA - yB) > len * 0.25) continue;
-      layout.logs.push({ id: layout.logs.length, x, z, rot, len, r, yA, yB, roots: rl() < 0.6, dead: volcanic || rl() < 0.15, hue: rl() });
-      for (const p of pts) {
-        const top = yA + (yB - yA) * (p.t + 0.5) + r * 0.9;
-        circles.push({ x: p.x, z: p.z, r: r * 0.95, bottom: p.g - 0.6, top, kind: 'log' });
-        reserve(p.x, p.z, r + 0.5);
+      layout.logs.push({ id: layout.logs.length, x, z, rot, len, r, yA, yB, roots, dead: volcanic || rl() < 0.15, hue: rl() });
+      for (const p of pts) reserve(p.x, p.z, r + 0.5);
+      // ~1.2 m segments; the trunk tapers from r (root end) to 0.75 r (break)
+      const n = Math.ceil(len / 1.2);
+      for (let k = 0; k < n; k++) {
+        const u0 = k / n, u1 = (k + 1) / n, um = (u0 + u1) / 2;
+        const rr = r * (1.05 - um * 0.3);
+        const top = Math.max(yA + (yB - yA) * u0, yA + (yB - yA) * u1) + rr * 0.95;
+        boxes.push({ x: x + dx * len * (um - 0.5), z: z + dz * len * (um - 0.5), hw: len / n / 2 + 0.02, hd: rr * 0.95, rot, top, kind: 'log', stand: true });
+      }
+      // the root plate: an upright disc of roots and soil (radius ~2.3 r) at the thick end
+      if (roots) {
+        const px = x - dx * (len / 2 + r * 0.2), pz = z - dz * (len / 2 + r * 0.2);
+        boxes.push({ x: px, z: pz, hw: r * 0.45, hd: r * 2.1, rot, top: yA + r * 2.1, kind: 'log', stand: true });
+        reserve(px, pz, r * 2.3);
       }
     }
   }
@@ -762,10 +780,10 @@ export function buildLayout(terrain) {
   };
   /** Top of rock at (x, z), or -Infinity. */
   layout.rockHeightAt = (x, z) => layout.rockSurfaceAt(x, z).h;
-  /** Ground a player stands on: terrain or the top of a rock. */
-  layout.groundAt = (x, z) => Math.max(terrain.heightAt(x, z), layout.rockHeightAt(x, z));
   // Players collide with everything except rocks (those are ground, see above).
   layout.playerColliders = { circles: circles.filter((c) => c.kind !== 'rock'), boxes };
+  /** Ground a player stands on: terrain, the top of a rock or of a `stand` collider (fallen trunk, ruin stone). */
+  layout.groundAt = (x, z) => Math.max(terrain.heightAt(x, z), layout.rockHeightAt(x, z), standTop(layout.playerColliders, x, z));
 
   return layout;
 }

@@ -11,6 +11,8 @@ const MAX_SLOPE = P.maxWalkSlope * 0.7;
 const DIRS = 8;
 const PROBE_STEP = 0.5;
 const PROBE_LEN = 2.5;
+/** Low trunks and stones the player steps onto (see collision.js `stand`). */
+const CLIMB = P.stepHeight - 0.05;
 /** Open directions a spot needs so the player can walk away from it. */
 export const MIN_FREE_DIRS = 3;
 
@@ -35,7 +37,7 @@ export function standable(terrain, layout, x, z) {
     if (Math.abs(layout.groundAt(px, pz) - g) / e > MAX_SLOPE) return null;
     if (terrain.lavaLevelAt(px, pz) !== null) return null;
   }
-  if (penetration(x, z, P.radius + 0.05, layout.playerColliders, g + 0.05, g + P.height) > 0) return null;
+  if (penetration(x, z, P.radius + 0.05, layout.playerColliders, g + 0.05, g + P.height, CLIMB) > 0) return null;
   return g;
 }
 
@@ -52,7 +54,7 @@ export function freeDirections(terrain, layout, x, z, g) {
       const rise = h - prev;
       if (rise > P.stepHeight * 0.8 || (rise > 0.05 && rise / PROBE_STEP > P.maxWalkSlope)) ok = false;
       else if (terrain.waterDepthAt(px, pz) > CONFIG.world.maxWadeDepth || terrain.lavaLevelAt(px, pz) !== null) ok = false;
-      else if (penetration(px, pz, P.radius, layout.playerColliders, h + 0.05, h + P.height) > 0.01) ok = false;
+      else if (penetration(px, pz, P.radius, layout.playerColliders, h + 0.05, h + P.height, CLIMB) > 0.01) ok = false;
       prev = h;
     }
     if (ok) free++;

@@ -112,12 +112,7 @@ export function buildRuins(r, biome) {
   };
   for (const p of L.pillars) {
     std.push(place(pillar(p), [p.x, 0, p.z], [0, rng() * TAU, 0]));
-    // broken-off pieces lying next to snapped pillars
-    if (p.state === 'broken') {
-      const a = rng() * TAU;
-      const len = 0.8 + rng() * 0.6;
-      std.push(place(paint(shaftGeo(len, p.r, true, a), stone([p.x, 0, p.z])), [p.x + Math.cos(a) * 1.1, p.r * 0.95, p.z + Math.sin(a) * 1.1], [Math.PI / 2, a, 0.1]));
-    }
+    // (their broken-off pieces lie among the fallen columns, see below)
     if (!P.volcano && (p.state === 'full' || rng() < 0.35)) vines(p.x, p.z, p.r + 0.04, Math.min(p.h, 3.2));
   }
 
@@ -139,10 +134,7 @@ export function buildRuins(r, biome) {
       const a = Math.PI * (1 - t);
       std.push(block(0.62, 0.9, 0.9, [A.x + Math.cos(a) * (R + 0.02), cy + Math.sin(a) * (R + 0.02), A.z], [0, 0, a - Math.PI / 2]));
     }
-    // keystone + fallen voussoirs on the broken side
-    for (let k = 0; k < 3; k++) {
-      std.push(block(0.62, 0.9, 0.9, [A.x + A.broken * (1.4 + k * 0.7 + rng() * 0.3), 0.3, A.z + 0.9 + rng() * 1.2], [rng() * 0.4, rng() * TAU, Math.PI / 2 - 0.2 + rng() * 0.3]));
-    }
+    // (the fallen voussoirs of the broken side are layout blocks, see below)
     if (!P.volcano) for (const s of [-1, 1]) vines(A.x + s * half, A.z, 0.55, A.h);
   }
 
@@ -161,17 +153,15 @@ export function buildRuins(r, biome) {
       }
     }
     std.push(place(merge(parts), [w.x, 0, w.z], [0, w.yaw, 0]));
-    // a couple of tumbled blocks at its foot
-    for (let k = 0; k < 2; k++) {
-      std.push(place(block(0.8, 0.43, 0.7), [w.x + Math.cos(w.yaw) * (rng() - 0.5) * w.len + Math.sin(w.yaw) * -1.0, 0.2, w.z - Math.sin(w.yaw) * (rng() - 0.5) * w.len + Math.cos(w.yaw) * -1.0], [0.1, rng() * TAU, 0.08]));
-    }
   }
 
-  // --------------------------------------------------- fallen columns
+  // ------------------- fallen columns, pillar pieces and loose blocks
   for (const f of L.fallen) {
-    const g = paint(shaftGeo(f.len, f.r, true, f.x), drumSeams(f.len));
+    const g = paint(shaftGeo(f.len, f.r, true, f.x), f.piece ? stone([f.x, 0, f.z]) : drumSeams(f.len));
     std.push(place(place(g, [0, -f.len / 2, 0]), [f.x, f.r * 0.92, f.z], [0, f.yaw, Math.PI / 2]));
   }
+  // voussoirs fallen from the arch, tumbled blocks at the foot of the walls
+  for (const [k, b] of L.blocks.entries()) std.push(block(b.w, b.h, b.d, [b.x, b.y, b.z], [b.tilt, b.yaw, -b.tilt * 0.7], k * 3));
 
   // ------------------------------------ overgrowth: rubble, collapse, roots
   /** Low earth mound that half-buries a heap (dirt at the foot, grass/moss on top). */

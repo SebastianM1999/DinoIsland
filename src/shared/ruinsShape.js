@@ -20,13 +20,16 @@ export const RUINS_RADIUS = 7;
  *  pillars: [{ x, z, h, state: 'full'|'broken'|'stump', r }]
  *  arch:    { x, z, span, h, broken } – two posts at x ± span/2
  *  walls:   [{ x, z, len, h, yaw }]  (yaw like THREE rotation.y, long axis = local x)
- *  fallen:  [{ x, z, len, r, yaw }]  column drums lying on the plaza
+ *  fallen:  [{ x, z, len, r, yaw, piece? }] column drums lying on the plaza
+ *           (piece: broken off the snapped pillar next to it)
  *  rubble:  [{ x, z, r, h }]         half-buried heaps of tumbled blocks (h above r.y)
  *  slabs:   [{ x, z, len, h, yaw, tilt }] collapsed wall sections, leaning and
  *           half-buried (h = top above r.y, long axis = local x like walls)
  *  roots:   [{ x, z, yaw, len }]     big jungle roots creeping in over the plaza (flat)
- * Rubble and slabs keep >= RUINS_MIN_GAP to every other solid piece or
- * overlap nothing, so no player-trapping slots appear.
+ *  blocks:  [{ x, z, w, h, d, y, yaw, tilt }] loose blocks lying flat (y = center height)
+ * Rubble, slabs and pillar pieces keep >= RUINS_MIN_GAP to every other solid
+ * piece, so no player-trapping slots appear. Every stone is solid and its
+ * top is ground (`stand`): low ones you step onto, the rest you jump onto.
  */
 export function ruinsLayout(r) {
   const rng = makeRng(((r.seed ?? 1) * 7919 + 17) >>> 0);
@@ -55,11 +58,6 @@ export function ruinsLayout(r) {
   for (const w of walls) solids.push({ x: w.x, z: w.z, r: 0.4, hx: Math.cos(w.yaw) * w.len / 2, hz: -Math.sin(w.yaw) * w.len / 2 });
   for (const f of fallen) solids.push({ x: f.x, z: f.z, r: f.r, hx: Math.cos(f.yaw) * f.len / 2, hz: -Math.sin(f.yaw) * f.len / 2 });
   solids.push({ x: 0, z: 0, r: 1.3 });
-  const gap = (x, z, r, hx = 0, hz = 0) => {
-    let g = Infinity;
-    for (const o of solids) g = Math.min(g, segDist(x, z, hx, hz, o) - r - o.r);
-    return g;
-  };
   const entrance = (x, z, pad) => z < -2 && Math.abs(x) < 2.6 + pad;   // walkway through the arch
 
   const rubble = [];
@@ -99,13 +97,70 @@ export function ruinsLayout(r) {
     if (Math.cos(phi) < -0.8) continue;
     roots.push({ x: Math.sin(phi) * 10.5, z: Math.cos(phi) * 10.5, yaw: phi + Math.PI + rng.range(-0.5, 0.5), len: rng.range(4.5, 7) });
   }
-  return { pillars, arch, walls, fallen, rubble, slabs, roots };
+  // (drawn last, so the pieces above keep their places)
+  // drums broken off the snapped pillars: lying outward from the pillar's foot
+  for (const p of pillars) {
+    if (p.state !== 'broken') continue;
+    const own = solids.find((o) => o.x === p.x && o.z === p.z);
+    const len = rng.range(0.8, 1.4);
+    for (let tries = 0; tries < 8; tries++) {
+      const a = Math.atan2(p.x, p.z) + rng.range(-1.4, 1.4);
+      const d = 0.62 + len / 2;
+      const x = p.x + Math.sin(a) * d, z = p.z + Math.cos(a) * d, yaw = a - Math.PI / 2;
+      const hx = Math.cos(yaw) * len / 2, hz = -Math.sin(yaw) * len / 2;
+      if (entrance(x, z, 0.5) || gap(x, z, p.r, hx, hz, own) < RUINS_MIN_GAP) continue;
+      fallen.push({ x, z, len, r: p.r, yaw, piece: true });
+      solids.push({ x, z, r: p.r, hx, hz });
+      break;
+    }
+  }
+  // loose blocks lying flat (low: you step onto them): voussoirs that fell
+  // from the broken half of the arch, tumbled blocks inside the walls
+  const blocks = [];
+  for (let k = 0; k < 3; k++) {
+    const x = arch.x + arch.broken * (1.6 + k * 0.7 + rng() * 0.3), z = arch.z + 0.9 + rng() * 1.2;
+    blocks.push({ x, z, w: 0.9, h: 0.58, d: 0.62, y: 0.2, yaw: rng() * Math.PI * 2, tilt: rng.range(-0.08, 0.08) });
+  }
+  for (const w of walls) {
+    for (let k = 0; k < 2; k++) {
+      const u = (rng() - 0.5) * w.len;
+      blocks.push({ x: w.x + Math.cos(w.yaw) * u - Math.sin(w.yaw) * 1.0, z: w.z - Math.sin(w.yaw) * u - Math.cos(w.yaw) * 1.0,
+        w: 0.8, h: 0.43, d: 0.7, y: 0.2, yaw: rng() * Math.PI * 2, tilt: rng.range(-0.08, 0.08) });
+    }
+  }
+  return { pillars, arch, walls, fallen, rubble, slabs, roots, blocks };
+
+  function gap(x, z, r, hx = 0, hz = 0, skip = null) {
+    let g = Infinity;
+    for (const o of solids) if (o !== skip) g = Math.min(g, segDist(x, z, hx, hz, o) - r - o.r);
+    return g;
+  }
+}
+
+/** Height of a wall's top course above r.y (whole 0.45 m courses). */
+export const wallTop = (w) => Math.max(2, Math.round(w.h / 0.45)) * 0.45;
+
+/**
+ * Footprint of a collapsed wall section across its long axis (slab local z):
+ * { z0, z1 } of the stones that show above ground, after the lean (see the
+ * slab model: courses from -0.6 m up to tall, 0.7 m thick, tilted about x).
+ */
+export function slabSpan(sl) {
+  const tall = sl.h / Math.cos(sl.tilt) + 0.6;
+  const c = Math.cos(sl.tilt), s = Math.sin(sl.tilt);
+  const yg = 0.6 / c;                       // where the face comes out of the ground
+  let z0 = Infinity, z1 = -Infinity;
+  for (const y of [yg, tall]) for (const zz of [-0.37, 0.37]) {
+    const z = y * s + zz * c;
+    z0 = Math.min(z0, z); z1 = Math.max(z1, z);
+  }
+  return { z0, z1 };
 }
 
 /** Minimum free gap between two solid ruin pieces (player fits through). */
 export const RUINS_MIN_GAP = 1.4;
 
-/** Distance from segment (x,z)�(hx,hz) to piece o (circle or segment). */
+/** Distance from segment (x,z)�(hx,hz) to piece o (circle or segment). */
 function segDist(x, z, hx, hz, o) {
   const ohx = o.hx || 0, ohz = o.hz || 0;
   let best = Infinity;
@@ -119,27 +174,50 @@ function segDist(x, z, hx, hz, o) {
   return best;
 }
 
-/** Colliders: { circles: [{x, z, r, top, kind:'ruins'}], boxes: [{x, z, hw, hd, rot, top}] }. */
+/**
+ * Colliders, all `stand` (their tops are ground):
+ * { circles: [{x, z, r, top, kind:'ruins', stand}], boxes: [{x, z, hw, hd, rot, top, kind, stand}] }.
+ * Shapes follow the stones of models/props/ruins.js.
+ */
 export function ruinsColliders(r) {
   const y = r.y ?? 0;
   const L = ruinsLayout(r);
   const circles = [], boxes = [];
   const circle = (lx, lz, rad, top) => {
     const p = toWorld(r, lx, lz);
-    circles.push({ x: p.x, z: p.z, r: rad, top: y + top, kind: 'ruins' });
+    circles.push({ x: p.x, z: p.z, r: rad, top: y + top, kind: 'ruins', stand: true });
   };
-  for (const p of L.pillars) circle(p.x, p.z, 0.6, p.h);
-  for (const s of [-1, 1]) circle(L.arch.x + s * L.arch.span / 2, L.arch.z, 0.62, L.arch.h + 0.6);
-  for (const w of L.walls) boxes.push(siteBox(r, w.x, w.z, w.len / 2, 0.4, y + w.h, w.yaw));
-  for (const f of L.fallen) boxes.push(siteBox(r, f.x, f.z, f.len / 2, f.r, y + f.r * 2, f.yaw));
-  boxes.push(siteBox(r, 0, 0, 1.0, 1.0, y + RUINS_ALTAR_TOP));
-  for (const p of L.rubble) if (p.h > 0.6) circle(p.x, p.z, p.r * 0.85, p.h);
-  for (const sl of L.slabs) {
-    if (sl.h <= 0.6) continue;
-    // centered between the buried foot and the leaning top (lean toward local +z * sign(tilt))
-    const off = Math.sign(sl.tilt) * 0.3;
-    boxes.push(siteBox(r, sl.x + Math.sin(sl.yaw) * off, sl.z + Math.cos(sl.yaw) * off, sl.len / 2, 0.65, y + sl.h, sl.yaw));
+  const box = (lx, lz, hw, hd, top, yaw = 0) => boxes.push({ ...siteBox(r, lx, lz, hw, hd, y + top, yaw), kind: 'ruins', stand: true });
+  // pillars: the shaft (r 0.42) on its 1.15 m square plinth
+  for (const p of L.pillars) {
+    circle(p.x, p.z, 0.55, p.h);
+    box(p.x, p.z, 0.56, 0.56, 0.32);
   }
+  // arch posts: stacked 0.95 m blocks
+  for (const s of [-1, 1]) box(L.arch.x + s * L.arch.span / 2, L.arch.z, 0.5, 0.5, L.arch.h + 0.24);
+  for (const w of L.walls) box(w.x, w.z, w.len / 2, 0.38, wallTop(w), w.yaw);
+  // lying drums: axis at 0.92 r
+  for (const f of L.fallen) box(f.x, f.z, f.len / 2, f.r * 0.95, f.r * 1.9, f.yaw);
+  // the stepped altar: three steps you can walk up
+  box(0, 0, 1.0, 1.0, 0.3);
+  box(0, 0, 0.78, 0.78, 0.65);
+  box(0, 0, 0.6, 0.6, RUINS_ALTAR_TOP);
+  // rubble heaps: tumbled blocks around (low ring), the top block in the middle
+  for (const p of L.rubble) {
+    if (p.r > 0.8) {
+      circle(p.x, p.z, p.r * 0.85, Math.min(p.h, 0.5));
+      if (p.h > 0.5) circle(p.x, p.z, 0.42, p.h);
+    } else {
+      circle(p.x, p.z, 0.45, p.h);
+    }
+  }
+  // collapsed wall sections: what shows above ground, after the lean
+  for (const sl of L.slabs) {
+    const { z0, z1 } = slabSpan(sl);
+    const off = (z0 + z1) / 2;
+    box(sl.x + Math.sin(sl.yaw) * off, sl.z + Math.cos(sl.yaw) * off, sl.len / 2, (z1 - z0) / 2, sl.h + 0.1, sl.yaw);
+  }
+  for (const b of L.blocks) box(b.x, b.z, b.w / 2, b.d / 2, b.y + b.h / 2, b.yaw);
   return { circles, boxes };
 }
 

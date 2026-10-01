@@ -195,8 +195,9 @@ export class Game {
       this.debugGroup.add(m);
     }
     for (const b of this.layout.colliders.boxes) {
-      const m = new THREE.Mesh(new THREE.BoxGeometry(b.hw * 2, 3, b.hd * 2), dm);
-      m.position.set(b.x, this.terrain.heightAt(b.x, b.z) + 1.5, b.z);
+      const g = this.terrain.heightAt(b.x, b.z) - 0.2, top = b.top ?? g + 3;
+      const m = new THREE.Mesh(new THREE.BoxGeometry(b.hw * 2, top - g, b.hd * 2), dm);
+      m.position.set(b.x, (top + g) / 2, b.z);
       m.rotation.y = -b.rot;
       this.debugGroup.add(m);
     }

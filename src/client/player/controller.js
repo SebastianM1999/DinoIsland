@@ -4,7 +4,7 @@
 // the server; everything else (health, loot) is server-authoritative.
 
 import { CONFIG } from '../../shared/config.js';
-import { resolveCircle, penetration } from '../../shared/collision.js';
+import { resolveCircle, penetration, standTop } from '../../shared/collision.js';
 import { settings } from '../core/settings.js';
 
 const P = CONFIG.player;
@@ -12,6 +12,15 @@ const tmp = { x: 0, z: 0, hit: false };
 const tmp2 = { x: 0, z: 0, hit: false };
 /** Rock sides steeper than this (tan) can't be walked up once they are higher than a step. */
 const ROCK_WALK_SLOPE = 0.45;
+/** Collision span starts this far above the feet; `stand` colliders up to a step higher are walked onto. */
+const FOOT = 0.05;
+const CLIMB = P.stepHeight - FOOT;
+/**
+ * The feet find a trunk or stone top as soon as the body touches it: the same
+ * moment the collision lets the body over it (a step) – no band where the body
+ * sinks into a stone it neither stands on nor is stopped by.
+ */
+const STAND_MARGIN = P.radius;
 const C = P.creative;
 const SW = P.swim;
 
@@ -25,8 +34,11 @@ export class PlayerController {
     this.terrain = terrain;
     this.colliders = colliders;
     this.rockSurfaceAt = rockSurfaceAt;
-    // rocks are ground: stand on them, jump over them
-    this.groundAt = (x, z) => Math.max(terrain.heightAt(x, z), rockSurfaceAt(x, z).h);
+    // rocks are ground: stand on them, jump over them; so are the tops of fallen
+    // trunks and ruin stones (`stand` colliders) once the feet are at most a step
+    // below them – reached by walking up a low one or jumping onto a higher one
+    this.groundAt = (x, z, feet = Infinity) => Math.max(terrain.heightAt(x, z), rockSurfaceAt(x, z).h,
+      feet === Infinity ? standTop(colliders, x, z) : standTop(colliders, x, z, STAND_MARGIN, feet + P.stepHeight));
     this.pos = { x: 0, y: 0, z: 0 };   // feet position
     this.vel = { x: 0, y: 0, z: 0 };
     this.yaw = 0;                       // 0 = looking north (-z)
@@ -211,8 +223,8 @@ export class PlayerController {
     }
 
     // --- horizontal move with slope + water limits (axis separated so we slide)
-    const oldX = this.pos.x, oldZ = this.pos.z;
-    const groundNow = this.groundAt(oldX, oldZ);
+    const oldX = this.pos.x, oldZ = this.pos.z, oldY = this.pos.y;
+    const groundNow = this.groundAt(oldX, oldZ, oldY);
     this.barrierHit = false;
     this.#tryMove(this.vel.x * dt, 0, groundNow);
     this.#tryMove(0, this.vel.z * dt, groundNow);
@@ -229,7 +241,8 @@ export class PlayerController {
 
     // --- vertical
     this.pos.y += this.vel.y * dt;
-    const ground = this.groundAt(this.pos.x, this.pos.z);
+    // feet: the higher end of this frame's fall/rise, so a fast drop onto a trunk still lands on it
+    const ground = this.groundAt(this.pos.x, this.pos.z, Math.max(oldY, this.pos.y));
     if (this.flying) {
       this.pos.y = Math.min(this.pos.y, ground + C.maxHeight);
       // touching the ground ends the flight
@@ -264,16 +277,16 @@ export class PlayerController {
    * is refused and the player simply stops.
    */
   #collide(oldX, oldZ, groundNow) {
-    const y0 = this.pos.y + 0.05, y1 = this.pos.y + P.height;
+    const y0 = this.pos.y + FOOT, y1 = this.pos.y + P.height;
     const cx = this.pos.x, cz = this.pos.z;
-    resolveCircle(cx, cz, P.radius, this.colliders, tmp, y0, y1);
+    resolveCircle(cx, cz, P.radius, this.colliders, tmp, y0, y1, CLIMB);
     if (!tmp.hit) return;
     const nx = tmp.x - cx, nz = tmp.z - cz, nl = Math.hypot(nx, nz);
     if (nl > 1e-6) {
       const vn = (this.vel.x * nx + this.vel.z * nz) / nl;
       if (vn < 0) { this.vel.x -= nx / nl * vn; this.vel.z -= nz / nl * vn; }
     }
-    const depth = penetration(tmp.x, tmp.z, P.radius, this.colliders, y0, y1);
+    const depth = penetration(tmp.x, tmp.z, P.radius, this.colliders, y0, y1, CLIMB);
     // the push-out may slide us sideways but never back against the step: that
     // back-and-forth is what makes pushing into a notch vibrate
     const sx = cx - oldX, sz = cz - oldZ;
@@ -288,8 +301,8 @@ export class PlayerController {
       const sn = (sx * nx + sz * nz) / nl;
       const tx = oldX + sx - nx / nl * sn, tz = oldZ + sz - nz / nl * sn;
       if ((tx - oldX) ** 2 + (tz - oldZ) ** 2 > 1e-8) {
-        resolveCircle(tx, tz, P.radius, this.colliders, tmp2, y0, y1);
-        if (penetration(tmp2.x, tmp2.z, P.radius, this.colliders, y0, y1) < 0.01 && forward(tmp2.x, tmp2.z) &&
+        resolveCircle(tx, tz, P.radius, this.colliders, tmp2, y0, y1, CLIMB);
+        if (penetration(tmp2.x, tmp2.z, P.radius, this.colliders, y0, y1, CLIMB) < 0.01 && forward(tmp2.x, tmp2.z) &&
             this.#canStep(oldX, oldZ, tmp2.x, tmp2.z, groundNow)) {
           this.pos.x = tmp2.x;
           this.pos.z = tmp2.z;
@@ -298,7 +311,7 @@ export class PlayerController {
       }
     }
     // no clean spot ahead: stay where we were (unless that is inside something too)
-    const oldDepth = penetration(oldX, oldZ, P.radius, this.colliders, y0, y1);
+    const oldDepth = penetration(oldX, oldZ, P.radius, this.colliders, y0, y1, CLIMB);
     if (oldDepth < 0.01 || depth >= oldDepth) {
       this.pos.x = oldX;
       this.pos.z = oldZ;
