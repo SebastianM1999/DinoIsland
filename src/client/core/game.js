@@ -444,7 +444,7 @@ export class Game {
     this.hud.show(false);
     this.input.onPanelToggle = null;
     this.input.onLockChange = null;
-    this.audio.update?.(0, { coast: 0, waterfallDistance: Infinity, danger: false });
+    this.audio.update?.(0, { coast: 0, water: {}, danger: false });   // water loops fade out
     return { gfx: this.gfx, audio: this.audio, input: this.input };
   }
 
@@ -546,20 +546,102 @@ export class Game {
     const up = new THREE.Vector3(0, 1, 0).applyQuaternion(cam.quaternion);
     this.audio.setListener(cam.position, fwd, up);
     const p = this.player;
-    // footsteps
-    this.stepDist += p.moveSpeed * dt * (p.onGround ? 1 : 0);
-    if (this.stepDist > (p.sprinting ? 2.2 : 1.7)) {
+    // footsteps (in water: a splashing step and a ring on the surface)
+    const wet = p.inWater > 0.06 && !p.swimming;
+    this.stepDist += p.moveSpeed * dt * (p.onGround || p.swimming ? 1 : 0);
+    if (this.stepDist > (p.swimming ? 2.6 : p.sprinting ? 2.2 : 1.7)) {
       this.stepDist = 0;
-      this.audio.play(p.inWater > 0.2 ? 'splash' : 'step', { vol: p.sprinting ? 1.3 : 1 });
+      if (wet || p.swimming) {
+        this.audio.play('waterStep', { vol: Math.min(1.4, 0.55 + p.inWater * 0.8) * (p.sprinting ? 1.25 : 1) * (p.swimming ? 0.7 : 1) });
+        this.water.ripple(p.pos.x, p.pos.z, Math.min(1, 0.3 + p.inWater * 0.5));
+      } else this.audio.play('step', { vol: p.sprinting ? 1.3 : 1 });
     }
+    this.#waterEvents(dt);
     // surf gets louder toward the coast
     const g = this.terrain.heightAt(p.pos.x, p.pos.z);
     const plan = this.layout.plan;
     const rim = Math.hypot(p.pos.x / plan.A, p.pos.z / plan.B);
     const coast = Math.max(0, Math.min(1, (rim - 0.7) / 0.3)) * (g < 6 ? 1 : 0.3);
-    const fall = this.layout.waterfall?.bottom;
-    const waterfallDistance = fall ? Math.hypot(p.pos.x - fall.x, p.pos.z - fall.z) : Infinity;
-    this.audio.update(dt, { coast, waterfallDistance, danger: this.#inDanger() });
+    this.audio.update(dt, { coast, water: this.#waterSoundscape(cam.position), danger: this.#inDanger() });
+  }
+
+  /**
+   * The local player and the water: a big splash when jumping / falling in, a
+   * wake of rings while wading or swimming.
+   * TODO(water-sim): dinosaurs and remote players wading don't ripple the water yet.
+   */
+  #waterEvents(dt) {
+    const p = this.player;
+    const depth = p.inWater;
+    const prev = this.prevWaterDepth ?? depth;
+    this.prevWaterDepth = depth;
+    const fallSpeed = -(this.prevVelY ?? 0);
+    this.prevVelY = p.vel.y;
+    if (depth > 0.25 && prev < 0.05 || (p.swimming && !this.wasSwimming)) {
+      const big = Math.min(1.5, 0.4 + Math.max(0, fallSpeed) / 8 + depth * 0.3);
+      const y = this.terrain.waterLevelAt(p.pos.x, p.pos.z) ?? p.pos.y;
+      this.water.splash(p.pos.x, y, p.pos.z, big);
+      this.audio.play(big > 0.8 ? 'splashBig' : 'waterStep', { vol: big });
+    }
+    this.wasSwimming = p.swimming;
+    // a wake of rings behind the player while moving through water
+    this.wakeT = (this.wakeT ?? 0) - dt;
+    if (depth > 0.15 && p.moveSpeed > 0.6 && this.wakeT <= 0) {
+      this.wakeT = p.swimming ? 0.5 : 0.32;
+      this.water.ripple(p.pos.x, p.pos.z, Math.min(0.9, 0.25 + p.moveSpeed * 0.06));
+    }
+  }
+
+  /** Something (an arrow, a spear) hit the water at `pt`. */
+  onWaterSplash(pt, strength = 0.4) {
+    this.water.splash(pt.x, pt.y, pt.z, strength);
+    this.audio.play(strength > 0.8 ? 'splashBig' : 'plop', { pos: pt, vol: 0.6 + strength * 0.5 });
+  }
+
+  /**
+   * Where the water sounds come from, seen from the listener at `cam`: the
+   * waterfall (impact, cascade, grotto), the nearest stretch of river and the
+   * nearest pool – for the distance-driven water ambience in audio.js.
+   */
+  #waterSoundscape(cam) {
+    const w = {};
+    const L = this.layout;
+    const wf = L.waterfall;
+    if (wf?.impact) {
+      const impact = { x: wf.impact.x, y: wf.impact.y + 0.5, z: wf.impact.z };
+      const mid = { x: (wf.top.x + wf.impact.x) / 2, y: (wf.top.y + wf.impact.y) / 2, z: (wf.top.z + wf.impact.z) / 2 };
+      const d3 = (q) => Math.hypot(cam.x - q.x, (cam.y - q.y) * 0.7, cam.z - q.z);
+      w.fall = { impact, d: d3(impact), cascade: wf.cascade ?? 0, cascadePos: mid, cascadeD: d3(mid) };
+      if (wf.source) w.spring = { pos: { x: wf.source.x, y: wf.source.y, z: wf.source.z }, d: d3(wf.source) };
+    }
+    const river = L.rivers.find((r) => r.kind === 'water');
+    if (river) {
+      let best = null;
+      const pts = river.pts;
+      for (let i = 0; i < pts.length - 1; i++) {
+        const a = pts[i], b = pts[i + 1];
+        const vx = b.x - a.x, vz = b.z - a.z;
+        const u = Math.max(0, Math.min(1, ((cam.x - a.x) * vx + (cam.z - a.z) * vz) / (vx * vx + vz * vz || 1)));
+        const x = a.x + vx * u, z = a.z + vz * u;
+        const d = Math.hypot(cam.x - x, cam.z - z) - (a.w + (b.w - a.w) * u) / 2;
+        if (!best || d < best.d) {
+          const slope = Math.max(0, a.y - b.y) / (Math.hypot(vx, vz) || 1);
+          best = { d: Math.max(0, d), pos: { x, y: a.y + (b.y - a.y) * u, z }, w: a.w + (b.w - a.w) * u, slope };
+        }
+      }
+      // size: width and pace (a narrow, steep stretch babbles; a broad one rushes)
+      if (best) w.river = { pos: best.pos, d: best.d, size: Math.min(1, Math.max(0, (best.w - 5) / 9) + best.slope * 2) };
+    }
+    let pool = null;
+    for (const pl of L.pools) {
+      if (pl.kind !== 'water') continue;
+      const d = Math.max(0, Math.hypot(cam.x - pl.x, cam.z - pl.z) - pl.r);
+      if (!pool || d < pool.d) pool = { pos: { x: pl.x, y: pl.level, z: pl.z }, d, r: pl.r };
+    }
+    if (pool) w.pool = pool;
+    const p = this.player;
+    if (p.inWater > 0.05) w.wade = { depth: p.inWater, speed: p.moveSpeed, swimming: p.swimming };
+    return w;
   }
 
   /**

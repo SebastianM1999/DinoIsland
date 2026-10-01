@@ -1,11 +1,13 @@
 // Procedural audio with the Web Audio API – no sound files. Short synthesized
 // effects (bow, hits, roars, footsteps, UI), 3D-positioned where it matters,
-// location-aware shore/waterfall details and adaptive melodic music.
+// location-aware shore details, distance-driven water ambience (waterfall,
+// cascade, spring, river, pools, wading) and adaptive melodic music.
 
 import { CONFIG } from '../../shared/config.js';
 import { onSettings, audioGains } from '../core/settings.js';
 
 const A = CONFIG.audio;
+const smoothstep = (a, b, x) => { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 
 export class GameAudio {
   constructor() {
@@ -31,7 +33,10 @@ export class GameAudio {
     this.ambBus = this.ctx.createGain();
     this.ambBus.gain.value = 0.35;
     this.ambBus.connect(this.master);
-    this.noiseBuf = this.#makeNoise(2);
+    // long buffers + random start offsets: loops built on them never audibly repeat
+    this.noiseBuf = this.#makeNoise(6);
+    this.brownBuf = this.#makeNoise(6, 'brown');
+    this.water = null;                    // water ambience loops (built on first use)
     this.listenerPos = { x: 0, y: 0, z: 0 };
     this.lastPlay = new Map();
     this.musicOn = true;
@@ -53,11 +58,21 @@ export class GameAudio {
     if (this.ok && this.ctx.state !== 'running') this.ctx.resume().catch(() => {});
   }
 
-  #makeNoise(seconds) {
+  /** White noise, or brown noise (deep rumble: integrated white, for big water). */
+  #makeNoise(seconds, kind = 'white') {
     const len = this.ctx.sampleRate * seconds;
     const buf = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
     const d = buf.getChannelData(0);
-    for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+    let last = 0;
+    for (let i = 0; i < len; i++) {
+      const w = Math.random() * 2 - 1;
+      if (kind === 'brown') { last = (last + 0.02 * w) / 1.02; d[i] = last * 3.5; } else d[i] = w;
+    }
+    // brown noise drifts: tilt it so the end meets the start (no click at the loop point)
+    if (kind === 'brown') {
+      const drift = d[len - 1] - d[0];
+      for (let i = 0; i < len; i++) d[i] -= drift * (i / len);
+    }
     return buf;
   }
 
@@ -273,6 +288,34 @@ export class GameAudio {
       case 'splash':
         this.#noise(t, 0.22, out, { vol: 0.15, f0: 1500, f1: 550, q: 1.6 });
         break;
+      case 'waterStep': {
+        // a foot in shallow water: a low slosh, then a spray of small droplets;
+        // every step a little different (vol scales with depth / pace)
+        const r = Math.random();
+        this.#noise(t, 0.16 + r * 0.06, out, { vol: 0.11, type: 'lowpass', f0: 900 + r * 400, f1: 280, q: 0.9, a: 0.012 });
+        this.#noise(t + 0.03, 0.12 + r * 0.05, out, { vol: 0.06, f0: 2600 + r * 1400, f1: 1300, q: 1.4, a: 0.006 });
+        if (Math.random() < 0.6) this.#osc('sine', 1300 + r * 900, 650, t + 0.06 + r * 0.04, 0.05, out, 0.035);
+        break;
+      }
+      case 'splashBig': {
+        // something heavy breaks the surface: a deep plunge, a broad spray and
+        // droplets pattering back down
+        this.#osc('sine', 150, 55, t, 0.28, out, 0.45, 0.004);
+        this.#noise(t, 0.5, out, { vol: 0.32, type: 'lowpass', f0: 3200, f1: 420, q: 0.7, a: 0.008 });
+        this.#noise(t + 0.02, 0.35, out, { vol: 0.12, f0: 4200, f1: 1800, q: 1.1, a: 0.01 });
+        for (let i = 0; i < 7; i++) {
+          const f = 900 + Math.random() * 1800;
+          this.#osc('sine', f, f * 0.5, t + 0.25 + Math.random() * 0.55, 0.04, out, 0.03 + Math.random() * 0.03);
+        }
+        break;
+      }
+      case 'plop': {
+        // a small thing dropping in (arrow, spear): the bubble's pitch drop + a tiny splash
+        const f = 700 + Math.random() * 500;
+        this.#osc('sine', f, f * 0.35, t, 0.09, out, 0.18, 0.003);
+        this.#noise(t, 0.08, out, { vol: 0.06, f0: 2400, f1: 1100, q: 1.5, a: 0.004 });
+        break;
+      }
       case 'roar_trex':
       case 'roar_raptor':
       case 'roar_stego':
@@ -317,11 +360,181 @@ export class GameAudio {
   /** Sparse ambience is scheduled near its source; no always-on noise bed. */
   startAmbient() {
     if (!this.ok || this.amb) return;
-    this.amb = { surfAt: 0, waterfallAt: 0 };
+    this.amb = { surfAt: 0 };
+  }
+
+  // ------------------------------------------------------------------ water ambience
+  //
+  // Continuous water sounds are looping noise layers (long buffers, random
+  // start offsets, slowly wandering filters and gains – no audible repeat),
+  // each with its own distance curve so far away there is only a soft hush,
+  // nearer the body of the water, and up close its fine detail. Bubbly,
+  // trickling detail (springs, brooks, drops into a pool) is scheduled as tiny
+  // random blips instead of a loop.
+  // TODO(water-sfx): swap the synthesized layers for recorded loops / one-shots
+  // once real water samples exist; keep the layer names and distance curves.
+
+  /** A looping noise layer: source -> filter (+ optional wobble) -> gain -> panner -> ambience bus. */
+  #loopLayer({ brown = false, type = 'bandpass', f = 800, q = 0.8, wobble = 0, wobbleRate = 0.6, positional = true }) {
+    const ctx = this.ctx;
+    const src = ctx.createBufferSource();
+    src.buffer = brown ? this.brownBuf : this.noiseBuf;
+    src.loop = true;
+    src.playbackRate.value = 0.94 + Math.random() * 0.12;
+    const flt = ctx.createBiquadFilter();
+    flt.type = type;
+    flt.frequency.value = f;
+    flt.Q.value = q;
+    const g = ctx.createGain();
+    g.gain.value = 0;
+    src.connect(flt).connect(g);
+    let pan = null;
+    if (positional) {
+      pan = ctx.createPanner();
+      pan.panningModel = 'HRTF';
+      pan.distanceModel = 'linear';
+      pan.rolloffFactor = 0;                 // loudness is ours (distance curves below), the panner only places it
+      g.connect(pan).connect(this.ambBus);
+    } else g.connect(this.ambBus);
+    // gurgle: an LFO sweeping the filter (two rates so it never settles into a pattern)
+    const lfos = [];
+    if (wobble > 0) {
+      for (const [rate, depth] of [[wobbleRate, wobble], [wobbleRate * 2.73 + 0.11, wobble * 0.45]]) {
+        const o = ctx.createOscillator();
+        o.frequency.value = rate * (0.85 + Math.random() * 0.3);
+        const og = ctx.createGain();
+        og.gain.value = depth;
+        o.connect(og).connect(flt.frequency);
+        o.start();
+        lfos.push(o);
+      }
+    }
+    src.start(0, Math.random() * 5);
+    return { src, flt, g, pan, base: f, phase: Math.random() * 100 };
+  }
+
+  /** Smoothly steer a layer's loudness and place it at `pos`. */
+  #steer(layer, gain, pos, t) {
+    // a slow, irregular swell so a steady source still breathes
+    const wander = 1 + 0.14 * Math.sin(t * 0.31 + layer.phase) * Math.sin(t * 0.117 + layer.phase * 1.7);
+    layer.g.gain.setTargetAtTime(Math.max(0, gain * wander), t, 0.25);
+    if (layer.pan && pos) {
+      layer.pan.positionX.setTargetAtTime(pos.x, t, 0.1);
+      layer.pan.positionY.setTargetAtTime(pos.y, t, 0.1);
+      layer.pan.positionZ.setTargetAtTime(pos.z, t, 0.1);
+    }
+  }
+
+  /** A tiny pitched water blip (a drop, a bubble) at `pos`, routed through a one-off panner. */
+  #drip(t, pos, { f = 1400, vol = 0.03, fall = 0.5, dur = 0.05 } = {}) {
+    const out = this.ctx.createGain();
+    out.gain.value = 1;
+    if (pos) {
+      const p = this.ctx.createPanner();
+      p.panningModel = 'HRTF';
+      p.distanceModel = 'inverse';
+      p.refDistance = 3;
+      p.rolloffFactor = 1.3;
+      p.positionX.value = pos.x; p.positionY.value = pos.y; p.positionZ.value = pos.z;
+      out.connect(p).connect(this.ambBus);
+    } else out.connect(this.ambBus);
+    this.#osc('sine', f, f * fall, t, dur, out, vol, 0.003);
+  }
+
+  /**
+   * Water ambience for this frame. `w` (all optional):
+   *   fall:   { pos, impact, d, cascade, cascadePos, cascadeD }  the waterfall
+   *   spring: { pos, d }                                          the grotto it springs from
+   *   river:  { pos, d, size }   nearest point of the river (size 0 brook .. 1 broad river)
+   *   pool:   { pos, d, r }      nearest pool / basin
+   *   wade:   { depth, speed, swimming }                          the player in the water
+   */
+  #waterAmbience(dt, t, w) {
+    if (!this.water) {
+      this.water = {
+        fallRumble: this.#loopLayer({ brown: true, type: 'lowpass', f: 380, q: 0.5 }),
+        fallBody: this.#loopLayer({ type: 'bandpass', f: 1100, q: 0.55, wobble: 120, wobbleRate: 0.4 }),
+        fallHiss: this.#loopLayer({ type: 'highpass', f: 4200, q: 0.4 }),
+        cascade: this.#loopLayer({ type: 'bandpass', f: 720, q: 2.2, wobble: 260, wobbleRate: 1.7 }),
+        river: this.#loopLayer({ type: 'bandpass', f: 800, q: 0.9, wobble: 140, wobbleRate: 0.9 }),
+        riverLow: this.#loopLayer({ brown: true, type: 'lowpass', f: 300, q: 0.4 }),
+        wade: this.#loopLayer({ type: 'lowpass', f: 700, q: 1.2, wobble: 260, wobbleRate: 2.2, positional: false }),
+        brookAt: 0, springAt: 0, poolAt: 0, impactAt: 0,
+      };
+    }
+    const W = this.water;
+    const near = (d, r0, r1) => 1 - smoothstep(r0, r1, d);       // 1 inside r0 .. 0 beyond r1
+    // --- the waterfall: a hush from afar, its roar nearer, its hiss and spray up close
+    const f = w.fall;
+    if (f) {
+      const far = near(f.d, 20, 150), mid = near(f.d, 6, 45), close = near(f.d, 2, 16);
+      this.#steer(W.fallRumble, 0.5 * far + 0.25 * mid, f.impact, t);
+      this.#steer(W.fallBody, 0.12 * far * far + 0.42 * mid, f.impact, t);
+      this.#steer(W.fallHiss, 0.22 * close ** 1.5, f.impact, t);
+      // water running over the rocks of the cliff (only where it cascades)
+      this.#steer(W.cascade, 0.32 * (f.cascade ?? 0) * near(f.cascadeD ?? f.d, 3, 35), f.cascadePos ?? f.impact, t);
+      // water hitting the basin: patter of the plunge, close by
+      if (close > 0.05 && t >= W.impactAt) {
+        this.#noise(t, 0.12 + Math.random() * 0.15, this.#placed(f.impact), { vol: 0.07 * close, f0: 1600 + Math.random() * 2400, f1: 700, q: 1.3, a: 0.01 });
+        W.impactAt = t + 0.06 + Math.random() * 0.12;
+      }
+    } else {
+      for (const k of ['fallRumble', 'fallBody', 'fallHiss', 'cascade']) this.#steer(W[k], 0, null, t);
+    }
+    // --- the spring: trickling, bubbling right at the grotto
+    const s = w.spring;
+    if (s && s.d < 28 && t >= W.springAt) {
+      const k = near(s.d, 2, 28);
+      this.#drip(t, s.pos, { f: 700 + Math.random() * 1300, vol: 0.04 * k, fall: 1.4 + Math.random() * 0.6, dur: 0.04 + Math.random() * 0.04 });
+      W.springAt = t + 0.05 + Math.random() * 0.22;
+    }
+    // --- the river: a brook babbles, a broad river rushes and rumbles
+    const r = w.river;
+    if (r) {
+      const size = r.size ?? 0.5;
+      const k = near(r.d, 2, 30 + size * 40);
+      W.river.flt.frequency.setTargetAtTime(1300 - size * 650, t, 0.5);
+      this.#steer(W.river, (0.08 + size * 0.22) * k, r.pos, t);
+      this.#steer(W.riverLow, size * size * 0.3 * near(r.d, 4, 60), r.pos, t);
+      // babbling detail when close to a small, fast stretch
+      const babble = near(r.d, 1, 12) * (1 - size * 0.6);
+      if (babble > 0.05 && t >= W.brookAt) {
+        this.#drip(t, r.pos, { f: 900 + Math.random() * 1600, vol: 0.03 * babble, fall: 0.6 + Math.random() * 0.9, dur: 0.03 + Math.random() * 0.05 });
+        W.brookAt = t + 0.04 + Math.random() * 0.16;
+      }
+    } else {
+      this.#steer(W.river, 0, null, t);
+      this.#steer(W.riverLow, 0, null, t);
+    }
+    // --- a pool / basin: now and then a drop falls in or a bubble rises
+    const p = w.pool;
+    if (p && p.d < 18 && t >= W.poolAt) {
+      const a = Math.random() * Math.PI * 2, rr = Math.random() * (p.r ?? 4);
+      const pos = { x: p.pos.x + Math.cos(a) * rr, y: p.pos.y, z: p.pos.z + Math.sin(a) * rr };
+      this.#drip(t, pos, { f: 600 + Math.random() * 900, vol: 0.025 * near(p.d, 1, 18), fall: 1.6 + Math.random() * 0.8, dur: 0.06 });
+      W.poolAt = t + 0.8 + Math.random() * 2.6;
+    }
+    // --- the player moving through water: a swishing wake, louder deeper and faster
+    const wd = w.wade;
+    const wade = wd ? Math.min(1, wd.depth * 1.4) * Math.min(1, wd.speed / 5) * (wd.swimming ? 0.55 : 1) : 0;
+    this.#steer(W.wade, 0.18 * wade, null, t);
+  }
+
+  /** A gain routed through a fixed-position panner (for one-off ambience noises). */
+  #placed(pos) {
+    const g = this.ctx.createGain();
+    const p = this.ctx.createPanner();
+    p.panningModel = 'HRTF';
+    p.distanceModel = 'inverse';
+    p.refDistance = 5;
+    p.rolloffFactor = 1;
+    p.positionX.value = pos.x; p.positionY.value = pos.y; p.positionZ.value = pos.z;
+    g.connect(p).connect(this.ambBus);
+    return g;
   }
 
   /** Per-frame: quiet positional ambience and calm/danger music scheduling. */
-  update(dt, { coast = 0, waterfallDistance = Infinity, danger = false } = {}) {
+  update(dt, { coast = 0, water = null, danger = false } = {}) {
     if (!this.ok || this.ctx.state !== 'running') return;
     const t = this.ctx.currentTime;
     if (this.amb) {
@@ -329,11 +542,7 @@ export class GameAudio {
         this.#noise(t, 1.2, this.ambBus, { vol: 0.055 * coast, type: 'lowpass', f0: 360, f1: 210, q: 0.7, a: 0.25 });
         this.amb.surfAt = t + 2.2 + Math.random() * 0.7;
       }
-      if (waterfallDistance < 30 && t >= this.amb.waterfallAt) {
-        const proximity = (1 - waterfallDistance / 30) ** 2;
-        this.#noise(t, 0.8, this.ambBus, { vol: 0.035 * proximity, f0: 700, f1: 420, q: 1.8, a: 0.12 });
-        this.amb.waterfallAt = t + 1.8;
-      }
+      if (water) this.#waterAmbience(dt, t, water);
       this.birdT -= dt;
       if (this.birdT <= 0) {
         this.birdT = 5 + Math.random() * 9;

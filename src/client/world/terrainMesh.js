@@ -17,6 +17,10 @@ const JUNGLE = {
 const VOLCANO = Object.fromEntries(['rock', 'rockDark', 'ash', 'scorch'].map((k) => [k, new THREE.Color(BIOMES.volcano.terrain[k]).multiplyScalar(0.7)]));
 const EMBER = new THREE.Color('#7a2a12');
 const CAUSEWAY = new THREE.Color('#6a5f62');
+// Wet ground at the water line and under the waterfall
+const WET = new THREE.Color();          // scratch: the ground's own colour, darkened
+const WET_ROCK = new THREE.Color('#4a4652');
+const WET_MOSS = new THREE.Color('#3f6e3a');
 
 /**
  * @param {import('../../shared/terrain.js').Terrain} terrain
@@ -32,6 +36,7 @@ export function buildTerrainMesh(terrain, layout) {
   const hut = layout.hut;
   const v = plan.volcano;
   const arena = layout.bossArena;
+  const falls = (layout.waterfalls || []).filter((wf) => wf.kind !== 'lava' && wf.impact);
 
   const color = new THREE.Color();
   const base = new THREE.Color();
@@ -84,6 +89,23 @@ export function buildTerrainMesh(terrain, layout) {
       const nearWater = terrain.waterLevelAt(x + 2.5, z) !== null || terrain.waterLevelAt(x - 2.5, z) !== null
         || terrain.waterLevelAt(x, z + 2.5) !== null || terrain.waterLevelAt(x, z - 2.5) !== null;
       if (nearWater && y > 1.5) color.lerp(P.riverbed, 0.55);
+    }
+    // Wet ground just above the water line: darker, glossier-looking sand and
+    // banks where the surf and the ripples keep it wet (sea, pools, rivers).
+    if (water === null && y < 3.5) {
+      const wl = Math.max(0, ...[[2, 0], [-2, 0], [0, 2], [0, -2]].map(([ox, oz]) => terrain.waterLevelAt(x + ox, z + oz) ?? -Infinity));
+      const above = y - wl;
+      // darker in any biome (pale jungle sand and grey volcanic sand alike)
+      if (above < 0.7) color.lerp(WET.copy(color).multiplyScalar(0.68), 1 - smoothstep(0.05, 0.7, above));
+    }
+    // The rock the waterfall runs down: dark, wet stone with a little moss.
+    for (const wf of falls) {
+      const vx = wf.impact.x - wf.top.x, vz = wf.impact.z - wf.top.z;
+      const L2 = vx * vx + vz * vz || 1;
+      const u = Math.max(0, Math.min(1, ((x - wf.top.x) * vx + (z - wf.top.z) * vz) / L2));
+      const d = Math.hypot(wf.top.x + vx * u - x, wf.top.z + vz * u - z);
+      const k = (1 - smoothstep(wf.width * 0.5, wf.width * 0.5 + 2.2, d)) * (y > wf.impact.y - 0.2 && y < wf.top.y + 0.6 ? 1 : 0);
+      if (k > 0) color.lerp(WET_ROCK, k * 0.7).lerp(WET_MOSS, k * 0.25 * smoothstep(0.3, 0.8, noise));
     }
     // Scorched ground next to lava.
     if (lava === null && volcanic) {

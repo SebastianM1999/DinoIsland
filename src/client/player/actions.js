@@ -284,6 +284,15 @@ export class PlayerActions {
     const end = hit ? hit.point : blocked;
     // the shot died on the Primeval Grove's barrier: show the ripple there
     if (!hit && insideGrove(g.layout, blocked.x, blocked.z, 0.05) && !insideGrove(g.layout, origin.x, origin.z)) g.onGroveBarrierHit?.(blocked);
+    // a shot into water kicks up a little spout where it breaks the surface
+    if (!hit) {
+      const len = origin.distanceTo(blocked);
+      for (let s = 0.5; s <= len; s += 0.5) {
+        const x = origin.x + dir.x * s, y = origin.y + dir.y * s, z = origin.z + dir.z * s;
+        const wl = g.terrain.waterLevelAt(x, z);
+        if (wl !== null && y <= wl) { g.onWaterSplash?.(new THREE.Vector3(x, wl, z), 0.25); break; }
+      }
+    }
     g.net.act(ACT.SHOT, { kind: tool, o: origin.toArray(), dir: dir.toArray(),
       ...(hit ? { dino: hit.view.id, p: hit.point.toArray(), zone: hit.zone } : {}) });
     // Position the tracer at the rendered muzzle, transformed into world space.

@@ -145,7 +145,18 @@ export function buildLayout(terrain) {
       // the water leaves the grotto over its lip, 2 m in front of the opening and
       // just below it (SPRING_LIP_OFFSET / SPRING_FLOOR in props/springCave.js)
       const lip = { x: src.x - dir.x * 2.0, y: src.y - 0.12, z: src.z - dir.z * 2.0 };
-      layout.waterfall = { top: lip, bottom, dirX: -dir.x, dirZ: -dir.z, width, kind: 'water', source };
+      // Where the falling water meets the basin: a little way out into the
+      // water from the cliff foot (never on the dry bank), so the chain is always
+      // source -> fall / cascade -> impact in the basin -> river out of it.
+      // The plunge (ripples, churn, splash) varies with the drop and the basin.
+      let impact = { x: bottom.x, z: bottom.z, y: pool.level };
+      for (let d = 0; d < pool.r; d += 0.25) {
+        const x = bottom.x - dir.x * d, z = bottom.z - dir.z * d;
+        if (pool.level - terrain.heightAt(x, z) > 0.45) { impact = { x: x - dir.x * 0.8, z: z - dir.z * 0.8, y: pool.level }; break; }
+      }
+      const rw = makeRng(S ^ 0x3a7e5);
+      const plunge = { r: Math.min(pool.r * 0.6, 1.6 + drop * 0.07 + rw.range(-0.3, 0.5)), churn: Math.min(1, 0.45 + drop / 30) };
+      layout.waterfall = { top: lip, bottom, impact, plunge, dirX: -dir.x, dirZ: -dir.z, width, kind: 'water', source, pool: { x: pool.x, z: pool.z, r: pool.r, level: pool.level } };
       layout.waterfalls.push(layout.waterfall);
     }
   }
@@ -196,6 +207,11 @@ export function buildLayout(terrain) {
     return best;
   };
   const poolDist = (x, z) => Math.min(Infinity, ...plan.pools.map((p) => Math.hypot(x - p.x, z - p.z) - p.r));
+  // the falling water's way down the cliff stays clear of trees and rocks
+  for (const wf of layout.waterfalls) {
+    const run = Math.hypot(wf.impact.x - wf.top.x, wf.impact.z - wf.top.z);
+    for (let d = 0; d <= run; d += 1.5) reserve(wf.top.x + wf.dirX * d, wf.top.z + wf.dirZ * d, wf.width / 2 + 1.2);
+  }
 
   // ------------------------------------------------ special sites first
   for (const c of plan.sites.caves) {

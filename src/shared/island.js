@@ -187,7 +187,8 @@ function riverCarve(plan, x, z, h) {
   let out = Math.min(h, bank);
   // ... and never lower than the water beside it: a low natural levee keeps the
   // river in its bed (except where it meets the sea, which is its mouth)
-  if (q.surface > 0.3 && q.d < half + 7) {
+  // (not inside the pool the river leaves: that basin stays open water)
+  if (q.surface > 0.3 && q.d < half + 7 && !inWaterPool(plan, x, z)) {
     const levee = q.surface + 0.35 + (q.d - half) * 0.12;
     out = Math.max(out, lerp(levee, out, smoothstep(half + 4, half + 7, q.d)));
   }
@@ -228,6 +229,12 @@ function padEffect(plan, x, z, h) {
   return h;
 }
 
+/** Inside a water pool's basin (its bowl, a little past the waterline)? */
+function inWaterPool(plan, x, z) {
+  for (const p of plan.pools) if (p.kind === 'water' && Math.hypot(x - p.x, z - p.z) < p.r * 1.1) return true;
+  return false;
+}
+
 /** Final analytic island height at (x, z). */
 export function islandHeight(plan, x, z) {
   let h = naturalHeight(plan, x, z);
@@ -241,8 +248,10 @@ export function islandHeight(plan, x, z) {
   const hr = h;
   if (keep > 0) h = lerp(h, rampEffect(plan, x, z, h), keep);
   h = padEffect(plan, x, z, h);
-  // paths and flattened sites never dig the river's levee away
-  if (q && q.d >= q.width / 2 && q.surface > 0.3) h = Math.max(h, Math.min(hr, q.surface + 0.35 + (q.d - q.width / 2) * 0.12));
+  // paths and flattened sites never dig the river's levee away – except in the
+  // pool the river flows out of: its basin must stay a basin (no levee hump in
+  // the middle of it, where the waterfall comes down)
+  if (q && q.d >= q.width / 2 && q.surface > 0.3 && !inWaterPool(plan, x, z)) h = Math.max(h, Math.min(hr, q.surface + 0.35 + (q.d - q.width / 2) * 0.12));
   // the boss arena's islet beside the boat (shared/bossArena.js)
   if (plan.bossArena) h = bossArenaHeight(plan.bossArena, x, z, h, plan.seed);
   return h;

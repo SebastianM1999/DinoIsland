@@ -102,6 +102,16 @@ export class Projectiles {
           break;
         }
 
+        // breaking the water surface on the way down: a splash, a ring and a plop
+        // (it carries on to the bed – pools and the shallows are clear enough to see it)
+        if (!p.splashed) {
+          const wl = terrain.waterLevelAt(tb.x, tb.z);
+          if (wl !== null && ta.y >= wl && tb.y < wl) {
+            p.splashed = true;
+            this.game.onWaterSplash?.(new THREE.Vector3(tb.x, wl, tb.z), p.kind === 'spear' ? 0.7 : 0.4);
+          }
+        }
+
         // dinosaurs
         let hit = null;
         for (const v of dinos.map.values()) {
