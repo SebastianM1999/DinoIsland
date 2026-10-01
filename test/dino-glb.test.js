@@ -36,8 +36,8 @@ test('GLBs keep combat, independent skins, semantic clips and terrain animation 
     const animator = new DinoAnimator(a, SPECIES[type].anim), other = SPECIES[type].createAnimator(b);
     assert.notEqual(animator.mixer, other.mixer);
     assert.equal(!!a.jaw, type === 'brachio' || type === 'raptor', `${type}: preserve the existing head anatomy`);
-    // The project raptor's eyes are part of its authored skin mesh.
-    if (type !== 'raptor') assert.ok(a.model.getObjectByName('FaceEyes'), `${type}: missing visible eyes`);
+    // The project raptor's and brachio's eyes are part of their authored meshes.
+    if (type !== 'raptor' && type !== 'brachio') assert.ok(a.model.getObjectByName('FaceEyes'), `${type}: missing visible eyes`);
     assert.equal(a.model.getObjectByName('DetailedFace'), undefined, 'no replacement facial geometry');
     if (type !== 'brachio') {
       const sourceTriangles = { raptor: 53128, trex: 27968, stego: 36752 };

@@ -33,7 +33,7 @@ Branch: `codex/animated-dinosaur-models`. Local commits only; no push.
 | Raptor | Project Velociraptor from `art/sources/raptor/raptor.blend` (opening jaw, IK-baked clips) | 53,128 | 1.675 × 3.037 m |
 | T-Rex | Quaternius T-Rex plus black eye dots | 28,672 | 4.1 × 11 m |
 | Stego | Quaternius Stegosaurus plus black eye dots | 37,456 | 4 × 7.9 m |
-| Brachio | Project Brachiosaurus baked to GLB | 28,524 | 11 × 19 m |
+| Brachio | Project Brachiosaurus from `art/sources/brachio/brachio.blend` (opening jaw, IK-baked clips, rear-up stomp) | 57,660 | 13.0 × 18.5 m |
 | Ptera | Project procedural flight rig | 25,808 | Existing dimensions |
 
 Original Quaternius assets remain CC0. Project additions retain the project's

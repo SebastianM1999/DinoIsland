@@ -26,9 +26,9 @@
     {
       "id": "dino-brachio",
       "file": "assets/models/dinos/brachio.glb",
-      "source": "Project-authored Brachiosaurus; scripts/build-brachio-glb.mjs",
+      "source": "Project-authored Brachiosaurus; art/sources/brachio/brachio.blend (build scripts in its text blocks)",
       "license": "Project source",
-      "triangles": 28524
+      "triangles": 57660
     }
   ]
 }

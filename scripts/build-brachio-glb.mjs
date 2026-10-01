@@ -1,3 +1,6 @@
+// SUPERSEDED: assets/models/dinos/brachio.glb is now built from
+// art/sources/brachio/brachio.blend (run its `bbuild` text block). Running this
+// script overwrites it with the older procedural Brachiosaurus.
 // Bake the project's Brachiosaurus at its natural proportions. Apatosaurus is
 // unsuitable here: fitting its horizontal neck to 11 m stretches every leg.
 import * as THREE from 'three';
