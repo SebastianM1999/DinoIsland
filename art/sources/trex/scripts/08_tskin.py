@@ -28,14 +28,26 @@ def rigid(ob, choose):
         bn = choose(c); g = ob.vertex_groups.get(bn) or ob.vertex_groups.new(name=bn); g.add(isl, 1.0, 'REPLACE')
     m = ob.modifiers.new('Armature', 'ARMATURE'); m.object = rig; ob.parent = rig
 for n in ('TrexEyes', 'TrexPupils', 'TrexLids', 'TrexTeethUp', 'TrexKnobs'): rigid(bpy.data.objects[n], lambda c: 'Head')
-for n in ('TrexJaw', 'TrexTeethLow'): rigid(bpy.data.objects[n], lambda c: 'Jaw')
+rigid(bpy.data.objects['TrexTeethLow'], lambda c: 'Jaw')
 SPINE = segs(['Torso', 'Body', 'Neck1', 'Neck2'] + ['Tail%d' % i for i in range(1, 6)])
 rigid(bpy.data.objects['TrexScutes'], lambda c: 'Head' if c.y < -0.72 and c.z > 1.42 else nearest(c, SPINE))
 rigid(bpy.data.objects['TrexClaws'], lambda c: nearest(c, segs(['BackToesL', 'BackToesR', 'HandL', 'HandR'])))
 body = bpy.data.objects['TrexBody']
 for o in bpy.context.selected_objects: o.select_set(False)
 body.select_set(True); rig.select_set(True); bpy.context.view_layer.objects.active = rig
-bpy.ops.object.parent_set(type='ARMATURE_AUTO')
+bpy.ops.object.parent_set(type='ARMATURE_NAME')
+# distance weights along the bone chains (robust on boolean topology, unlike bone heat)
+def seg_d(p, a, b):
+    ab = b - a; u = max(0, min(1, (p - a).dot(ab) / ab.length_squared)); return (p - (a + ab * u)).length
+CORE = segs(['Body', 'Torso', 'Neck1', 'Neck2', 'Head'] + ['Tail%d' % i for i in range(1, 6)])
+SIDE = {s: segs(['BackUpLeg' + s, 'BackLowLeg' + s, 'BackFoot' + s, 'BackToes' + s, 'ArmUp' + s, 'ArmLow' + s, 'Hand' + s]) for s in 'LR'}
+for v in body.data.vertices:
+    p = body.matrix_world @ v.co
+    cand = CORE + (SIDE['L' if p.x > 0 else 'R'] if abs(p.x) > 0.07 else [])
+    ds = sorted(((seg_d(p, a, b), n) for n, a, b in cand))[:4]; dmin = ds[0][0]
+    ws = [(n, math.exp(-((d - dmin) / 0.05) ** 2)) for d, n in ds]; tot = sum(w for _, w in ws)
+    for n, w in ws:
+        if w / tot > 0.01: (body.vertex_groups.get(n) or body.vertex_groups.new(name=n)).add([v.index], w / tot, 'REPLACE')
 for gn in ('Jaw', 'root'):
     g = body.vertex_groups.get(gn)
     if g: body.vertex_groups.remove(g)
@@ -64,18 +76,21 @@ for s, sx in (('L', 1), ('R', -1)):
         for n, w in old.items():
             if w > 1e-3: (body.vertex_groups.get(n) or body.vertex_groups.new(name=n)).add([v.index], w, 'REPLACE')
 
-# rigid skull inside the fused mesh, fading into the neck
-JT = MAPP(0, 0, 1.348).z
+# skull -> Head, lower jaw -> Jaw, blended across the fused skin by the region groups from tmerge
 def set_weights(v, ws):
     for g in list(v.groups): body.vertex_groups[g.group].remove([v.index])
     for n, w in ws.items():
         if w > 1e-3: (body.vertex_groups.get(n) or body.vertex_groups.new(name=n)).add([v.index], w, 'REPLACE')
+RG = {body.vertex_groups[n].index: n for n in ('rg_head', 'rg_jaw')}
 for v in body.data.vertices:
-    p = body.matrix_world @ v.co
-    h = smooth(-0.76, -0.88, p.y) * smooth(JT - 0.08, JT - 0.01, p.z)
-    if h <= 0: continue
-    ws = {body.vertex_groups[g.group].name: g.weight * (1 - h) for g in v.groups}; ws['Head'] = ws.get('Head', 0) + h
+    rg = {RG[g.group]: g.weight for g in v.groups if g.group in RG}
+    wh, wj = min(1, rg.get('rg_head', 0) * 1.3), min(1, rg.get('rg_jaw', 0) * 1.3)
+    if wh + wj <= 0.001: continue
+    keep = max(0.0, 1 - wh - wj)
+    ws = {body.vertex_groups[g.group].name: g.weight * keep for g in v.groups if g.group not in RG}
+    tot = wh + wj; ws['Head'] = ws.get('Head', 0) + wh * min(1, 1 / max(tot, 1)); ws['Jaw'] = ws.get('Jaw', 0) + wj * min(1, 1 / max(tot, 1))
     set_weights(v, ws)
+for n in ('rg_head', 'rg_jaw'): body.vertex_groups.remove(body.vertex_groups[n])
 # crisp arm weights so the arm skin and the rigid claws move together
 for s, sx in (('L', 1), ('R', -1)):
     chain = segs(['ArmUp' + s, 'ArmLow' + s, 'Hand' + s]); shoulder = chain[0][1]

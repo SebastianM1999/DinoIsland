@@ -41,7 +41,7 @@ test('GLBs keep combat, independent skins, semantic clips and terrain animation 
     if (!authored) assert.ok(a.model.getObjectByName('FaceEyes'), `${type}: missing visible eyes`);
     assert.equal(a.model.getObjectByName('DetailedFace'), undefined, 'no replacement facial geometry');
     if (type !== 'brachio') {
-      const sourceTriangles = { raptor: 53128, trex: 48477, stego: 36752 };
+      const sourceTriangles = { raptor: 53128, trex: 47633, stego: 36752 };
       let skinTriangles = 0;
       a.model.traverse(o => { if (o.isSkinnedMesh) skinTriangles += o.geometry.index.count / 3; });
       assert.equal(skinTriangles, sourceTriangles[type], 'integrated head/body surface remains complete');
