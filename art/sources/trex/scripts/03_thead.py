@@ -1,11 +1,12 @@
 
 for n in ('TrexHead', 'TrexJaw', 'TrexEyes', 'TrexPupils', 'TrexLids', 'TrexTeethUp', 'TrexTeethLow', 'TrexKnobs'): remove(n)
-def map_sec(y, half, xs=1.0):
-    q = [MAPP(x * xs, y, z) for x, z in half]; return (q[0].y, [(p.x, p.z) for p in q])
+def map_sec(y, half, xs=1.0, zs=1.0):
+    zm = (half[0][1] + half[-1][1]) / 2
+    q = [MAPP(x * xs, y, zm + (z - zm) * zs) for x, z in half]; return (q[0].y, [(p.x, p.z) for p in q])
 HS = []
 for i, (y, half) in enumerate(HEAD_SECS):
-    blunt = 1.0 if i < 6 else (1.25 if i < 8 else 1.6)          # broad, blunt T-Rex snout
-    HS.append(map_sec(y, half, blunt))
+    blunt = (0.72, 0.9)[i] if i < 2 else (1.0 if i < 6 else (1.25 if i < 8 else 1.6))   # tapered skull back, broad blunt snout
+    HS.append(map_sec(y, half, blunt, (0.72, 0.88)[i] if i < 2 else 1.0))
 head = loft2('TrexHead', HS)
 bpy.context.view_layer.objects.active = head
 for o in bpy.context.selected_objects: o.select_set(False)
@@ -28,7 +29,7 @@ T_ = [(0,0.9),(0.5,0.93),(0.82,1.0),(0.97,0.9),(1.0,0.62),(0.92,0.3),(0.72,0.1),
 JT = MAPP(0, 0, 1.348).z
 JS = []
 for y, w, bot in JAW_SECS:
-    yy = MAPP(0, y, 0).y; ww = w * 1.32 * (1.25 if y < -1.0 else 1); bb = JT - (1.348 - bot) * 1.75
+    yy = MAPP(0, y, 0).y; ww = w * 1.32 * 0.86 * (1.22 if y < -1.0 else 1); bb = JT - (1.348 - bot) * 1.75
     JS.append((yy, [(tx*ww, bb + tz*(JT-bb)) for tx, tz in T_]))
 jaw = loft2('TrexJaw', JS)
 EYE = MAPP(.15, -0.805, 1.505)
@@ -52,19 +53,31 @@ def lerp(secs, y, f):
         if a[0] >= y >= b[0]:
             u = (y - a[0]) / (b[0] - a[0]); return f(a) + (f(b) - f(a)) * u
     return f(secs[-1])
-bm = bmesh.new()
-for sx in (1, -1):
-    ys = [HS[2][0] - 0.03 - i * 0.047 for i in range(11)]
-    for i, y in enumerate(ys):
-        x = lerp(HS, y, lambda s: s[1][6][0]) * .9; z = lerp(HS, y, lambda s: s[1][6][1]) + .015
-        L = (.05 + .025 * math.sin(i * 1.9) ** 2) * (1.25 if i in (7, 8) else 1)
-        horn_bm(bm, (sx*x, y, z), (sx*x*.98, y + .016, z - L - .015), .015 + L*.17, bend=(sx*.004, -.01, 0), seg=8, rings=6)
+
+def lip_at(ob, y, lower=True):
+    """Outer mouth edge of an evaluated mesh at slice y: (|x|, z) of the outermost vertex near the lip."""
+    dg = bpy.context.evaluated_depsgraph_get(); e = ob.evaluated_get(dg); mw = ob.matrix_world
+    pts = [mw @ v.co for v in e.data.vertices if v.co.x > 0]; sl = sorted(pts, key=lambda p: abs(p.y - y))[:80]
+    zc = sum(p.z for p in sl) / len(sl)
+    side = [p for p in sl if (p.z < zc if lower else p.z > zc)]
+    p = max(side, key=lambda q: q.x - abs(q.z - (min(side, key=lambda r: r.z).z if lower else max(side, key=lambda r: r.z).z)) * 1.5)
+    return p.x, p.z
+bm = bmesh.new(); TEETH_UP = []
+for i in range(8):
+    y = HS[2][0] - 0.035 - i * 0.046
+    lx, lz = lip_at(head, y, lower=True)
+    L = (.045 + .022 * math.sin(i * 1.9) ** 2) * (1.25 if i in (5, 6) else 1)
+    for sx in (1, -1):
+        root = V((sx * (lx - .03), y, lz + .03)); tip = V((sx * (lx - .022), y + .014, lz - L))
+        horn_bm(bm, root, tip, .016 + L * .16, bend=(sx * .003, -.008, 0), seg=8, rings=6)
+    TEETH_UP.append((y, lx, lz))
 mk('TrexTeethUp', bm)
 bm = bmesh.new()
-for sx in (1, -1):
-    for i in range(9):
-        y = JS[1][0] - 0.06 - i * 0.05
-        x = lerp(JS, y, lambda s: s[1][3][0]) * .78
-        L = .04 + .02 * math.sin(i * 2.3) ** 2
-        horn_bm(bm, (sx*x, y, JT - .02), (sx*x*.98, y + .012, JT + L), .013 + L*.16, bend=(0, -.008, 0), seg=8, rings=6)
+for i in range(7):
+    y = HS[2][0] - 0.06 - i * 0.05
+    lx, lz = lip_at(jaw, y, lower=False)
+    L = .035 + .02 * math.sin(i * 2.3) ** 2
+    for sx in (1, -1):
+        root = V((sx * (lx - .03), y, lz - .03)); tip = V((sx * (lx - .03), y + .01, lz + L))
+        horn_bm(bm, root, tip, .014 + L * .15, bend=(0, -.006, 0), seg=8, rings=6)
 mk('TrexTeethLow', bm)

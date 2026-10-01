@@ -12,7 +12,7 @@
       "file": "assets/models/dinos/trex.glb",
       "source": "Project-authored T-Rex; art/sources/trex/trex.blend (build scripts in its text blocks)",
       "license": "Project source",
-      "triangles": 50440
+      "triangles": 48828
     },
     {
       "id": "dino-stego",

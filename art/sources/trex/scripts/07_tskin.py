@@ -45,3 +45,21 @@ bpy.ops.object.mode_set(mode='WEIGHT_PAINT'); bpy.ops.object.vertex_group_normal
 zero = [v.index for v in body.data.vertices if sum(g.weight for g in v.groups) < 1e-3]
 if zero: (body.vertex_groups.get('Head') or body.vertex_groups.new(name='Head')).add(zero, 1.0, 'REPLACE')
 print('zero-weight', len(zero))
+
+# crisp leg weights: below the thigh, hinge at knee/ankle/toes instead of bending like rubber
+def seg_d(p, a, b):
+    ab = b - a; u = max(0, min(1, (p - a).dot(ab) / ab.length_squared)); return (p - (a + ab * u)).length
+for s, sx in (('L', 1), ('R', -1)):
+    chain = segs(['BackUpLeg' + s, 'BackLowLeg' + s, 'BackFoot' + s, 'BackToes' + s])
+    groups = [body.vertex_groups.get(n) or body.vertex_groups.new(name=n) for n, _, _ in chain]
+    for v in body.data.vertices:
+        p = body.matrix_world @ v.co
+        if p.x * sx < 0.1 or p.z > 0.8: continue
+        blend = smooth(0.8, 0.68, p.z)                       # fade in below the thigh bulk
+        ds = [seg_d(p, a, b2) for _, a, b2 in chain]; dmin = min(ds)
+        ws = [math.exp(-((d - dmin) / 0.025) ** 2) for d in ds]; tot = sum(ws); ws = [w / tot for w in ws]
+        old = {body.vertex_groups[g.group].name: g.weight * (1 - blend) for g in v.groups}
+        for g in list(v.groups): body.vertex_groups[g.group].remove([v.index])
+        for (n, _, _), w in zip(chain, ws): old[n] = old.get(n, 0) + w * blend
+        for n, w in old.items():
+            if w > 1e-3: (body.vertex_groups.get(n) or body.vertex_groups.new(name=n)).add([v.index], w, 'REPLACE')

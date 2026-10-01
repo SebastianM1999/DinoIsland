@@ -20,7 +20,7 @@ function model(species, source, height, length, walkStride, runStride, quadruped
 export const GLB_DINOS = {
   // Median grounded foot velocity × clip duration; see measure-dino-strides.mjs.
   raptor: model('raptor', 'Velociraptor', 1.675, 3.037, 1.818, 4.09),
-  trex: model('trex', 'TRex', 5.808, 11, 4.719, 7.928),
+  trex: model('trex', 'TRex', 5.919, 11, 4.819, 8.095),
   stego: model('stego', 'Stegosaurus', 4, 7.9, 2.04, 3.629, true),
   brachio: model('brachio', 'Brachiosaurus', 13.007, 18.514, 2.714, 5.333, true),
 };
