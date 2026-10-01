@@ -27,7 +27,7 @@ def rigid(ob, choose):
         c = sum((mw @ me.vertices[i].co for i in isl), V()) / len(isl)
         bn = choose(c); g = ob.vertex_groups.get(bn) or ob.vertex_groups.new(name=bn); g.add(isl, 1.0, 'REPLACE')
     m = ob.modifiers.new('Armature', 'ARMATURE'); m.object = rig; ob.parent = rig
-for n in ('TrexHead', 'TrexEyes', 'TrexPupils', 'TrexLids', 'TrexTeethUp', 'TrexKnobs'): rigid(bpy.data.objects[n], lambda c: 'Head')
+for n in ('TrexEyes', 'TrexPupils', 'TrexLids', 'TrexTeethUp', 'TrexKnobs'): rigid(bpy.data.objects[n], lambda c: 'Head')
 for n in ('TrexJaw', 'TrexTeethLow'): rigid(bpy.data.objects[n], lambda c: 'Jaw')
 SPINE = segs(['Torso', 'Body', 'Neck1', 'Neck2'] + ['Tail%d' % i for i in range(1, 6)])
 rigid(bpy.data.objects['TrexScutes'], lambda c: 'Head' if c.y < -0.72 and c.z > 1.42 else nearest(c, SPINE))
@@ -63,3 +63,29 @@ for s, sx in (('L', 1), ('R', -1)):
         for (n, _, _), w in zip(chain, ws): old[n] = old.get(n, 0) + w * blend
         for n, w in old.items():
             if w > 1e-3: (body.vertex_groups.get(n) or body.vertex_groups.new(name=n)).add([v.index], w, 'REPLACE')
+
+# rigid skull inside the fused mesh, fading into the neck
+JT = MAPP(0, 0, 1.348).z
+def set_weights(v, ws):
+    for g in list(v.groups): body.vertex_groups[g.group].remove([v.index])
+    for n, w in ws.items():
+        if w > 1e-3: (body.vertex_groups.get(n) or body.vertex_groups.new(name=n)).add([v.index], w, 'REPLACE')
+for v in body.data.vertices:
+    p = body.matrix_world @ v.co
+    h = smooth(-0.76, -0.88, p.y) * smooth(JT - 0.08, JT - 0.01, p.z)
+    if h <= 0: continue
+    ws = {body.vertex_groups[g.group].name: g.weight * (1 - h) for g in v.groups}; ws['Head'] = ws.get('Head', 0) + h
+    set_weights(v, ws)
+# crisp arm weights so the arm skin and the rigid claws move together
+for s, sx in (('L', 1), ('R', -1)):
+    chain = segs(['ArmUp' + s, 'ArmLow' + s, 'Hand' + s]); shoulder = chain[0][1]
+    for v in body.data.vertices:
+        p = body.matrix_world @ v.co
+        if p.x * sx < 0.12: continue
+        ds = [seg_d(p, a, b2) for _, a, b2 in chain]; dmin = min(ds)
+        if dmin > 0.075: continue
+        blend = smooth(0.0, 0.07, (p - shoulder).length)
+        ws_arm = [math.exp(-((d - dmin) / 0.015) ** 2) for d in ds]; tot = sum(ws_arm)
+        ws = {body.vertex_groups[g.group].name: g.weight * (1 - blend) for g in v.groups}
+        for (n, _, _), w in zip(chain, ws_arm): ws[n] = ws.get(n, 0) + blend * w / tot
+        set_weights(v, ws)

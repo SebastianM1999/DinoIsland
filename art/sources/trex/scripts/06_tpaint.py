@@ -4,7 +4,6 @@ skinm = vc_mat('TrexSkin', 0.62, 0.35); gloss = vc_mat('TrexGloss', 0.18, 0.6)
 def body_fn(p, n):
     c = rex_skin(p, n)
     return mix(c, mix(P['leg'], P['stripe'], 0.3 + 0.5*fbm(p, 8)), smooth(0.55, 0.38, p.z) * (1 if abs(p.x) > .12 else 0))
-paint(bpy.data.objects['TrexBody'], body_fn)
 MOUTH = JT
 def head_fn(p, n):
     sx = 1 if p.x >= 0 else -1
@@ -16,7 +15,8 @@ def head_fn(p, n):
     c = mix(c, P['gum'], smooth(-0.3, -0.7, n.z) * smooth(MOUTH + .04, MOUTH + .01, p.z))
     nd = p - V((sx * .07, -1.27, 1.57)); nd = V((nd.x * 1.5, nd.y * .8, nd.z * 1.5)).length
     return mix(c, P['pupil'], smooth(.022, .01, nd))
-paint(bpy.data.objects['TrexHead'], head_fn)
+# head and body are one mesh: blend the head paint in over the skull
+paint(bpy.data.objects['TrexBody'], lambda p, n: mix(body_fn(p, n), head_fn(p, n), smooth(-0.74, -0.86, p.y) * smooth(JT - 0.07, JT + 0.01, p.z)))
 def jaw_fn(p, n):
     c = rex_skin(p, n)
     c = mix(c, P['belly'], smooth(-0.1, -0.6, n.z))

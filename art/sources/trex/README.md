@@ -15,6 +15,7 @@ wider, much deeper T-Rex skull (`MAPP`). The model is authored at raptor scale
 | --- | --- |
 | `tbody` | skin-modifier skeleton: horizontal trunk, thick neck, massive thighs, 3-toed feet, tiny 2-finger arms |
 | `thead` | blunt boxy skull with brow ridge, jaw muscles, nasal bumps, brow hornlets, amber eyes, two rows of teeth |
+| `tmerge` | fuses skull and body into one mesh (exact boolean union, smoothed fillet at the neck); the lower jaw stays separate so it can open |
 | `tparts` | foot and hand claws, low bony scutes along neck/back/tail |
 | `tpaint` | grey hide (`rex_skin` in `tlib`): dark back, grey flanks, dark mottling, cream throat/belly, dark eye mask, pink mouth; teeth rooted in the measured gum line |
 | `trig` / `tskin` | theropod rig (same bone names as the raptor) with IK feet; rigid head/jaw parts |

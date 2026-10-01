@@ -68,8 +68,8 @@ def idle(t):
     rot('Jaw', (X, .05 + .03 * br + track(t, [(0, 0), (.78, 0), (.82, .3), (.86, 0), (1, 0)])))
     tail(lambda i: .06 * math.sin(TAU * t - .5 * i) + .03 * math.sin(2 * TAU * t - i), lambda i: .02 * math.sin(TAU * t - .4 * i))
     for s, sg in (('L', 1), ('R', -1)):
-        rot('ArmUp' + s, (X, -.15 + .05 * br)); rot('ArmLow' + s, (X, -.35 + .1 * math.sin(TAU * 2 * t + sg)))
-        rot('Hand' + s, (X, -.2 + .2 * math.sin(TAU * 3 * t + sg)))
+        rot('ArmUp' + s, (X, -.15 + .04 * br)); rot('ArmLow' + s, (X, -.35 + .06 * math.sin(TAU * t + sg)))
+        rot('Hand' + s, (X, -.2 + .08 * math.sin(TAU * t + sg + .6)))
 def attack(t):
     # bite: rear back with the jaws wide, lunge low, snap shut, shake, recover
     by = track(t, [(0, 0), (.3, .1), (.5, -.22), (.7, -.12), (1, 0)])
