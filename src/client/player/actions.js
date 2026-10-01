@@ -10,6 +10,7 @@ import { shotEnd } from '../../shared/gunshots.js';
 import { insideGrove } from '../../shared/grove.js';
 import { segmentColliders } from '../../shared/collision.js';
 import { GunEffects } from '../entities/gunEffects.js';
+import { spearLaunch } from './spearThrow.js';
 import { Viewmodel } from './viewmodel.js';
 import { mesh } from '../models/kit.js';
 import { trapGeometry, meatGeometry } from '../models/weapons.js';
@@ -235,15 +236,14 @@ export class PlayerActions {
 
   throwSpear() {
     const g = this.game;
-    const { origin, dir, right, up } = this.aim();
-    const o = origin.clone().addScaledVector(right, 0.25).addScaledVector(up, -0.1).addScaledVector(dir, 0.3);
-    const v = dir.clone().multiplyScalar(W.spear.throwSpeed).addScaledVector(up, 1.5);
-    this.vm.throwSpear();
+    this.vm.throwSpear(() => {
+      if (!g.running || !g.me.alive) return;
+      const { origin, velocity, rotation } = spearLaunch(g.gfx.camera);
+      g.projectiles.fire('spear', origin, velocity, 1, rotation);
+      g.audio?.play('throw');
+    });
     this.cooldown = W.spear.throwCooldown;
     g.flags |= PF.ATTACK;
-    g.audio?.play('throw');
-    // launch slightly after the wind-up
-    setTimeout(() => { if (g.running && g.me.alive) g.projectiles.fire('spear', o, v, 1); }, 220);
     this.inv.spear = false; // optimistic; the server confirms with an inventory update
   }
 

@@ -1,6 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
+import { SPEAR_THROW, spearLaunch } from '../src/client/player/spearThrow.js';
+import { CONFIG } from '../src/shared/config.js';
+import { Projectiles } from '../src/client/entities/projectiles.js';
 import { Viewmodel } from '../src/client/player/viewmodel.js';
 import { BOW_REST, ARROW_TIP_Y } from '../src/client/models/weapons.js';
 import { PlayerModel } from '../src/client/models/playerModel.js';
@@ -41,7 +44,7 @@ test('both hands stay on trap handles during walking, switching, and placement',
 test('optimistic inventory removal preserves spear until its throw release', () => {
   const vm = make(); vm.throwSpear(); vm.setTool('spear', { hasSpear: false });
   vm.update(0.05, idle); assert.equal(vm.spear.visible, true);
-  for (let i = 0; i < 4; i++) vm.update(0.05, idle);
+  for (let i = 0; i < 5; i++) vm.update(0.05, idle);
   assert.equal(vm.spear.visible, false);
   for (let i = 0; i < 50; i++) vm.update(1 / 60, idle);
   assert.equal(vm.spear.visible, false);
@@ -83,4 +86,59 @@ test('arrow shaft touches its bow rest and arrowhead projects to screen center t
       assert.ok(Math.hypot(projected.x, projected.y) < 1e-6, `arrowhead off center: ${projected.x}, ${projected.y}`);
     }
   }
+});
+
+
+test('the entire held spear matches the first flying frame across both camera projections', () => {
+  for (const aspect of [1.6, 0.65]) for (const fov of [74, 85]) {
+    const camera = new THREE.PerspectiveCamera(fov, aspect, 0.1, 500);
+    camera.position.set(3, 2, -6); camera.rotation.set(0.4, 1.2, 0, 'YXZ'); camera.updateMatrixWorld(true);
+    const viewCamera = new THREE.PerspectiveCamera(62, aspect, 0.01, 10);
+    const vm = new Viewmodel({ viewCamera, camera }, 0); settle(vm, 'spear');
+    let releases = 0, launch;
+    vm.throwSpear(() => { releases++; launch = spearLaunch(camera); });
+    vm.setTool('spear', { hasSpear: false });
+    while (vm.throwElapsed < SPEAR_THROW.release - 0.001) vm.update(Math.min(1 / 120, SPEAR_THROW.release - vm.throwElapsed), { ...idle, speed: 5, lookX: 12, lookY: 8 });
+    vm.root.updateMatrixWorld(true);
+    assert.equal(releases, 1); assert.equal(vm.spear.visible, false);
+    const worldRotation = launch.rotation;
+    for (const point of [[0, 1.5, 0], [0, -0.75, 0], [0.08, 1.25, 0.03], [0, 0, 0]]) {
+      const held = vm.spear.localToWorld(new THREE.Vector3(...point)).project(viewCamera);
+      const flying = new THREE.Vector3(...point).applyQuaternion(worldRotation).add(launch.origin).project(camera);
+      assert.ok(Math.hypot(held.x - flying.x, held.y - flying.y) < 1e-6, `release projection: ${held.toArray()} / ${flying.toArray()}, t=${vm.throwElapsed}`);
+    }
+    for (let i = 0; i < 100; i++) vm.update(1 / 120, idle);
+    assert.equal(releases, 1);
+    assert.ok(vm.rHand.position.distanceTo(vm.rHandRest) < 0.006);
+  }
+});
+
+test('release stays synchronized at different frame rates and hand recovery stays continuous', () => {
+  for (const dt of [1 / 30, 1 / 60, 1 / 144]) {
+    const vm = make(); settle(vm, 'spear'); let releases = 0;
+    vm.throwSpear(() => releases++); vm.setTool('spear', { hasSpear: false });
+    assert.equal(vm.rPalm.geometry.morphAttributes.position[0].count, vm.rPalm.geometry.attributes.position.count);
+    let last = vm.rHand.position.clone(), opened = false;
+    while (vm.throwT > 0) {
+      vm.update(dt, idle);
+      if (vm.throwElapsed < SPEAR_THROW.release - 1e-9) { assert.equal(releases, 0); assert.equal(vm.spear.visible, true); }
+      else { assert.equal(releases, 1); assert.equal(vm.spear.visible, false); }
+      assert.ok(vm.rHand.position.distanceTo(last) < dt * 12 + 0.01, 'hand path must not snap');
+      if (vm.rPalm.morphTargetInfluences[0] > 0.8) opened = true;
+      last.copy(vm.rHand.position);
+    }
+    assert.equal(opened, true); assert.equal(vm.rPalm.morphTargetInfluences[0], 0);
+  }
+});
+
+test('own spear renders at the release pose before advancing along its ballistic path', () => {
+  const game = { gfx: { scene: new THREE.Scene() }, net: { on() {}, act() {} },
+    terrain: { waterLevelAt: () => -100 }, dinos: { map: new Map() }, layout: { colliders: { circles: [], boxes: [] }, groundAt: () => -100 } };
+  const projectiles = new Projectiles(game);
+  const origin = new THREE.Vector3(0.25, 5, -0.55), velocity = new THREE.Vector3(0, 1.5, -CONFIG.weapons.spear.throwSpeed);
+  projectiles.fire('spear', origin, velocity);
+  const p = projectiles.list[0]; projectiles.update(1 / 60);
+  near(p.obj.position, origin); assert.equal(p.t, 0);
+  projectiles.update(1 / 60);
+  assert.ok(p.obj.position.z < origin.z); assert.ok(p.vel.y < velocity.y);
 });
