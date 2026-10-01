@@ -44,9 +44,11 @@ document.querySelector('#throw').addEventListener('click', () => {
   setTimeout(() => {
     const obj = makeSpear();
     const forward = gfx.camera.getWorldDirection(new THREE.Vector3());
-    obj.position.copy(gfx.camera.position).addScaledVector(forward, 0.3);
+    const right = new THREE.Vector3(1, 0, 0).applyQuaternion(gfx.camera.quaternion);
+    const up = new THREE.Vector3(0, 1, 0).applyQuaternion(gfx.camera.quaternion);
+    obj.position.copy(gfx.camera.position).addScaledVector(right, 0.25).addScaledVector(up, -0.1).addScaledVector(forward, 0.3);
     gfx.scene.add(obj);
-    flyingSpear = { obj, velocity: forward.multiplyScalar(CONFIG.weapons.spear.throwSpeed).add(new THREE.Vector3(0, 1.5, 0)), landed: false };
+    flyingSpear = { obj, velocity: forward.multiplyScalar(CONFIG.weapons.spear.throwSpeed).addScaledVector(up, 1.5), landed: false };
   }, 220);
 });
 document.querySelector('#reset-spear').addEventListener('click', () => {

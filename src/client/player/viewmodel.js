@@ -254,8 +254,10 @@ export class Viewmodel {
       r.y += k * 0.04;
       if (this.throwT > 0) {
         const t = 1 - this.throwT;
-        if (t < 0.37) { r.z += t * 0.6; r.y += t * 0.4; this.rHand.rotation.x = -t * 0.8; }     // wind up
-        else { const u = (t - 0.37) / 0.63; r.z += 0.222 - u * 0.7; r.y += 0.148 - u * 0.3; }     // release + follow through
+        // Lift the final wind-up so the spearhead meets the world projectile
+        // at release (the held weapon and world use different camera FOVs).
+        if (t < 0.37) { r.z += t * 0.6; r.y += t * 1.3; this.rHand.rotation.x = -t * 0.8; }     // wind up
+        else { const u = (t - 0.37) / 0.63; r.z += 0.222 - u * 0.7; r.y += 0.481 - u * 0.633; }     // continuous follow through
       }
     } else if (this.tool === 'trap') {
       this.rHand.rotation.set(0, 0, 0);

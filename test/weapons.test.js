@@ -84,3 +84,26 @@ test('arrow shaft touches its bow rest and arrowhead projects to screen center t
     }
   }
 });
+
+
+test('throw wind-up raises the spearhead to the flying projectile height at release', () => {
+  const camera = new THREE.PerspectiveCamera(62, 1.6, 0.01, 10);
+  const worldCamera = new THREE.PerspectiveCamera(74, 1.6, 0.1, 500);
+  const vm = new Viewmodel({ viewCamera: camera }, 0);
+  settle(vm, 'spear'); vm.throwSpear(); vm.setTool('spear', { hasSpear: false });
+  for (let i = 0; i < 26; i++) vm.update(1 / 120, idle);
+  vm.root.updateMatrixWorld(true);
+  assert.equal(vm.spear.visible, true);
+  vm.spear.geometry.computeBoundingBox();
+  const tipY = vm.spear.geometry.boundingBox.max.y;
+  const heldTip = vm.spear.localToWorld(new THREE.Vector3(0, tipY, 0)).project(camera);
+  const velocity = new THREE.Vector3(0, 1.5, -30).normalize();
+  const flyingTip = new THREE.Vector3(0, tipY, 0)
+    .applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), velocity))
+    .add(new THREE.Vector3(0.25, -0.1, -0.3)).project(worldCamera);
+  assert.ok(Math.abs(heldTip.y - flyingTip.y) < 0.015, 'spearhead height must connect across the two camera passes');
+  const height = vm.rHand.position.y;
+  vm.update(1 / 120, idle);
+  assert.equal(vm.spear.visible, false);
+  assert.ok(Math.abs(vm.rHand.position.y - height) < 0.02, 'hand must follow through without a vertical snap');
+});
