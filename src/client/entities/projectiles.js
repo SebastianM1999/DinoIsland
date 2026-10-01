@@ -15,6 +15,7 @@ const UP = new THREE.Vector3(0, 1, 0);
 const _a = new THREE.Vector3();
 const _b = new THREE.Vector3();
 const _d = new THREE.Vector3();
+const _turn = new THREE.Quaternion();
 const _ta = new THREE.Vector3();
 const _tb = new THREE.Vector3();
 
@@ -31,28 +32,35 @@ export class Projectiles {
   }
 
   /** Fire an own projectile. Returns its pid. */
-  fire(kind, origin, velocity, power = 1) {
+  fire(kind, origin, velocity, power = 1, rotation = null) {
     const pid = this.nextPid++;
     const o = [+origin.x.toFixed(2), +origin.y.toFixed(2), +origin.z.toFixed(2)];
     const v = [+velocity.x.toFixed(2), +velocity.y.toFixed(2), +velocity.z.toFixed(2)];
     this.game.net.act(ACT.FIRE, { kind, o, v, pid, pw: +power.toFixed(2) });
-    this.spawn(kind, o, v, true, pid);
+    this.spawn(kind, o, v, true, pid, rotation);
     return pid;
   }
 
-  spawn(kind, o, v, own, pid) {
+  spawn(kind, o, v, own, pid, rotation = null) {
     const obj = mesh(kind === 'spear' ? spearGeometry() : arrowGeometry());
     obj.castShadow = true;
-    const p = { kind, own, pid, obj, pos: new THREE.Vector3(o[0], o[1], o[2]), vel: new THREE.Vector3(v[0], v[1], v[2]), t: 0, done: false, restT: 0 };
+    const p = { kind, own, pid, obj, pos: new THREE.Vector3(o[0], o[1], o[2]), vel: new THREE.Vector3(v[0], v[1], v[2]), t: 0, done: false, restT: 0, fresh: kind === 'spear' && own };
     p.gravity = kind === 'spear' ? CONFIG.weapons.spear.throwGravity : CONFIG.weapons.bow.arrowGravity;
     this.orient(p);
+    if (rotation) {
+      obj.quaternion.copy(rotation);
+      p.lastDirection = p.vel.clone().normalize();
+    }
     this.scene.add(obj);
     this.list.push(p);
   }
 
   orient(p) {
     _a.copy(p.vel).normalize();
-    p.obj.quaternion.setFromUnitVectors(UP, _a);
+    if (p.lastDirection) {
+      p.obj.quaternion.premultiply(_turn.setFromUnitVectors(p.lastDirection, _a));
+      p.lastDirection.copy(_a);
+    } else p.obj.quaternion.setFromUnitVectors(UP, _a);
     // spear geometry has its grip at the origin; offset so the tip leads
     p.obj.position.copy(p.pos);
   }
@@ -72,6 +80,8 @@ export class Projectiles {
         }
         continue;
       }
+      // Render the released spear once at the exact handoff pose before moving.
+      if (p.fresh) { p.fresh = false; continue; }
       p.t += dt;
       // sub-step for fast arrows
       const steps = Math.ceil((p.vel.length() * dt) / 1.5) || 1;

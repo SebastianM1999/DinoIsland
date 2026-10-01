@@ -22,11 +22,11 @@ export const GLB_DINOS = {
   raptor: model('raptor', 'Velociraptor', 1.675, 3.037, 1.818, 4.09),
   trex: model('trex', 'TRex', 4.1, 11, 6.262, 10.715),
   stego: model('stego', 'Stegosaurus', 4, 7.9, 2.04, 3.629, true),
-  brachio: model('brachio', 'Brachiosaurus', 11, 19, 4.4, 7.5, true),
+  brachio: model('brachio', 'Brachiosaurus', 13.007, 18.514, 2.714, 5.333, true),
 };
-GLB_DINOS.brachio.yaw = 0;
+// Project brachio (art/sources/brachio/brachio.blend).
 GLB_DINOS.brachio.bones = { ...GLB_DINOS.brachio.bones,
-  jaw: 'FaceJaw',
+  jaw: 'Jaw',
   neck: Array.from({ length: 6 }, (_, i) => `Neck${i + 1}`),
   tail: Array.from({ length: 8 }, (_, i) => `Tail${i + 1}`), spine: ['Body', 'Shoulders'] };
 // Project raptor (art/sources/raptor/raptor.blend): opening jaw, two-bone neck,
@@ -39,4 +39,4 @@ GLB_DINOS.stego.width = 2.4;
 GLB_DINOS.raptor.maxCadence = 2.4;
 GLB_DINOS.trex.maxCadence = 1.25;
 GLB_DINOS.stego.maxCadence = 1.35;
-GLB_DINOS.brachio.maxCadence = .9;
+GLB_DINOS.brachio.maxCadence = 1.25;

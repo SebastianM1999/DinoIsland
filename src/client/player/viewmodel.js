@@ -9,6 +9,7 @@ import { TOPS } from '../../shared/outfits.js';
 import { MAT, merge, mesh, tube } from '../models/kit.js';
 import { spearGeometry, bowGeometry, arrowGeometry, trapGeometry, meatGeometry, makeBowString, BOW_REST, ARROW_TIP_Y } from '../models/weapons.js';
 import { handGeometry } from '../models/hands.js';
+import { SPEAR_THROW, spearReleaseRotation, cameraPlaneScale } from './spearThrow.js';
 import { makeFirearm } from '../models/firearms/index.js';
 import { makeFruitMesh } from '../models/fruit.js';
 
@@ -44,6 +45,10 @@ export class Viewmodel {
     this.rHand.position.copy(this.rHandRest);
     this.rArm = mesh(armGeometry(skin, TOPS[0], 1), MAT.standard, { cast: false });
     this.rPalm = mesh(handGeometry(skin, 1), MAT.standard, { cast: false });
+    const openPalm = handGeometry(skin, 1, 0.034, false, true);
+    this.rPalm.geometry.morphAttributes.position = [openPalm.attributes.position];
+    this.rPalm.geometry.morphAttributes.normal = [openPalm.attributes.normal];
+    this.rPalm.updateMorphTargets();
     this.rPinch = mesh(handGeometry(skin, 1, 0.034, true), MAT.standard, { cast: false });
     this.rHand.add(this.rArm, this.rPalm, this.rPinch);
     this.root.add(this.rHand);
@@ -111,6 +116,17 @@ export class Viewmodel {
     this.pendingTool = null;
     this.stabT = 0;
     this.throwT = 0;
+    this.throwElapsed = 0; this.throwReleased = false; this.throwRelease = null;
+    this.throwStart = new THREE.Vector3(); this.throwStartRotation = new THREE.Quaternion();
+    this.throwPose = new THREE.Matrix4(); this.throwProjection = new THREE.Matrix4();
+    this.throwRotation = new THREE.Quaternion(); this.throwPosition = new THREE.Vector3();
+    this.spearGripRotation = this.spear.quaternion.clone();
+    this.spearGripInverse = this.spearGripRotation.clone().invert();
+    this.throwWind = V(0.27, -0.12, -0.34);
+    this.throwWindRotation = new THREE.Quaternion().setFromUnitVectors(V(0, 1, 0), V(-0.1, 0.13, -1).normalize());
+    this.throwEnd = V(...SPEAR_THROW.origin);
+    this.throwUnit = V(1, 1, 1);
+    this.throwIdentity = new THREE.Quaternion();
     this.draw = 0;
     this.drawVis = 0;
     this.hasArrow = true;
@@ -158,7 +174,7 @@ export class Viewmodel {
 
   applyVisibility() {
     const t = this.tool;
-    this.spear.visible = t === 'spear' && (this.throwT > 0.63 || (this.hasSpear && this.throwT === 0));
+    this.spear.visible = t === 'spear' && ((this.throwT > 0 && !this.throwReleased) || (this.hasSpear && this.throwT === 0));
     this.bow.visible = t === 'bow';
     this.nocked.visible = t === 'bow' && this.hasArrow;
     this.trap.visible = t === 'trap';
@@ -180,7 +196,11 @@ export class Viewmodel {
   }
 
   stab() { if (this.stabT <= 0) this.stabT = 1; }
-  throwSpear() { this.throwT = 1; }
+  throwSpear(onRelease) {
+    this.throwT = 1; this.throwElapsed = 0; this.throwReleased = false; this.throwRelease = onRelease;
+    this.throwStart.copy(this.rHand.position);
+    this.throwStartRotation.copy(this.rHand.quaternion).multiply(this.spearGripRotation);
+  }
   setDraw(frac) { this.draw = THREE.MathUtils.clamp(frac, 0, 1); }
   release() { this.recoil = 1; this.draw = 0; }
   eat(type, duration) { this.fruitType = type; this.eatT = duration; this.eatDur = duration; this.applyVisibility(); }
@@ -208,7 +228,10 @@ export class Viewmodel {
     } else this.switchT = Math.max(0, this.switchT - dt * 5);
 
     this.stabT = Math.max(0, this.stabT - dt / 0.38);
-    if (this.throwT > 0) this.throwT = Math.max(0, this.throwT - dt / 0.6);
+    if (this.throwT > 0) {
+      this.throwElapsed += dt;
+      this.throwT = Math.max(0, 1 - this.throwElapsed / SPEAR_THROW.duration);
+    }
     this.eatT = Math.max(0, this.eatT - dt);
     this.placeT = Math.max(0, this.placeT - dt / 0.5);
     this.recoil = Math.max(0, this.recoil - dt * 5);
@@ -237,6 +260,7 @@ export class Viewmodel {
 
     // Tool-specific wrist orientation; forearms stay directed off screen.
     this.rPalm.quaternion.identity();
+    this.rPalm.morphTargetInfluences[0] = 0;
     this.lPalm.quaternion.identity();
     this.rPalm.visible = this.tool !== 'bow';
     this.rPinch.visible = this.tool === 'bow';
@@ -252,11 +276,10 @@ export class Viewmodel {
       const k = this.stabT > 0 ? Math.sin((1 - this.stabT) * Math.PI) : 0;
       r.addScaledVector(this.spearDir, k * 0.42);
       r.y += k * 0.04;
-      if (this.throwT > 0) {
-        const t = 1 - this.throwT;
-        if (t < 0.37) { r.z += t * 0.6; r.y += t * 0.4; this.rHand.rotation.x = -t * 0.8; }     // wind up
-        else { const u = (t - 0.37) / 0.63; r.z += 0.222 - u * 0.7; r.y += 0.148 - u * 0.3; }     // release + follow through
-      }
+      this.spear.matrixAutoUpdate = true;
+      this.spear.position.set(0, 0, 0); this.spear.scale.set(1, 1, 1);
+      this.spear.quaternion.copy(this.spearGripRotation);
+      if (this.throwT > 0) this.poseSpearThrow();
     } else if (this.tool === 'trap') {
       this.rHand.rotation.set(0, 0, 0);
     }
@@ -335,6 +358,48 @@ export class Viewmodel {
     for (const [kind, other] of Object.entries(this.guns)) if (kind !== this.tool) other.userData.flash.visible = false;
     this.aimArm(this.rArm, this.rHand, 1);
     this.aimArm(this.lArm, this.lHand, -1);
+    // Launch after the release pose is evaluated, in the same animation frame.
+    if (this.throwT > 0 && !this.throwReleased && this.throwElapsed + 1e-9 >= SPEAR_THROW.release) {
+      this.throwReleased = true; this.spear.visible = false;
+      const release = this.throwRelease; this.throwRelease = null; release?.();
+    }
+  }
+
+  poseSpearThrow() {
+    const t = this.throwElapsed;
+    const smooth = u => { u = THREE.MathUtils.clamp(u, 0, 1); return u * u * (3 - 2 * u); };
+    const k = smooth(t / SPEAR_THROW.release);
+    this.rPalm.morphTargetInfluences[0] = smooth((t - SPEAR_THROW.release + 0.025) / 0.075) *
+      (1 - smooth((t - SPEAR_THROW.release - 0.19) / 0.20));
+    this.root.rotation.x *= 1 - k; this.root.rotation.y *= 1 - k; this.root.rotation.z *= 1 - k;
+    const plane = 1 + (cameraPlaneScale(this.gfx.viewCamera, this.gfx.camera) - 1) * k;
+    if (t < SPEAR_THROW.windup) {
+      const u = smooth(t / SPEAR_THROW.windup);
+      this.throwPosition.copy(this.throwStart).lerp(this.throwWind, u);
+      this.throwRotation.copy(this.throwStartRotation).slerp(this.throwWindRotation, u);
+    } else {
+      // Accelerate out of the modest shoulder wind-up; settle rotation by release.
+      const u = Math.min(1, (t - SPEAR_THROW.windup) / (SPEAR_THROW.release - SPEAR_THROW.windup));
+      this.throwPosition.copy(this.throwWind).lerp(this.throwEnd, u * u);
+      this.throwRotation.copy(this.throwWindRotation).slerp(spearReleaseRotation, smooth(u));
+    }
+    this.throwPose.compose(this.throwPosition, this.throwRotation, this.throwUnit);
+    this.throwProjection.makeScale(plane, plane, 1);
+    this.throwPose.premultiply(this.throwProjection);
+    this.rHand.position.setFromMatrixPosition(this.throwPose);
+    this.rHand.quaternion.copy(this.throwRotation).multiply(this.spearGripInverse);
+    if (t > SPEAR_THROW.release) {
+      const u = (t - SPEAR_THROW.release) / (SPEAR_THROW.duration - SPEAR_THROW.release);
+      // Extend the empty hand briefly, then recover smoothly to its idle pose.
+      if (u < 0.3) this.rHand.position.z -= Math.sin(u / 0.3 * Math.PI / 2) * 0.15;
+      else { this.rHand.position.z -= 0.15; this.rHand.position.lerp(this.rHandRest, smooth((u - 0.3) / 0.7)); }
+      this.rHand.quaternion.slerp(this.throwIdentity, smooth(u));
+    }
+    this.rHand.updateMatrix();
+    this.spear.matrixAutoUpdate = false;
+    // Compensate the complete spear transform for the two camera projections,
+    // so its grip, blade, shaft and tail all match the world mesh at release.
+    this.spear.matrix.copy(this.rHand.matrix).invert().multiply(this.throwPose);
   }
 
   aimArm(arm, hand, side) {

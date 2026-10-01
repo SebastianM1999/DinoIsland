@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { Renderer } from '../core/renderer.js';
+import { spearLaunch } from './spearThrow.js';
 import { Viewmodel } from './viewmodel.js';
 import { PlayerModel } from '../models/playerModel.js';
 import { CONFIG } from '../../shared/config.js';
@@ -40,14 +41,15 @@ primary.addEventListener('pointercancel', release);
 tool.addEventListener('change', () => { release(); reloading = null; });
 document.querySelector('#throw').addEventListener('click', () => {
   if (tool.value !== 'spear' || !hasSpear) return;
-  vm.throwSpear(); hasSpear = false;
-  setTimeout(() => {
+  hasSpear = false;
+  vm.throwSpear(() => {
     const obj = makeSpear();
-    const forward = gfx.camera.getWorldDirection(new THREE.Vector3());
-    obj.position.copy(gfx.camera.position).addScaledVector(forward, 0.3);
+    const { origin, velocity, rotation } = spearLaunch(gfx.camera);
+    obj.position.copy(origin);
+    obj.quaternion.copy(rotation);
     gfx.scene.add(obj);
-    flyingSpear = { obj, velocity: forward.multiplyScalar(CONFIG.weapons.spear.throwSpeed).add(new THREE.Vector3(0, 1.5, 0)), landed: false };
-  }, 220);
+    flyingSpear = { obj, velocity, landed: false };
+  });
 });
 document.querySelector('#reset-spear').addEventListener('click', () => {
   if (vm.throwT > 0) return;
@@ -85,9 +87,10 @@ function frame(now) {
   vm.setGunPose(document.querySelector('#aim').checked, reloading?.kind === tool.value ? reloading.elapsed / CONFIG.weapons[tool.value].reloadTime : 0);
   effects.update(dt);
   if (flyingSpear && !flyingSpear.landed) {
+    const oldDirection = flyingSpear.velocity.clone().normalize();
     flyingSpear.velocity.y -= CONFIG.weapons.spear.throwGravity * dt;
     flyingSpear.obj.position.addScaledVector(flyingSpear.velocity, dt);
-    flyingSpear.obj.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), flyingSpear.velocity.clone().normalize());
+    flyingSpear.obj.quaternion.premultiply(new THREE.Quaternion().setFromUnitVectors(oldDirection, flyingSpear.velocity.clone().normalize()));
     if (flyingSpear.obj.position.y <= 0.12) { flyingSpear.obj.position.y = 0.12; flyingSpear.landed = true; flyingSpear.obj.rotation.set(Math.PI / 2, 0, 0); }
   }
   const a = ammo[tool.value];
