@@ -31,6 +31,12 @@ export const ISLAND_MUSIC = {
   volcano: { calm: '/assets/audio/music/volcano-calm.ogg', danger: '/assets/audio/music/volcano-danger.ogg' },
 };
 
+export const MENU_MUSIC = '/assets/audio/music/menu.ogg';
+export const BOSS_MUSIC = '/assets/audio/music/boss.ogg';
+// Forest Exploration ships as a seamless loop; other tracks retain their
+// opening on first play and crossfade the tail into the first two seconds.
+export const musicLoopStart = url => url === ISLAND_MUSIC.jungle.calm ? 0 : 2;
+
 export function effectGroup(name, { surface = 'grass' } = {}) {
   return name === 'step' ? FOOTSTEPS[surface] || FOOTSTEPS.grass : EFFECTS[name];
 }

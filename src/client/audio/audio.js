@@ -78,6 +78,13 @@ export class GameAudio {
     if (this.ok) { this.musicOn = true; this.islandMusic.start(); }
   }
 
+  startMenuMusic() {
+    if (!this.ok) return;
+    this.musicOn = true;
+    this.resume();
+    this.islandMusic.startMenu();
+  }
+
   stopMusic() {
     if (!this.ok) return;
     this.musicOn = false;
@@ -582,7 +589,7 @@ export class GameAudio {
   }
 
   /** Per-frame: quiet positional ambience and calm/danger music scheduling. */
-  update(dt, { coast = 0, water = null, danger = false } = {}) {
+  update(dt, { coast = 0, water = null, danger = false, bossArea = false } = {}) {
     if (!this.ok || this.ctx.state !== 'running') return;
     const t = this.ctx.currentTime;
     if (this.amb) {
@@ -604,7 +611,7 @@ export class GameAudio {
         for (let i = 0; i < n; i++) this.#osc('sine', f, f * (0.8 + Math.random() * 0.4), t + i * 0.11, 0.07, out, 1, 0.01);
       }
     }
-    if (danger) this.dangerUntil = t + 4;
+    if (danger || bossArea) this.dangerUntil = t + 4;
     const mode = t < this.dangerUntil ? 'danger' : 'calm';
     if (mode !== this.musicMode) {
       this.musicMode = mode;
@@ -614,7 +621,7 @@ export class GameAudio {
       this.dangerBus.gain.setTargetAtTime(mode === 'danger' ? 1 : 0, t, 0.55);
     }
     if (this.musicOn) {
-      this.islandMusic.update(danger);
+      this.islandMusic.update(danger, bossArea);
       const fallback = !this.islandMusic.current;
       this.calmBus.gain.setTargetAtTime(fallback && mode === 'calm' ? 1 : 0, t, 0.2);
       this.dangerBus.gain.setTargetAtTime(fallback && mode === 'danger' ? 1 : 0, t, 0.2);
