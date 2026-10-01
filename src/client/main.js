@@ -90,9 +90,9 @@ async function launch(net, reuse = null) {
   }
   window.__game = game; // handy for debugging in the console
   game.input.onLockChange = (locked) => {
-    setPaused(!locked && game?.running && !game.hud.isPanelOpen());
+    setPaused(!locked && game?.running && !game.hud.isPanelOpen() && !game.input.lockPending);
   };
-  game.onPanelChange = (open) => setPaused(!open && !game.input.locked);
+  game.onPanelChange = () => setPaused(false);
   game.onLeave = (reason) => backToMenu(reason);
   // The team set sail: the server sends a fresh welcome for the next island.
   game.onNewIsland = (welcome) => {
@@ -118,9 +118,16 @@ $('join-form').addEventListener('submit', (e) => {
   start('online');
 });
 $('btn-solo').addEventListener('click', () => start('local'));
-$('btn-resume').addEventListener('click', () => game?.input.requestLock());
+function resumeGame() {
+  if (!game?.running) return;
+  setPaused(false);
+  game.audio.resume();
+  game.input.requestLock();
+}
+$('btn-resume').addEventListener('click', resumeGame);
+$('btn-pause-close').addEventListener('click', resumeGame);
 paused.addEventListener('click', (e) => {
-  if (e.target === paused) game?.input.requestLock();
+  if (e.target === paused) resumeGame();
 });
 canvas.addEventListener('click', () => {
   if (!game?.running || game.hud.isPanelOpen()) return;

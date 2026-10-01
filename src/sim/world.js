@@ -17,6 +17,7 @@ import { MSG, ACT, EV, EQUIP } from '../shared/protocol.js';
 import { DinoSystem } from './dinos.js';
 import { Mission } from './mission.js';
 import { resolveCircle } from '../shared/collision.js';
+import { resolveDinoContact, DINO_CONTACT } from '../shared/dinoContact.js';
 import { makeRng } from '../shared/rng.js';
 import { lineBlocked } from '../shared/visibility.js';
 import { sanitizeOutfit, sameOutfit } from '../shared/outfits.js';
@@ -272,6 +273,7 @@ export class ServerWorld {
 
   onState(p, m) {
     if (!p.alive) return;
+    const previous = { x: p.x, y: p.y, z: p.z };
     const num = (v, d) => (Number.isFinite(v) ? v : d);
     const x = num(m.x, p.x), z = num(m.z, p.z);
     const y = num(m.y, p.y);
@@ -300,6 +302,22 @@ export class ServerWorld {
     p.spd = Math.max(0, Math.min(20, num(m.spd, 0)));
     p.eq = Math.max(0, Math.min(EQUIP.length - 1, m.eq | 0));
     p.fl = (m.fl | 0) & 63;
+    this.resolvePlayerDinos(p, previous);
+  }
+
+  resolvePlayerDinos(p, previous = p) {
+    if (!p.alive || p.creative) return;
+    const result = resolveDinoContact(previous, p, this.dinos.list, this.layout.playerColliders, (d, nx, nz) => {
+      if (this.now < (p.nextDinoContactAt ?? 0)) return;
+      p.nextDinoContactAt = this.now + DINO_CONTACT.cooldown;
+      this.hurtPlayer(p, DINO_CONTACT.damage, { kx: nx * DINO_CONTACT.knockback, kz: nz * DINO_CONTACT.knockback,
+        src: d.type, from: { id: d.id, x: d.x, y: d.y, z: d.z } });
+    });
+    if (Math.hypot(result.x - p.x, result.z - p.z) > 0.005) {
+      p.x = result.x; p.z = result.z;
+      p.y = Math.max(p.y, this.layout.groundAt(p.x, p.z));
+      this.send(p.id, { t: MSG.CORRECT, x: r2(p.x), y: r2(p.y), z: r2(p.z) });
+    }
   }
 
   /**
@@ -739,6 +757,7 @@ export class ServerWorld {
     while (this.tracks.length && this.now - this.tracks[0].t > CONFIG.tracks.lifetime) this.tracks.shift();
 
     this.dinos.update(dt);
+    for (const p of this.players.values()) this.resolvePlayerDinos(p);
     this.mission.update(dt);
   }
 

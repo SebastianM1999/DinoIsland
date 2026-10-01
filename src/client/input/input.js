@@ -55,21 +55,39 @@ export class Input {
   }
 
   requestLock() {
-    if (this.locked) return;
-    // Some browsers return a promise that rejects when requested too soon after exit.
-    try {
-      const p = this.target.requestPointerLock({ unadjustedMovement: true });
-      if (p && p.catch) p.catch(() => this.target.requestPointerLock()?.catch?.(() => {}));
-    } catch {
-      this.target.requestPointerLock();
-    }
+    if (this.locked || this.lockPending) return;
+    this.lockPending = true;
+    const generation = this.lockGeneration ?? 0;
+    const attempt = async (retries = 0) => {
+      if (generation !== (this.lockGeneration ?? 0)) return;
+      try {
+        // Raw movement is optional; ordinary pointer lock works on more systems.
+        await this.target.requestPointerLock();
+        this.lockPending = false;
+      } catch {
+        if (retries < 2 && this.enabled && generation === (this.lockGeneration ?? 0)) {
+          // Escape imposes a browser cooldown before the mouse can be recaptured.
+          this.lockRetry = setTimeout(() => attempt(retries + 1), 650);
+        } else {
+          this.lockPending = false;
+        }
+      }
+    };
+    attempt();
   }
 
   exitLock() {
+    this.lockGeneration = (this.lockGeneration ?? 0) + 1;
+    clearTimeout(this.lockRetry);
+    this.lockPending = false;
     if (document.pointerLockElement) document.exitPointerLock();
   }
 
   #onKey(e, down) {
+    if (this.enabled && down && !e.repeat && e.code === 'KeyE' && this.onPanelToggle?.('interact')) {
+      e.preventDefault();
+      return;
+    }
     if (this.enabled && down && !e.repeat && e.code === 'Escape' && this.onPanelToggle?.('close')) {
       e.preventDefault();
       return;

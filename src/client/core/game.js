@@ -3,6 +3,7 @@
 
 import * as THREE from 'three';
 import { CONFIG } from '../../shared/config.js';
+import { resolveDinoContact } from '../../shared/dinoContact.js';
 import { Terrain } from '../../shared/terrain.js';
 import { buildLayout } from '../../shared/layout.js';
 import { planIsland } from '../../shared/island.js';
@@ -103,6 +104,10 @@ export class Game {
       this.#showMission();
     };
     this.input.onPanelToggle = (action) => {
+      if (action === 'interact') {
+        if (!(this.hud._boardOpen || this.hud.isExtraOpen('wardrobe') || this.hud.isExtraOpen('boat'))) return false;
+        action = 'close';
+      }
       if (action === 'close' && !this.hud.isPanelOpen()) return false;
       let open;
       if (action === 'inventory') open = this.hud.toggleInventory();
@@ -125,6 +130,7 @@ export class Game {
       else this.input.requestLock();
       return true;
     };
+    this.hud.onCloseBoard = () => this.input.onPanelToggle('close');
 
     this.#buildWorld();
     this.remotes = new RemotePlayers(this.gfx.scene, this.gfx.camera, this.overlay);
@@ -482,9 +488,8 @@ export class Game {
       this.debug = !this.debug;
       this.debugGroup.visible = this.debug;
     }
-    // E toggles the mission board closed again (opening is an interaction)
-    if ((this.hud._boardOpen || this.hud.isExtraOpen('wardrobe') || this.hud.isExtraOpen('boat')) && input.wasPressed('interact')) this.input.onPanelToggle('close');
     const canMove = this.me.alive && !this.hud.isPanelOpen();
+    const previousPos = { ...p.pos };
     p.update(dt, {
       forward: canMove && input.isHeld('forward'),
       back: canMove && input.isHeld('back'),
@@ -493,6 +498,11 @@ export class Game {
       jump: canMove && input.isHeld('jump'),
       sprint: canMove && input.isHeld('sprint'),
     });
+    if (this.me.alive && !p.creative) {
+      const contact = resolveDinoContact(previousPos, p.pos, this.dinos.map.values(), this.layout.playerColliders);
+      p.pos.x = contact.x; p.pos.z = contact.z;
+      if (contact.hit) p.pos.y = Math.max(p.pos.y, p.groundAt(p.pos.x, p.pos.z, p.pos.y));
+    }
     if (canMove && input.wasPressed('unstuck')) this.stuck.manual();
     // the grove prompt shows again once the player has stepped back from the stones
     const gv = this.layout.grove;

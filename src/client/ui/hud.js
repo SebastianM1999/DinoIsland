@@ -211,6 +211,10 @@ export class Hud {
     this._boardOpen = false;
     this._extras = new Map();
     this.$board.addEventListener('click', (e) => {
+      if (e.target.closest('[data-close-board]')) {
+        this.onCloseBoard?.();
+        return;
+      }
       const btn = e.target.closest('[data-track]');
       if (!btn) return;
       const id = btn.dataset.track;
@@ -820,7 +824,8 @@ export class Hud {
       <header class="board-head">
         <h2>${icon('quest')} Mission Board</h2>
         <p>Team contracts · rewards upgrade the whole team</p>
-        <span class="hud-panel-close"><kbd>E</kbd> / <kbd>Esc</kbd> Close</span>
+        <span class="hud-panel-close"><kbd>E</kbd> Close</span>
+        <button type="button" class="board-close" data-close-board aria-label="Close mission board" title="Close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
       </header>
       ${quest}
       <div class="board-cols">

@@ -5,6 +5,7 @@
 import { CONFIG } from '../shared/config.js';
 import { EV, DS } from '../shared/protocol.js';
 import { resolveCircle, segmentColliders, penetration } from '../shared/collision.js';
+import { dinoBodyCircles } from '../shared/dinoContact.js';
 import { angleDiff, clamp } from '../shared/rng.js';
 import { insideGrove } from '../shared/grove.js';
 import { insideBossArena } from '../shared/bossArena.js';
@@ -241,8 +242,7 @@ export class DinoSystem {
 
   /** Body footprint circles (world space) of `d` standing at (x, z) facing `yaw`. */
   *bodyCircles(d, x, z, yaw) {
-    const fx = -Math.sin(yaw), fz = -Math.cos(yaw), s = d.scale || 1;
-    for (const [off, r] of CONFIG.dinos[d.type].body || [[0, radiusOf(d) * 0.6 / s]]) yield [x + fx * off * s, z + fz * off * s, r * s];
+    yield* dinoBodyCircles(d, x, z, yaw);
   }
 
   /**
