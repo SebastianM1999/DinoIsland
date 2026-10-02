@@ -16,7 +16,8 @@ export const SETTING_DEFS = [
   // `labels` turns a slider into a discrete choice (value = label index).
   { id: 'quality', label: 'Graphics quality', group: 'Graphics', min: 0, max: 3, step: 1, def: 2, labels: ['Low', 'Medium', 'High', 'Ultra'] },
   { id: 'renderScale', label: 'Render scale', group: 'Graphics', min: 50, max: 100, step: 5, def: 100, unit: '%' },
-  { id: 'stats', label: 'Performance overlay (F2)', group: 'Graphics', min: 0, max: 1, step: 1, def: 0, labels: ['Off', 'On'] },
+  // type 'toggle' = checkbox (checked when > 0). F2 in game also cycles to 2 = detailed.
+  { id: 'stats', label: 'Show FPS & ping', group: 'Graphics', type: 'toggle', min: 0, max: 2, step: 1, def: 1, labels: ['Off', 'On', 'Detailed'] },
 ];
 
 const defaults = Object.fromEntries(SETTING_DEFS.map((d) => [d.id, d.def]));

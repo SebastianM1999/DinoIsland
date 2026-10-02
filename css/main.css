@@ -250,19 +250,23 @@ input[type="text"], input:not([type]) {
   overflow: hidden;
   z-index: 5;
 }
-/* Performance overlay (F2): mid-left edge, clear of the HUD corners */
+/* FPS & ping display (F2 cycles compact / detailed / off): top-right corner, above the minimap */
 .perf-stats {
   position: absolute;
-  left: 8px;
-  top: 50%;
-  transform: translateY(-50%);
-  padding: 6px 9px;
-  border-radius: 6px;
-  background: rgba(var(--navy-rgb), 0.72);
+  right: 6px;
+  top: 4px;
+  padding: 2px 7px;
+  border-radius: 5px;
+  background: rgba(var(--navy-rgb), 0.55);
   color: #fff;
-  font: 600 12px/1.45 ui-monospace, Consolas, monospace;
+  font: 700 11px/1.45 ui-monospace, Consolas, monospace;
   white-space: pre;
+  text-align: right;
 }
+.perf-stats.detailed { padding: 5px 9px; font-weight: 600; }
+.perf-stats .good { color: #8ee07a; }
+.perf-stats .ok { color: #ffd54a; }
+.perf-stats .bad { color: #ff7a6b; }
 .nameplate {
   position: absolute;
   left: 0;
@@ -543,6 +547,15 @@ kbd {
   border: 3px solid var(--navy);
 }
 .setting-row input[type=range]:focus-visible { outline: 3px solid var(--focus); outline-offset: 4px; }
+.setting-row input[type=checkbox] {
+  justify-self: start;
+  width: 22px;
+  height: 22px;
+  margin: 0;
+  accent-color: var(--yellow);
+  cursor: url('../assets/cursor-hand.svg') 12 3, pointer;
+}
+.setting-row input[type=checkbox]:focus-visible { outline: 3px solid var(--focus); outline-offset: 4px; }
 .controls-list {
   display: grid;
   grid-template-columns: auto 1fr;

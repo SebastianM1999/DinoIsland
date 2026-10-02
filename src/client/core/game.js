@@ -150,7 +150,7 @@ export class Game {
     this.#buildWorld();
     this.stats = new PerfStats(this.overlay);
     this.unsubSettings = onSettings((s) => {
-      this.stats.visible = !!s.stats;
+      this.stats.setMode(s.stats);
       this.vegetation.setDensity((QUALITY[s.quality] ?? QUALITY[2]).grass);
     });
     this.remotes = new RemotePlayers(this.gfx.scene, this.gfx.camera, this.overlay);
@@ -538,7 +538,7 @@ export class Game {
       this.debug = !this.debug;
       this.debugGroup.visible = this.debug;
     }
-    if (input.wasPressed('stats')) setSetting('stats', settings.stats ? 0 : 1);
+    if (input.wasPressed('stats')) setSetting('stats', (settings.stats + 1) % 3);   // compact → detailed → off
     const canMove = this.me.alive && !this.hud.isPanelOpen();
     const previousPos = { ...p.pos };
     p.update(dt, {

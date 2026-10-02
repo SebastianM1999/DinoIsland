@@ -43,18 +43,21 @@ export function initSettings({ onClose } = {}) {
     const row = document.createElement('div');
     row.className = 'setting-row';
     const id = `set-${d.id}`;
+    const toggle = d.type === 'toggle';
     row.innerHTML = `
       <label for="${id}">${d.label}</label>
-      <input type="range" id="${id}" min="${d.min}" max="${d.max}" step="${d.step}">
+      ${toggle ? `<input type="checkbox" id="${id}">` : `<input type="range" id="${id}" min="${d.min}" max="${d.max}" step="${d.step}">`}
       <output for="${id}"></output>`;
     const input = row.querySelector('input');
-    input.addEventListener('input', () => setSetting(d.id, Number(input.value)));
+    if (toggle) input.addEventListener('change', () => setSetting(d.id, input.checked ? 1 : 0));
+    else input.addEventListener('input', () => setSetting(d.id, Number(input.value)));
     rows.set(d.id, { input, out: row.querySelector('output'), d });
     panel.append(row);
   }
   onSettings((s) => {
     for (const { input, out, d } of rows.values()) {
-      input.value = s[d.id];
+      if (d.type === 'toggle') input.checked = s[d.id] > 0;
+      else input.value = s[d.id];
       const pct = ((s[d.id] - d.min) / (d.max - d.min)) * 100;
       input.style.setProperty('--fill', `${pct}%`);
       out.textContent = d.labels ? d.labels[s[d.id]] : d.id === 'master' || d.id === 'music' || d.id === 'sfx'
