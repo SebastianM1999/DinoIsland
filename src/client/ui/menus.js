@@ -57,7 +57,7 @@ export function initSettings({ onClose } = {}) {
       input.value = s[d.id];
       const pct = ((s[d.id] - d.min) / (d.max - d.min)) * 100;
       input.style.setProperty('--fill', `${pct}%`);
-      out.textContent = d.id === 'master' || d.id === 'music' || d.id === 'sfx'
+      out.textContent = d.labels ? d.labels[s[d.id]] : d.id === 'master' || d.id === 'music' || d.id === 'sfx'
         ? (s[d.id] === 0 ? 'Off' : `${s[d.id]}${d.unit}`)
         : `${s[d.id]}${d.unit}`;
     }

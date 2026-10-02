@@ -11,6 +11,7 @@ import { CONFIG } from '../src/shared/config.js';
 import { startGameHost } from './gameHost.js';
 import { lanAddresses } from './lanAddress.js';
 import { InternetHost } from './internetHost.js';
+import { BRAND } from '../src/shared/brand.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -120,6 +121,6 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   const { httpServer, host, internet } = createGameServer();
   for (const signal of ['SIGINT', 'SIGTERM']) process.once(signal, () => { internet.stop(); host.stop(); httpServer.close(); });
   httpServer.listen(port, () => {
-    console.log(`Dinosaur Island server running at http://localhost:${port}`);
+    console.log(`${BRAND.name} server running at http://localhost:${port}`);
   });
 }

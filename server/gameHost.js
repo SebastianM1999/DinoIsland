@@ -73,10 +73,8 @@ export function startGameHost(httpServer = null, { onConnection } = {}) {
 
   // Fixed-rate simulation + snapshot broadcast.
   const tickMs = 1000 / NET.tickRate;
-  const snapEvery = Math.max(1, Math.round(NET.tickRate / NET.snapshotRate));
   let last = performance.now();
   let acc = 0;
-  let ticks = 0;
   const interval = setInterval(() => {
     const now = performance.now();
     acc += Math.min(250, now - last);
@@ -84,8 +82,7 @@ export function startGameHost(httpServer = null, { onConnection } = {}) {
     while (acc >= tickMs) {
       world.step(tickMs / 1000);
       acc -= tickMs;
-      ticks++;
-      if (ticks % snapEvery === 0 && sockets.size > 0) world.host.send('*', world.snapshot());
+      if (world.snapshotDue(tickMs / 1000) && sockets.size > 0) world.host.send('*', world.snapshot());
     }
     // drop silent clients (closed laptop lids, crashed tabs)
     for (const p of world.players.values()) {

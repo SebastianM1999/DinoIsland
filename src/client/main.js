@@ -10,6 +10,10 @@ import { GameAudio } from './audio/audio.js';
 import { initSteamLobby } from './ui/steamLobby.js';
 import { initLanAddress, websocketAddress } from './net/lan.js';
 import { initInternetTest } from './ui/internetTest.js';
+import { BRAND, storageKey, migrateStorage } from '../shared/brand.js';
+
+migrateStorage();
+document.title = BRAND.name;
 
 // SVG filter that gives HUD and menu panels their brush-stroke edges.
 document.body.insertAdjacentHTML('beforeend', `
@@ -70,7 +74,7 @@ async function start(mode, options = {}) {
   busy = true;
   playMenuMusic();
   const name = nameInput.value.trim() || 'Explorer';
-  try { localStorage.setItem('di.name', name); } catch { /* storage may be blocked */ }
+  try { localStorage.setItem(storageKey('name'), name); } catch { /* storage may be blocked */ }
   setBusy(true, mode === 'online' ? 'Connecting…' : 'Starting…');
   let net;
   try {
@@ -215,7 +219,7 @@ leaveBtn.addEventListener('click', () => {
   backToMenu('');
 });
 
-try { nameInput.value = localStorage.getItem('di.name') || ''; } catch { /* ignore */ }
+try { nameInput.value = localStorage.getItem(storageKey('name')) || ''; } catch { /* ignore */ }
 serverInput.value = served ? `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}` : `ws://localhost:${CONFIG.net.port}`;
 const hashMsg = new URLSearchParams(location.hash.slice(1)).get('msg');
 if (hashMsg) {

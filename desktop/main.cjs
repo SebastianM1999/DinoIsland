@@ -1,6 +1,8 @@
 const { app, BrowserWindow, shell } = require('electron');
 const path = require('node:path');
 const { installSteam } = require('./steam.cjs');
+// Window titles follow the packaged product name (see src/shared/brand.js).
+const PRODUCT = require('../package.json').build.productName;
 
 let server;
 let gameHost;
@@ -29,7 +31,7 @@ async function launch() {
     minWidth: 960,
     minHeight: 640,
     backgroundColor: '#1f2a44',
-    title: 'Dinosaur Island',
+    title: PRODUCT,
     webPreferences: { preload: path.join(__dirname, 'preload.cjs'), nodeIntegration: false, contextIsolation: true, sandbox: true },
   });
   win.webContents.setWindowOpenHandler(({ url }) => {
@@ -37,7 +39,7 @@ async function launch() {
     // the browser without granting those sites access to the game window.
     if (url === `${localUrl}assets/audio/CREDITS.md`) {
       return { action: 'allow', overrideBrowserWindowOptions: {
-        width: 860, height: 680, title: 'Dinosaur Island — audio credits',
+        width: 860, height: 680, title: `${PRODUCT} — audio credits`,
         webPreferences: { nodeIntegration: false, contextIsolation: true, sandbox: true },
       } };
     }
@@ -59,7 +61,7 @@ async function launch() {
 }
 
 app.whenReady().then(launch).catch((error) => {
-  console.error('Could not start Dinosaur Island:', error);
+  console.error(`Could not start ${PRODUCT}:`, error);
   app.quit();
 });
 

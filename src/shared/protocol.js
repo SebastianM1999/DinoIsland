@@ -5,22 +5,25 @@
 //     player health, inventories, the mission and the hut store.
 //   * Clients own only their own movement (position/look is sent ~20x/s)
 //     and report attacks/projectile results, which the server validates
-//     (range checks) and turns into damage.
+//     (range checks) and turns into damage. Hits carry `rt`, the server time
+//     the client was drawing dinosaurs at; the server checks them against
+//     where the dinosaur was then (lag compensation, ≤ CONFIG.net.lagCompMax).
 //
 // ---------------------------------------------------------------- client -> server
 //   hello   { name, outfit? }                            outfit = { hat, top, pants }
-//   state   { x, y, z, yaw, pitch, spd, eq, fl }       own movement (fl = PF flags)
+//   state   { s, k, x, y, z, yaw, pitch, spd, eq, fl } own movement (fl = PF flags); s = sequence number,
+//                                                       k = last correction epoch seen (older k / s are dropped)
 //   act     { a: <action>, ...fields }                  see ACT below
 //   ping    { c }                                       latency probe (server echoes pong)
 //
 // ---------------------------------------------------------------- server -> client
-//   welcome { id, slot, now, inv, world }               full state on join – sent again when
+//   welcome { id, slot, now, k?, inv, world }               full state on join – sent again when
 //                                                       the team sails to the next island
 //   reject  { reason }
 //   pong    { c, now }
 //   snap    { now, p: [...PLAYER_FIELDS], d: [...DINO_FIELDS] }
 //   inv     { inv }                                     your private inventory changed
-//   correct { x, y, z, unstuck? }                       rejected movement / unstuck move; reset prediction
+//   correct { x, y, z, k, unstuck? }                    rejected movement / unstuck move; reset prediction, k = new epoch
 //   ev      { e: <event>, ...fields }                   see EV below
 
 export const MSG = {
@@ -39,11 +42,11 @@ export const MSG = {
 
 /** Client actions (msg.a). */
 export const ACT = {
-  SHOT: 'shot',         // { kind: 'pistol'|'rifle', o, dir, dino?, p?, zone? } validated hitscan
+  SHOT: 'shot',         // { kind: 'pistol'|'rifle', o, dir, dino?, p?, zone?, rt? } validated hitscan
   RELOAD: 'reload',     // { kind: 'pistol'|'rifle' }
-  MELEE: 'melee',       // { dino, zone }                     spear stab hit
+  MELEE: 'melee',       // { dino, zone, p, rt }              spear stab hit
   FIRE: 'fire',         // { kind: 'arrow'|'spear', o:[x,y,z], v:[x,y,z], pid }
-  LAND: 'land',         // { kind, pid, p:[x,y,z], dino?, zone?, attach?, pose? } projectile impact
+  LAND: 'land',         // { kind, pid, p:[x,y,z], dino?, zone?, rt?, attach?, pose? } projectile impact
   PICKUP: 'pickup',     // { item }
   HARVEST: 'harvest',   // { spot }
   EAT: 'eat',           // { fruit? }                          start eating (type optional)

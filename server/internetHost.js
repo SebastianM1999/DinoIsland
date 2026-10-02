@@ -11,6 +11,7 @@ import { spawn } from 'node:child_process';
 import { createHash, randomBytes } from 'node:crypto';
 import { lookup, Resolver } from 'node:dns/promises';
 import { setTimeout as delay } from 'node:timers/promises';
+import { BRAND } from '../src/shared/brand.js';
 
 const VERSION = '2026.9.3';
 const SHA256 = 'f096265ec2fcbe9bb6e2d64268db167ced3fcbb83d894bdb9e2fcdb26f2ea7e2';
@@ -36,7 +37,7 @@ async function download(url, destination, signal, redirects = 0) {
 
 async function helper(signal) {
   if (process.platform !== 'win32' || process.arch !== 'x64') throw new Error('The built-in internet test currently supports Windows x64.');
-  const folder = path.join(os.tmpdir(), 'dinosaur-island-tools');
+  const folder = path.join(os.tmpdir(), `${BRAND.slug}-tools`);
   await fs.promises.mkdir(folder, { recursive: true });
   const executable = path.join(folder, `cloudflared-${VERSION}.exe`);
   const hash = async file => createHash('sha256').update(await fs.promises.readFile(file)).digest('hex');
@@ -93,7 +94,7 @@ export class InternetHost {
     const token = randomBytes(24).toString('hex');
     const proxy = http.createServer((_req, res) => {
       res.writeHead(404, { 'Content-Type': 'text/plain' });
-      res.end('Paste the shared WebSocket address into Dinosaur Island to join.');
+      res.end(`Paste the shared WebSocket address into ${BRAND.name} to join.`);
     });
     this.proxy = proxy;
     proxy.on('connection', socket => {

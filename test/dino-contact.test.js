@@ -37,7 +37,9 @@ test('server corrects overlap, applies small outward knockback, and limits conta
   world.resolvePlayerDinos(p);
   assert.equal(p.hp, hp - 3);
   assert.ok(p.x < d.x - 0.66);
-  assert.ok(messages.some(m => m.t === MSG.CORRECT));
+  // A shallow overlap (client and server saw the dinosaur at slightly different
+  // times) is resolved on the server without snapping the client back.
+  assert.ok(!messages.some(m => m.t === MSG.CORRECT));
   assert.ok(messages.some(m => m.e === EV.HURT && m.kx < 0));
   // A client-predicted position just outside the collider still counts as contact.
   world.resolvePlayerDinos(p);
@@ -49,4 +51,24 @@ test('server corrects overlap, applies small outward knockback, and limits conta
   world.now += 1.01;
   world.resolvePlayerDinos(p);
   assert.equal(p.hp, hp - 6);
+});
+
+test('a deep overlap is corrected on the client, and stale state packets are ignored', () => {
+  const messages = [];
+  const world = new ServerWorld({ send: (to, msg) => messages.push(msg) }, { variant: 1 });
+  const { id } = world.join('Contact tester'), p = world.players.get(id);
+  world.dinos.list = [dino({ x: p.x + 0.01, y: p.y, z: p.z })];
+  const before = { x: p.x, z: p.z };
+  world.resolvePlayerDinos(p);
+  const fix = messages.find(m => m.t === MSG.CORRECT);
+  assert.ok(fix && fix.k === p.epoch && p.epoch === 1);
+  // a packet the client sent before it saw the correction must not undo it
+  world.receive(id, { t: MSG.STATE, s: 1, k: 0, x: before.x, y: p.y, z: before.z, yaw: 0, pitch: 0 });
+  assert.ok(Math.abs(p.x - fix.x) < 0.01);
+  // overtaken packets (lower sequence number) are dropped as well
+  world.dinos.list = [];
+  world.receive(id, { t: MSG.STATE, s: 3, k: 1, x: p.x + 0.2, y: p.y, z: p.z, yaw: 0, pitch: 0 });
+  const x = p.x;
+  world.receive(id, { t: MSG.STATE, s: 2, k: 1, x: p.x - 0.2, y: p.y, z: p.z, yaw: 0, pitch: 0 });
+  assert.equal(p.x, x);
 });

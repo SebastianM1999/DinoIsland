@@ -35,6 +35,9 @@ for (const [type, species] of Object.entries(SPECIES)) {
   species.extraUpdate = (view, dt) => { if (!view.rig.isGLB) extra?.(view, dt); };
 }
 const V = new THREE.Vector3();
+const _frustum = new THREE.Frustum();
+const _m4 = new THREE.Matrix4();
+const _sphere = new THREE.Sphere();
 
 class DinoView {
   constructor(desc, ctx) {
@@ -180,8 +183,11 @@ class DinoView {
     if (V.z > 1) { this.bar.hidden = true; return; }
     this.bar.hidden = false;
     const sx = (V.x * 0.5 + 0.5) * innerWidth, sy = (-V.y * 0.5 + 0.5) * innerHeight;
-    this.bar.style.transform = `translate(${sx.toFixed(1)}px, ${sy.toFixed(1)}px) translate(-50%, -100%)`;
-    this.barFill.style.width = `${Math.max(0, (this.hp / this.maxHp) * 100).toFixed(1)}%`;
+    // write the DOM only when the value changed (no style invalidation otherwise)
+    const tf = `translate(${sx.toFixed(0)}px, ${sy.toFixed(0)}px) translate(-50%, -100%)`;
+    if (tf !== this.barTf) this.bar.style.transform = this.barTf = tf;
+    const w = `${Math.max(0, (this.hp / this.maxHp) * 100).toFixed(0)}%`;
+    if (w !== this.barW) this.barFill.style.width = this.barW = w;
   }
 
   hitSpheres() {
@@ -267,18 +273,29 @@ export class DinoViews {
   }
 
   update(dt, renderTime) {
-    const cam = this.game.gfx.camera.position;
+    const camera = this.game.gfx.camera;
+    const cam = camera.position;
+    _frustum.setFromProjectionMatrix(_m4.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse));
+    // past the fog nothing can be seen: don't draw or animate at all
+    const hide = (this.game.gfx.scene.fog?.far ?? Infinity) + 10;
     for (const v of this.map.values()) {
-      // far away dinosaurs animate at a lower rate (still interpolated every frame)
-      const far = v.pos.distanceToSquared(cam) > 180 * 180;
+      const d2 = v.pos.distanceToSquared(cam);
+      const hidden = d2 > hide * hide;
+      if (v.root.visible === hidden) v.root.visible = !hidden;
+      // far away or off-screen dinosaurs animate at a lower rate (still
+      // interpolated every frame; off-screen ones may still cast a visible shadow)
+      _sphere.center.copy(v.pos);
+      _sphere.radius = v.sp.barHeight * 1.6 * v.scale + 2;
+      const far = hidden || d2 > 180 * 180 || !_frustum.intersectsSphere(_sphere);
       v.skip = far ? (v.skip || 0) + dt : 0;
-      if (far && v.skip < 0.1) {
+      if (far && (hidden || v.skip < 0.1)) {
+        if (hidden && !v.bar.hidden) v.bar.hidden = true;
         v.buf.sample(renderTime, v.tmp);
         v.pos.set(v.tmp[X], v.tmp[Y], v.tmp[Z]);
         v.root.position.copy(v.pos);
         continue;
       }
-      v.update(far ? v.skip : dt, renderTime);
+      v.update(far ? Math.min(v.skip, 0.25) : dt, renderTime);   // no huge step after a long time hidden
       v.skip = 0;
     }
     this.#updateHitDebug(cam);

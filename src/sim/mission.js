@@ -6,6 +6,7 @@
 import { EV } from '../shared/protocol.js';
 import { CONTRACTS } from '../shared/missions.js';
 import { RELICS } from '../shared/relics.js';
+import { BRAND } from '../shared/brand.js';
 
 const SAIL_RADIUS = 18;          // everyone alive must stand this close to the boat
 const SAIL_HOLD = 3;             // seconds the team has to stay there
@@ -74,7 +75,7 @@ export class Mission {
     return {
       level: { index: L.index, number: L.number, name: L.name, biome: L.biome.id, last: L.last },
       step: this.phase,
-      title: won ? 'You escaped Dinosaur Island!' : this.phase === 'sailing' ? 'Island complete!' : `Island ${L.number}: ${L.name}`,
+      title: won ? `You escaped ${BRAND.name}!` : this.phase === 'sailing' ? 'Island complete!' : `Island ${L.number}: ${L.name}`,
       won,
       objectives,
       relics,
@@ -157,7 +158,7 @@ export class Mission {
         this.islandsDone++;
         const last = w.layout.level.last;
         this.doneTimer = last ? SAIL_DELAY * 2.5 : SAIL_DELAY;
-        w.toast(last ? 'All aboard! You escaped Dinosaur Island – well done!' : 'All aboard! Setting sail for the next island…', 'quest');
+        w.toast(last ? `All aboard! You escaped ${BRAND.name} – well done!` : 'All aboard! Setting sail for the next island…', 'quest');
         this.onEvent('island');
         this.broadcast();
       }

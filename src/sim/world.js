@@ -24,6 +24,7 @@ import { sanitizeOutfit, sameOutfit } from '../shared/outfits.js';
 import { planIsland } from '../shared/island.js';
 import { levelDef, LEVEL_COUNT } from '../shared/levels.js';
 import { findUnstuckSpot, goodSpot } from './unstuck.js';
+import { nearDino, plausibleZone } from './hitCheck.js';
 import { insideGrove, mayEnterGrove } from '../shared/grove.js';
 import { RECIPE_BY_ID, upgradeMods, unlockIsland, canAfford } from '../shared/crafting.js';
 
@@ -37,6 +38,13 @@ const validVec = (v) => Array.isArray(v) && v.length === 3 && v.every((n) => Num
 const collisionResult = { x: 0, z: 0, hit: false };
 /** Seconds between two successful unstuck moves of one player. */
 const UNSTUCK_COOLDOWN = 5;
+// Distance reserve for state packets (~0.55 s of sprint): absorbs bunched
+// packets after a lag spike; the 11 m/s refill still caps the average speed.
+const MOVE_RESERVE = 6;
+// The client resolves dinosaur contact against interpolated (slightly older)
+// positions, the server against current ones. Push-outs below this are applied
+// silently instead of snapping the player back.
+const DINO_PUSH_TOLERANCE = 0.5;
 
 export class ServerWorld {
   /**
@@ -86,7 +94,7 @@ export class ServerWorld {
       Object.assign(p, {
         x: sp.x, y: this.terrain.heightAt(sp.x, sp.z), z: sp.z, yaw: sp.yaw, pitch: 0, spd: 0,
         hp: P.maxHealth, alive: true, deadT: 0, eating: null, hot: null,
-        lastMoveAt: this.now, moveBudget: 3.5,
+        lastMoveAt: this.now, moveBudget: 3.5, epoch: p.epoch + 1,
       });
       p.inv.arrows = caps.arrows;
       p.inv.arrowUses = Array(caps.arrows).fill(W.bow.uses);
@@ -99,7 +107,7 @@ export class ServerWorld {
       p.inv.upgrades = [...this.upgrades];
     }
     for (const p of this.players.values()) {
-      this.send(p.id, { t: MSG.WELCOME, id: p.id, slot: p.slot, now: r3(this.now), inv: p.inv, world: this.fullState() });
+      this.send(p.id, { t: MSG.WELCOME, id: p.id, slot: p.slot, now: r3(this.now), k: p.epoch, inv: p.inv, world: this.fullState() });
     }
   }
 
@@ -137,6 +145,8 @@ export class ServerWorld {
       lastInput: this.now,
       lastMoveAt: this.now,
       moveBudget: 3.5,
+      epoch: 0,              // bumped by every correction/teleport (see correct())
+      lastSeq: -1,           // newest state packet seen (`s`)
       knockBudgetUntil: 0,
       creative: false,       // invincible, may fly (toggled by the player)
       nextMeleeAt: 0,
@@ -270,7 +280,8 @@ export class ServerWorld {
     p.inv.spear = true;
     p.inv.guns = gunInventory(); p.inv.reloading = null;
     this.sendInv(p);
-    this.event(EV.RESPAWN, { id: p.id, x: r2(p.x), z: r2(p.z), yaw: p.yaw });
+    p.epoch++;
+    this.event(EV.RESPAWN, { id: p.id, x: r2(p.x), z: r2(p.z), yaw: p.yaw, k: p.epoch });
   }
 
   // ------------------------------------------------------------------ messages
@@ -286,16 +297,32 @@ export class ServerWorld {
     }
   }
 
+  /**
+   * Tell a client where it really is. Bumps the player's correction epoch, so
+   * state packets it sent before receiving this (still based on the old
+   * position) are ignored instead of being rejected one by one.
+   */
+  correct(p, extra) {
+    p.epoch++;
+    this.send(p.id, { t: MSG.CORRECT, x: r2(p.x), y: r2(p.y), z: r2(p.z), k: p.epoch, ...extra });
+  }
+
   onState(p, m) {
     if (!p.alive) return;
-    const previous = { x: p.x, y: p.y, z: p.z };
     const num = (v, d) => (Number.isFinite(v) ? v : d);
+    // stale (sent before the last correction/teleport) or overtaken (unreliable transport)
+    if (num(m.k, p.epoch) < p.epoch) return;
+    if (Number.isFinite(m.s)) {
+      if (m.s <= p.lastSeq) return;
+      p.lastSeq = m.s;
+    }
+    const previous = { x: p.x, y: p.y, z: p.z };
     const x = num(m.x, p.x), z = num(m.z, p.z);
     const y = num(m.y, p.y);
     // A small distance reserve accommodates packet bunching without allowing
     // repeated state packets to move faster than the player's sprint.
     const creative = p.creative;
-    p.moveBudget = Math.min(creative ? 10 : this.now < p.knockBudgetUntil ? 7 : 3.5,
+    p.moveBudget = Math.min(creative ? 10 : this.now < p.knockBudgetUntil ? 7 : MOVE_RESERVE,
       p.moveBudget + Math.max(0, this.now - p.lastMoveAt) * (creative ? P.creative.flySpeed + 4 : 11));
     p.lastMoveAt = this.now;
     const distance = Math.hypot(x - p.x, z - p.z);
@@ -307,7 +334,7 @@ export class ServerWorld {
         !Number.isFinite(ground) || y < ground - 2 || y > ground + (creative ? P.creative.maxHeight + 5 : 20) ||
         // rivers and lakes may be swum; only the open sea is off-limits
         (!creative && this.terrain.seaDepthAt(x, z) > CONFIG.world.maxWadeDepth + 0.2) || blocked) {
-      this.send(p.id, { t: MSG.CORRECT, x: r2(p.x), y: r2(p.y), z: r2(p.z) });
+      this.correct(p);
       return;
     }
     p.moveBudget -= distance;
@@ -328,10 +355,11 @@ export class ServerWorld {
       this.hurtPlayer(p, DINO_CONTACT.damage, { kx: nx * DINO_CONTACT.knockback, kz: nz * DINO_CONTACT.knockback,
         src: d.type, from: { id: d.id, x: d.x, y: d.y, z: d.z } });
     });
-    if (Math.hypot(result.x - p.x, result.z - p.z) > 0.005) {
+    const shift = Math.hypot(result.x - p.x, result.z - p.z);
+    if (shift > 0.005) {
       p.x = result.x; p.z = result.z;
       p.y = Math.max(p.y, this.layout.groundAt(p.x, p.z, p.y + P.stepHeight));
-      this.send(p.id, { t: MSG.CORRECT, x: r2(p.x), y: r2(p.y), z: r2(p.z) });
+      if (shift > DINO_PUSH_TOLERANCE) this.correct(p);
     }
   }
 
@@ -358,7 +386,7 @@ export class ServerWorld {
     p.x = spot.x; p.y = spot.y; p.z = spot.z;
     p.lastMoveAt = this.now;
     p.moveBudget = 3.5;
-    this.send(p.id, { t: MSG.CORRECT, x: r2(p.x), y: r2(p.y), z: r2(p.z), unstuck: 1 });
+    this.correct(p, { unstuck: 1 });
     this.toast('Unstuck!', 'info', p.id);
     this.log(`unstuck #${p.id} ${manual ? '(manual)' : '(auto)'} -> ${r2(p.x)}, ${r2(p.z)}`);
   }
@@ -415,9 +443,11 @@ export class ServerWorld {
         if (!p.alive || p.eating || !inv.spear || this.now < p.nextMeleeAt) return;
         const d = this.dinos.get(m.dino);
         if (!d || !d.alive) return;
-        if (!validVec(m.p) || !this.validMeleeHit(p, d, m.p)) return;
+        if (!validVec(m.p)) return;
+        const pose = this.hitPose(d, m.rt);
+        if (!this.validMeleeHit(p, d, m.p, pose)) return;
         p.nextMeleeAt = this.now + W.spear.cooldown;
-        this.dinos.damage(d, W.spear.damage * (1 + this.mods().spearDamage), m.zone, p.id, 'spear');
+        this.dinos.damage(d, W.spear.damage * (1 + this.mods().spearDamage), plausibleZone(d, pose, m.p, m.zone), p.id, 'spear');
         inv.spearHealth = Math.max(0, (inv.spearHealth ?? W.spear.durability) - W.spear.useWear);
         if (!inv.spearHealth) { inv.spear = false; this.toast('Your spear broke - refill at the hut', 'spear', p.id); }
         this.sendInv(p);
@@ -460,15 +490,16 @@ export class ServerWorld {
         const [x, y, z] = m.p;
         const d = m.dino != null ? this.dinos.get(m.dino) : null;
         if (d && d.alive) {
-          const reach = d.type === 'ptera' ? 9 : d.radius + 4 * (d.scale || 1);
-          const maxHeight = { brachio: 17, trex: 12, stego: 7, raptor: 5, ptera: 6 }[d.type] * (d.scale || 1);
-          if (dist2(x, z, d.x, d.z) > reach * reach || Math.abs(y - d.y) > maxHeight) return;
+          // lag compensation: the dinosaur where the shooter saw it when the projectile hit
+          const pose = this.hitPose(d, m.rt);
+          if (!nearDino(d, pose, m.p, 4)) return;
+          const zone = plausibleZone(d, pose, m.p, m.zone);
           this.projectiles.delete(key);
           if (proj.health > 0) {
             const item = this.spawnItem(proj.kind, x, z, 1, y, proj.health, false);
-            const dx = x - d.x, dz = z - d.z, c = Math.cos(d.yaw), s = Math.sin(d.yaw);
+            const dx = x - pose.x, dz = z - pose.z, c = Math.cos(pose.yaw), s = Math.sin(pose.yaw);
             item.dino = d.id;
-            item.offset = [dx * c - dz * s, y - d.y, dx * s + dz * c];
+            item.offset = [dx * c - dz * s, y - pose.y, dx * s + dz * c];
             item.direction = proj.v.slice();
             // Bone coordinates only affect rendering; pickup positions come from the validated hit.
             if (m.attach && Number.isInteger(m.attach.joint) && m.attach.joint >= 0 && m.attach.joint < 100 &&
@@ -481,9 +512,9 @@ export class ServerWorld {
           }
           if (proj.kind === 'arrow') {
             const dmg = W.bow.damage * (1 + this.mods().bowDamage) * (0.45 + 0.55 * Math.min(1, proj.pw));
-            this.dinos.damage(d, dmg, m.zone, p.id, 'arrow');
+            this.dinos.damage(d, dmg, zone, p.id, 'arrow');
           } else {
-            this.dinos.damage(d, W.spear.throwDamage * (1 + this.mods().spearDamage), m.zone, p.id, 'spear');
+            this.dinos.damage(d, W.spear.throwDamage * (1 + this.mods().spearDamage), zone, p.id, 'spear');
           }
           return;
         }
@@ -698,7 +729,8 @@ export class ServerWorld {
     this.event(EV.STORE, { store: this.store });
   }
 
-  validMeleeHit(p, d, point) {
+  /** pose: where the attacker saw the dinosaur (hitPose); default its current position. */
+  validMeleeHit(p, d, point, pose = d) {
     const [x, y, z] = point;
     const vx = x - p.x, vy = y - p.y - P.eyeHeight, vz = z - p.z;
     const distance = Math.hypot(vx, vy, vz);
@@ -707,8 +739,7 @@ export class ServerWorld {
     const fy = Math.sin(p.pitch);
     const fz = -Math.cos(p.yaw) * Math.cos(p.pitch);
     if ((vx * fx + vy * fy + vz * fz) / distance < 0.4) return false;
-    const reach = d.type === 'ptera' ? 8 : d.radius + 3 * (d.scale || 1);
-    return dist2(x, z, d.x, d.z) <= reach * reach && Math.abs(y - d.y) < 17 * (d.scale || 1);
+    return nearDino(d, pose, point, 3);
   }
 
   validProjectileLanding(proj, point) {
@@ -881,18 +912,49 @@ export class ServerWorld {
     while (this.tracks.length && this.now - this.tracks[0].t > CONFIG.tracks.lifetime) this.tracks.shift();
 
     this.dinos.update(dt);
+    this.dinos.recordHistory(this.now);
     for (const p of this.players.values()) this.resolvePlayerDinos(p);
     this.mission.update(dt);
   }
 
+  /**
+   * Hosts call this once per step(dt): true when a snapshot is due. Keeps
+   * CONFIG.net.snapshotRate exact on average for any ratio to the tick rate.
+   */
+  snapshotDue(dt) {
+    this.snapAcc = (this.snapAcc ?? 0) + dt * CONFIG.net.snapshotRate;
+    if (this.snapAcc < 1 - 1e-6) return false;
+    this.snapAcc = Math.min(1, this.snapAcc - 1);
+    return true;
+  }
+
+  /**
+   * The dinosaur as a client saw it when it aimed: `rt` is the client's render
+   * time (server clock), clamped to CONFIG.net.lagCompMax. Without rt: now.
+   */
+  hitPose(d, rt) {
+    const t = Number.isFinite(rt) ? Math.max(this.now - CONFIG.net.lagCompMax, Math.min(this.now, rt)) : this.now;
+    return this.dinos.poseAt(d, t);
+  }
+
   snapshot() {
+    const N = CONFIG.net;
     const p = [];
     for (const q of this.players.values()) {
       const carry = q.inv.loot.meat + q.inv.loot.hide + q.inv.loot.plates;
       const fl = q.fl | (q.eating ? 4 : 0);
       p.push([q.id, r2(q.x), r2(q.y), r2(q.z), r3(q.yaw), r3(q.pitch), r2(q.spd), q.eq, fl, Math.ceil(q.hp), q.alive ? 1 : 0, carry]);
     }
-    return { t: MSG.SNAP, now: r3(this.now), p, d: this.dinos.snapshotRows() };
+    // Dinosaurs far from every player change nothing anyone can see (fog):
+    // they go out only with every Nth snapshot.
+    this.snapSeq = (this.snapSeq ?? 0) + 1;
+    const far2 = N.farSnapshotDist * N.farSnapshotDist;
+    const near = (d) => {
+      for (const q of this.players.values()) if (dist2(q.x, q.z, d.x, d.z) <= far2) return true;
+      return false;
+    };
+    const rows = this.dinos.snapshotRows(this.snapSeq % N.farSnapshotEvery === 0 ? null : near);
+    return { t: MSG.SNAP, now: r3(this.now), p, d: rows };
   }
 
   fullState() {

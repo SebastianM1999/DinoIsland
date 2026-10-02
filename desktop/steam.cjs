@@ -32,7 +32,7 @@ async function installSteam(app, win, localUrl) {
             console.error('[Steam] Networking failed:', error);
             session.endFromHost('Steam connection failed. Restart Steam and try again.');
           }
-        }, 15);
+        }, 4);   // every pump receives and flushes; this bounds the added latency per hop
       }
     }
   } catch (error) {

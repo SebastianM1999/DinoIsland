@@ -144,7 +144,7 @@ export class Projectiles {
               scale.set(1 / scale.x, 1 / scale.y, 1 / scale.z);
               attach = { joint: hit.view.hitSpheres().findIndex(s => s.joint === joint && s.zone === hit.sph.zone), p: position.toArray(), q: rotation.toArray(), s: scale.toArray() };
             }
-            this.game.net.act(ACT.LAND, { kind: p.kind, pid: p.pid, p: [+hp.x.toFixed(2), +hp.y.toFixed(2), +hp.z.toFixed(2)], dino: hit.view.id, zone: hit.sph.zone, attach });
+            this.game.net.act(ACT.LAND, { kind: p.kind, pid: p.pid, p: [+hp.x.toFixed(2), +hp.y.toFixed(2), +hp.z.toFixed(2)], dino: hit.view.id, zone: hit.sph.zone, rt: +this.game.renderTime.toFixed(3), attach });
             this.game.onProjectileHit?.(p, hit.view, hit.sph.zone);
           }
           // The authoritative recoverable item owns the embedded mesh on every client.

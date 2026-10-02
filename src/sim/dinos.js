@@ -107,8 +107,36 @@ export class DinoSystem {
 
   describeAll() { return this.list.map((d) => this.describe(d)); }
 
-  snapshotRows() {
-    return this.list.map((d) => [d.id, r2(d.x), r2(d.y), r2(d.z), r3(d.yaw), d.st, Math.ceil(d.hp), r2(d.spd), d.fl]);
+  /** @param {((d:object)=>boolean)|null} [include] only these dinosaurs (default: all) */
+  snapshotRows(include = null) {
+    const rows = [];
+    for (const d of this.list) {
+      if (include && !include(d)) continue;
+      rows.push([d.id, r2(d.x), r2(d.y), r2(d.z), r3(d.yaw), d.st, Math.ceil(d.hp), r2(d.spd), d.fl]);
+    }
+    return rows;
+  }
+
+  /** Remember recent poses for lag-compensated hit checks (poseAt). Once per tick. */
+  recordHistory(now) {
+    const keep = CONFIG.net.lagCompMax + 0.15;
+    for (const d of this.list) {
+      const h = (d.hist ??= []);
+      h.push({ t: now, x: d.x, y: d.y, z: d.z, yaw: d.yaw });
+      while (now - h[0].t > keep) h.shift();
+    }
+  }
+
+  /** Pose of `d` at server time t, interpolated from the history (current pose when t is not covered). */
+  poseAt(d, t) {
+    const h = d.hist;
+    if (!h?.length || t >= h[h.length - 1].t) return { x: d.x, y: d.y, z: d.z, yaw: d.yaw };
+    if (t <= h[0].t) return h[0];
+    let i = h.length - 1;
+    while (h[i - 1].t > t) i--;
+    const a = h[i - 1], b = h[i];
+    const k = (t - a.t) / (b.t - a.t);
+    return { x: a.x + (b.x - a.x) * k, y: a.y + (b.y - a.y) * k, z: a.z + (b.z - a.z) * k, yaw: a.yaw + angleDiff(a.yaw, b.yaw) * k };
   }
 
   forgetPlayer(id) {

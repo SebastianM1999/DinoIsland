@@ -235,7 +235,7 @@ export class PlayerActions {
     // no stabbing through a tree trunk or rock
     const end = hit && origin.clone().addScaledVector(dir, hit.dist);
     if (hit && segmentColliders(origin.x, origin.y, origin.z, end.x, end.y, end.z, g.layout.colliders, g.layout.groundAt) >= 0) return;
-    if (hit) g.net.act(ACT.MELEE, { dino: hit.view.id, zone: hit.zone, p: hit.point.toArray().map((n) => +n.toFixed(2)) });
+    if (hit) g.net.act(ACT.MELEE, { dino: hit.view.id, zone: hit.zone, p: hit.point.toArray().map((n) => +n.toFixed(2)), rt: +g.renderTime.toFixed(3) });
   }
 
   throwSpear() {
@@ -298,7 +298,7 @@ export class PlayerActions {
       }
     }
     g.net.act(ACT.SHOT, { kind: tool, o: origin.toArray(), dir: dir.toArray(),
-      ...(hit ? { dino: hit.view.id, p: hit.point.toArray(), zone: hit.zone } : {}) });
+      ...(hit ? { dino: hit.view.id, p: hit.point.toArray(), zone: hit.zone, rt: +g.renderTime.toFixed(3) } : {}) });
     // Position the tracer at the rendered muzzle, transformed into world space.
     const muzzle = this.vm.muzzlePosition(new THREE.Vector3());
     g.gfx.viewCamera.worldToLocal(muzzle); g.gfx.camera.localToWorld(muzzle);

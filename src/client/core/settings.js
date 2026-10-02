@@ -2,8 +2,9 @@
 // Tiny, so they live in localStorage; changes notify listeners immediately.
 
 import { CONFIG } from '../../shared/config.js';
+import { storageKey } from '../../shared/brand.js';
 
-const KEY = 'di.settings';
+const KEY = storageKey('settings');
 
 /** Slider definitions: values are stored exactly as the slider shows them. */
 export const SETTING_DEFS = [
@@ -12,6 +13,10 @@ export const SETTING_DEFS = [
   { id: 'sfx', label: 'Effects', group: 'Sound', min: 0, max: 100, step: 1, def: Math.round(CONFIG.audio.sfxVolume * 100), unit: '%' },
   { id: 'fov', label: 'Field of view', group: 'View', min: 60, max: 100, step: 1, def: CONFIG.player.fov, unit: '°' },
   { id: 'sens', label: 'Mouse sensitivity', group: 'View', min: 20, max: 300, step: 5, def: 100, unit: '%' },
+  // `labels` turns a slider into a discrete choice (value = label index).
+  { id: 'quality', label: 'Graphics quality', group: 'Graphics', min: 0, max: 3, step: 1, def: 2, labels: ['Low', 'Medium', 'High', 'Ultra'] },
+  { id: 'renderScale', label: 'Render scale', group: 'Graphics', min: 50, max: 100, step: 5, def: 100, unit: '%' },
+  { id: 'stats', label: 'Performance overlay (F2)', group: 'Graphics', min: 0, max: 1, step: 1, def: 0, labels: ['Off', 'On'] },
 ];
 
 const defaults = Object.fromEntries(SETTING_DEFS.map((d) => [d.id, d.def]));

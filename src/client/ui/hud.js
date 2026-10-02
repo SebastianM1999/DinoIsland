@@ -12,6 +12,7 @@ import { buildMapBase, drawMap } from './minimap.js';
 import { ITEM_INFO } from './itemInfo.js';
 import { CONTRACTS as BOARD_CONTRACTS } from '../../shared/missions.js';
 import { RELICS } from '../../shared/relics.js';
+import { BRAND } from '../../shared/brand.js';
 
 const TAU = Math.PI * 2;
 const DEG = 180 / Math.PI;
@@ -682,7 +683,7 @@ export class Hud {
     this.$win.innerHTML = info.won
       ? `<div class="hud-win-card brush">
       <span class="hud-win-ic">${icon('trophy')}</span>
-      <h2>You escaped Dinosaur Island!</h2>
+      <h2>You escaped ${esc(BRAND.name)}!</h2>
       <p>The boat is repaired and the whole team is aboard. Thanks for playing!</p>
       ${info.completedIn != null ? `<p class="hud-win-time">${icon('clock')} ${fmtTime(info.completedIn)} on the last island</p>` : ''}
       <p>A new adventure starts on a fresh first island in a moment…</p>

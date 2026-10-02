@@ -2,7 +2,7 @@
 
 The host's Electron main process runs `ServerWorld`. Steam provides lobby discovery, invites, authenticated peer identities, and Steam Networking Sockets packet delivery, including Valve relay routing. No developer-operated game backend or port forwarding is needed for Steam sessions. The local HTTP server serves each player's own bundled client; remote players never download the game from the host.
 
-The current JSON protocol uses reliable, ordered Steam messages, matching the existing WebSocket ordering. Introducing unreliable snapshots/movement later requires sequence numbers and world epochs so old packets cannot corrupt a new island. The Steam host is a fresh world per session and is separate from the optional LAN world.
+Snapshots (`snap`) and own-movement updates (`state`) are sent unreliably: a lost one is replaced 50 ms later, while a reliable resend would stall every packet behind it. Movement updates carry a sequence number and correction epoch, so the host drops reordered and pre-correction updates; clients drop snapshots older than the last welcome, so a late packet from the previous island cannot corrupt the new one. Everything else (events, actions, welcome, corrections) stays reliable and ordered. The Steam pump runs every 4 ms and flushes each connection, so Steam's send coalescing adds no extra delay. The Steam host is a fresh world per session and is separate from the optional LAN world.
 
 ## Configure the Windows build
 

@@ -33,7 +33,10 @@ import { GameAudio } from '../audio/audio.js';
 import { inBossMusicArea } from '../audio/region.js';
 import { footstepSurface, woodSupports } from '../audio/surface.js';
 import { StepCadence } from '../audio/steps.js';
-import { settings } from './settings.js';
+import { settings, setSetting, onSettings } from './settings.js';
+import { QUALITY } from './renderer.js';
+import { PerfStats } from '../ui/perfStats.js';
+import { storageKey } from '../../shared/brand.js';
 import { Wardrobe } from '../ui/wardrobe.js';
 import { BoatPanel } from '../ui/boatPanel.js';
 import { CraftingPanel } from '../ui/craftingPanel.js';
@@ -91,6 +94,10 @@ export class Game {
     this.debug = false;
     this.sendTimer = 0;
     this.pingTimer = 0;
+    this.renderTime = 0;      // server time remote entities are drawn at (sent with hits for lag compensation)
+    this.corrections = 0;     // server position corrections received (performance overlay)
+    // Camera-only offset after a small correction: the body snaps, the view glides.
+    this.corrOffset = { x: 0, y: 0, z: 0 };
     this.onLeave = null;
 
     // Overlay for nameplates and other screen-space labels.
@@ -104,9 +111,9 @@ export class Game {
     this.stepCadence = new StepCadence();
     this.hud = new Hud(document.getElementById('hud'));
     this.hud.initMinimap(this.terrain, this.layout);
-    try { this.hud.trackedContract = localStorage.getItem('di.tracked') || null; } catch { /* storage blocked */ }
+    try { this.hud.trackedContract = localStorage.getItem(storageKey('tracked')) || null; } catch { /* storage blocked */ }
     this.hud.onTrackContract = (id) => {
-      try { if (id) localStorage.setItem('di.tracked', id); else localStorage.removeItem('di.tracked'); } catch { /* ignore */ }
+      try { if (id) localStorage.setItem(storageKey('tracked'), id); else localStorage.removeItem(storageKey('tracked')); } catch { /* ignore */ }
       this.#showMission();
     };
     this.input.onPanelToggle = (action) => {
@@ -141,6 +148,11 @@ export class Game {
     this.hud.onCloseBoard = () => this.input.onPanelToggle('close');
 
     this.#buildWorld();
+    this.stats = new PerfStats(this.overlay);
+    this.unsubSettings = onSettings((s) => {
+      this.stats.visible = !!s.stats;
+      this.vegetation.setDensity((QUALITY[s.quality] ?? QUALITY[2]).grass);
+    });
     this.remotes = new RemotePlayers(this.gfx.scene, this.gfx.camera, this.overlay);
 
     const w = net.welcome;
@@ -347,9 +359,14 @@ export class Game {
     });
     net.on(MSG.INV, (m) => { this.me.inv = m.inv; this.#syncCrafting(); });
     net.on(MSG.CORRECT, (m) => {
-      this.player.pos.x = m.x;
-      this.player.pos.y = m.y;
-      this.player.pos.z = m.z;
+      const pos = this.player.pos, o = this.corrOffset;
+      this.corrections++;
+      // small corrections glide the camera over (~0.1 s); teleports and unstuck snap
+      const jump = Math.hypot(m.x - pos.x, m.y - pos.y, m.z - pos.z);
+      if (!m.unstuck && jump < 1.5) { o.x += pos.x - m.x; o.y += pos.y - m.y; o.z += pos.z - m.z; } else o.x = o.y = o.z = 0;
+      pos.x = m.x;
+      pos.y = m.y;
+      pos.z = m.z;
       this.player.vel.x = this.player.vel.z = 0;
       if (m.unstuck) { this.player.vel.y = 0; this.stuck.reset(this.player.pos); } else this.stuck.onCorrect(this.player.pos);
     });
@@ -432,8 +449,7 @@ export class Game {
 
   #sendState() {
     const p = this.player;
-    this.net.send({
-      t: MSG.STATE,
+    this.net.sendState({
       x: +p.pos.x.toFixed(2), y: +p.pos.y.toFixed(2), z: +p.pos.z.toFixed(2),
       yaw: +p.yaw.toFixed(3), pitch: +p.pitch.toFixed(3),
       spd: +p.moveSpeed.toFixed(2),
@@ -474,6 +490,7 @@ export class Game {
    */
   dispose() {
     this.stop();
+    this.unsubSettings();
     this.dinos.dispose();
     this.overlay.remove();
     this.wardrobe.dispose?.();
@@ -488,11 +505,13 @@ export class Game {
   loop() {
     if (!this.running) return;
     requestAnimationFrame(this.loop);
-    const dt = Math.min(this.clock.getDelta(), 0.05);
+    const rawDt = this.clock.getDelta();
+    const dt = Math.min(rawDt, 0.05);
     this.time += dt;
     this.update(dt);
     this.gfx.render();
     this.input.endFrame();
+    this.stats.frame(rawDt, { renderer: this.gfx.renderer, net: this.net, corrections: this.corrections });
   }
 
   /** Creative mode: invincible (server-side) and double-tap Space to fly. */
@@ -519,6 +538,7 @@ export class Game {
       this.debug = !this.debug;
       this.debugGroup.visible = this.debug;
     }
+    if (input.wasPressed('stats')) setSetting('stats', settings.stats ? 0 : 1);
     const canMove = this.me.alive && !this.hud.isPanelOpen();
     const previousPos = { ...p.pos };
     p.update(dt, {
@@ -553,7 +573,7 @@ export class Game {
       this.net.send({ t: MSG.PING, c: performance.now() / 1000 });
     }
 
-    const renderTime = this.net.serverNow() - CONFIG.net.interpDelay;
+    const renderTime = this.renderTime = this.net.serverNow() - this.net.interpDelay;
     this.remotes.update(dt, renderTime);
 
     WIND.uTime.value = this.time;
@@ -764,10 +784,15 @@ export class Game {
     const bobX = Math.cos(phase) * 0.035 * bobAmt;
     p.landImpact = Math.max(0, p.landImpact - dt * 3);
     const deadDrop = this.me.alive ? 0 : 1.2;
+    const o = this.corrOffset;
+    const decay = Math.exp(-dt / 0.035);   // ~0.1 s to (almost) nothing
+    const len = Math.hypot(o.x, o.y, o.z);
+    const k = (len > 1.5 ? 1.5 / len : 1) * decay;
+    o.x *= k; o.y *= k; o.z *= k;
     cam.position.set(
-      p.pos.x + Math.cos(p.yaw) * bobX,
-      p.pos.y + CONFIG.player.eyeHeight + bobY - p.landImpact * 0.25 - deadDrop,
-      p.pos.z - Math.sin(p.yaw) * bobX,
+      p.pos.x + o.x + Math.cos(p.yaw) * bobX,
+      p.pos.y + o.y + CONFIG.player.eyeHeight + bobY - p.landImpact * 0.25 - deadDrop,
+      p.pos.z + o.z - Math.sin(p.yaw) * bobX,
     );
     const roll = this.me.alive ? (p.knockTimer > 0 ? Math.sin(this.time * 20) * 0.05 : 0) : 0.5;
     cam.rotation.set(p.pitch, p.yaw, roll, 'YXZ');

@@ -3,7 +3,7 @@
 // in-page host (solo / offline). Gameplay code never knows the difference.
 
 import { CONFIG } from '../../shared/config.js';
-import { MSG } from '../../shared/protocol.js';
+import { MSG, EV } from '../../shared/protocol.js';
 import { connectSteam } from './steamTransport.js';
 
 export class Net {
@@ -14,6 +14,15 @@ export class Net {
     this.welcome = null;
     this.rtt = 0;
     this.serverOffset = null;       // serverTime - localTime
+    this.jitter = 0;                // smoothed lateness of snapshots vs. the least delayed one (s)
+    this.interpDelay = CONFIG.net.interpDelay;   // adapts to the measured jitter
+    // Own movement updates carry a sequence number and the correction epoch the
+    // server last told us (CORRECT / RESPAWN / WELCOME `k`), so the server can
+    // drop reordered and pre-correction updates (see ServerWorld.onState).
+    this.stateSeq = 0;
+    this.epoch = 0;
+    this.myId = null;
+    this.minSnapNow = -Infinity;    // snapshots older than the last welcome belong to the previous island
     this.closed = false;
     this.onClose = null;
     transport.onMessage = (msg) => this.#dispatch(msg);
@@ -70,51 +79,34 @@ export class Net {
     });
   }
 
-  /** Start an in-page authoritative world for solo play. */
-  static async local(name, outfit) {
-    const { ServerWorld } = await import('../../sim/world.js');
-    let playerId = null;
-    const inbox = [];
-    const transport = { onMessage: null, onClose: null, send: null, close: null };
-    const world = new ServerWorld({
-      // Messages are copied (like a real network) and delivered asynchronously.
-      send(to, msg, except) {
-        if (playerId === null || (to === '*' ? except === playerId : to !== playerId)) return;
-        inbox.push(JSON.stringify(msg));
-      },
+  /**
+   * Start an authoritative world for solo play. It runs in a Web Worker
+   * (src/sim/worker.js), so its ticks never stall a rendered frame.
+   * Resolves after the welcome.
+   */
+  static local(name, outfit) {
+    return new Promise((resolve, reject) => {
+      const worker = new Worker(new URL('../../sim/worker.js', import.meta.url), { type: 'module' });
+      const transport = {
+        onMessage: null,
+        onClose: null,
+        // structured clone copies the message, like a real network
+        send: (msg) => worker.postMessage({ type: 'msg', msg }),
+        close: () => worker.postMessage({ type: 'stop' }),
+      };
+      const net = new Net(transport, 'local');
+      worker.onmessage = (e) => {
+        const msg = e.data;
+        if (!net.welcome && msg.t === MSG.WELCOME) { net.welcome = msg; resolve(net); }
+        transport.onMessage?.(msg);
+      };
+      worker.onerror = (e) => {
+        console.error('[solo] world worker failed:', e.message);
+        if (!net.welcome) reject(new Error('The island could not be started'));
+        else transport.onClose?.('The island simulation stopped');
+      };
+      worker.postMessage({ type: 'start', name, outfit });
     });
-    const flush = () => {
-      while (inbox.length) transport.onMessage?.(JSON.parse(inbox.shift()));
-    };
-    transport.send = (m) => {
-      const copy = JSON.parse(JSON.stringify(m));
-      queueMicrotask(() => world.receive(playerId, copy));
-    };
-    const tickMs = 1000 / CONFIG.net.tickRate;
-    const snapEvery = Math.max(1, Math.round(CONFIG.net.tickRate / CONFIG.net.snapshotRate));
-    let ticks = 0;
-    let last = performance.now();
-    let acc = 0;
-    // The in-page "server" ticks on a timer, like the real one.
-    const interval = setInterval(() => {
-      const now = performance.now();
-      acc += Math.min(250, now - last);
-      last = now;
-      while (acc >= tickMs) {
-        world.step(tickMs / 1000);
-        acc -= tickMs;
-        if (++ticks % snapEvery === 0) world.host.send(playerId, world.snapshot());
-      }
-      flush();
-    }, tickMs / 2);
-    transport.close = () => clearInterval(interval);
-    const net = new Net(transport, 'local');
-    net.world = world; // debugging aid (solo only)
-    world.join(name, (id) => { playerId = id; }, outfit);
-    const idx = inbox.findIndex((m) => m.startsWith('{"t":"welcome"'));
-    const welcome = JSON.parse(inbox.splice(idx, 1)[0]);
-    net.welcome = welcome;
-    return net;
   }
 
   /** Forget every handler (the game for the next island registers its own). */
@@ -146,7 +138,33 @@ export class Net {
     return performance.now() / 1000 + (this.serverOffset ?? 0);
   }
 
+  /**
+   * Render remote entities just far enough in the past that the next snapshot
+   * has (almost always) arrived: one snapshot interval plus headroom for the
+   * measured jitter. Moves slowly so the remote timeline never visibly jumps.
+   */
+  #adaptInterp(lateness) {
+    const N = CONFIG.net;
+    this.jitter += (Math.min(lateness, 0.5) - this.jitter) * 0.1;
+    const target = Math.min(N.interpDelayMax, Math.max(N.interpDelayMin, 1 / N.snapshotRate + 2.5 * this.jitter + 0.02));
+    this.interpDelay += (target - this.interpDelay) * (target > this.interpDelay ? 0.1 : 0.01);
+  }
+
+  /** A movement update for the server (fields of MSG.STATE without t/s/k). */
+  sendState(fields) {
+    this.send({ t: MSG.STATE, s: ++this.stateSeq, k: this.epoch, ...fields });
+  }
+
   #dispatch(msg) {
+    if (msg.t === MSG.WELCOME) {
+      this.myId = msg.id;
+      this.epoch = msg.k ?? 0;
+      this.minSnapNow = msg.now;
+    } else if (msg.t === MSG.SNAP) {
+      if (msg.now < this.minSnapNow) return;   // overtaken by the welcome (unreliable transport)
+    } else if (msg.t === MSG.CORRECT || (msg.t === MSG.EV && msg.e === EV.RESPAWN && msg.id === this.myId)) {
+      if (Number.isFinite(msg.k)) this.epoch = msg.k;
+    }
     if (msg.t === MSG.SNAP || msg.t === MSG.WELCOME || msg.t === MSG.PONG) {
       const local = performance.now() / 1000;
       const target = msg.now - local;
@@ -154,6 +172,7 @@ export class Net {
       if (this.serverOffset === null) this.serverOffset = target;
       else if (target > this.serverOffset) this.serverOffset += (target - this.serverOffset) * 0.05;
       else this.serverOffset += (target - this.serverOffset) * 0.3;
+      if (msg.t === MSG.SNAP) this.#adaptInterp(Math.max(0, this.serverOffset - target));
     }
     if (msg.t === MSG.PONG) this.rtt = performance.now() / 1000 - msg.c;
     const key = msg.t === MSG.EV ? `ev:${msg.e}` : msg.t;

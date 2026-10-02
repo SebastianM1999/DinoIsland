@@ -3,26 +3,76 @@
 
 import * as THREE from 'three';
 import { CONFIG } from '../../shared/config.js';
+import { onSettings } from './settings.js';
 
 const R = CONFIG.render;
 const _tmpColor = new THREE.Color();
+
+/**
+ * Graphics presets (settings.quality is the index); "High" is the original look.
+ * shadowEvery re-renders the sun's shadow map every N frames: static shadows
+ * stay exact in between, only moving casters lag by a frame.
+ * grass is the share of grass/flower instances drawn.
+ */
+export const QUALITY = [
+  { pixelRatio: 1, shadows: false, shadowSize: 1024, soft: false, shadowEvery: 1, grass: 0.35 },
+  { pixelRatio: 1.25, shadows: true, shadowSize: 1024, soft: false, shadowEvery: 2, grass: 0.65 },
+  { pixelRatio: R.maxPixelRatio, shadows: true, shadowSize: R.shadowMapSize, soft: true, shadowEvery: 1, grass: 1 },
+  { pixelRatio: 2, shadows: true, shadowSize: 4096, soft: true, shadowEvery: 1, grass: 1 },
+];
 
 export class Renderer {
   constructor(canvas) {
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
     const r = this.renderer;
-    r.setPixelRatio(Math.min(devicePixelRatio, R.maxPixelRatio));
     r.outputColorSpace = THREE.SRGBColorSpace;
     r.toneMapping = THREE.ACESFilmicToneMapping;
     r.toneMappingExposure = 1.05;
-    r.shadowMap.enabled = true;
-    r.shadowMap.type = THREE.PCFSoftShadowMap;
     r.autoClear = false;
+    r.shadowMap.autoUpdate = false;   // render() decides when (QUALITY.shadowEvery)
+    r.info.autoReset = false;         // count every pass of a frame, not just the last
+    this.frame = 0;
+    this.quality = null;
+    this.renderScale = 1;
 
     this.camera = new THREE.PerspectiveCamera(CONFIG.player.fov, 1, 0.1, R.viewDistance);
     this.camera.rotation.order = 'YXZ';
     this.reset();
     addEventListener('resize', () => this.resize());
+    onSettings((st) => this.applySettings(st));
+  }
+
+  /** Graphics quality and render scale, applied live (no restart). */
+  applySettings(st) {
+    const q = QUALITY[st.quality] ?? QUALITY[2];
+    const scale = (st.renderScale ?? 100) / 100;
+    if (q === this.quality && scale === this.renderScale) return;
+    const r = this.renderer;
+    const type = q.soft ? THREE.PCFSoftShadowMap : THREE.PCFShadowMap;
+    const recompile = this.quality && (q.shadows !== r.shadowMap.enabled || type !== r.shadowMap.type);
+    this.quality = q;
+    this.renderScale = scale;
+    r.shadowMap.enabled = q.shadows;
+    r.shadowMap.type = type;
+    r.setPixelRatio(Math.min(devicePixelRatio, q.pixelRatio) * scale);
+    this.#applyShadowSize();
+    // shadows on/off and the filter type are compiled into the shaders
+    if (recompile) for (const sc of [this.scene, this.viewScene]) sc.traverse((o) => {
+      for (const m of [o.material].flat()) if (m) m.needsUpdate = true;
+    });
+    this.resize();
+    this.onQuality?.(q);
+  }
+
+  #applyShadowSize() {
+    const sh = this.sun.shadow;
+    const size = (this.quality ?? QUALITY[2]).shadowSize;
+    if (sh.mapSize.x !== size) {
+      sh.mapSize.set(size, size);
+      sh.map?.dispose();
+      sh.map = null;
+    }
+    this.renderer.shadowMap.needsUpdate = true;
   }
 
   /** Fresh, empty scenes (a new island reuses the renderer). */
@@ -36,6 +86,7 @@ export class Renderer {
     this.viewCamera = new THREE.PerspectiveCamera(62, 1, 0.01, 10);
     this.viewScene.add(this.viewCamera);
     this.#setupLights();
+    this.#applyShadowSize();
     this.resize();
     this.renderer.renderLists.dispose();
   }
@@ -106,7 +157,7 @@ export class Renderer {
   followSun(x, y, z) {
     const d = 160;
     // Snap to shadow texels to avoid shimmering.
-    const texel = (R.shadowRange * 2) / R.shadowMapSize;
+    const texel = (R.shadowRange * 2) / this.sun.shadow.mapSize.x;
     const sx = Math.round(x / texel) * texel, sz = Math.round(z / texel) * texel;
     this.sun.target.position.set(sx, y, sz);
     this.sun.position.set(sx + this.sunDir.x * d, y + this.sunDir.y * d, sz + this.sunDir.z * d);
@@ -123,6 +174,8 @@ export class Renderer {
 
   render() {
     const r = this.renderer;
+    r.info.reset();
+    if (++this.frame % this.quality.shadowEvery === 0) r.shadowMap.needsUpdate = true;
     r.clear();
     r.render(this.scene, this.camera);
     r.clearDepth();

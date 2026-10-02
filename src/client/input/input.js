@@ -17,6 +17,7 @@ const KEY_BINDINGS = {
   KeyT: 'team',
   KeyU: 'unstuck',
   Digit1: 'slot1', Digit2: 'slot2', Digit3: 'slot3', Digit4: 'slot4', Digit5: 'slot5', Digit6: 'slot6', Digit7: 'slot7',
+  F2: 'stats',
   F3: 'debug',
 };
 

@@ -3,6 +3,7 @@
 import { CONFIG } from '../shared/config.js';
 import { ACT, EV, EQUIP } from '../shared/protocol.js';
 import { shotEnd } from '../shared/gunshots.js';
+import { nearDino, plausibleZone } from './hitCheck.js';
 
 export const GUNS = ['pistol', 'rifle'];
 export function gunInventory() {
@@ -37,13 +38,11 @@ export function gunAction(world, player, message) {
     const along = delta.reduce((sum, n, i) => sum + n * message.dir[i], 0);
     const lateral = Math.hypot(...delta.map((n, i) => n - message.dir[i] * along));
     const available = Math.hypot(...end.map((n, i) => n - message.o[i]));
-    const reach = dino.type === 'ptera' ? 9 : dino.radius + 4 * (dino.scale || 1);
-    const height = { brachio: 17, trex: 12, stego: 7, raptor: 5, ptera: 6 }[dino.type] * (dino.scale || 1);
-    if (along > 0 && along <= available + 0.05 && lateral < 0.15 &&
-      Math.hypot(message.p[0] - dino.x, message.p[2] - dino.z) <= reach && Math.abs(message.p[1] - dino.y) <= height) {
+    // lag compensation: check against the dinosaur where the shooter saw it
+    const pose = world.hitPose(dino, message.rt);
+    if (along > 0 && along <= available + 0.05 && lateral < 0.15 && nearDino(dino, pose, message.p, 4)) {
       end = message.p;
-      const zone = Object.hasOwn(CONFIG.hitZones, message.zone) ? message.zone : 'body';
-      world.dinos.damage(dino, spec.damage, zone, player.id, kind);
+      world.dinos.damage(dino, spec.damage, plausibleZone(dino, pose, message.p, message.zone), player.id, kind);
     }
   }
   world.sendInv(player);

@@ -7,9 +7,14 @@ export const CONFIG = {
     port: 8080,
     maxPlayers: 4,
     tickRate: 20,            // server simulation steps per second
-    snapshotRate: 15,        // world snapshots per second sent to clients
+    snapshotRate: 20,        // world snapshots per second sent to clients (≤ tickRate)
+    farSnapshotEvery: 4,     // dinosaurs far from every player are sent only every Nth snapshot
+    farSnapshotDist: 200,    // meters
     clientSendRate: 20,      // player state updates per second sent by a client
-    interpDelay: 0.12,       // seconds remote entities are rendered in the past
+    interpDelay: 0.1,        // starting value: seconds remote entities are rendered in the past
+    interpDelayMin: 0.07,    // the client adapts interpDelay to the measured jitter
+    interpDelayMax: 0.3,
+    lagCompMax: 0.5,         // seconds the server rewinds dinosaurs to check a client's hit
     timeoutMs: 10000,        // drop silent clients after this long
   },
 

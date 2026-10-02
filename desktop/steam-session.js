@@ -4,11 +4,14 @@ import { EventEmitter } from 'node:events';
 import { randomUUID } from 'node:crypto';
 import { startGameHost } from '../server/gameHost.js';
 import { CONFIG } from '../src/shared/config.js';
+import { BRAND } from '../src/shared/brand.js';
 
-export const STEAM_PROTOCOL = 'dinosaur-island-1';
+export const STEAM_PROTOCOL = `${BRAND.slug}-1`;
 const MAX_INPUT_BYTES = 8192;
 const MAX_WORLD_BYTES = 512 * 1024;
 const CONNECTION_TIMEOUT = 30000;
+// Messages that may be lost or reordered (JSON.stringify keeps `t` first).
+const UNRELIABLE = /^\{"t":"(snap|state)"/;
 
 export function validSteamId(value) {
   return typeof value === 'string' && /^[1-9]\d{15,19}$/.test(value) && BigInt(value) <= 0xffffffffffffffffn;
@@ -68,7 +71,7 @@ export class SteamSession {
 
   async lobbies() {
     const mm = this.steam.matchmaking;
-    mm.addRequestLobbyListStringFilter('game', 'dinosaur-island', 0);
+    mm.addRequestLobbyListStringFilter('game', BRAND.slug, 0);
     mm.addRequestLobbyListStringFilter('protocol', STEAM_PROTOCOL, 0);
     mm.addRequestLobbyListStringFilter('ready', '1', 0);
     mm.addRequestLobbyListFilterSlotsAvailable(1);
@@ -94,7 +97,7 @@ export class SteamSession {
   }
 
   publishPresence() {
-    this.steam.richPresence.setRichPresence('status', 'Exploring Dinosaur Island');
+    this.steam.richPresence.setRichPresence('status', `Exploring ${BRAND.name}`);
     this.steam.richPresence.setRichPresence('steam_player_group', this.lobbyId);
     this.steam.richPresence.setRichPresence('steam_player_group_size', String(this.steam.matchmaking.getLobbyMembers(this.lobbyId).length));
   }
@@ -108,7 +111,7 @@ export class SteamSession {
       this.checkOperation(generation, result.lobbyId);
       this.lobbyId = result.lobbyId;
       this.hostId = this.steam.getStatus().steamId;
-      const metadata = { game: 'dinosaur-island', protocol: STEAM_PROTOCOL, host: this.hostId, ready: '1' };
+      const metadata = { game: BRAND.slug, protocol: STEAM_PROTOCOL, host: this.hostId, ready: '1' };
       this.listenSocket = this.steam.networkingSockets.createListenSocketP2P(0);
       if (!this.listenSocket) throw new Error('Steam could not open a host connection.');
       this.host = this.createHost();
@@ -138,7 +141,7 @@ export class SteamSession {
       this.checkOperation(generation, lobbyId);
       this.lobbyId = lobbyId;
       const mm = this.steam.matchmaking;
-      if (mm.getLobbyData(lobbyId, 'game') !== 'dinosaur-island' || mm.getLobbyData(lobbyId, 'protocol') !== STEAM_PROTOCOL) {
+      if (mm.getLobbyData(lobbyId, 'game') !== BRAND.slug || mm.getLobbyData(lobbyId, 'protocol') !== STEAM_PROTOCOL) {
         throw new Error('This lobby uses a different game version. Update both games and try again.');
       }
       this.hostId = mm.getLobbyData(lobbyId, 'host');
@@ -172,8 +175,15 @@ export class SteamSession {
 
   sendPacket(connection, data) {
     const sockets = this.steam.networkingSockets;
-    // Preserve the existing ordered protocol, including island changes and actions.
-    // Unreliable movement would require sequence numbers and world epochs first.
+    // Snapshots and own-movement updates go unreliable: a lost one is replaced
+    // 50 ms later, while a reliable resend would stall every packet behind it.
+    // Clients drop stale snapshots (InterpBuffer timestamps, Net drops snapshots
+    // older than the last welcome); the host drops out-of-order states (seq `s`).
+    // Everything else (events, actions, welcome, corrections) stays reliable and ordered.
+    if (sockets.sendUnreliable && UNRELIABLE.test(data)) {
+      sockets.sendUnreliable(connection, Buffer.from(data));   // a full send queue just drops it
+      return;
+    }
     const result = sockets.sendReliable(connection, Buffer.from(data));
     if (!result.success) {
       const peer = this.peers.get(connection);
@@ -226,6 +236,8 @@ export class SteamSession {
           try { if (JSON.parse(message.data.toString()).t === 'hello') peer.receivedHello = true; } catch { /* host discards malformed JSON */ }
           peer.emit('message', message.data);
         }
+        // send what this pump queued now instead of waiting out Steam's Nagle timer
+        sockets.flushMessages?.(connection);
       }
     } else if (this.connection) {
       if (this.steam.matchmaking.getLobbyOwner(this.lobbyId) !== this.hostId) {
@@ -240,6 +252,7 @@ export class SteamSession {
         try { data = JSON.parse(message.data.toString()); } catch { continue; }
         this.emit({ type: 'message', sessionId: this.sessionId, message: data });
       }
+      if (this.connected) sockets.flushMessages?.(this.connection);
     }
   }
 

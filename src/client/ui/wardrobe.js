@@ -5,8 +5,9 @@
 import * as THREE from 'three';
 import { OUTFIT_SLOTS, sanitizeOutfit, sameOutfit } from '../../shared/outfits.js';
 import { PlayerModel } from '../models/playerModel.js';
+import { storageKey } from '../../shared/brand.js';
 
-const STORE_KEY = 'di.outfit';
+const STORE_KEY = storageKey('outfit');
 
 /** Outfit remembered from the last session (null if none). */
 export function savedOutfit() {

@@ -184,5 +184,10 @@ export function buildVegetation(terrain, layout) {
     group,
     // Wind is shader-driven (WIND.uTime), nothing to do per frame.
     update() {},
+    /** Draw only a share (0..1) of the grass and flowers. Instances are in random order, so any prefix is evenly spread. */
+    setDensity(k) {
+      grass.count = Math.round(gi * k);
+      flowers.count = Math.round(fi * k);
+    },
   };
 }
