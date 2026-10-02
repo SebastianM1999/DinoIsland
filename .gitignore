@@ -43,3 +43,6 @@ coverage/
 .playwright-mcp/
 output/playwright/
 .playwright-cli/
+
+# Local junction so Codex finds the project skills in .claude/skills (create with: mklink /J .agents\skills .claude\skills)
+.agents/

@@ -1,0 +1,76 @@
+# test
+> Automated tests for shared rules, the authoritative simulation, headless client logic, the server and the Steam session, run with Node's built-in test runner (`npm test` = `node --test`).
+
+## Files
+Grouped by the module area they mainly cover. Many simulation tests also check the matching client code.
+
+### World generation, terrain and collision (src/shared)
+- `map-rules.test.js` — map design rules over many generated islands of both levels (planIsland, Terrain, buildLayout, tree trunks).
+- `levels.test.js` — island structure per level (hut beach, boat beach, reachable relic spots), boat repair and sailing to the next island, lava damage, winning on the last island.
+- `boss-arena.test.js` — boss arena islet, causeway and fixed boss spawn; walking the causeway with the player controller.
+- `grove.test.js` — giant's pen barrier: entry tests, shots stopped by `shotEnd`, titan only hurtable from inside.
+- `water.test.js` — every waterfall forms an unbroken grotto -> fall -> basin -> river chain (incl. client `buildWater`).
+- `spring-collision.test.js` — waterfall grotto SDF colliders vs. player controller and server movement checks.
+- `props.test.js` — cave, ruins, boat, tree colliders and relic/prop meshes match (shared shapes + `src/client/models/props/*`).
+- `traversal.test.js` — the player controller gets over every fallen trunk and ruin stone on real islands without server corrections.
+- `swim.test.js` — swimming in rivers/lakes, climbing out on banks, sea stays blocked (PlayerController).
+- `movement.test.js` — `resolveCircle`/`penetration`, player controller, server movement correction, unstuck (`src/sim/unstuck.js`), dinosaur spawn spots.
+
+### Simulation: dinosaurs and combat (src/sim)
+- `dino-slopes.test.js` — dinosaurs run down steep slopes to players, climbing stays limited (`findPath`, `climbSlope`) over seeded island variants.
+- `dino-contact.test.js` — player-vs-dinosaur body contact (`resolveDinoContact`) and contact damage events.
+- `raptor-fear.test.js` — raptor retreat/hesitation behaviour and raid raiders (`raptorBrain`, `raiderStep`).
+- `stego-tail.test.js` — stegosaurus tail sweep geometry and hits (`stegoBrain`, `tailSweep`).
+- `ptera-flight.test.js` — dead pteranodons fall with momentum and drop loot on impact (`DinoSystem`, `pteraBrain`).
+- `netcode.test.js` — snapshot rate, far-dino snapshot thinning, lag-compensated hit checks and hit-zone plausibility (`hitCheck.js`).
+- `world-authority.test.js` — server corrects teleports, validates spear and arrow hits.
+- `firearms.test.js` — pistol/rifle actions, reload, fire rate under host ticks, gun grips (`src/sim/firearms.js` + client viewmodel/player model).
+- `weapons.test.js` — client spear throw, bow/arrow/trap hand contacts and release sync (viewmodel, projectiles, player model).
+- `projectile-recovery.test.js` — arrow/spear wear, refill, lodged spears and recovery (server + client `Items`).
+- `butcher.test.js` — butchering carcasses, bones and skulls as loot.
+
+### Simulation: progression, base and economy
+- `skills.test.js` — skill tree data, XP/level math, buying, `sanitizeProfile`, `skillMods` (pure shared/skills.js).
+- `skills-server.test.js` — server-side profile, XP awards, skill effects, downed and revive.
+- `skills-movement.test.js` — skill effects on local movement: stamina, jumps, dash (PlayerController).
+- `skills-ui.test.js` — profile persistence, profile in `hello`/`MSG.PROF`, skill panel view model (`src/client/core/profile.js`, `src/client/ui/skillModel.js`).
+- `creative.test.js` — creative mode: all skills, free crafting, full supplies, boat repair without parts.
+- `crafting.test.js` — workbench recipes, upgrades and their effects on the server.
+- `base.test.js` — base building stages, costs, colliders, camp stations, towers.
+- `raids.test.js` — raids on the team's base and base repair (`src/sim/raids.js`).
+- `inventory-drop.test.js` — dropping, picking up and depositing inventory stacks without duplication.
+- `discovery-fruit.test.js` — fruit plant harvests/regrowth, shared dinosaur sightings, fruit plant visuals.
+- `outfits.test.js` — outfit sanitizing, server outfit changes, player model outfits.
+
+### Client (headless)
+- `tracking-minimap.test.js` — dinosaur discovery by sustained sighting, server sighting checks, minimap does not reveal the boss arena.
+- `dino-visibility.test.js` — every server-spawned dinosaur type has an animated client model; damage events name the attacker.
+- `dino-glb.test.js` — GLB dinosaur loading, fallback and retry, clips and animation (`src/client/models/dino/*`).
+- `dino-skin.test.js` — procedural skin loft faces outward.
+- `audio.test.js` — audio catalog/samples, music transitions and boss-area music, footstep surfaces and cadence; HTTP serving of audio files.
+- `graphics-tier.test.js` — automatic graphics tier choice and auto-tune.
+- `input-panels.test.js` — Escape/E panel handling and pointer-lock retry (`src/client/input/input.js`).
+- `ordering.test.js` — packet ordering and action/state dependencies under unreliable transport (client `Net` + `ServerWorld`).
+
+### Hosting and networking (server/, desktop/)
+- `http-host.test.js` — real HTTP/WebSocket host with two co-op players routing firearm shots and reloads.
+- `lan-address.test.js` — LAN address list, join-field parsing (`src/client/net/lan.js`), `/connection` port info.
+- `internet-host.test.js` — internet relay admits only token WebSockets, control endpoint origin checks, startup failure and stop handling.
+- `steam-coop.test.js` — `SteamSession` with a modelled Steam API: two players through the real game host, lobby caps, invalid lobbies, invites, renderer transport (`connectSteam`).
+
+## Entry points
+- `npm test` runs `node --test`, which discovers every `*.test.js` file here. A single file runs with `node --test test/<name>.test.js`.
+- There is no shared helper module; each file defines its own small fixtures (`setup()`, `fixture()`, `solo()` and similar).
+
+## Rules
+- Use `import test from 'node:test'` and `import assert from 'node:assert/strict'`; tests are flat `test('sentence describing the behaviour', ...)` calls.
+- Import source modules by relative path (`../src/shared/...`, `../src/sim/...`, `../src/client/...`, `../server/...`, `../desktop/...`); no build step, no mocks library.
+- Simulation tests create a real `ServerWorld` with a fake host, e.g. `new ServerWorld({ send: (to, msg) => messages.push(...) }, { level, variant })`, then drive it with real `MSG`/`ACT` messages (and `world.step()` where time must pass); assertions read world state or captured messages.
+- Islands are picked by fixed `variant` seeds; rule checks that must hold everywhere iterate over many variants (seeded lists, so failures can be replayed). No test uses `Math.random`.
+- Client tests run headless in Node: they use `three` objects without a renderer and temporarily stub globals (`document`, `addEventListener`, `fetch`, storage) and restore them afterwards.
+- Network tests start real servers via `createGameServer()` listening on `127.0.0.1` port 0, and external dependencies (cloudflared process, DNS, Steam) are injected fakes.
+- Conditionally disabled features use the `skip` option (e.g. cave checks skip while `CAVES_ENABLED` is false).
+
+## Not here
+- Code under test: `src/shared/`, `src/sim/`, `src/client/`, `server/`, `desktop/`.
+- Asset and model tooling scripts: `scripts/`. Browser/visual checks of the running game are not automated here.
