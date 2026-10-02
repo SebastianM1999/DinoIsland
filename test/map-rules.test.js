@@ -25,7 +25,13 @@ test('rivers flow downhill and always have higher ground on both sides', () => {
       const dx = pts[i + 1].x - pts[i - 1].x, dz = pts[i + 1].z - pts[i - 1].z, l = Math.hypot(dx, dz);
       for (const s of [-1, 1]) {
         const d = pts[i].w / 2 + 2.5;
-        const g = terrain.heightAt(pts[i].x - (dz / l) * d * s, pts[i].z + (dx / l) * d * s);
+        const x = pts[i].x - (dz / l) * d * s, z = pts[i].z + (dx / l) * d * s;
+        // At the outlet, a river's nominal bank can still be inside the lake.
+        if (plan.pools.some(p => p.kind === 'water' && Math.hypot(x - p.x, z - p.z) < p.r)) {
+          assert.ok(terrain.inlandWaterLevelAt(x, z) !== null, 'lake reaches the river outlet');
+          continue;
+        }
+        const g = terrain.heightAt(x, z);
         assert.ok(g > pts[i].y, `L${level} v${variant}: bank below water at ${i}`);
       }
     }
@@ -41,6 +47,25 @@ test('waterfalls spring from a cliff face, not from the mountain top', () => {
       assert.ok(behind > wf.source.y + 1, 'cliff continues above the spring');
       assert.ok(wf.source.y > wf.bottom.y + 2, 'spring is above the pool');
     }
+  }
+});
+
+test('first-island waterfall stays central and faces the western spawn across variants', () => {
+  for (const { level, variant, plan, layout, terrain } of islands) {
+    if (level !== 0) continue;
+    const wf = layout.waterfall;
+    assert.ok(wf, `variant ${variant}: waterfall exists`);
+    assert.ok(Math.abs(wf.top.x / plan.A + 0.12) < 1e-6, `variant ${variant}: central longitude`);
+    assert.ok(Math.abs(wf.top.z) < 1e-6, `variant ${variant}: central latitude`);
+    assert.equal(wf.dirX, -1);
+    assert.equal(Math.abs(wf.dirZ), 0);
+    assert.equal(wf.vertical, true);
+    assert.equal(wf.impact.x, wf.top.x);
+    assert.equal(wf.impact.z, wf.top.z);
+    assert.ok(wf.pool.x < wf.top.x && plan.hut.x < wf.pool.x);
+    assert.ok(plan.mainPeak.x > wf.source.x);
+    assert.ok(Math.abs(wf.pool.r - 14 * Math.max(0.8, plan.k)) < 1e-6);
+    assert.ok(terrain.waterDepthAt(wf.impact.x, wf.impact.z) > 0.45);
   }
 });
 

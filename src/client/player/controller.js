@@ -241,6 +241,9 @@ export class PlayerController {
 
     // --- vertical
     this.pos.y += this.vel.y * dt;
+    // Falling can enter a trunk slice or wall that was above the body's span
+    // during the horizontal pass. Resolve again at the integrated height.
+    this.#collide(oldX, oldZ, groundNow);
     // feet: the higher end of this frame's fall/rise, so a fast drop onto a trunk still lands on it
     const ground = this.groundAt(this.pos.x, this.pos.z, Math.max(oldY, this.pos.y));
     if (this.flying) {

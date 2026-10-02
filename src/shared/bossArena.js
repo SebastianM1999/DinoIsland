@@ -50,7 +50,7 @@ const A = BOSS_ARENA;
  * the river mouth. Returns the arena: { side, u, v, start, center, plateau,
  * spawn, path, lava } (lava = the lava pool for plan.pools).
  */
-export function planBossArena(plan) {
+export function planBossArena(plan, heightAt = null) {
   const b = plan.boat;
   const candidates = [-1, 1].map((side) => {
     const start = { x: b.x - 10, z: b.z + side * A.besideBoat };
@@ -59,10 +59,22 @@ export function planBossArena(plan) {
     const center = { x: start.x + u.x * A.offshore, z: start.z + u.z * A.offshore };
     let riverGap = Infinity;
     for (const p of plan.river?.pts || []) riverGap = Math.min(riverGap, Math.hypot(p.x - center.x, p.z - center.z) - p.w / 2);
-    return { side, start, u, center, riverGap };
+    // Prefer the shore that reaches open sea sooner when both sides keep the
+    // islet clear of the river. Coastal noise can extend one beach farther.
+    let shoreLand = 0;
+    if (heightAt) {
+      const v = { x: -u.z, z: u.x };
+      for (let d = 0; d <= A.offshore - A.outerR - 14; d += 2) {
+        for (const s of [-1, 1]) {
+          if (heightAt(start.x + u.x * d + v.x * s * 8, start.z + u.z * d + v.z * s * 8) >= 0) shoreLand++;
+        }
+      }
+    }
+    return { side, start, u, center, riverGap, shoreLand };
   });
-  // away from the river, else the side away from the island's middle
-  candidates.sort((p, q) => (q.riverGap > A.outerR + 15) - (p.riverGap > A.outerR + 15) || q.riverGap - p.riverGap);
+  // Keep river clearance first, then prefer the shorter shore approach.
+  candidates.sort((p, q) => (q.riverGap > A.outerR + 15) - (p.riverGap > A.outerR + 15)
+    || p.shoreLand - q.shoreLand || q.riverGap - p.riverGap);
   const { side, start, u, center } = candidates[0];
   const v = { x: -u.z, z: u.x };
   const plateau = { x: center.x + u.x * A.plateauShift, z: center.z + u.z * A.plateauShift };

@@ -102,7 +102,7 @@ const corrections = (messages, id) => messages.filter((m) => m.to === id && m.ms
 test('UNSTUCK moves a player out of a tree trunk to a free spot and corrects the client', () => {
   const { world, player, messages } = setup({ level: 0, variant: 3 });
   const L = world.layout;
-  const trunk = L.playerColliders.circles.find((c) => c.r > 0.3 && c.kind !== 'rock' &&
+  const trunk = L.playerColliders.circles.find((c) => c.r > 0.3 && c.kind === 'tree' &&
     standable(world.terrain, L, c.x + c.r + 1.5, c.z) !== null && Math.hypot(c.x - player.x, c.z - player.z) > 40);
   assert.ok(trunk, 'found a tree');
   player.x = trunk.x; player.z = trunk.z; player.y = L.groundAt(trunk.x, trunk.z);

@@ -419,6 +419,15 @@ export function planIsland(levelIndex = 0, variant = 1) {
       x: rng.range(-0.05, 0.32) * A, z: rng.range(-0.25, 0.25) * B,
       radius: rng.range(60, 72) * Math.max(0.62, K), height: rng.range(50, 60) * Math.max(0.55, K), terrace: K < 0.7 ? 7 : 10, sharp: 0.84, rough: 3, main: true,
     });
+    const spurRadius = 26 * Math.max(0.7, K);
+    const poolRadius = 14 * Math.max(0.8, K);
+    if (level.index === 0) {
+      // Anchor the falling curtain first, then fit its pool and mountain around it.
+      // The pool centre is west of the lip by 55% of its radius.
+      const poolX = -0.12 * A - poolRadius * 0.55;
+      main.x = poolX + main.radius * 0.7 + spurRadius * 1.05;
+      main.z = 0;
+    }
     const n = Math.round(rng.int(4, 6) * Math.max(0.6, K));
     for (let i = 0; i < n; i++) {
       const p = place(250, (x, z) => clearOf(x, z, 40 * K) && insideEllipse(plan, x, z, 0.72)
@@ -436,15 +445,17 @@ export function planIsland(levelIndex = 0, variant = 1) {
         && plan.hills.every((h) => Math.hypot(x - h.x, z - h.z) > h.radius * 0.7 + 12));
       if (p) addHill({ ...p, radius: rng.range(10, 20), height: rng.range(3.5, 9), terrace: 0, rough: 1.2, core: 0.05, shape: 1.2 });
     }
-    // waterfall spur next to the main peak, on the side with the most land (along the island)
+    // First-island waterfall faces the western spawn; other jungle islands use
+    // the side of the peak with the most land along the island.
     const dir = { x: main.x > 0 ? -1 : 1, z: rng.range(-0.45, 0.45) };
+    if (level.index === 0) { dir.x = -1; dir.z = 0; }
     const dl = Math.hypot(dir.x, dir.z);
     dir.x /= dl; dir.z /= dl;
     const spur = addHill({
       x: main.x + dir.x * main.radius * 0.7, z: main.z + dir.z * main.radius * 0.7,
-      radius: 26 * Math.max(0.7, K), height: 22 * Math.max(0.65, K), terrace: K < 0.7 ? 7 : 10, sharp: 0.86, rough: 2, spur: true,
+      radius: spurRadius, height: 22 * Math.max(0.65, K), terrace: K < 0.7 ? 7 : 10, sharp: 0.86, rough: 2, spur: true,
     });
-    const pool = { x: spur.x + dir.x * spur.radius * 1.05, z: spur.z + dir.z * spur.radius * 1.05, r: 14 * Math.max(0.8, K), depth: 3, kind: 'water' };
+    const pool = { x: spur.x + dir.x * spur.radius * 1.05, z: spur.z + dir.z * spur.radius * 1.05, r: poolRadius, depth: 3, kind: 'water' };
     // pool level from the ground around it
     let ring = 0;
     for (let k = 0; k < 12; k++) {
@@ -576,7 +587,7 @@ export function planIsland(levelIndex = 0, variant = 1) {
   // --- boss arena (first island): a lava islet grown onto the coast beside the
   // boat, placed from the boat alone (no rng draws: the rest of the island stays as it was)
   if (level.bossArena) {
-    plan.bossArena = planBossArena(plan);
+    plan.bossArena = planBossArena(plan, (x, z) => naturalHeight(plan, x, z));
     plan.pools.push(plan.bossArena.lava);
   }
 

@@ -17,6 +17,23 @@ const P = CONFIG.player;
 const DT = 1 / 60;
 const NO_ROCKS = () => ({ h: -Infinity, slope: 0, ledge: -Infinity });
 
+test('falling into a trunk height slice resolves the body before sending its position', () => {
+  const terrain = {
+    heightAt: () => 0, gradientAt: () => ({ x: 0, z: 0 }), slopeAt: () => 0,
+    waterDepthAt: () => 0, inlandWaterLevelAt: () => null, seaDepthAt: () => 0,
+  };
+  const cols = { circles: [{ x: 0, z: 0, r: 1, bottom: 2, top: 4.5, kind: 'tree' }], boxes: [] };
+  const pc = new PlayerController(terrain, cols, NO_ROCKS);
+  pc.teleport(0.2, 0);
+  pc.pos.y = 4.55;
+  pc.vel.y = -8;
+  pc.onGround = false;
+  pc.update(DT, {});
+  assert.ok(pc.pos.y < 4.5, 'feet descend into the slice height');
+  const res = resolveCircle(pc.pos.x, pc.pos.z, P.radius, cols, undefined, pc.pos.y + 0.05, pc.pos.y + P.height, P.stepHeight - 0.05);
+  assert.ok(Math.hypot(res.x - pc.pos.x, res.z - pc.pos.z) < 0.01, 'falling player is clear of the trunk');
+});
+
 const islands = [];
 for (const [level, variant] of [[0, 1], [0, 2], [1, 1], [1, 2]]) {
   const terrain = new Terrain(planIsland(level, variant));
