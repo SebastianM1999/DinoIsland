@@ -17,10 +17,9 @@
     {
       "id": "dino-stego",
       "file": "assets/models/dinos/stego.glb",
-      "source": "Quaternius Animated Dinosaur Pack / Stegosaurus",
-      "license": "CC0-1.0",
-      "url": "https://quaternius.com/packs/animateddinosaurs.html",
-      "triangles": 37456
+      "source": "Project-authored Stegosaurus; art/sources/stego/stego.blend (build scripts in its text blocks)",
+      "license": "Project source",
+      "triangles": 51228
     },
     {
       "id": "dino-brachio",

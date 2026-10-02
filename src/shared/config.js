@@ -180,12 +180,19 @@ export const CONFIG = {
       calmTime: 10,
       chargeDuration: 1.6,
       chargeCooldown: 2.4,
-      tailRange: 5.2,
+      tailRange: 5.2,         // body centre -> spike tips (hip pivot 0.68 m back + 4.1 m tail) + player radius
       tailDamage: 28,
       tailKnockback: 11,
+      // hit from the front (inside counterCone rad, closer than counterRange m): pivots its rump onto the
+      // attacker during the wind-up and counters with a heavy swing
+      counterRange: 9,
+      counterCone: 1.1,
+      tailCounterDamage: 50,
+      tailCounterKnockback: 15,
       chargeDamage: 20,
       radius: 2.2,
-      body: [[0.3, 1.05], [1.4, 0.9], [2.5, 0.45], [-1.2, 0.85], [-2.4, 0.5]],
+      // footprint [forward offset m, radius m] measured from art/sources/stego (tail tip and spikes left out)
+      body: [[0, 1.0], [1.23, 0.85], [2.12, 0.38], [2.8, 0.33], [-0.72, 0.95], [-1.87, 0.6], [-2.88, 0.38]],
       loot: { meat: 2, hide: 1, plates: 2 },
       respawn: 150,
     },

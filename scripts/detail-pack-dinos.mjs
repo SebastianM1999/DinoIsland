@@ -6,8 +6,9 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { paintSkinDetails } from '../src/client/models/dino/skinStyle.js';
 import { exportGLB } from './glb-export.mjs';
 
-// Raptor and T-Rex are project-authored in art/sources/<type>/<type>.blend and already have eyes.
-for (const type of ['stego']) {
+// SUPERSEDED: every pack dino is now project-authored in art/sources/<type>/<type>.blend with its own
+// eyes and paint; the list is empty so a rerun never paints over them.
+for (const type of []) {
   const path = new URL(`../assets/models/dinos/${type}.glb`, import.meta.url);
   const bytes = await fs.readFile(path);
   const gltf = await new GLTFLoader().parseAsync(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength), '');

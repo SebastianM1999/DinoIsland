@@ -32,7 +32,7 @@ Branch: `codex/animated-dinosaur-models`. Local commits only; no push.
 | --- | --- | ---: | --- |
 | Raptor | Project Velociraptor from `art/sources/raptor/raptor.blend` (opening jaw, IK-baked clips) | 53,128 | 1.675 × 3.037 m |
 | T-Rex | Project T-Rex from `art/sources/trex/trex.blend` (opening jaw, roar clip, IK-baked clips) | 47,633 | 5.9 × 11 m |
-| Stego | Quaternius Stegosaurus plus black eye dots | 37,456 | 4 × 7.9 m |
+| Stego | Project Stegosaurus from `art/sources/stego/stego.blend` (fused head+jaw+neck, IK-baked clips, tail-swing attack) | 51,228 | 3.76 × 7.9 m |
 | Brachio | Project Brachiosaurus from `art/sources/brachio/brachio.blend` (opening jaw, IK-baked clips, rear-up stomp) | 57,660 | 13.0 × 18.5 m |
 | Ptera | Project procedural flight rig | 25,808 | Existing dimensions |
 

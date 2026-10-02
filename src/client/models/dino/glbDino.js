@@ -101,6 +101,12 @@ export function buildGLBDino(type) {
       }
     }
   }
+  // Species extras (armour plates, weak flanks), added after the padding so it never copies them:
+  // rest-pose points in fitted metres [x, y, forward], stored as offsets on the bone that carries them.
+  for (const { zone, bone, at: [x, y, fwd], radius } of spec.extraHitZones || []) {
+    const joint = find(bone);
+    if (joint) rig.hitZones.push({ zone, joint, offset: joint.worldToLocal(new THREE.Vector3(x, y, -fwd)), radius });
+  }
   rig.hitSpheres = out => {
     root.updateMatrixWorld(true);
     rig.hitZones.forEach((hz, i) => {

@@ -375,18 +375,22 @@ export class DinoSystem {
 
   /** Damage a player with knockback away from the dinosaur (no animation cue). */
   /** Is there a clear line (no trunk, rock or wall) from the animal's front to the player? */
-  canReach(d, p) {
+  canReach(d, p, origin = null) {
     if (d.type === 'ptera') return true; // dives from above
-    const body = CONFIG.dinos[d.type].body;
-    const front = body ? Math.max(...body.map(([off]) => off)) : 0;
-    const fx = -Math.sin(d.yaw), fz = -Math.cos(d.yaw);
+    let ox = origin?.x, oz = origin?.z;
+    if (!origin) {
+      const body = CONFIG.dinos[d.type].body;
+      const front = body ? Math.max(...body.map(([off]) => off)) : 0;
+      ox = d.x - Math.sin(d.yaw) * front; oz = d.z - Math.cos(d.yaw) * front;
+    }
     const y = p.y + 1;
-    return segmentColliders(d.x + fx * front, y, d.z + fz * front, p.x, y, p.z, this.colliders, this.world.layout.groundAt) < 0;
+    return segmentColliders(ox, y, oz, p.x, y, p.z, this.colliders, this.world.layout.groundAt) < 0;
   }
 
-  hitPlayer(d, p, dmg, knock = 6, down = 0) {
-    if (!this.canReach(d, p)) return; // the bite/tail hits the tree in between
-    const dx = p.x - d.x, dz = p.z - d.z;
+  /** Damage + knockback away from `origin` (default: the animal's centre; a tail uses its hip pivot). */
+  hitPlayer(d, p, dmg, knock = 6, down = 0, origin = null) {
+    if (!this.canReach(d, p, origin)) return; // the bite/tail hits the tree in between
+    const dx = p.x - (origin?.x ?? d.x), dz = p.z - (origin?.z ?? d.z);
     const l = Math.hypot(dx, dz) || 1;
     this.world.hurtPlayer(p, dmg * this.dmgMul, { kx: (dx / l) * knock, kz: (dz / l) * knock, down,
       src: d.type, from: { id: d.id, x: r2(d.x), y: r2(d.y), z: r2(d.z) } });

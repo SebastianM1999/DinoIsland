@@ -5,7 +5,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { exportGLB } from './glb-export.mjs';
 
-for (const type of ['raptor', 'trex', 'stego']) {
+for (const type of ['raptor', 'trex']) {   // stego clips are baked as closed loops in stego.blend
   const path = new URL(`../assets/models/dinos/${type}.glb`, import.meta.url), bytes = await fs.readFile(path);
   const gltf = await new GLTFLoader().parseAsync(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength), '');
   for (const clip of gltf.animations.filter(c => /_(Walk|Run)$/.test(c.name))) {
