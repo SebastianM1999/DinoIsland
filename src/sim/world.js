@@ -25,7 +25,8 @@ import { planIsland } from '../shared/island.js';
 import { levelDef, LEVEL_COUNT } from '../shared/levels.js';
 import { findUnstuckSpot, goodSpot } from './unstuck.js';
 import { nearDino, plausibleZone } from './hitCheck.js';
-import { freshBase, campStations, safeZone as baseSafeZone, hasBasePlots, PLOT_REACH, MAX_STAGE, stageCost, BUILD_TIME, BASE_STAGES, applyBaseColliders, baseSpawnPoints } from '../shared/base.js';
+import { freshBase, campStations, safeZone as baseSafeZone, hasBasePlots, PLOT_REACH, MAX_STAGE, stageCost, BUILD_TIME, BASE_STAGES, applyBaseColliders, baseSpawnPoints, TOWERS, TOWER_SLOTS, towerCost } from '../shared/base.js';
+import { updateTowers } from './towers.js';
 import { insideGrove, mayEnterGrove } from '../shared/grove.js';
 import { RECIPE_BY_ID, upgradeMods, unlockIsland, canAfford } from '../shared/crafting.js';
 
@@ -338,7 +339,7 @@ export class ServerWorld {
 
   publicBase() {
     const b = this.base;
-    return { ...b, building: b.building && { stage: b.building.stage, left: r2(Math.max(0, b.building.until - this.now)) }, towers: b.towers.map((t) => ({ ...t })) };
+    return { ...b, building: b.building && { stage: b.building.stage, left: r2(Math.max(0, b.building.until - this.now)) }, towers: b.towers.map(({ cool, ...t }) => t) };
   }
 
   /** Build (op 'build' on a plot) or grow (op 'upgrade') the team's base from the hut store. */
@@ -346,6 +347,7 @@ export class ServerWorld {
     const b = this.base;
     const deny = (text) => this.toast(text, 'crate', p.id);
     if (!p.alive || !hasBasePlots(this.layout)) return;
+    if (m.op === 'tower' || m.op === 'towerUp') return this.towerAction(p, m);
     if (b.building) return deny('The team is already building – wait for it to finish');
     let plot, stage;
     if (m.op === 'build') {
@@ -367,6 +369,46 @@ export class ServerWorld {
     this.event(EV.STORE, { store: this.store });
     this.event(EV.BASE, { base: this.publicBase() });
     this.toast(`${p.name} started building the ${BASE_STAGES[stage].name.toLowerCase()} – ${BUILD_TIME} s`, BASE_STAGES[stage].icon);
+  }
+
+  /** Build a tower on a free tower spot (op 'tower') or upgrade one (op 'towerUp'). Towers stand at once. */
+  towerAction(p, m) {
+    const b = this.base;
+    const deny = (text) => this.toast(text, 'crate', p.id);
+    const plot = b.plot != null ? this.layout.basePlots[b.plot] : null;
+    if (!plot || b.stage < 1 || !this.near(p, plot.x, plot.z, plot.r + PLOT_REACH)) return;
+    const slot = m.slot | 0;
+    const slots = BASE_STAGES[b.stage].towerSlots;
+    if (slot < 0 || slot >= TOWER_SLOTS.length) return;
+    if (slot >= slots) return deny(slots ? `Grow the base to build more towers (${slots} spots)` : 'Towers need the lodge (stage 2)');
+    const have = b.towers.find((t) => t.slot === slot);
+    let kind, level;
+    if (m.op === 'tower') {
+      if (have) return deny('This tower spot is taken');
+      kind = TOWERS[m.kind] ? m.kind : null;
+      if (!kind) return;
+      level = 1;
+    } else {
+      if (!have) return;
+      if (have.level >= 2) return deny('This tower is fully upgraded');
+      kind = have.kind;
+      level = 2;
+    }
+    const cost = towerCost(kind, level, this.levelIndex);
+    if (!canAfford({ cost }, this.store)) return deny('Not enough loot in the hut store');
+    for (const [k, n] of Object.entries(cost)) this.store[k] -= n;
+    const T = TOWERS[kind];
+    if (have) {
+      have.level = 2;
+      have.hp = have.maxHp = Math.round(T.hp * 1.4);
+      have.damaged = false;
+    } else {
+      b.towers.push({ slot, kind, level: 1, hp: T.hp, maxHp: T.hp, damaged: false, cool: 0 });
+      applyBaseColliders(this.layout, b);
+    }
+    this.event(EV.STORE, { store: this.store });
+    this.event(EV.BASE, { base: this.publicBase() });
+    this.toast(`${p.name} built: ${level >= 2 ? T.upgrade.name : T.name}`, T.icon);
   }
 
   /** A stage under construction is finished: it stands, collides and works. */
@@ -1043,6 +1085,7 @@ export class ServerWorld {
     while (this.tracks.length && this.now - this.tracks[0].t > CONFIG.tracks.lifetime) this.tracks.shift();
 
     this.dinos.update(dt);
+    updateTowers(this, dt);
     this.dinos.recordHistory(this.now);
     for (const p of this.players.values()) this.resolvePlayerDinos(p);
     this.mission.update(dt);

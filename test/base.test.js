@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { ServerWorld } from '../src/sim/world.js';
 import { CONFIG } from '../src/shared/config.js';
 import { MSG, ACT, EV } from '../src/shared/protocol.js';
-import { BASE_STAGES, BUILD_TIME, MAX_STAGE, stageCost, plotPoint, campStations } from '../src/shared/base.js';
+import { BASE_STAGES, BUILD_TIME, MAX_STAGE, TOWERS, stageCost, towerCost, plotPoint, campStations } from '../src/shared/base.js';
 import { penetration } from '../src/shared/collision.js';
 
 const P = CONFIG.player;
@@ -127,4 +127,80 @@ test('every new island starts without a base', () => {
   world.nextLevel();
   assert.equal(world.base.stage, 0);
   assert.equal(world.base.plot, null);
+});
+
+// ------------------------------------------------------------------ towers
+
+/** Island 2 with a lodge (2 tower spots) standing and the store full. */
+function lodge() {
+  const s = island2();
+  const plot = s.world.layout.basePlots[0];
+  s.goTo(plotPoint(plot, [0, -plot.r + 3]));
+  s.fill();
+  s.act({ a: ACT.BASE, op: 'build', plot: 0 });
+  s.run(BUILD_TIME + 0.5);
+  s.act({ a: ACT.BASE, op: 'upgrade' });
+  s.run(BUILD_TIME + 0.5);
+  assert.equal(s.world.base.stage, 2);
+  return { ...s, plot };
+}
+
+test('towers go on the open tower spots, cost store loot and can be upgraded once', () => {
+  const { world, act, fill } = lodge();
+  fill();
+  act({ a: ACT.BASE, op: 'tower', slot: 2, kind: 'arrow' });
+  assert.equal(world.base.towers.length, 0, 'spot 3 opens with the fort');
+  const before = { ...world.store };
+  act({ a: ACT.BASE, op: 'tower', slot: 0, kind: 'arrow' });
+  act({ a: ACT.BASE, op: 'tower', slot: 0, kind: 'ballista' });
+  assert.equal(world.base.towers.length, 1, 'one tower per spot');
+  for (const [k, n] of Object.entries(towerCost('arrow', 1, 1))) assert.equal(world.store[k], before[k] - n);
+  act({ a: ACT.BASE, op: 'towerUp', slot: 0 });
+  assert.equal(world.base.towers[0].level, 2);
+  act({ a: ACT.BASE, op: 'towerUp', slot: 0 });
+  assert.equal(world.base.towers[0].level, 2);
+  const boxes = world.layout._baseColliders.boxes.length;
+  act({ a: ACT.BASE, op: 'tower', slot: 1, kind: 'ballista' });
+  assert.equal(world.layout._baseColliders.boxes.length, boxes + 1, 'a new tower collides');
+});
+
+test('towers shoot hostile dinosaurs in range – raiders first – and leave calm ones alone', () => {
+  const { world, act, run, plot, events } = lodge();
+  act({ a: ACT.BASE, op: 'tower', slot: 0, kind: 'arrow' });
+  const at = (lx, lz) => plotPoint(plot, [lx, lz]);
+  const calm = world.dinos.spawn('stego', at(-2, -6).x, at(-2, -6).z);
+  calm.x = at(-2, -6).x; calm.z = at(-2, -6).z;
+  events.length = 0;
+  run(2);
+  assert.ok(!events.some((m) => m.e === EV.TOWER_SHOT), 'a calm stegosaurus is left alone');
+  const raider = world.dinos.spawn('raptor', at(4, -4).x, at(4, -4).z);
+  raider.x = at(4, -4).x; raider.z = at(4, -4).z;
+  raider.raid = { target: null };
+  const hp = raider.hp;
+  run(TOWERS.arrow.cooldown + 0.2);
+  const shots = events.filter((m) => m.e === EV.TOWER_SHOT);
+  assert.ok(shots.length >= 1 && shots.every((m) => m.dino === raider.id));
+  assert.ok(raider.hp < hp, 'the raider takes damage');
+  // a damaged tower does not fire
+  world.base.towers[0].damaged = true;
+  events.length = 0;
+  run(3);
+  assert.ok(!events.some((m) => m.e === EV.TOWER_SHOT));
+});
+
+test('a ballista cannot hit a pterosaur in the air, an arrow tower can', () => {
+  const { world, act, run, plot, events } = lodge();
+  act({ a: ACT.BASE, op: 'tower', slot: 0, kind: 'ballista' });
+  const p = plotPoint(plot, [0, -4]);
+  // circles right above the base (its circling area is the base itself)
+  const ptera = world.dinos.spawn('ptera', p.x, p.z, { nest: { x: p.x, z: p.z }, area: { x: p.x, z: p.z }, slot: 0 });
+  ptera.x = p.x; ptera.z = p.z;
+  const keepFlying = () => { ptera.y = world.terrain.heightAt(ptera.x, ptera.z) + 12; ptera.raid = { target: null }; };
+  keepFlying();
+  events.length = 0;
+  for (let i = 0; i < 40; i++) { keepFlying(); run(0.1); }
+  assert.ok(!events.some((m) => m.e === EV.TOWER_SHOT));
+  act({ a: ACT.BASE, op: 'tower', slot: 1, kind: 'arrow' });
+  for (let i = 0; i < 20; i++) { keepFlying(); run(0.1); }
+  assert.ok(events.some((m) => m.e === EV.TOWER_SHOT && m.kind === 'arrow'));
 });

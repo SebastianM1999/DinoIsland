@@ -204,6 +204,8 @@ export class Game {
     this.basePanel = new BasePanel({
       onBuild: (plot) => this.net.act(ACT.BASE, { op: 'build', plot }),
       onUpgrade: () => this.net.act(ACT.BASE, { op: 'upgrade' }),
+      onTower: (slot, kind) => this.net.act(ACT.BASE, { op: 'tower', slot, kind }),
+      onTowerUp: (slot) => this.net.act(ACT.BASE, { op: 'towerUp', slot }),
       onClose: () => this.input.onPanelToggle('close'),
     });
     this.hud.addPanel('base', { el: this.basePanel.el, onOpen: () => { this.#syncBase(); this.basePanel.onOpen(); } });
@@ -442,6 +444,10 @@ export class Game {
     });
     net.on(`ev:${EV.STORE}`, (m) => { this.store = m.store; this.#syncCrafting(); this.#syncBase(); });
     net.on(`ev:${EV.BASE}`, (m) => this.setBase(m.base));
+    net.on(`ev:${EV.TOWER_SHOT}`, (m) => {
+      this.baseView.shoot(m);
+      this.audio.play(m.kind === 'arrow' ? 'bow' : 'throw', { pos: { x: m.o[0], y: m.o[1], z: m.o[2] } });
+    });
     net.on(`ev:${EV.HURT}`, (m) => {
       if (m.id === this.me.id) {
         this.me.hp = m.hp;

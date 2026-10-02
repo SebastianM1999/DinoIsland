@@ -55,6 +55,41 @@ export function stageCost(stage, levelIndex) {
   return Object.fromEntries(Object.entries(BASE_STAGES[stage].cost).map(([key, n]) => [key, Math.ceil(n * k)]));
 }
 
+/**
+ * Defence towers on the tower spots (stage 2: 2 spots, stage 3: 4). They shoot
+ * hostile dinosaurs (raiders first) in range and in sight; one upgrade each.
+ */
+export const TOWERS = {
+  arrow: {
+    name: 'Arrow tower', icon: 'bow', text: 'Quick arrows. Also hits Pteranodons in the air.',
+    range: 35, cooldown: 1.1, damage: 12, air: true, hp: 250,
+    cost: { hide: 2, teeth: 3, bones: 3 },
+    upgrade: { name: 'Twin crossbow', text: '+50% damage, +6 m range.', cost: { hide: 2, teeth: 4, bones: 4 }, damage: 1.5, range: 6 },
+  },
+  ballista: {
+    name: 'Spear ballista', icon: 'spear', text: 'Slow, heavy spears against big dinosaurs on the ground.',
+    range: 45, cooldown: 3.5, damage: 55, air: false, hp: 350,
+    cost: { plates: 2, bones: 5, claws: 2 },
+    upgrade: { name: 'Heavy ballista', text: '+50% damage, +6 m range.', cost: { plates: 2, bones: 6, skull: 1 }, damage: 1.5, range: 6 },
+  },
+};
+/** Height of a tower's launcher above the plot. */
+export const TOWER_HEIGHT = 6.6;
+
+/** Range, cooldown, damage and air reach of a built tower { kind, level }. */
+export function towerStats(t) {
+  const T = TOWERS[t.kind];
+  const up = t.level >= 2 ? T.upgrade : null;
+  return { range: T.range + (up?.range || 0), cooldown: T.cooldown, damage: T.damage * (up?.damage || 1), air: T.air };
+}
+
+/** Cost of a tower (level 1) or of its upgrade (level 2), scaled per island like the stages. */
+export function towerCost(kind, level, levelIndex) {
+  const k = 1 + 0.25 * Math.max(0, levelIndex - 1);
+  const cost = level >= 2 ? TOWERS[kind].upgrade.cost : TOWERS[kind].cost;
+  return Object.fromEntries(Object.entries(cost).map(([key, n]) => [key, Math.ceil(n * k)]));
+}
+
 /** Fresh (unbuilt) base state, replicated to clients as-is. */
 export function freshBase() {
   return { plot: null, stage: 0, building: null, hp: 0, maxHp: 0, damaged: false, towers: [] };
@@ -142,8 +177,7 @@ export function baseColliders(plot, stage, towers = []) {
     for (const s of palisadeSegments()) boxes.push(siteBox(plot, s.lx, s.lz, seg, 0.35, y + 3.4, s.a));
   }
   for (const t of towers) {
-    const p = plotPoint(plot, TOWER_SLOTS[t.slot]);
-    circles.push({ x: p.x, z: p.z, r: 1.5, top: y + 8 });
+    boxes.push(siteBox(plot, ...TOWER_SLOTS[t.slot], 1.5, 1.5, y + TOWER_HEIGHT + 1.5));
   }
   for (const c of [...boxes, ...circles]) c.kind = 'base';
   return { boxes, circles };

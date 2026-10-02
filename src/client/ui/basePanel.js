@@ -4,16 +4,21 @@
 
 import { CONFIG } from '../../shared/config.js';
 import { canAfford } from '../../shared/crafting.js';
-import { BASE_STAGES, MAX_STAGE, PLOT_KINDS, stageCost } from '../../shared/base.js';
+import { BASE_STAGES, MAX_STAGE, PLOT_KINDS, TOWERS, TOWER_SLOTS, stageCost, towerCost } from '../../shared/base.js';
 import { icon } from './icons.js';
 
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
 export class BasePanel {
-  /** @param {{ onBuild: (plot: number) => void, onUpgrade: () => void, onClose: () => void }} opts */
-  constructor({ onBuild, onUpgrade, onClose }) {
+  /**
+   * @param {{ onBuild: (plot: number) => void, onUpgrade: () => void, onTower: (slot: number, kind: string) => void,
+   *   onTowerUp: (slot: number) => void, onClose: () => void }} opts
+   */
+  constructor({ onBuild, onUpgrade, onTower, onTowerUp, onClose }) {
     this.onBuild = onBuild;
     this.onUpgrade = onUpgrade;
+    this.onTower = onTower;
+    this.onTowerUp = onTowerUp;
     this.onClose = onClose;
     this.state = { store: {}, base: null, island: 2, plot: -1, plotKind: null };
     this.el = document.createElement('section');
@@ -25,6 +30,8 @@ export class BasePanel {
       const act = b.dataset.act;
       if (act === 'build') this.onBuild?.(this.state.plot);
       else if (act === 'upgrade') this.onUpgrade?.();
+      else if (act === 'tower') this.onTower?.(Number(b.dataset.slot), b.dataset.kind);
+      else if (act === 'towerUp') this.onTowerUp?.(Number(b.dataset.slot));
       else if (act === 'close') this.onClose?.();
     });
     this.timer = null;
@@ -67,6 +74,43 @@ export class BasePanel {
     </li>`;
   }
 
+  /** One row per tower spot: locked, free (choose a tower) or built (upgrade). */
+  towerRows() {
+    const base = this.state.base;
+    if (!base || base.stage < 1) return '';
+    const levelIndex = this.state.island - 1;
+    const open = BASE_STAGES[base.stage].towerSlots;
+    const rows = TOWER_SLOTS.map((_, slot) => {
+      const t = base.towers.find((q) => q.slot === slot);
+      if (slot >= open) {
+        const need = BASE_STAGES[slot < 2 ? 2 : 3].name.toLowerCase();
+        return `<li class="craft-row is-locked"><span class="craft-ic">${icon('tower')}</span>
+          <span class="craft-txt"><b>Tower spot ${slot + 1}</b><small>Opens with the ${esc(need)}.</small></span>
+          <button type="button" class="wd-btn" disabled>Locked</button></li>`;
+      }
+      if (!t) {
+        const choice = Object.entries(TOWERS).map(([kind, T]) => {
+          const cost = towerCost(kind, 1, levelIndex);
+          const ok = canAfford({ cost }, this.state.store);
+          return `<button type="button" class="wd-btn" data-act="tower" data-slot="${slot}" data-kind="${kind}" title="${esc(T.text)}"${ok ? '' : ' disabled'}>${icon(T.icon)}${esc(T.name)} ${this.costHtml(cost)}</button>`;
+        }).join('');
+        return `<li class="craft-row"><span class="craft-ic">${icon('tower')}</span>
+          <span class="craft-txt"><b>Tower spot ${slot + 1}</b><small>Free – choose a tower.</small></span>
+          <span class="base-tower-choice">${choice}</span></li>`;
+      }
+      const T = TOWERS[t.kind];
+      const maxed = t.level >= 2;
+      const cost = towerCost(t.kind, 2, levelIndex);
+      const ok = !maxed && canAfford({ cost }, this.state.store);
+      const sub = t.damaged ? 'Damaged – it fires again once repaired.' : maxed ? T.text : `Upgrade: ${T.upgrade.name} – ${T.upgrade.text}`;
+      return `<li class="craft-row${maxed ? ' is-done' : ''}"><span class="craft-ic">${icon(T.icon)}</span>
+        <span class="craft-txt"><b>${esc(maxed ? T.upgrade.name : T.name)} <em>spot ${slot + 1}</em></b><small>${esc(sub)}</small></span>
+        <span class="craft-costs">${maxed ? '' : this.costHtml(cost)}</span>
+        <button type="button" class="wd-btn${maxed ? '' : ' wd-primary'}" data-act="towerUp" data-slot="${slot}"${ok ? '' : ' disabled'}>${maxed ? `${icon('check')}Max` : 'Upgrade'}</button></li>`;
+    }).join('');
+    return `<h3 class="base-sub">${icon('tower')} Defence towers</h3><ul class="craft-list">${rows}</ul>`;
+  }
+
   render() {
     const { store = {}, base, plotKind } = this.state;
     const stock = Object.keys(CONFIG.loot).map((k) => `<span class="craft-stock${store[k] ? '' : ' is-zero'}" title="${esc(CONFIG.loot[k].name)}">${icon(k)}<b>${store[k] || 0}</b></span>`).join('');
@@ -85,6 +129,7 @@ export class BasePanel {
       <p class="base-intro">${intro}</p>
       <div class="craft-stockbar"><span class="craft-stock-label">${icon('home')} Hut store</span>${stock}</div>
       <ul class="craft-list">${rows}</ul>
+      ${this.towerRows()}
       <footer class="wd-foot"><button type="button" class="wd-btn" data-act="close">Close</button></footer>`;
   }
 

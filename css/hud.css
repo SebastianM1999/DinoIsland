@@ -1048,6 +1048,11 @@
 .hud-craft button { cursor: url('../assets/cursor-hand.svg') 12 3, pointer; }
 @media (max-width: 38em) { .craft-row { flex-wrap: wrap; } .craft-costs { order: 3; } }
 .base-intro { margin: 0 0 0.8em; color: var(--ink-dim); font-weight: 700; line-height: 1.35; }
+.base-sub { display: flex; align-items: center; gap: 0.4em; margin: 0.9em 0 0.5em; font-size: 1em; }
+.base-sub svg { width: 1.3em; height: 1.3em; }
+.base-tower-choice { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 0.4em; }
+.base-tower-choice .craft-cost svg { width: 1.1em; height: 1.1em; }
+.hud-craft .craft-list + .base-sub + .craft-list { max-height: 30vh; }
 
 /* ---------------------------------------------------------------- primeval grove prompt */
 .hud-grove { width: min(30em, 92vw); }

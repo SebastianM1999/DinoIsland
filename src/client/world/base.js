@@ -9,13 +9,17 @@
 import * as THREE from 'three';
 import { MAT, merge, mesh, place, part, paint, deform, jitter, rockGeometry, spike } from '../models/kit.js';
 import { makeRng } from '../../shared/rng.js';
-import { BASE_LOCAL, TOWER_SLOTS, palisadeSegments, plotPoint } from '../../shared/base.js';
+import { BASE_LOCAL, TOWER_SLOTS, TOWER_HEIGHT, palisadeSegments, plotPoint } from '../../shared/base.js';
+import { bowGeometry, arrowGeometry, spearGeometry } from '../models/weapons.js';
 import { buildCabin, CABIN } from './hut/cabin.js';
 import { buildDropOff, buildWorkbench, buildMissionBoard, buildWardrobe, buildFlagpole, buildCampfire, FLAG_ATTACH } from './hut/props.js';
 import { createFlag, createFire, createSmoke } from './hut/fx.js';
-import { COL, box, plank, log } from './hut/pieces.js';
+import { COL, box, plank, log, lashing } from './hut/pieces.js';
 
 const ANIM_RANGE = 220;
+const _v = new THREE.Vector3();
+const _w = new THREE.Vector3();
+const _up = new THREE.Vector3(0, 1, 0);
 
 /** Materials of a base per biome. */
 const STYLE = {
@@ -159,6 +163,47 @@ function trophies(style) {
   return out;
 }
 
+/** Tower body (no head): four splayed legs, braces, platform with railing. Origin = tower spot. */
+function towerBody(style, kind, level) {
+  const out = [];
+  const h = TOWER_HEIGHT, s = 1.15;
+  for (const [x, z] of [[-s, -s], [s, -s], [-s, s], [s, s]]) {
+    out.push(log(h + 0.2, 0.12, [x * 1.08, h / 2, z * 1.08], 'y', { body: style.log[0], seed: 80 + x * 2 + z, rot: [z * 0.05, 0, -x * 0.05] }));
+  }
+  for (const y of [1.8, 3.8]) {
+    for (const [x, z, axis] of [[0, -s, 'x'], [0, s, 'x'], [-s, 0, 'z'], [s, 0, 'z']]) out.push(log(s * 2.4, 0.06, [x, y, z], axis, { body: style.log[2], seed: 90 + y }));
+  }
+  out.push(box(s * 2 + 0.7, 0.16, s * 2 + 0.7, COL.plank[1], [0, h - 0.1, 0], [0, 0, 0], 0.01, 9));
+  for (const [x, z, axis] of [[0, -s - 0.3, 'x'], [0, s + 0.3, 'x'], [-s - 0.3, 0, 'z'], [s + 0.3, 0, 'z']]) {
+    out.push(log(s * 2 + 0.7, 0.05, [x, h + 0.75, z], axis, { body: style.log[1], seed: 95 }));
+  }
+  for (const [x, z] of [[-s - 0.3, -s - 0.3], [s + 0.3, -s - 0.3], [-s - 0.3, s + 0.3], [s + 0.3, s + 0.3]]) out.push(log(0.85, 0.05, [x, h + 0.4, z], 'y', { body: style.log[1], seed: 96 }));
+  // banner in the tower's colour: yellow arrows, red ballista; an upgrade adds a second one
+  const flag = kind === 'arrow' ? '#ffcd2e' : '#e0552f';
+  out.push(box(0.04, 0.9, 0.55, flag, [s + 0.36, h - 0.75, 0]));
+  if (level >= 2) out.push(box(0.04, 0.9, 0.55, flag, [-s - 0.36, h - 0.75, 0]));
+  return out;
+}
+
+/** Rotating head: a crossbow (arrow tower) or a ballista with a spear, aiming along local -z. */
+function towerHead(kind, level) {
+  const g = new THREE.Group();
+  const parts = [part(new THREE.CylinderGeometry(0.35, 0.45, 0.35, 8), COL.metal, [0, 0.18, 0])];
+  if (kind === 'arrow') {
+    parts.push(box(0.16, 0.14, 1.5, COL.plank[0], [0, 0.55, -0.2]));
+    parts.push(place(bowGeometry(), [0, 0.6, -0.85], [Math.PI / 2, 0, Math.PI / 2], 0.85));
+    parts.push(place(arrowGeometry(), [0, 0.66, -0.3], [-Math.PI / 2, 0, 0], 0.9));
+    if (level >= 2) parts.push(place(bowGeometry(), [0, 0.82, -0.85], [Math.PI / 2, 0, Math.PI / 2], 0.85), place(arrowGeometry(), [0, 0.88, -0.3], [-Math.PI / 2, 0, 0], 0.9));
+  } else {
+    parts.push(box(0.3, 0.22, 2.6, COL.plank[2], [0, 0.6, -0.4]));
+    for (const sx of [-1, 1]) parts.push(log(1.7, 0.08, [sx * 0.85, 0.75, -1.4], 'x', { body: COL.log[0], seed: 99, rot: [0, sx * 0.35, 0] }));
+    parts.push(place(spearGeometry(), [0, 0.78, -0.6], [-Math.PI / 2, 0, 0], level >= 2 ? 1.5 : 1.25));
+    parts.push(lashing(0.12, 0.1, 3, [0, 0.7, 0.4]));
+  }
+  g.add(mesh(merge(parts)));
+  return g;
+}
+
 /** Scaffolding around what is being built (stage 1: tent, 2: cabin, 3: watchtower). */
 function scaffolding(style, stage) {
   const out = [];
@@ -190,14 +235,22 @@ export function buildBaseView(terrain, layout) {
   const plots = layout.basePlots || [];
   let key = '';
   let fx = [];          // per-frame updaters of the current stage
+  let heads = new Map(); // tower slot -> { head, yaw, want }
+  let plotG = null;      // plot-aligned group of the current base
+  const flights = [];    // tower arrows / spears in the air
+  const flyGroup = new THREE.Group();
+  group.add(flyGroup);
   let center = null;
 
   const clear = () => {
     for (const o of [...group.children]) {
+      if (o === flyGroup) continue;
       group.remove(o);
       o.traverse((c) => { if (c.isMesh) { c.geometry.dispose(); if (c.material !== MAT.standard && c.material !== MAT.glossy && c.material !== MAT.glow) c.material.dispose?.(); } });
     }
     fx = [];
+    heads = new Map();
+    plotG = null;
   };
 
   /** Merge pieces in a plot frame into a few meshes under a plot-aligned group. */
@@ -219,8 +272,9 @@ export function buildBaseView(terrain, layout) {
     for (const geo of o.glow) glow.push(place(geo, pos, [0, rotY, 0]));
   };
 
-  function buildStage(plot, stage, building) {
+  function buildStage(plot, stage, building, towers) {
     const g = plotGroup(plot);
+    plotG = g;
     const std = [], glossy = [], glow = [];
     if (stage >= 1) {
       prop(buildDropOff(), at('dropOff'), 0, std, glossy, glow);
@@ -244,6 +298,17 @@ export function buildBaseView(terrain, layout) {
       std.push(...trophies(style).map((geo) => place(geo, at('trophies'), [0, 0.5, 0])));
     }
     if (building) std.push(...scaffolding(style, building.stage));
+    for (const t of towers) {
+      const [tx, tz] = TOWER_SLOTS[t.slot];
+      std.push(...towerBody(style, t.kind, t.level).map((geo) => place(geo, [tx, 0, tz])));
+      const head = towerHead(t.kind, t.level);
+      head.position.set(tx, TOWER_HEIGHT, tz);
+      // look out of the base until the first shot
+      const yaw = Math.atan2(-tx, -tz);
+      head.rotation.y = yaw;
+      g.add(head);
+      heads.set(t.slot, { head, want: yaw });
+    }
     if (stage === 0 && building) std.push(...borderPegs(style, plot.r - 1));
     addMeshes(g, std, glossy, glow);
 
@@ -278,15 +343,49 @@ export function buildBaseView(terrain, layout) {
     group,
     /** Show the base state (shared/base.js freshBase shape); rebuilds only when something visible changed. */
     setBase(base) {
-      const k = `${base?.plot}|${base?.stage}|${base?.building?.stage ?? ''}`;
+      const towers = base?.towers || [];
+      const k = `${base?.plot}|${base?.stage}|${base?.building?.stage ?? ''}|${towers.map((t) => `${t.slot}${t.kind}${t.level}`).join(',')}`;
       if (k === key) return;
       key = k;
       clear();
       if (!plots.length) return;
       if (base?.plot == null) buildStakes();
-      else buildStage(plots[base.plot], base.stage, base.building);
+      else buildStage(plots[base.plot], base.stage, base.building, towers);
+    },
+    /** A tower fired (EV.TOWER_SHOT): turn its head and send an arrow / spear flying. */
+    shoot(m) {
+      const h = heads.get(m.slot);
+      if (h && plotG) {
+        const local = plotG.worldToLocal(_v.set(m.end[0], m.end[1], m.end[2]));
+        h.want = Math.atan2(-(local.x - h.head.position.x), -(local.z - h.head.position.z));
+      }
+      const from = new THREE.Vector3(...m.o), to = new THREE.Vector3(...m.end);
+      const dist = from.distanceTo(to);
+      const obj = new THREE.Mesh(m.kind === 'arrow' ? arrowGeometry() : spearGeometry(), MAT.standard);
+      obj.castShadow = false;
+      if (m.kind !== 'arrow') obj.scale.setScalar(1.3);
+      flyGroup.add(obj);
+      flights.push({ obj, from, to, t: 0, dur: Math.max(0.08, dist / (m.kind === 'arrow' ? 70 : 50)), arc: dist * 0.04 });
+      if (flights.length > 24) flyGroup.remove(flights.shift().obj);
     },
     update(dt, time, camPos) {
+      // flying shots and turning heads: always (cheap, and only while towers fire)
+      for (let i = flights.length - 1; i >= 0; i--) {
+        const f = flights[i];
+        f.t += dt;
+        const k = Math.min(1, f.t / f.dur);
+        _v.copy(f.from).lerp(f.to, k);
+        _v.y += Math.sin(k * Math.PI) * f.arc;
+        _w.copy(f.to).sub(f.from);
+        _w.y += Math.cos(k * Math.PI) * f.arc * Math.PI;
+        f.obj.position.copy(_v);
+        f.obj.quaternion.setFromUnitVectors(_up, _w.normalize());
+        if (f.t > f.dur + 0.4) { flyGroup.remove(f.obj); flights.splice(i, 1); }
+      }
+      for (const h of heads.values()) {
+        const d = Math.atan2(Math.sin(h.want - h.head.rotation.y), Math.cos(h.want - h.head.rotation.y));
+        h.head.rotation.y += d * Math.min(1, dt * 8);
+      }
       if (!fx.length || (camPos && center && camPos.distanceToSquared(center) > ANIM_RANGE * ANIM_RANGE)) return;
       for (const f of fx) f(dt, time);
     },
