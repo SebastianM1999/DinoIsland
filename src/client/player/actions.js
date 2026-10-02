@@ -9,6 +9,7 @@ import { ACT, EV, PF, EQUIP } from '../../shared/protocol.js';
 import { shotEnd } from '../../shared/gunshots.js';
 import { insideGrove } from '../../shared/grove.js';
 import { segmentColliders } from '../../shared/collision.js';
+import { upgradeMods } from '../../shared/crafting.js';
 import { GunEffects } from '../entities/gunEffects.js';
 import { spearLaunch } from './spearThrow.js';
 import { Viewmodel } from './viewmodel.js';
@@ -73,6 +74,8 @@ export class PlayerActions {
   }
 
   get inv() { return this.game.me.inv; }
+  /** Effects of the team's workbench upgrades (server sends the built ids with every inventory). */
+  get mods() { return upgradeMods(this.inv.upgrades); }
   get tool() { return EQUIP[this.game.eq]; }
 
   // ------------------------------------------------------------------ helpers
@@ -239,11 +242,11 @@ export class PlayerActions {
     const g = this.game;
     this.vm.throwSpear(() => {
       if (!g.running || !g.me.alive) return;
-      const { origin, velocity, rotation } = spearLaunch(g.gfx.camera);
+      const { origin, velocity, rotation } = spearLaunch(g.gfx.camera, 1 + this.mods.throwSpeed);
       g.projectiles.fire('spear', origin, velocity, 1, rotation);
       g.audio?.play('throw');
     });
-    this.cooldown = W.spear.throwCooldown;
+    this.cooldown = W.spear.throwCooldown * (1 + this.mods.throwCooldown);
     g.flags |= PF.ATTACK;
     this.inv.spear = false; // optimistic; the server confirms with an inventory update
   }
@@ -253,7 +256,7 @@ export class PlayerActions {
     if (this.inv.arrows <= 0) return;
     const power = Math.min(1, this.drawT / W.bow.maxDrawTime);
     const { origin, dir, right, up } = this.aim();
-    const speed = W.bow.minSpeed + (W.bow.maxSpeed - W.bow.minSpeed) * power;
+    const speed = W.bow.minSpeed + (W.bow.maxSpeed + this.mods.bowSpeed - W.bow.minSpeed) * power;
     const o = origin.clone().addScaledVector(dir, 0.6).addScaledVector(right, 0.05).addScaledVector(up, -0.04);
     g.projectiles.fire('arrow', o, dir.clone().multiplyScalar(speed), power);
     this.inv.arrows--;
@@ -393,7 +396,7 @@ export class PlayerActions {
       return { text: 'Change clothes', run: () => g.openWardrobe() };
     }
     if (near(h.arrowRack, 4)) {
-      return { text: 'Refill ammunition, traps and bait', run: () => net.act(ACT.REFILL) };
+      return { text: 'Open the crafting box', run: () => g.openCrafting() };
     }
     if (near(h.missionBoard, 3.5)) {
       return { text: 'Open the mission board', run: () => g.openBoard() };

@@ -51,7 +51,8 @@ export const ACT = {
   TRAP: 'trap',         // { x, z, yaw }
   BAIT: 'bait',         // { x, z }
   DEPOSIT: 'deposit',   // {}                                  drop loot at the hut
-  REFILL: 'refill',     // {}                                  refill arrows/traps/bait at the hut
+  REFILL: 'refill',     // {}                                  free basic resupply (12 arrows, spear, guns) at the hut
+  CRAFT: 'craft',       // { recipe }                          craft a supply or team upgrade at the workbench
   RESPAWN: 'respawn',   // {}                                  request respawn when dead
   SPOT: 'spot',         // { dino }                            player saw a dinosaur
   CREATIVE: 'creative', // { on }                              creative mode (invincible, flying)
