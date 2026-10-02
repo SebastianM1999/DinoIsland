@@ -42,6 +42,8 @@ export class PlayerActions {
     this.eatingT = 0;
     this.butcher = null;     // { dino, t, time, x, z, confirmed } while holding V at a carcass
     this.butcherRetry = 0;
+    this.reviving = null;    // { id, t, start } while holding E on a downed teammate (t = channel seconds once the server confirms)
+    this.reviveRetry = 0;
     this.autoPickT = 0;
     this.pickRequested = new Map();   // item id -> time until we may ask again
     this.nextFullAlert = 0;
@@ -68,6 +70,18 @@ export class PlayerActions {
       if (m.id !== game.me.id) return;
       if (!m.dino) this.butcher = null;                       // finished or cancelled by the server
       else if (this.butcher?.dino === m.dino) { this.butcher.confirmed = true; this.butcher.time = m.t; }
+    });
+    net.on(`ev:${EV.REVIVE}`, (m) => {
+      if (m.by !== game.me.id || !this.reviving || this.reviving.id !== m.id) return;
+      if (m.t > 0) { this.reviving.t = m.t; this.reviving.start = game.time; }
+      else { this.reviving = null; this.reviveRetry = 1; }          // the server stopped or refused it
+    });
+    net.on(`ev:${EV.REVIVED}`, (m) => { if (this.reviving?.id === m.id) this.reviving = null; });   // done: nothing to stop
+    net.on(`ev:${EV.HURT}`, (m) => {
+      if (m.id !== game.me.id || !this.reviving) return;
+      net.act(ACT.REVIVE, { stop: true });                            // being hit breaks the channel
+      this.reviving = null;
+      this.reviveRetry = 1;
     });
     net.on(`ev:${EV.DINO_HIT}`, (m) => {
       if (m.by !== game.me.id) return;
@@ -106,7 +120,7 @@ export class PlayerActions {
   bestFruit() {
     const f = this.inv.fruit;
     if (!f.length) return null;
-    const missing = P.maxHealth - this.game.me.hp;
+    const missing = this.game.maxHp - this.game.me.hp;
     let best = null, bestHeal = Infinity, biggest = null, bigHeal = -1;
     for (const t of f) {
       const h = CONFIG.fruit.types[t].heal;
@@ -134,7 +148,7 @@ export class PlayerActions {
   update(dt) {
     const g = this.game;
     const input = g.input;
-    const alive = g.me.alive;
+    const alive = g.me.alive && !g.downed;   // downed: lying on the ground, no actions
     const net = g.net;
     this.cooldown = Math.max(0, this.cooldown - dt);
     this.eatingT = Math.max(0, this.eatingT - dt);
@@ -185,7 +199,7 @@ export class PlayerActions {
     this.gunEffects.update(dt);
     this.reloadT = this.inv.reloading ? this.reloadT + dt : 0;
     // guns are always fired from the hip (no aim-down-sights)
-    this.vm.setGunPose(false, this.inv.reloading === tool ? Math.min(0.98, this.reloadT / W[tool].reloadTime) : 0);
+    this.vm.setGunPose(false, this.inv.reloading === tool ? Math.min(0.98, this.reloadT / (W[tool].reloadTime * this.game.mods.reloadMul)) : 0);
     this.vm.setDraw(this.drawing ? this.drawT / W.bow.maxDrawTime : 0);
 
     // placement tools with a ghost preview
@@ -211,6 +225,10 @@ export class PlayerActions {
 
     // --- knife (hold V at a carcass), then interactions (E) + prompt
     this.updateKnife(dt, alive && !panel && !eating && input.locked, input.isHeld('knife'));
+    this.updateRevive(dt, alive && !panel && !eating && input.locked, input.isHeld('interact'));
+    // Field Medic: a hurt teammate in front of you can be healed with one of your fruit
+    const mate = alive && g.mods.fieldMedic && this.inv.fruit.length ? this.lookedAtTeammate(P.giveRange) : null;
+    g.medicTarget = mate && (mate.fl & PF.DOWNED) === 0 && mate.hp < mate.mhp - 0.5 ? { id: mate.id, name: mate.name } : null;
     this.updateInteraction(alive && !panel, input.wasPressed('interact'));
 
     // --- automatic looting: walk over items to collect them
@@ -355,7 +373,9 @@ export class PlayerActions {
     const target = this.lookedAtTeammate(P.giveRange);
     if (!target) return this.game.hud.toast('Look at a teammate close by to give them fruit', 'fruit');
     if (!this.inv.fruit.length) return this.game.hud.toast('You have no fruit to give', 'fruit');
-    this.game.net.act(ACT.GIVE, { to: target.id });
+    // Field Medic: feeding a hurt teammate heals them on the spot (the server checks the skill)
+    const heal = this.game.mods.fieldMedic && (target.fl & PF.DOWNED) === 0 && target.hp < target.mhp - 0.5;
+    this.game.net.act(ACT.GIVE, heal ? { to: target.id, heal: true } : { to: target.id });
   }
 
   // ------------------------------------------------------------------ interactions
@@ -407,6 +427,38 @@ export class PlayerActions {
     g.audio?.play('swing');
   }
 
+  /** The nearest downed teammate within revive range, or null. */
+  findDowned() {
+    const pos = this.game.player.pos;
+    let best = null, bd = P.reviveRange;
+    for (const rp of this.game.remotes.map.values()) {
+      if (!(rp.fl & PF.DOWNED)) continue;
+      const d = Math.hypot(rp.pos.x - pos.x, rp.pos.z - pos.z);
+      if (d <= bd && Math.abs(rp.pos.y - pos.y) < 2.5) { bd = d; best = rp; }
+    }
+    return best;
+  }
+
+  /** Hold E at a downed teammate to revive them (server channel; releasing, walking off or being hit stops it). */
+  updateRevive(dt, enabled, held) {
+    const g = this.game;
+    this.reviveRetry = Math.max(0, this.reviveRetry - dt);
+    const target = enabled ? this.findDowned() : null;
+    const r = this.reviving;
+    if (r && (!held || !target || target.id !== r.id)) {
+      g.net.act(ACT.REVIVE, { stop: true });
+      this.reviving = null;
+    } else if (!r && target && held && this.reviveRetry <= 0) {
+      this.reviving = { id: target.id, t: 0, start: g.time };
+      g.net.act(ACT.REVIVE, { to: target.id });
+    }
+    const cur = this.reviving;
+    g.reviveTarget = target ? {
+      id: target.id, name: target.name,
+      progress: cur && cur.t > 0 ? Math.min(1, (g.time - cur.start) / cur.t) : 0,
+    } : null;
+  }
+
   updateInteraction(enabled, pressed) {
     const g = this.game;
     const hud = g.hud;
@@ -431,6 +483,8 @@ export class PlayerActions {
     const near = (o, r) => Math.hypot(o.x - pos.x, o.z - pos.z) < r;
 
     // (items on the ground are looted automatically – see autoLoot())
+    // 0. a downed teammate: reviving beats everything else on E
+    if (g.reviveTarget) return { text: this.reviving ? `Reviving ${g.reviveTarget.name}…` : `Hold to revive ${g.reviveTarget.name}`, run: null };
     // 1. ripe fruit
     let best = null, bd = Infinity;
     for (const s of g.layout.fruitSpots) {
@@ -485,7 +539,8 @@ export class PlayerActions {
     if (st.board && near(st.board, 3.5)) {
       return { text: 'Open the mission board', run: () => g.openBoard() };
     }
-    // 4. give fruit
+    // 4. heal a hurt teammate (Field Medic) / give fruit
+    if (g.medicTarget) return { text: `Heal ${g.medicTarget.name} with fruit`, run: () => net.act(ACT.GIVE, { to: g.medicTarget.id, heal: true }) };
     const mate = inv.fruit.length ? this.lookedAtTeammate(P.giveRange) : null;
     if (mate) return { text: `Give fruit to ${mate.name}`, key: 'G', run: null };
     return null;

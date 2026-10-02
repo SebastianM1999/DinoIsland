@@ -13,7 +13,8 @@ import { gunInventory, gunAction, updateGunReload } from './firearms.js';
 import { CONFIG } from '../shared/config.js';
 import { Terrain } from '../shared/terrain.js';
 import { buildLayout } from '../shared/layout.js';
-import { MSG, ACT, EV, EQUIP } from '../shared/protocol.js';
+import { MSG, ACT, EV, EQUIP, PF } from '../shared/protocol.js';
+import { sanitizeProfile, skillMods, progress, buy, canBuy, SKILL_IDS, MAX_XP, MAX_BONUS_POINTS, RELIC_XP, RELIC_POINTS, DASH } from '../shared/skills.js';
 import { DinoSystem } from './dinos.js';
 import { Mission } from './mission.js';
 import { resolveCircle, penetration } from '../shared/collision.js';
@@ -48,6 +49,12 @@ const MOVE_RESERVE = 6;
 // positions, the server against current ones. Push-outs below this are applied
 // silently instead of snapping the player back.
 const DINO_PUSH_TOLERANCE = 0.5;
+/** Seconds of invulnerability after being revived. */
+const REVIVE_INVULN = 1.5;
+/** After an accepted dash the movement validator stays generous for this long. */
+const DASH_WINDOW = 0.6;
+/** Sprint Strike stays armed this long after the last sprinting state packet. */
+const SPRINT_STRIKE_WINDOW = 2;
 
 export class ServerWorld {
   /**
@@ -100,7 +107,8 @@ export class ServerWorld {
       const sp = this.layout.spawnPoints[p.slot];
       Object.assign(p, {
         x: sp.x, y: this.terrain.heightAt(sp.x, sp.z), z: sp.z, yaw: sp.yaw, pitch: 0, spd: 0,
-        hp: P.maxHealth, alive: true, deadT: 0, eating: null, hot: null,
+        hp: p.maxHp, alive: true, deadT: 0, eating: null, hot: null,
+        downed: false, downT: 0, reviving: null, lastStandUsed: false, invulnUntil: 0,
         lastMoveAt: this.now, moveBudget: 3.5, epoch: p.epoch + 1,
       });
       p.inv.arrows = caps.arrows;
@@ -115,6 +123,7 @@ export class ServerWorld {
     }
     for (const p of this.players.values()) {
       this.send(p.id, { t: MSG.WELCOME, id: p.id, slot: p.slot, now: r3(this.now), k: p.epoch, inv: p.inv, world: this.fullState() });
+      this.sendProf(p);
     }
   }
 
@@ -129,13 +138,15 @@ export class ServerWorld {
   // ------------------------------------------------------------------ players
 
   /** @param {(id:number)=>void} [attach] called with the new id before the welcome is sent */
-  join(name, attach, outfit) {
+  join(name, attach, outfit, profile) {
     if (this.players.size >= CONFIG.net.maxPlayers) return { ok: false, reason: 'The expedition is full (4 players max).' };
     const used = new Set([...this.players.values()].map((p) => p.slot));
     let slot = 0;
     while (used.has(slot)) slot++;
     const clean = String(name || '').replace(/[^\p{L}\p{N} _\-.]/gu, '').trim().slice(0, 14) || `Player ${slot + 1}`;
     const sp = this.spawnPoint(slot);
+    const prof = sanitizeProfile(profile);   // a saved profile comes from the client: never trust it
+    const mods = skillMods(prof.skills);
     const p = {
       id: this.id(),
       slot,
@@ -143,9 +154,23 @@ export class ServerWorld {
       outfit: sanitizeOutfit(outfit, slot),
       x: sp.x, y: this.terrain.heightAt(sp.x, sp.z), z: sp.z,
       yaw: sp.yaw, pitch: 0, spd: 0, eq: 0, fl: 0,
-      hp: P.maxHealth,
+      prof,
+      mods,
+      maxHp: P.maxHealth + mods.maxHpAdd,
+      hp: P.maxHealth + mods.maxHpAdd,
       alive: true,
       deadT: 0,
+      downed: false,         // lying on the ground, bleeding out (a teammate can revive)
+      downT: 0,
+      downedAt: 0,
+      reviving: null,        // { to, until } while this player revives a downed teammate
+      lastHurtAt: -99,
+      lastStandUsed: false,
+      invulnUntil: 0,
+      bloodlustUntil: 0,
+      sprinting: false, sprintArmed: false, lastSprintAt: -99,
+      nextDashAt: 0, dashUntil: 0,
+      nextSkillAt: 0,
       eating: null,
       hot: null,
       inv: this.freshInventory(),
@@ -171,6 +196,7 @@ export class ServerWorld {
       inv: p.inv,
       world: this.fullState(),
     });
+    this.sendProf(p);
     this.event(EV.PLAYER_JOIN, { player: this.publicPlayer(p) }, p.id);
     this.toast(`${p.name} joined the expedition`, 'team');
     this.log(`join #${p.id} "${p.name}" slot ${slot} (${this.players.size} players)`);
@@ -202,7 +228,7 @@ export class ServerWorld {
   }
 
   publicPlayer(p) {
-    return { id: p.id, slot: p.slot, name: p.name, outfit: p.outfit, x: r2(p.x), y: r2(p.y), z: r2(p.z), yaw: r3(p.yaw), hp: Math.ceil(p.hp), alive: p.alive };
+    return { id: p.id, slot: p.slot, name: p.name, outfit: p.outfit, x: r2(p.x), y: r2(p.y), z: r2(p.z), yaw: r3(p.yaw), hp: Math.ceil(p.hp), maxHp: p.maxHp, alive: p.alive, downed: p.downed };
   }
 
   sendInv(p) {
@@ -246,10 +272,21 @@ export class ServerWorld {
   }
 
   hurtPlayer(p, dmg, { kx = 0, kz = 0, down = 0, src = null, from = null } = {}) {
-    if (!p.alive || dmg <= 0 || p.creative) return;
+    if (!p.alive || dmg <= 0 || p.creative || this.now < p.invulnUntil) return;
+    // Unshakable: the client scales the knockdown TIME with the same mods, we scale what it is sent
+    const knock = p.mods.knockMul;
+    if (knock !== 1) { kx *= knock; kz *= knock; if (knock === 0) down = 0; }
+    p.lastHurtAt = this.now;
     p.hp = Math.max(0, p.hp - dmg);
+    // Last Stand: one lethal hit per life leaves 1 HP and a moment of invulnerability
+    if (p.hp <= 0 && p.mods.lastStand && !p.lastStandUsed) {
+      p.lastStandUsed = true;
+      p.hp = 1;
+      p.invulnUntil = this.now + p.mods.lastStandInvuln;
+    }
     if (p.eating) p.eating = null;   // getting hit interrupts eating
     this.stopButcher(p);             // ... and butchering
+    this.stopRevive(p);              // ... and reviving
     // A dinosaur's knockback can briefly exceed normal sprint speed.
     if (kx || kz) {
       p.knockBudgetUntil = this.now + 1;
@@ -275,7 +312,7 @@ export class ServerWorld {
     // a carcass on the ground (fallen pterosaurs only once they landed), not yet butchered
     if (!p.alive || p.eating || p.butcher || !d || d.alive || d.butchered || !d.lootDropped) return;
     if (this.carcassDistance(p, d) > K.reach + P.radius || Math.abs(p.y - d.y) > 4 * (d.scale || 1)) return;
-    const time = CONFIG.dinos[d.type].butcher.time;
+    const time = CONFIG.dinos[d.type].butcher.time * p.mods.knifeTimeMul;   // Butcher's Eye
     p.butcher = { dino: d.id, until: this.now + time, x: p.x, z: p.z };
     d.deadT = Math.max(d.deadT, time + 2);   // the carcass stays until it is done
     this.event(EV.BUTCHER, { id: p.id, dino: d.id, t: time });
@@ -303,10 +340,40 @@ export class ServerWorld {
     this.toast(`${p.name} butchered the ${CONFIG.dinos[d.type].name}: ${parts}`, 'bones');
   }
 
+  /** A lethal hit: downed when a living teammate could still revive, else defeated (the old death). */
   killPlayer(p, src) {
+    if (this.hasRescuer(p)) this.downPlayer(p, src);
+    else this.defeatPlayer(p, src);
+  }
+
+  /** Is another player alive (so not downed and not dead) who could revive `p`? */
+  hasRescuer(p) {
+    for (const q of this.players.values()) if (q !== p && q.alive) return true;
+    return false;
+  }
+
+  downPlayer(p, src) {
     p.butcher = null;
     p.alive = false;
-    p.deadT = P.respawnDelay;
+    p.downed = true;
+    p.downT = P.bleedOutTime;
+    p.downedAt = this.now;
+    p.eating = null;
+    p.hot = null;
+    p.spd = 0;
+    p.reviving = null;
+    if (p.inv.reloading) { p.inv.reloading = null; this.sendInv(p); }
+    this.event(EV.DOWN, { id: p.id, t: P.bleedOutTime, by: src });
+    this.toast(`${p.name} is down! Revive them before they bleed out`, 'skull');
+  }
+
+  /** True death: the carried loot is lost and the player respawns after the delay. */
+  defeatPlayer(p, src, respawnIn = P.respawnDelay) {
+    p.butcher = null;
+    p.alive = false;
+    p.downed = false;
+    p.reviving = null;
+    p.deadT = respawnIn;
     p.eating = null;
     p.hot = null;
     // Carried loot and fruit are lost.
@@ -317,6 +384,135 @@ export class ServerWorld {
     this.event(EV.DEATH, { id: p.id, by: src });
     this.toast(`${p.name} was defeated${lostMeat ? ' – the carried loot is lost' : ''}!`, 'skull');
   }
+
+  // ------------------------------------------------------------------ revive
+
+  /** Hold E at a downed teammate: starts the channel (finished in updateRevive). */
+  startRevive(p, toId) {
+    const q = this.players.get(toId);
+    if (!p.alive || p.eating || !q || q === p || !q.downed || !this.near(p, q.x, q.z, P.reviveRange + 0.5)) return;
+    if (p.reviving?.to === q.id) return;
+    this.stopRevive(p);
+    const t = P.reviveTime * p.mods.reviveTimeMul;
+    p.reviving = { to: q.id, until: this.now + t };
+    this.event(EV.REVIVE, { id: p.id, by: p.id, to: q.id, t: r2(t) });
+  }
+
+  stopRevive(p) {
+    if (!p.reviving) return;
+    const to = p.reviving.to;
+    p.reviving = null;
+    this.event(EV.REVIVE, { id: p.id, by: p.id, to, t: 0 });
+  }
+
+  updateRevive(p) {
+    const q = this.players.get(p.reviving.to);
+    if (!q || !q.downed || p.eating || Math.hypot(p.x - q.x, p.z - q.z) > P.reviveRange + 1) return this.stopRevive(p);
+    if (this.now < p.reviving.until) return;
+    p.reviving = null;
+    this.revivePlayer(q, p);
+  }
+
+  /** `by` brought the downed `q` back on their feet where they lay. */
+  revivePlayer(q, by) {
+    q.downed = false;
+    q.downT = 0;
+    q.alive = true;
+    q.hp = Math.ceil(P.reviveHpFrac * q.maxHp);
+    q.invulnUntil = this.now + REVIVE_INVULN;
+    q.lastStandUsed = false;
+    q.lastHurtAt = this.now;
+    q.lastMoveAt = this.now;
+    q.moveBudget = 3.5;
+    q.knockBudgetUntil = 0;
+    this.event(EV.REVIVED, { id: q.id, by: by.id, x: r2(q.x), z: r2(q.z) });
+    this.correct(q);   // fresh epoch: the client resets its prediction
+    this.toast(`${by.name} revived ${q.name}`, 'team');
+  }
+
+  /** A downed player bleeds out, or is given up on when nobody is left to help. */
+  updateDowned(p, dt) {
+    p.downT -= dt;
+    if (p.downT <= 0 || !this.hasRescuer(p)) this.defeatPlayer(p, null);
+  }
+
+  // ------------------------------------------------------------------ skills / xp
+
+  sendProf(p) {
+    this.send(p.id, { t: MSG.PROF, prof: { xp: p.prof.xp, bonus: p.prof.bonus, skills: p.prof.skills } });
+  }
+
+  /** The bought skills changed: new mods and max HP (a higher max also raises current HP by the same amount). */
+  refreshMods(p) {
+    const old = p.maxHp;
+    p.mods = skillMods(p.prof.skills);
+    p.maxHp = P.maxHealth + p.mods.maxHpAdd;
+    if (p.maxHp > old) p.hp += p.maxHp - old;
+    p.hp = Math.min(p.hp, p.maxHp);
+  }
+
+  /** XP (and bonus skill points) for every connected player, wherever they are, alive or not. */
+  awardXp(amount, why, bonus = 0) {
+    for (const p of this.players.values()) {
+      const before = progress(p.prof);
+      p.prof.xp = Math.min(MAX_XP, p.prof.xp + amount);
+      p.prof.bonus = Math.min(MAX_BONUS_POINTS, p.prof.bonus + bonus);
+      const now = progress(p.prof);
+      if (now.xp === before.xp && now.total === before.total) continue;   // maxed out: nothing changed
+      this.send(p.id, { t: MSG.EV, e: EV.XP, amount, why, ...(now.level !== before.level ? { level: now.level } : {}), free: now.free });
+      this.sendProf(p);
+    }
+  }
+
+  skillAction(p, m) {
+    if (this.now < p.nextSkillAt) return;
+    p.nextSkillAt = this.now + 0.1;
+    if (m.op === 'buy') {
+      // SKILLS is a plain object: only real ids may reach buy() ("constructor" would crash it)
+      if (typeof m.id !== 'string' || !SKILL_IDS.includes(m.id)) return;
+      const ok = canBuy(p.prof, m.id);
+      if (!ok.ok) return this.toast(ok.reason, 'info', p.id);
+      p.prof.skills = buy(p.prof, m.id);
+    } else if (m.op === 'reset') {
+      const st = this.stations();
+      if (!p.alive || !this.nearAny(p, [st.fire, st.workbench, st.wardrobe, st.board, ...st.dropOff, ...st.refill], 6)) {
+        return this.toast('Skills can only be reset at your camp', 'info', p.id);
+      }
+      if (!Object.keys(p.prof.skills).length) return;
+      p.prof.skills = {};
+    } else return;
+    this.refreshMods(p);
+    this.sendProf(p);
+  }
+
+  /** Dash (Endurance capstone): the client moves itself, the server grants the extra distance. */
+  grantDash(p) {
+    if (!p.alive || !p.mods.dash || this.now < p.nextDashAt) return;
+    p.nextDashAt = this.now + DASH.cooldown;
+    p.dashUntil = this.now + DASH_WINDOW;
+    p.moveBudget += DASH.distance + 1;
+  }
+
+  /** Damage multiplier for `p` hitting dinosaur `d` with `weapon` (Brute Force, Marksman, Executioner, Sprint Strike, Bloodlust). */
+  damageMul(p, d, weapon) {
+    if (weapon === 'trap' || weapon === 'tower') return 1;
+    const m = p.mods;
+    let mul = weapon === 'spear' ? m.meleeMul : weapon === 'pistol' || weapon === 'rifle' ? m.gunMul : 1;
+    if (m.executionerBonus && d.hp <= m.executionerBelow * d.maxHp) mul *= 1 + m.executionerBonus;
+    if (m.sprintStrike && p.sprintArmed && this.now - p.lastSprintAt <= SPRINT_STRIKE_WINDOW) { mul *= 2; p.sprintArmed = false; }
+    if (this.now < p.bloodlustUntil) mul *= 1 + m.bloodlustDmg;
+    return mul;
+  }
+
+  /** `p` brought a dinosaur down: Bloodlust heals and arms the damage bonus (refreshes, never stacks). */
+  onPlayerKill(p) {
+    if (!p.mods.bloodlust || !p.alive) return;
+    this.healPlayer(p, p.mods.bloodlustHeal * p.maxHp);
+    p.bloodlustUntil = this.now + p.mods.bloodlustTime;
+  }
+
+  /** Restore HP (capped at max HP). */
+  healPlayer(p, amount) { p.hp = Math.min(p.maxHp, p.hp + amount); }
 
   // ------------------------------------------------------------------ base
 
@@ -458,7 +654,10 @@ export class ServerWorld {
   respawnPlayer(p) {
     const sp = this.spawnPoint(p.slot);
     p.alive = true;
-    p.hp = P.maxHealth;
+    p.downed = false;
+    p.lastStandUsed = false;
+    p.invulnUntil = 0;
+    p.hp = p.maxHp;
     p.x = sp.x; p.z = sp.z; p.y = this.terrain.heightAt(sp.x, sp.z);
     p.yaw = sp.yaw;
     p.lastMoveAt = this.now;
@@ -512,7 +711,9 @@ export class ServerWorld {
     // A small distance reserve accommodates packet bunching without allowing
     // repeated state packets to move faster than the player's sprint.
     const creative = p.creative;
-    p.moveBudget = Math.min(creative ? 10 : at < p.knockBudgetUntil ? 7 : MOVE_RESERVE,
+    // a dash briefly lifts the cap by its distance (grantDash)
+    const cap = creative ? 10 : at < p.dashUntil ? MOVE_RESERVE + DASH.distance + 1 : at < p.knockBudgetUntil ? 7 : MOVE_RESERVE;
+    p.moveBudget = Math.min(cap,
       p.moveBudget + Math.max(0, at - p.lastMoveAt) * (creative ? P.creative.flySpeed + 4 : 11));
     p.lastMoveAt = at;
     const distance = Math.hypot(x - p.x, z - p.z);
@@ -533,7 +734,12 @@ export class ServerWorld {
     p.pitch = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, num(m.pitch, p.pitch)));
     p.spd = Math.max(0, Math.min(20, num(m.spd, 0)));
     p.eq = Math.max(0, Math.min(EQUIP.length - 1, m.eq | 0));
-    p.fl = (m.fl | 0) & 63;
+    p.fl = (m.fl | 0) & (63 | PF.DASH);   // DOWNED is the server's to set
+    if (p.fl & PF.SPRINT) {
+      if (!p.sprinting) p.sprintArmed = true;   // Sprint Strike arms when a sprint starts
+      p.sprinting = true;
+      p.lastSprintAt = at;
+    } else p.sprinting = false;
     if (!historical) {
       this.resolvePlayerDinos(p, previous);
       const h = (p.stateHistory ??= []);
@@ -546,6 +752,10 @@ export class ServerWorld {
 
   receiveAction(p, m) {
     const state = m.state;
+    // The client dashes in the same state packet: grant the distance before that state is validated.
+    if (m.a === ACT.DASH) this.grantDash(p);
+    // Dead or downed clients send no usable movement: these acts don't need a pose.
+    if (!p.alive && (m.a === ACT.SKILL || m.a === ACT.RESPAWN)) return this.onAct(p, m);
     if (!state) return this.onAct(p, m); // compatible with older clients
     if (!Number.isSafeInteger(state.s) || !Number.isSafeInteger(state.k) || state.k !== p.epoch ||
         !['x', 'y', 'z', 'yaw', 'pitch', 'spd', 'eq', 'fl'].every(key => Number.isFinite(state[key]))) return;
@@ -653,7 +863,7 @@ export class ServerWorld {
         const on = !!m.on;
         if (on === !!p.creative) return;
         p.creative = on;
-        if (on && p.alive) p.hp = P.maxHealth;
+        if (on && p.alive) p.hp = p.maxHp;
         this.toast(`${p.name} ${on ? 'switched to' : 'left'} creative mode`, 'bolt');
         return;
       }
@@ -675,7 +885,7 @@ export class ServerWorld {
         const pose = this.hitPose(d, m.rt);
         if (!this.validMeleeHit(p, d, m.p, pose)) return;
         p.nextMeleeAt = this.now + W.spear.cooldown;
-        this.dinos.damage(d, W.spear.damage * (1 + this.mods().spearDamage), plausibleZone(d, pose, m.p, m.zone), p.id, 'spear');
+        this.dinos.damage(d, W.spear.damage * (1 + this.mods().spearDamage), plausibleZone(d, pose, m.p, m.zone), p.id, 'spear');   // skill multipliers: DinoSystem.damage
         inv.spearHealth = Math.max(0, (inv.spearHealth ?? W.spear.durability) - W.spear.useWear);
         if (!inv.spearHealth) { inv.spear = false; this.toast('Your spear broke - refill at the hut', 'spear', p.id); }
         this.sendInv(p);
@@ -824,6 +1034,7 @@ export class ServerWorld {
         const type = inv.fruit[idx];
         inv.fruit.splice(idx, 1);
         p.eating = { type, t: CONFIG.fruit.eatTime };
+        this.stopRevive(p);
         this.sendInv(p);
         this.event(EV.EAT, { id: p.id, fruit: type });
         return;
@@ -832,6 +1043,17 @@ export class ServerWorld {
         if (!p.alive || inv.fruit.length === 0) return;
         const q = this.players.get(m.to);
         if (!q || !q.alive || q === p || !this.near(p, q.x, q.z, P.giveRange + 1.5)) return;
+        // Field Medic: { to, heal: true } feeds the teammate one of my fruit on the spot instead of handing it over
+        if (m.heal && p.mods.fieldMedic) {
+          if (p.eating || q.hp >= q.maxHp) return;
+          const type = inv.fruit.splice(this.bestFruitIndex(p, q), 1)[0];
+          const ft = CONFIG.fruit.types[type];
+          this.healPlayer(q, ft.heal * p.mods.fruitHealMul);
+          if (ft.hot > 0) q.hot = { rate: (ft.hot * p.mods.fruitHealMul) / ft.hotTime, t: ft.hotTime };
+          this.sendInv(p);
+          this.event(EV.HEAL, { id: q.id, by: p.id, hp: Math.ceil(q.hp) });
+          return;
+        }
         if (q.inv.fruit.length >= this.caps().fruit) return this.toast(`${q.name} can't carry more fruit`, 'fruit', p.id);
         // give the fruit that heals the most if they're hurt, else the first
         const idx = this.bestFruitIndex(p);
@@ -918,6 +1140,14 @@ export class ServerWorld {
       }
       case ACT.CRAFT: return this.craft(p, m.recipe);
       case ACT.BASE: return this.baseAction(p, m);
+      case ACT.SKILL: return this.skillAction(p, m);
+      case ACT.REVIVE: return m.stop ? this.stopRevive(p) : this.startRevive(p, m.to);
+      case ACT.DASH: return;   // already granted in receiveAction, ahead of the bundled state
+      case ACT.RESPAWN: {
+        // giving up while downed (after the bleed-out grace): true death, back on the beach at once
+        if (p.downed && this.now - p.downedAt >= P.respawnDelay) this.defeatPlayer(p, null, 0);
+        return;
+      }
     }
   }
 
@@ -985,9 +1215,10 @@ export class ServerWorld {
     return Math.hypot(x - expectedX, z - expectedZ) < 2.5 && Math.abs(y - expectedY) < 3.5;
   }
 
-  bestFruitIndex(p) {
+  /** Which of p's fruit to eat (or feed `target`, default p themself). */
+  bestFruitIndex(p, target = p) {
     const f = p.inv.fruit;
-    const missing = P.maxHealth - p.hp;
+    const missing = target.maxHp - target.hp;
     // eat the smallest fruit that covers the missing health, else the biggest
     let best = -1, bestHeal = Infinity, biggest = 0, biggestHeal = -1;
     f.forEach((t, i) => {
@@ -1070,28 +1301,46 @@ export class ServerWorld {
     if (this.base.building && this.now >= this.base.building.until) this.finishBuilding();
     const F = CONFIG.fruit;
 
+    // Healing Aura sources (the strongest aura in range counts, they never stack)
+    let auras = null;
+    for (const p of this.players.values()) if (p.alive && p.mods.auraHps > 0) (auras ??= []).push(p);
+
     for (const p of this.players.values()) {
       updateGunReload(this, p);
       if (p.butcher) this.updateButcher(p);
       if (!p.alive) {
-        p.deadT -= dt;
-        if (p.deadT <= 0) this.respawnPlayer(p);
+        if (p.downed) this.updateDowned(p, dt);
+        else {
+          p.deadT -= dt;
+          if (p.deadT <= 0) this.respawnPlayer(p);
+        }
         continue;
       }
+      if (p.reviving) this.updateRevive(p);
       // eating
       if (p.eating) {
         p.eating.t -= dt;
         if (p.eating.t <= 0) {
           const ft = F.types[p.eating.type];
-          p.hp = Math.min(P.maxHealth, p.hp + ft.heal);
-          if (ft.hot > 0) p.hot = { rate: ft.hot / ft.hotTime, t: ft.hotTime };
+          this.healPlayer(p, ft.heal * p.mods.fruitHealMul);
+          if (ft.hot > 0) p.hot = { rate: (ft.hot * p.mods.fruitHealMul) / ft.hotTime, t: ft.hotTime };
           p.eating = null;
         }
       }
       if (p.hot) {
-        p.hp = Math.min(P.maxHealth, p.hp + p.hot.rate * dt);
+        this.healPlayer(p, p.hot.rate * dt);
         p.hot.t -= dt;
         if (p.hot.t <= 0) p.hot = null;
+      }
+      // Regeneration (out of combat) and teammates' Healing Aura
+      if (p.hp < p.maxHp) {
+        let rate = p.mods.regenHps > 0 && this.now - p.lastHurtAt >= p.mods.regenDelay ? p.mods.regenHps : 0;
+        if (auras) {
+          let best = 0;
+          for (const a of auras) if (a !== p && a.mods.auraHps > best && this.near(p, a.x, a.z, a.mods.auraRadius)) best = a.mods.auraHps;
+          rate += best;
+        }
+        if (rate > 0) this.healPlayer(p, rate * dt);
       }
       // lava burns (and sets you back on your feet only if you get out)
       const lava = this.terrain.lavaLevelAt(p.x, p.z);
@@ -1110,11 +1359,12 @@ export class ServerWorld {
         r.byName = p.name;
         this.event(EV.RELIC, { id: r.id, kind: r.kind, by: p.id });
         this.mission.onRelicFound(r, p);
+        this.awardXp(RELIC_XP, 'Boat part', RELIC_POINTS);
       }
       // the hut / the base campfire is a safe, healing place
       const st = this.stations();
-      if (st.fire && p.hp < P.maxHealth && this.near(p, st.fire.x, st.fire.z, st.healR)) {
-        p.hp = Math.min(P.maxHealth, p.hp + P.hutHealPerSecond * st.healRate * dt);
+      if (st.fire && p.hp < p.maxHp && this.near(p, st.fire.x, st.fire.z, st.healR)) {
+        this.healPlayer(p, P.hutHealPerSecond * st.healRate * dt);
       }
     }
 
@@ -1176,8 +1426,8 @@ export class ServerWorld {
     const p = [];
     for (const q of this.players.values()) {
       const carry = q.inv.loot.meat + q.inv.loot.hide + q.inv.loot.plates;
-      const fl = q.fl | (q.eating ? 4 : 0);
-      p.push([q.id, r2(q.x), r2(q.y), r2(q.z), r3(q.yaw), r3(q.pitch), r2(q.spd), q.eq, fl, Math.ceil(q.hp), q.alive ? 1 : 0, carry]);
+      const fl = q.fl | (q.eating ? 4 : 0) | (q.downed ? PF.DOWNED : 0);
+      p.push([q.id, r2(q.x), r2(q.y), r2(q.z), r3(q.yaw), r3(q.pitch), r2(q.spd), q.eq, fl, Math.ceil(q.hp), q.alive ? 1 : 0, carry, q.maxHp]);
     }
     // Dinosaurs far from every player change nothing anyone can see (fog):
     // they go out only with every Nth snapshot.

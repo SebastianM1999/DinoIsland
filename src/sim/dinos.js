@@ -4,6 +4,7 @@
 
 import { CONFIG } from '../shared/config.js';
 import { EV, DS } from '../shared/protocol.js';
+import { XP_BY_TYPE } from '../shared/skills.js';
 import { resolveCircle, segmentColliders, penetration } from '../shared/collision.js';
 import { dinoBodyCircles } from '../shared/dinoContact.js';
 import { angleDiff, clamp } from '../shared/rng.js';
@@ -15,6 +16,7 @@ import { raptorBrain } from './ai/raptor.js';
 import { pteraBrain } from './ai/ptera.js';
 import { trexBrain } from './ai/trex.js';
 import { raiderStep } from './raids.js';
+import { findPath } from './pathfind.js';
 
 const BRAINS = { brachio: brachioBrain, stego: stegoBrain, raptor: raptorBrain, ptera: pteraBrain, trex: trexBrain };
 const r2 = (v) => Math.round(v * 100) / 100;
@@ -30,6 +32,10 @@ const stepOver = (d) => Math.max(0.2, Math.min(1.2, radiusOf(d) * 0.35));
 const NUDGE_INSIDE = 2;     // standing inside a collider / on ground it can't stand on
 const NUDGE_BLOCKED = 6;    // blocked on free ground (goal unreachable)
 const EIGHT = [0, 1, 2, 3, 4, 5, 6, 7].map((k) => (k / 8) * Math.PI * 2);
+/** Detours around a blocked straight line (see #detour): when, how often, how big, how long. */
+const DETOUR = { after: 0.8, stall: 4, retry: 2, nodes: 1500, keep: 20, regoal: 10 };
+/** Steepest ground an animal walks UP (raiders scramble up steeper ground to reach a base on high ground). */
+export const climbSlope = (d) => (d.raid ? 1.25 : d.type === 'raptor' ? 0.95 : 0.8);
 
 export class DinoSystem {
   constructor(world) {
@@ -148,13 +154,14 @@ export class DinoSystem {
 
   players() { return this.world.players.values(); }
 
-  /** Nearest living player within `radius` (optionally filtered). */
+  /** Nearest living player within `radius` (optionally filtered); Stalker shrinks the radius per player. */
   nearestPlayer(d, radius, filter = null) {
     let best = null, bd = radius * radius;
     for (const p of this.world.players.values()) {
       if (!p.alive || (filter && !filter(p))) continue;
       const q = (p.x - d.x) ** 2 + (p.z - d.z) ** 2;
-      if (q < bd) { bd = q; best = p; }
+      const reach = radius * p.mods.stalkerMul;
+      if (q < bd && q < reach * reach) { bd = q; best = p; }
     }
     return best;
   }
@@ -176,8 +183,13 @@ export class DinoSystem {
     this.world.event(EV.BAIT_REMOVE, { id: b.id });
   }
 
-  /** Is this spot fine for a land animal? Keeps dinosaurs out of water, cliffs and the hut clearing. */
-  walkable(x, z, d) {
+  /**
+   * Is this spot fine for a land animal? Keeps dinosaurs out of water, cliffs and the hut clearing.
+   * `downhill`: the animal is heading down to this spot. Then steep ground is fine (it runs down a
+   * mountain wall instead of standing on the rim staring at a player below); only climbing up
+   * steep ground is limited. Without it the spot itself must be gentle (spawns, goals).
+   */
+  walkable(x, z, d, downhill = false) {
     const t = this.terrain;
     // the grove's titan never leaves its pen (no part of its body crosses the
     // stones; its centre is held by the leash in move()); everyone else stays out
@@ -188,8 +200,9 @@ export class DinoSystem {
       return false;
     }
     if (t.waterDepthAt(x, z) > (d.type === 'brachio' ? 1.2 : 0.35)) return false;
-    // raiders (sim/raids.js) scramble up steeper ground to reach a base on high ground
-    if (t.slopeAt(x, z) > (d.raid ? 1.25 : d.type === 'raptor' ? 0.95 : 0.8)) return false;
+    // the heightfield is continuous, so there is no wall too steep to run down (move() slows the
+    // descent to an along-the-surface speed); one shut in a pit below scrambles out (#detour)
+    if (!downhill && t.slopeAt(x, z) > climbSlope(d) && !(d.scrambleUntil > this.world.now)) return false;
     if (t.lavaLevelAt(x, z) !== null) return false;
     // the hut / the team's base (shared/base.js safeZone): dinosaurs keep out
     const zone = this.world.safeZone();
@@ -199,8 +212,10 @@ export class DinoSystem {
 
   /** Turn toward (tx, tz) and walk at `speed`, avoiding unwalkable ground. Returns remaining distance. */
   steer(d, tx, tz, speed, dt, turnRate = CONFIG.dinos[d.type].turnRate) {
-    const dx = tx - d.x, dz = tz - d.z;
-    const dist = Math.hypot(dx, dz);
+    const dist = Math.hypot(tx - d.x, tz - d.z);
+    // straight line blocked (a wall it can't climb, a ridge in the way): follow a planned detour
+    const wp = this.#detour(d, tx, tz);
+    const dx = wp.x - d.x, dz = wp.z - d.z;
     const desired = Math.atan2(-dx, -dz);
     this.turnTo(d, desired, dt, turnRate);
     // slow down while turning hard
@@ -208,6 +223,48 @@ export class DinoSystem {
     const want = speed * clamp(1.2 - off / 1.6, 0.25, 1);
     this.move(d, want, dt);
     return dist;
+  }
+
+  /**
+   * Where to head for goal (tx, tz): the goal itself, or the next waypoint of a detour planned
+   * (sim/pathfind.js, steep walls downhill only) once the straight approach has been blocked
+   * for a moment - e.g. a raptor on a ledge whose direct line to the player below runs up a
+   * bump first. Searches are small and rate-limited per animal (20 Hz server tick).
+   */
+  #detour(d, tx, tz) {
+    const now = this.world.now;
+    let r = d.route;
+    // the goal moved away from the planned one (a running player), or the plan is stale: drop it
+    if (r && (now > r.until || Math.hypot(tx - r.gx, tz - r.gz) > DETOUR.regoal)) r = d.route = null;
+    // getting no closer although it walks (sliding along the foot of a wall it can't climb)
+    const dist = Math.hypot(tx - d.x, tz - d.z);
+    const a = d.approach;
+    if (!a || Math.hypot(tx - a.gx, tz - a.gz) > DETOUR.regoal || dist < a.best - 1) d.approach = { gx: tx, gz: tz, best: dist, at: now };
+    const stalled = now - d.approach.at > DETOUR.stall;
+    // blocked or stalled (again, also on a planned way): plan from here. One search per tick for
+    // all animals together keeps failed searches (~5-15 ms each) from piling up in one tick
+    if (((d.blockedT || 0) > DETOUR.after || stalled) && now >= (d.routeAt ?? 0) && this.searchedAt !== now) {
+      d.approach.at = now;
+      this.searchedAt = now;
+      d.routeAt = now + DETOUR.retry * (1 + Math.random());
+      const reach = Math.max(3, radiusOf(d) * 1.5), info = {};
+      // every cell a waypoint: the straight line between far-apart cells can cut over a steep corner
+      let pts = findPath(this, d, d.x, d.z, tx, tz, reach, DETOUR.nodes, { every: 1, info });
+      if (!pts && info.closed && !(d.scrambleUntil > now)) {
+        // shut in a pit it ran down into, with no gentle way out: let it scramble up the wall
+        // (walkable) along a planned way instead of pacing at the bottom forever
+        d.scrambleUntil = now + DETOUR.keep;
+        pts = findPath(this, d, d.x, d.z, tx, tz, reach, DETOUR.nodes, { every: 1 });
+        if (!pts) d.scrambleUntil = 0;
+      }
+      r = d.route = pts && pts.length > 1 ? { pts, i: 1, gx: tx, gz: tz, until: now + DETOUR.keep } : null;
+    }
+    if (!r) return { x: tx, z: tz };
+    // next waypoint not yet reached (the last one leads straight on to the goal)
+    const near = Math.max(2.5, radiusOf(d));
+    while (r.i < r.pts.length && Math.hypot(r.pts[r.i].x - d.x, r.pts[r.i].z - d.z) < near) r.i++;
+    if (r.i >= r.pts.length) { d.route = null; d.scrambleUntil = 0; return { x: tx, z: tz }; }
+    return r.pts[r.i];
   }
 
   turnTo(d, desired, dt, turnRate = CONFIG.dinos[d.type].turnRate) {
@@ -222,16 +279,27 @@ export class DinoSystem {
     const step = d.spd * dt;
     let fx = -Math.sin(d.yaw), fz = -Math.cos(d.yaw);
     const look = Math.max(2, d.radius * 1.5);
-    // ground and trees ahead: the body has to fit through, otherwise look for a way around
-    const open = (px, pz, yaw) => this.walkable(px, pz, d) && !this.bodyBlocked(d, px, pz, yaw);
+    // downhill may be steep (see walkable). Judged over the look-ahead, not the tiny step: the
+    // triangle mesh has creases where a 1 cm step goes up although the slope runs down
+    const h0 = this.terrain.heightAt(d.x, d.z);
+    const down = (px, pz) => this.terrain.heightAt(px, pz) < h0;
+    // ground and trees ahead: the body has to fit through, otherwise look for a way around.
+    // The first stride counts too: a gentle spot beyond a steep step up is no way out
+    const open = (px, pz, yaw) => {
+      const dn = down(px, pz), k = Math.min(1, 0.6 / look);
+      return this.walkable(px, pz, d, dn) && this.walkable(d.x + (px - d.x) * k, d.z + (pz - d.z) * k, d, dn) &&
+        !this.bodyBlocked(d, px, pz, yaw);
+    };
     if (!open(d.x + fx * look, d.z + fz * look, d.yaw)) {
-      // probe left/right for a way around
+      // probe left/right for a way around. Turn away faster than steer() turns back to the goal,
+      // or a nimble raptor just twitches at the edge of a wall it can't climb
+      const avoid = Math.max(3, CONFIG.dinos[d.type].turnRate * 2) * dt;
       let found = false;
       for (const a of [0.5, -0.5, 1.0, -1.0, 1.6, -1.6, 2.4, -2.4]) {
         const yy = d.yaw + a * (d.avoidSide || 1);
         const px = d.x - Math.sin(yy) * look, pz = d.z - Math.cos(yy) * look;
         if (open(px, pz, yy)) {
-          d.yaw += clamp(a, -3 * dt, 3 * dt) * (d.avoidSide || 1);
+          d.yaw += clamp(a, -avoid, avoid) * (d.avoidSide || 1);
           found = true;
           break;
         }
@@ -240,7 +308,18 @@ export class DinoSystem {
       fx = -Math.sin(d.yaw); fz = -Math.cos(d.yaw);
     }
     let nx = d.x + fx * step, nz = d.z + fz * step;
-    if (!this.walkable(nx, nz, d) || this.#pastLeash(d, nx, nz)) { d.spd *= 0.5; d.yaw += 1.5 * dt * (d.avoidSide || 1); this.#progress(d, 0, want, dt); return; }
+    // judge a full stride, not the ground under its feet: standing on a spot just over the climb
+    // limit must not pin it (any tiny step there reads as "steep, uphill")
+    const stride = Math.max(step, 0.6);
+    if (!this.walkable(d.x + fx * stride, d.z + fz * stride, d, down(d.x + fx * look, d.z + fz * look)) || this.#pastLeash(d, nx, nz)) { d.spd *= 0.5; d.yaw += 1.5 * dt * (d.avoidSide || 1); this.#progress(d, 0, want, dt); return; }
+    // on a steep wall the speed runs along the surface: a raptor slides down a cliff instead of
+    // dropping 40 m/s (and the client's interpolation can follow)
+    const drop = Math.abs(h0 - this.terrain.heightAt(nx, nz));
+    let along = 1;
+    if (drop > step * climbSlope(d)) {
+      along = step / Math.hypot(step, drop);
+      nx = d.x + fx * step * along; nz = d.z + fz * step * along;
+    }
     // keep a little personal space from other dinosaurs (before the trees, so they can't push into a trunk)
     for (const o of this.list) {
       if (o === d || !o.alive || o.type === 'ptera') continue;
@@ -260,7 +339,7 @@ export class DinoSystem {
     const moved = Math.hypot(nx - d.x, nz - d.z);
     d.x = nx; d.z = nz;
     d.trackDist += moved;
-    this.#progress(d, moved, want, dt);
+    this.#progress(d, moved, want * along, dt);
   }
 
   /** Would a step to (x, z) take a leashed animal's centre further beyond its leash? */
@@ -363,7 +442,8 @@ export class DinoSystem {
     if (blocked <= 0) { d.stuckAt = null; return; }
     if (!d.stuckAt) d.stuckAt = { x: d.x, z: d.z };
     if (blocked < NUDGE_INSIDE) return;
-    const inside = !this.walkable(d.x, d.z, d) || this.bodyBlocked(d, d.x, d.z, d.yaw);
+    // steep ground under its feet is fine (it got there running downhill); water, lava, a no-go zone or a trunk are not
+    const inside = !this.walkable(d.x, d.z, d, true) || this.bodyBlocked(d, d.x, d.z, d.yaw);
     const wedged = blocked >= NUDGE_BLOCKED && Math.hypot(d.x - d.stuckAt.x, d.z - d.stuckAt.z) < 1.5;
     if (!inside && !wedged) return;
     // only teleport when it really can't walk off; a merely unreachable goal just gets replaced
@@ -376,6 +456,7 @@ export class DinoSystem {
     d.stuckAt = null;
     d.avoidSide = -(d.avoidSide || 1);
     d.wander = null;
+    d.route = null;
     BRAINS[d.type].onStuck?.(d, this);
   }
 
@@ -482,11 +563,18 @@ export class DinoSystem {
       if (!p || !insideGrove(this.world.layout, p.x, p.z)) return;
     }
     const Z = CONFIG.hitZones;
-    let mult = Z[zone] ?? 1;
+    const base = Z[zone] ?? 1;
+    let mult = base;
+    // skills (shared/skills.js): weapon/execute/sprint/bloodlust multipliers; Weak Spot scales only the bonus part of a zone
+    const by = this.world.players.get(byId);
+    if (by) {
+      amount *= this.world.damageMul(by, d, weapon);
+      if (mult > 1) mult = 1 + (mult - 1) * by.mods.weakSpotMul;
+    }
     const hitZone = zone in Z ? zone : 'body';
     const dmg = amount * mult;
     d.hp -= dmg;
-    this.world.event(EV.DINO_HIT, { id: d.id, zone: hitZone, dmg: Math.round(dmg), by: byId, weak: mult > 1.2, armor: mult < 0.5 });
+    this.world.event(EV.DINO_HIT, { id: d.id, zone: hitZone, dmg: Math.round(dmg), by: byId, weak: base > 1.2, armor: base < 0.5 });
     if (d.hp <= 0) this.kill(d, byId);
     else BRAINS[d.type].onHurt?.(d, this, byId, dmg, weapon);
   }
@@ -508,6 +596,8 @@ export class DinoSystem {
     this.world.event(EV.DINO_DIE, { id: d.id, by: byId });
     this.world.toast(`${killer ? killer.name : 'The team'} brought down a ${c.name}!`, 'dino');
     this.world.mission.onDinoKilled(d);
+    this.world.awardXp(XP_BY_TYPE[d.type] ?? 0, c.name);   // every player, raid dinos included
+    if (killer) this.world.onPlayerKill(killer);
     if (!d.raid) this.respawnQueue.push({ type: d.type, at: this.world.now + c.respawn, group: d.group });
   }
 

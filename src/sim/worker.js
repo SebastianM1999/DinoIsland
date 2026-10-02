@@ -1,7 +1,7 @@
 // Solo / offline host: runs the authoritative ServerWorld in a Web Worker so
 // AI, collision and missions never take time from the render thread.
 // Protocol with Net.local (src/client/net/net.js):
-//   page -> worker  { type: 'start', name, outfit, opts? } | { type: 'msg', msg } | { type: 'stop' }
+//   page -> worker  { type: 'start', name, outfit, opts?, profile? } | { type: 'msg', msg } | { type: 'stop' }
 //                   opts (testing aids): { level, baseStage, raidIn } – see Net.local
 //   worker -> page  a game message (welcome, snap, ev, ...) – copied like a real network
 
@@ -13,7 +13,7 @@ let playerId = null;
 let interval = null;
 let reliableSeq = 0;
 
-function start(name, outfit, { level = 0, baseStage = 0, raidIn = 0 } = {}) {
+function start(name, outfit, { level = 0, baseStage = 0, raidIn = 0 } = {}, profile) {
   world = new ServerWorld({
     send(to, msg, except) {
       if (playerId === null || (to === '*' ? except === playerId : to !== playerId)) return;
@@ -29,7 +29,7 @@ function start(name, outfit, { level = 0, baseStage = 0, raidIn = 0 } = {}) {
   }
   // testing aid (?raid=seconds): the first raid is announced that soon
   if (raidIn > 0 && world.base.stage > 0) world.raids.nextAt = world.now + raidIn;
-  world.join(name, (id) => { playerId = id; }, outfit);
+  world.join(name, (id) => { playerId = id; }, outfit, profile);
   const tickMs = 1000 / CONFIG.net.tickRate;
   let last = performance.now();
   let acc = 0;
@@ -52,7 +52,7 @@ function start(name, outfit, { level = 0, baseStage = 0, raidIn = 0 } = {}) {
 
 onmessage = (e) => {
   const m = e.data;
-  if (m.type === 'start' && !world) start(m.name, m.outfit, m.opts);
+  if (m.type === 'start' && !world) start(m.name, m.outfit, m.opts, m.profile);
   else if (m.type === 'msg' && world && playerId !== null) world.receive(playerId, m.msg);
   else if (m.type === 'stop') { clearInterval(interval); close(); }
 };

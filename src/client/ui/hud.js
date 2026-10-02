@@ -13,6 +13,7 @@ import { ITEM_INFO } from './itemInfo.js';
 import { CONTRACTS as BOARD_CONTRACTS } from '../../shared/missions.js';
 import { RELICS } from '../../shared/relics.js';
 import { BRAND } from '../../shared/brand.js';
+import { progress } from '../../shared/skills.js';
 
 const TAU = Math.PI * 2;
 const DEG = 180 / Math.PI;
@@ -26,6 +27,8 @@ const el = (tag, cls, html) => {
   return e;
 };
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+/** Readable name for an XP source: a dinosaur type, a boat part or plain text. */
+const xpWhy = (why) => CONFIG.dinos?.[why]?.name || (why === 'relic' ? 'Boat part' : String(why).charAt(0).toUpperCase() + String(why).slice(1));
 const wrapDeg = (d) => ((d % 360) + 540) % 360 - 180;
 const fmtTime = (s) => {
   s = Math.max(0, Math.round(s || 0));
@@ -76,6 +79,19 @@ export class Hud {
     const tl = el('div', 'hud-tl');
     const status = el('div', 'hud-status');
     this.$portrait = el('div', 'hud-portrait', portraitSvg(CONFIG.playerColors[0], 0));
+    // XP ring around the portrait (pathLength 100: the dash offset is the unfilled percentage),
+    // the level in a badge and a pulsing dot while skill points are unspent. The portrait clips
+    // its own overflow, so these are siblings inside a wrapper.
+    this.$portraitWrap = el('div', 'hud-portrait-wrap');
+    this.$portraitWrap.innerHTML = `<svg class="hud-xpring" viewBox="0 0 100 100" aria-hidden="true"><circle cx="50" cy="50" r="47" class="bg"/><circle cx="50" cy="50" r="47" class="fg" pathLength="100"/></svg>`;
+    this.$xpFg = this.$portraitWrap.querySelector('.fg');
+    this.$level = el('span', 'hud-level', '1');
+    this.$level.title = 'Level';
+    this.$points = el('span', 'hud-points', '');
+    this.$points.hidden = true;
+    this.$xpPops = el('div', 'hud-xp-pops');
+    this.$xpPops.setAttribute('aria-hidden', 'true');
+    this.$portraitWrap.append(this.$portrait, this.$level, this.$points, this.$xpPops);
     const bars = el('div', 'hud-bars brush');
     const mkBar = (cls, ic, label) => {
       const row = el('div', `hud-bar ${cls}`);
@@ -87,7 +103,16 @@ export class Hud {
     this.$hp = mkBar('is-hp', 'heart', 'Health');
     this.$st = mkBar('is-st', 'bolt', 'Stamina');
     this.$name = el('div', 'hud-name');
-    status.append(this.$portrait, bars);
+    // perk chips under the stamina bar (Dash cooldown, Adrenaline); hidden until the skill is owned
+    this.$perks = el('div', 'hud-perks');
+    this.$perks.hidden = true;
+    this.$dash = el('span', 'hud-perk is-dash', '<kbd>Q</kbd><span>Dash</span><i class="hud-perk-fill"></i>');
+    this.$dash.hidden = true;
+    this.$adren = el('span', 'hud-perk is-adren', `${icon('bolt')}<span>Adrenaline</span><i class="hud-perk-fill"></i>`);
+    this.$adren.hidden = true;
+    this.$perks.append(this.$dash, this.$adren);
+    bars.append(this.$perks);
+    status.append(this.$portraitWrap, bars);
     this.$mission = el('section', 'hud-mission brush');
     this.$mission.setAttribute('aria-label', 'Current mission');
     this.$mission.hidden = true;
@@ -141,12 +166,16 @@ export class Hud {
     this.$threat = el('div', 'hud-threat brush');
     this.$threat.setAttribute('role', 'status');
     this.$threat.hidden = true;
-    cc.append(this.$cross, this.$hit, this.$eat, this.$prompt, this.$threat);
+    // revive / medic prompt with a progress bar (the plain prompt slot belongs to the interaction hints)
+    this.$assist = el('div', 'hud-prompt hud-assist brush');
+    this.$assist.setAttribute('role', 'status');
+    this.$assist.hidden = true;
+    cc.append(this.$cross, this.$hit, this.$eat, this.$prompt, this.$assist, this.$threat);
 
     // ---------- bottom-left: key hints
     const bl = el('ul', 'hud-keys');
     bl.setAttribute('aria-label', 'Key hints');
-    for (const [ic, key, label] of [['bag', 'Tab', 'Inventory'], ['map', 'M', 'Map'], ['give', 'G', 'Give fruit'], ['eat', 'F', 'Eat'], ['knife', 'V', 'Butcher']]) {
+    for (const [ic, key, label] of [['bag', 'Tab', 'Inventory'], ['map', 'M', 'Map'], ['give', 'G', 'Give fruit'], ['eat', 'F', 'Eat'], ['knife', 'V', 'Butcher'], ['bolt', 'K', 'Skills']]) {
       bl.insertAdjacentHTML('beforeend', `<li><span class="hud-keys-ic brush">${icon(ic)}</span><span class="hud-keys-lab brush"><kbd>${key}</kbd>${label}</span></li>`);
     }
 
@@ -192,6 +221,13 @@ export class Hud {
     this.$win = el('div', 'hud-win');
     this.$win.hidden = true;
     this.$win.setAttribute('role', 'alert');
+    // downed: lying on the ground while teammates can still revive you
+    this.$downed = el('div', 'hud-downed');
+    this.$downed.hidden = true;
+    this.$downed.setAttribute('role', 'alert');
+    this.$downed.innerHTML = `<div class="hud-downed-card brush"><h2>You are downed</h2><p class="hud-downed-sub">A teammate can revive you</p><p class="hud-downed-count"></p><p class="hud-downed-key"></p></div>`;
+    this.$downedCount = this.$downed.querySelector('.hud-downed-count');
+    this.$downedKey = this.$downed.querySelector('.hud-downed-key');
 
     this.$invPanel = el('section', 'hud-panel hud-inv brush');
     this.$invPanel.setAttribute('aria-label', 'Inventory');
@@ -250,7 +286,7 @@ export class Hud {
     this.$invPanel.addEventListener('pointermove', (e) => showTip(e.target.closest('[data-tip]'), e.clientX, e.clientY));
     this.$invPanel.addEventListener('pointerleave', () => { this.$tip.hidden = true; });
 
-    r.append(this.$flash, tl, tc, tr, cc, bl, bc, br, this.$death, this.$win, this.$invPanel, this.$mapPanel, this.$board, this.$tip);
+    r.append(this.$flash, tl, tc, tr, cc, bl, bc, br, this.$death, this.$downed, this.$win, this.$invPanel, this.$mapPanel, this.$board, this.$tip);
 
     // Canvas backing-store sizes follow their CSS size (no per-frame layout reads).
     this._mm = { w: 0, h: 0, dpr: 1 };
@@ -553,23 +589,130 @@ export class Hud {
         this._teamRows.set(m.id, { li, ic: li.children[0], name: li.children[1], fill: li.children[2].firstChild, sig: '', hp: -1 });
       }
     }
-    const max = CONFIG.player.maxHealth;
     for (const m of list) {
       const row = this._teamRows.get(m.id);
-      const sig = `${m.name}|${m.slot}|${m.alive}|${m.isYou}`;
+      const max = (m.maxHp ?? m.mhp) > 0 ? (m.maxHp ?? m.mhp) : CONFIG.player.maxHealth;   // Thick Skin raises it
+      const downed = !!m.downed && m.alive;
+      const sig = `${m.name}|${m.slot}|${m.alive}|${m.isYou}|${downed}`;
       if (row.sig !== sig) {
         row.sig = sig;
+        row.li.classList.toggle('is-downed', downed);
         row.li.classList.toggle('is-dead', !m.alive);
         row.li.classList.toggle('is-you', !!m.isYou);
         row.ic.innerHTML = m.alive ? icon('person') : icon('skull');
         row.ic.style.color = CONFIG.playerColors[m.slot] || '#fff';
         row.name.textContent = m.name + (m.isYou ? ' (you)' : '');
-        row.li.setAttribute('aria-label', `${m.name}${m.isYou ? ' (you)' : ''}${m.alive ? '' : ', defeated'}`);
+        row.li.setAttribute('aria-label', `${m.name}${m.isYou ? ' (you)' : ''}${!m.alive ? ', defeated' : downed ? ', downed' : ''}`);
       }
       const f = m.alive ? Math.max(0, Math.min(1, m.hp / max)) : 0;
       const q = Math.round(f * 200) / 200;
       if (row.hp !== q) { row.hp = q; row.fill.style.transform = `scaleX(${q})`; }
     }
+  }
+
+  // ================================================================ XP / skills
+  /** XP ring, level badge and unspent-points dot from a profile ({ xp, bonus, skills }). */
+  setXp(profile) {
+    if (!profile) return;
+    const p = progress(profile);
+    const sig = `${p.level}|${p.free}|${Math.round(p.frac * 1000)}`;
+    if (this._c.xp === sig) return;
+    const prevLevel = this._c.xpLevel;
+    this._c.xp = sig;
+    this._c.xpLevel = p.level;
+    // after a level-up the ring would sweep backwards: let it jump for that frame
+    if (prevLevel != null && p.level !== prevLevel) {
+      this.$portraitWrap.classList.add('is-snap');
+      requestAnimationFrame(() => requestAnimationFrame(() => this.$portraitWrap.classList.remove('is-snap')));
+    }
+    this.$xpFg.style.strokeDashoffset = String(Math.round((1 - p.frac) * 1000) / 10);
+    this.$level.textContent = String(p.level);
+    this.$level.title = `Level ${p.level}${p.capped ? ' (max)' : ''}`;
+    this.$points.hidden = p.free <= 0;
+    this.$points.textContent = p.free > 9 ? '9+' : String(p.free);
+    this.$points.title = `${p.free} unspent skill point${p.free === 1 ? '' : 's'} (K)`;
+    this.$portraitWrap.classList.toggle('has-points', p.free > 0);
+  }
+
+  /** EV.XP: a floating "+20 XP Raptor" by the portrait; a level-up also flashes the icon and toasts. */
+  xpGain({ amount, why, level, free } = {}) {
+    if (amount > 0) {
+      const t = el('span', 'hud-xp-pop');
+      t.textContent = `+${amount} XP${why ? ` ${xpWhy(why)}` : ''}`;
+      this.$xpPops.appendChild(t);
+      while (this.$xpPops.children.length > 4) this.$xpPops.firstChild.remove();
+      const anim = t.animate([
+        { opacity: 0, transform: 'translateY(0.6em)' },
+        { opacity: 1, transform: 'translateY(0)', offset: 0.12 },
+        { opacity: 1, transform: 'translateY(-0.2em)', offset: 0.75 },
+        { opacity: 0, transform: 'translateY(-0.9em)' },
+      ], { duration: 2200, easing: 'ease-out' });
+      anim.onfinish = () => t.remove();
+    }
+    if (level != null) {
+      this.$portraitWrap.animate([
+        { transform: 'scale(1)', filter: 'brightness(1)' },
+        { transform: 'scale(1.22)', filter: 'brightness(1.6) drop-shadow(0 0 0.8em #ffc933)', offset: 0.3 },
+        { transform: 'scale(1)', filter: 'brightness(1)' },
+      ], { duration: 900, easing: 'ease-out' });
+      this.toast(free > 0 ? `Level ${level} - ${free} skill point${free === 1 ? '' : 's'} available` : `Level ${level}`, 'trophy');
+    }
+  }
+
+  /** Perk chips: dash = { ready, frac } (frac = cooldown elapsed 0..1), adren = { state: 'ready'|'active'|'cooldown', frac }; null hides one. */
+  setPerks({ dash = null, adren = null } = {}) {
+    const dSig = dash ? `${dash.ready}|${Math.round(dash.frac * 20)}` : '-';
+    if (this._c.dash !== dSig) {
+      this._c.dash = dSig;
+      this.$dash.hidden = !dash;
+      if (dash) {
+        this.$dash.classList.toggle('is-ready', !!dash.ready);
+        this.$dash.lastElementChild.style.transform = `scaleX(${dash.ready ? 1 : Math.max(0, Math.min(1, dash.frac))})`;
+      }
+    }
+    const aSig = adren ? `${adren.state}|${Math.round(adren.frac * 20)}` : '-';
+    if (this._c.adren !== aSig) {
+      this._c.adren = aSig;
+      this.$adren.hidden = !adren;
+      if (adren) {
+        this.$adren.dataset.state = adren.state;
+        this.$adren.lastElementChild.style.transform = `scaleX(${Math.max(0, Math.min(1, adren.frac))})`;
+        this.$adren.title = adren.state === 'active' ? 'Adrenaline: stamina is free' : adren.state === 'cooldown' ? 'Adrenaline recharging' : 'Adrenaline ready: triggers below 30% HP';
+      }
+    }
+    this.$perks.hidden = !dash && !adren;
+  }
+
+  /** Downed overlay: info = { left (s), key? } or null. */
+  setDowned(info) {
+    const s = info ? Math.max(0, Math.ceil(info.left ?? 0)) : -1;
+    const key = info?.key || '';
+    const sig = `${s}|${key}`;
+    if (this._c.downed === sig) return;
+    this._c.downed = sig;
+    this.$downed.hidden = !info;
+    if (!info) return;
+    this.$downedCount.textContent = `Bleeding out in ${s} s`;
+    this.$downedKey.hidden = !key;
+    this.$downedKey.innerHTML = key ? `<kbd>${esc(key)}</kbd> Give up` : '';
+  }
+
+  /** Revive / medic prompt. `a` = { kind: 'revive', name, progress 0..1 } | { kind: 'medic', name } | null. */
+  setAssist(a) {
+    const shape = a ? `${a.kind}|${a.name}` : null;
+    const sig = a ? `${shape}|${a.kind === 'revive' ? Math.round((a.progress ?? 0) * 50) : ''}` : null;
+    if (this._c.assist === sig) return;
+    const rebuild = this._c.assistShape !== shape;
+    this._c.assist = sig;
+    this._c.assistShape = shape;
+    if (!a) { this.$assist.hidden = true; return; }
+    this.$assist.hidden = false;
+    if (rebuild) {
+      this.$assist.innerHTML = a.kind === 'revive'
+        ? `<kbd>E</kbd><span>Hold - Reviving ${esc(a.name)}</span><span class="hud-assist-bar"><i></i></span>`
+        : `<kbd>G</kbd><span>Heal ${esc(a.name)} with a fruit</span>`;
+    }
+    if (a.kind === 'revive') this.$assist.querySelector('i').style.transform = `scaleX(${Math.max(0, Math.min(1, a.progress ?? 0))})`;
   }
 
   prompt(text, key = 'E') {

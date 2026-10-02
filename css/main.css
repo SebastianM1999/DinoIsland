@@ -469,6 +469,10 @@ kbd {
 #settings { background: rgba(12, 17, 30, 0.55); z-index: 60; backdrop-filter: blur(2px); }
 .settings-card {
   width: min(520px, 100%);
+  /* one fixed size for every tab: switching tabs must not make the dialog jump; long tabs scroll inside */
+  height: min(600px, calc(100vh - 40px));
+  display: flex;
+  flex-direction: column;
   padding: 20px 26px;
   animation: card-in 0.18s ease-out;
 }
@@ -496,7 +500,8 @@ kbd {
 }
 .settings-tabs [role=tab][aria-selected=true] { background: #3a4a72; color: var(--ink); box-shadow: 0 2px 0 #1a233b; }
 .settings-tabs [role=tab]:focus-visible { outline: 3px solid var(--focus); outline-offset: 1px; }
-.settings-panel { min-height: 300px; }
+.settings-panel { flex: 1; min-height: 0; overflow-y: auto; padding-right: 6px; }
+.settings-panel[hidden] { display: none; }
 .audio-credits { margin-top: 12px; font-size: 0.85rem; line-height: 1.55; }
 .audio-credits[open] { max-height: 220px; overflow-y: auto; }
 .audio-credits summary { cursor: pointer; }

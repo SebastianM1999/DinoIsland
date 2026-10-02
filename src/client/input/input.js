@@ -11,9 +11,11 @@ const KEY_BINDINGS = {
   KeyE: 'interact',
   KeyF: 'eat',
   KeyG: 'give',
+  KeyQ: 'dash',       // Dash skill (Endurance capstone)
   KeyR: 'reloadHint',
   Tab: 'inventory',
   KeyM: 'map',
+  KeyK: 'skills',     // skill tree panel
   KeyT: 'team',
   KeyU: 'unstuck',
   KeyV: 'knife',      // hold at a carcass to butcher it (not on the hotbar)
@@ -96,7 +98,7 @@ export class Input {
     }
     const action = KEY_BINDINGS[e.code];
     if (!action || !this.enabled) return;
-    if (action === 'inventory' || action === 'map') {
+    if (action === 'inventory' || action === 'map' || action === 'skills') {
       e.preventDefault();
       if (down && !e.repeat) this.onPanelToggle?.(action);
       return;

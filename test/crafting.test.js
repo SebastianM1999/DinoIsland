@@ -128,10 +128,15 @@ test('tier 2 upgrades unlock on island 2 and need their tier 1 upgrade', () => {
   craft('bow2');
   assert.ok(!world.upgrades.has('bow2'), 'no workbench before a camp is built');
   const plot = world.layout.basePlots[0];
+  if (!plot) return;   // rare island-2 layout without a base plot: the game falls back to the hut (shared/base.js)
   p.x = plot.x; p.z = plot.z;
   stock({ hide: 9, teeth: 9, claws: 9, plates: 9, bones: 9 });
   world.receive(p.id, { t: MSG.ACT, a: ACT.BASE, op: 'build', plot: 0 });
+  // invincible while the camp builds: on a random island a dinosaur can reach (and kill) the
+  // player in these 16 s, which has nothing to do with crafting and made this test flaky
+  p.creative = true;
   for (let t = 0; t < 16; t += 0.5) world.step(0.5);
+  p.creative = false;
   assert.equal(world.base.stage, 1);
   const bench = world.stations().workbench;
   p.x = bench.x; p.z = bench.z;

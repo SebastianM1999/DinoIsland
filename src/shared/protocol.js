@@ -10,7 +10,7 @@
 //     where the dinosaur was then (lag compensation, ≤ CONFIG.net.lagCompMax).
 //
 // ---------------------------------------------------------------- client -> server
-//   hello   { name, outfit? }                            outfit = { hat, top, pants }
+//   hello   { name, outfit?, profile? }                  outfit = { hat, top, pants }; profile = saved { xp, bonus, skills } (shared/skills.js)
 //   state   { s, k, x, y, z, yaw, pitch, spd, eq, fl } own movement (fl = PF flags); s = sequence number,
 //                                                       k = last correction epoch seen (older k / s are dropped)
 //   act     { a: <action>, ...fields }                  see ACT below
@@ -23,6 +23,7 @@
 //   pong    { c, now }
 //   snap    { now, p: [...PLAYER_FIELDS], d: [...DINO_FIELDS] }
 //   inv     { inv }                                     your private inventory changed
+//   prof    { prof }                                    your private progression changed: { xp, bonus, skills } (client saves it)
 //   correct { x, y, z, k, unstuck? }                    rejected movement / unstuck move; reset prediction, k = new epoch
 //   ev      { e: <event>, ...fields }                   see EV below
 
@@ -36,6 +37,7 @@ export const MSG = {
   PONG: 'pong',
   SNAP: 'snap',
   INV: 'inv',
+  PROF: 'prof',
   CORRECT: 'correct',
   EV: 'ev',
 };
@@ -66,6 +68,9 @@ export const ACT = {
   BUTCHER: 'butcher',   // { dino, stop? }                     start (hold V) / stop butchering a carcass with the knife
   BASE: 'base',         // { op: 'build', plot } | { op: 'upgrade' } | { op: 'tower', slot, kind } | { op: 'towerUp', slot } | { op: 'repair' }
                         //                                     build / grow the team's base and its towers (islands 2+)
+  SKILL: 'skill',       // { op: 'buy', id } | { op: 'reset' }  spend a point / reset all points (only at camp)
+  REVIVE: 'revive',     // { to } start reviving a downed teammate (hold E) | { stop: true }
+  DASH: 'dash',         // {}                                   Dash skill used (client moves, server grants the distance + checks cooldown)
 };
 
 /** Server events (msg.e). */
@@ -107,10 +112,15 @@ export const EV = {
   BASE: 'base',             // { base }                          the team's base changed (see shared/base.js freshBase)
   TOWER_SHOT: 'tshot',      // { slot, kind, o, end, dino }      a base tower fired
   RAID: 'raid',             // { raid: { phase, dir, left } }    raid announced (warn) / started / over (idle)
+  XP: 'xp',                 // { amount, why, level?, free }     PRIVATE: you gained XP (level = new level when you levelled up, free = unspent points)
+  DOWN: 'down',             // { id, t, by }                     player id is downed and bleeds out in t seconds (teammates can revive)
+  REVIVE: 'revive',         // { id, by, t }                     by started reviving id (t = seconds; t 0 = stopped)
+  REVIVED: 'revived',       // { id, by, x, z }                  id was revived (replaces a respawn)
+  HEAL: 'heal',             // { id, by, hp }                    Field Medic healed id
 };
 
 /** Player snapshot tuple layout. */
-export const PLAYER_FIELDS = ['id', 'x', 'y', 'z', 'yaw', 'pitch', 'spd', 'eq', 'fl', 'hp', 'alive', 'carry'];
+export const PLAYER_FIELDS = ['id', 'x', 'y', 'z', 'yaw', 'pitch', 'spd', 'eq', 'fl', 'hp', 'alive', 'carry', 'mhp'];   // mhp = max HP (Thick Skin raises it)
 /** Dinosaur snapshot tuple layout. */
 export const DINO_FIELDS = ['id', 'x', 'y', 'z', 'yaw', 'st', 'hp', 'spd', 'fl'];
 
@@ -122,6 +132,8 @@ export const PF = {
   ATTACK: 8,    // spear stab / throw animation
   GROUND: 16,
   KNOCKED: 32,
+  DOWNED: 64,   // lying downed (server ORs it into snapshots)
+  DASH: 128,
 };
 
 /** Equipment slot ids (`eq`). */

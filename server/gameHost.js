@@ -55,7 +55,7 @@ export function startGameHost(httpServer = null, { onConnection } = {}) {
           playerId = id;
           joined = true;
           sockets.set(id, ws);
-        }, msg.outfit);
+        }, msg.outfit, msg.profile);
         if (!res.ok) {
           ws.send(JSON.stringify({ t: MSG.REJECT, reason: res.reason }));
           ws.close(4000, 'full');

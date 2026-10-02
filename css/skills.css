@@ -1,0 +1,133 @@
+/* Dinosaur Island – skill tree panel (K). Loaded by src/client/ui/skillPanel.js.
+   Built on the shared HUD panel pieces in hud.css (.hud-panel.brush, .hud-panel-head,
+   .hud-panel-close, .craft-stockbar, .hud-bar-track/.hud-bar-fill, .wd-foot, .wd-btn)
+   and the main.css tokens (--navy, --ink, --ink-dim, --cream, --yellow, --red, --green,
+   --blue, --track, --slot-bg, --slot-rim, --shadow-text, --focus). Only the skill-specific
+   parts (columns, tiles, footer text) are defined here. */
+
+.hud-skills { width: min(68em, 96vw); max-height: 96vh; display: flex; flex-direction: column; padding: 0.9em 1.3em 1em; }
+.hud-skills button { cursor: url('../assets/cursor-hand.svg') 12 3, pointer; font-family: inherit; }
+.hud-skills .wd-btn:disabled { opacity: 0.5; cursor: default; }
+
+/* ---- header (hud-panel-head) */
+.sk-head { margin-bottom: 0.5em; gap: 1em; }
+.sk-head h2 { display: flex; align-items: center; gap: 0.4em; flex: 1; }
+.sk-head h2 svg { width: 1.2em; height: 1.2em; }
+.sk-level {
+  padding: 0.2em 0.9em; border-radius: 99em; font-weight: 800; white-space: nowrap;
+  background: rgba(255, 201, 51, 0.16); color: var(--yellow); box-shadow: inset 0 0 0 0.12em rgba(255, 201, 51, 0.45);
+}
+
+/* ---- xp strip (craft-stockbar) */
+.sk-xprow { flex: none; flex-wrap: wrap; gap: 0.35em 0.9em; margin-bottom: 0.6em; }
+.sk-xpbar { flex: 1; min-width: 10em; height: 1.1em; }
+.sk-xpbar .hud-bar-fill { background: linear-gradient(#ffe27a, var(--yellow) 55%, #e39a12); transition: transform 0.3s ease-out; }
+.sk-xpnum { font-weight: 800; white-space: nowrap; }
+.sk-free { padding: 0.1em 0.8em; border-radius: 99em; background: rgba(255, 255, 255, 0.08); color: var(--ink-dim); font-weight: 700; white-space: nowrap; }
+.sk-free b { color: var(--ink); }
+.sk-free.has-free { background: rgba(255, 201, 51, 0.16); color: var(--cream); box-shadow: inset 0 0 0 0.12em rgba(255, 201, 51, 0.5); }
+.sk-free.has-free b { color: var(--yellow); }
+.sk-xptable { flex-basis: 100%; font-size: 0.82em; color: var(--ink-dim); font-weight: 600; }
+.sk-xptable b { color: var(--cream); }
+
+/* ---- three tree columns */
+.sk-cols { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.8em; flex: 1; min-height: 0; overflow-y: auto; scrollbar-width: thin; }
+.sk-col {
+  --ac: var(--red);
+  display: flex; flex-direction: column; align-items: center; gap: 0.25em; min-width: 0; padding-bottom: 0.55em;
+  border-radius: 0.8em; background: rgba(10, 15, 28, 0.45); border: 0.12em solid rgba(255, 255, 255, 0.1); overflow: hidden;
+}
+.sk-endurance { --ac: var(--green); }
+.sk-durability { --ac: var(--blue); }
+.sk-colhead {
+  align-self: stretch; display: flex; align-items: center; gap: 0.6em; padding: 0.45em 0.7em;
+  background: color-mix(in srgb, var(--ac) 14%, transparent); border-bottom: 0.16em solid color-mix(in srgb, var(--ac) 70%, transparent);
+}
+.sk-treeic { width: 2.2em; height: 2.2em; padding: 0.38em; flex: none; border-radius: 0.6em; background: var(--slot-bg); box-shadow: inset 0 0 0 0.14em var(--slot-rim); color: var(--ac); }
+.sk-treetxt { display: grid; flex: 1; min-width: 0; line-height: 1.15; }
+.sk-treetxt b { font-size: 1.1em; font-weight: 800; color: var(--cream); text-shadow: var(--shadow-text); }
+.sk-treetxt small { font-size: 0.8em; font-weight: 700; color: var(--ink-dim); }
+.sk-badge { display: grid; place-items: center; min-width: 1.8em; height: 1.8em; padding: 0 0.3em; border-radius: 99em; background: color-mix(in srgb, var(--ac) 80%, #000); color: #fff; font-weight: 800; }
+
+.sk-tier { display: flex; align-items: center; justify-content: center; gap: 0.6em; margin-top: 0.15em; line-height: 1; }
+.sk-tierlabel { font-size: 0.72em; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; color: var(--cream); }
+.sk-gate { display: inline-flex; align-items: center; gap: 0.3em; font-size: 0.75em; font-weight: 700; color: var(--ink-dim); }
+.sk-gate svg { width: 1.2em; height: 1.2em; flex: none; }
+.sk-gate em { font-style: normal; color: var(--orange); }
+.sk-tier:not(.is-locked) .sk-gate { color: var(--green); }
+
+.sk-tiles { display: grid; grid-template-columns: repeat(2, 6.9em); justify-content: center; gap: 0.4em; }
+.sk-tiles > :last-child:nth-child(odd) { grid-column: 1 / -1; justify-self: center; width: 6.9em; }
+
+/* ---- tiles: the inventory slot look (--slot-bg / --slot-rim / bottom shade) */
+.sk-tile {
+  position: relative; display: flex; flex-direction: column; align-items: center; gap: 0.25em;
+  height: 5.7em; padding: 0.4em 0.3em 0.35em; border: 0; border-radius: 0.7em; text-align: center;
+  background: var(--slot-bg); color: var(--ink);
+  box-shadow: inset 0 0 0 0.14em var(--slot-rim), inset 0 -0.3em 0 rgba(0, 0, 0, 0.18);
+}
+.sk-tile:hover { box-shadow: inset 0 0 0 0.16em var(--yellow), inset 0 -0.3em 0 rgba(0, 0, 0, 0.18); }
+.sk-tile:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+.sk-disc { width: 2.2em; height: 2.2em; flex: none; padding: 0.45em; border-radius: 50%; background: rgba(10, 15, 28, 0.55); color: var(--ink-dim); }
+.sk-name { flex: 1; display: grid; align-items: center; font-size: 0.8em; font-weight: 800; line-height: 1.1; }
+.sk-pips { display: flex; gap: 0.25em; height: 0.55em; }
+.sk-pips i { width: 0.55em; height: 0.55em; border-radius: 50%; background: var(--track); box-shadow: inset 0 0 0 0.08em rgba(255, 255, 255, 0.15); }
+.sk-pips i.on { background: var(--ac); box-shadow: 0 0 0.35em color-mix(in srgb, var(--ac) 70%, transparent); }
+
+/* can be learned now: tree-coloured rim and icon */
+.sk-tile.is-available { box-shadow: inset 0 0 0 0.16em var(--ac), inset 0 -0.3em 0 rgba(0, 0, 0, 0.18); }
+.sk-tile.is-available .sk-disc { background: color-mix(in srgb, var(--ac) 22%, rgba(10, 15, 28, 0.55)); color: var(--ac); }
+.sk-tile.is-available:hover { box-shadow: inset 0 0 0 0.16em var(--yellow), inset 0 -0.3em 0 rgba(0, 0, 0, 0.18); }
+/* ... and its icon pulses in the tree colour so a spendable point is easy to spot */
+.sk-tile.is-available .sk-disc { animation: sk-pulse 1.6s ease-in-out infinite; }
+@keyframes sk-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--ac) 55%, transparent), 0 0 0.2em color-mix(in srgb, var(--ac) 40%, transparent); }
+  50% { box-shadow: 0 0 0 0.3em color-mix(in srgb, var(--ac) 0%, transparent), 0 0 0.9em color-mix(in srgb, var(--ac) 85%, transparent); }
+}
+/* tier open, only points missing: normal slot, a little muted */
+.sk-tile.lock-points { opacity: 0.8; }
+.sk-tile.lock-points .sk-disc { color: var(--ink); }
+/* tier locked: hollow slot with a dashed rim */
+.sk-tile.lock-gate { background: rgba(10, 15, 28, 0.3); box-shadow: none; border: 0.12em dashed rgba(255, 255, 255, 0.2); color: var(--ink-dim); }
+.sk-tile.lock-gate .sk-disc, .sk-tile.lock-gate .sk-name { opacity: 0.45; }
+.sk-tile.lock-gate:hover { border-color: rgba(255, 255, 255, 0.4); box-shadow: none; }
+/* maxed: gold rim, gold icon and a tick */
+.sk-tile.is-maxed { background: color-mix(in srgb, var(--yellow) 12%, var(--slot-bg)); box-shadow: inset 0 0 0 0.16em var(--yellow), inset 0 -0.3em 0 rgba(0, 0, 0, 0.18); }
+.sk-tile.is-maxed .sk-disc { background: var(--yellow); color: var(--navy); }
+.sk-tile.is-maxed .sk-pips i.on { background: var(--yellow); }
+.sk-done { position: absolute; right: -0.3em; top: -0.3em; width: 1.4em; height: 1.4em; padding: 0.22em; border-radius: 50%; background: var(--yellow); color: var(--navy); box-shadow: 0 0 0 0.12em var(--navy); }
+
+/* capstone: gold accent, glowing once it can be bought */
+.sk-tile.is-cap .sk-name { color: var(--cream); }
+.sk-tile.is-cap:not(.lock-gate) .sk-disc { box-shadow: 0 0 0 0.12em rgba(255, 201, 51, 0.6); }
+.sk-tile.is-cap.lock-gate { border-color: rgba(255, 201, 51, 0.35); }
+.sk-tile.is-cap.is-available { animation: sk-glow 2s ease-in-out infinite; }
+@keyframes sk-glow {
+  0%, 100% { filter: drop-shadow(0 0 0.15em rgba(255, 201, 51, 0.3)); }
+  50% { filter: drop-shadow(0 0 0.6em rgba(255, 201, 51, 0.85)); }
+}
+
+/* ---- footer (wd-foot): hint or the hovered skill's explanation, then the buttons */
+.sk-foot { flex: none; align-items: center; justify-content: space-between; gap: 1em; height: 5.4em; margin-top: 0.6em; padding-top: 0.5em; border-top: 0.1em solid rgba(255, 255, 255, 0.12); }
+.sk-desc { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 0.7em; row-gap: 0.1em; line-height: 1.25; }
+.sk-hint { color: var(--ink-dim); font-weight: 700; }
+.sk-d-name { font-size: 1.15em; font-weight: 800; color: var(--cream); }
+.sk-d-rank { font-size: 0.85em; font-weight: 700; color: var(--ink-dim); }
+/* status pill: same recipe as the inventory tooltip's kind pill */
+.sk-st { font-style: normal; font-size: 0.85em; font-weight: 800; padding: 0.05em 0.6em; border-radius: 99em; }
+.sk-st.is-ok { background: rgba(124, 203, 69, 0.16); color: var(--green); }
+.sk-st.is-bad { background: rgba(255, 123, 123, 0.14); color: #ff9a9a; }
+.sk-st.is-max { background: rgba(255, 201, 51, 0.16); color: var(--yellow); }
+.sk-d-line { flex-basis: 100%; }
+.sk-d-line i { display: inline-block; min-width: 2.8em; font-style: normal; font-size: 0.75em; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-dim); }
+.sk-actions { display: flex; align-items: center; gap: 0.6em; flex: none; }
+.sk-note { font-size: 0.85em; font-weight: 700; color: var(--ink-dim); }
+.sk-danger { background: var(--red); color: #fff; box-shadow: 0 3px 0 #a52a3a; }
+
+@media (max-width: 900px) {
+  .sk-cols { grid-template-columns: 1fr; }
+  .sk-foot { flex-direction: column; align-items: stretch; height: auto; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sk-tile.is-cap.is-available, .sk-tile.is-available .sk-disc { animation: none; }
+}

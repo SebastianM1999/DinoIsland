@@ -344,7 +344,9 @@ export class DinoAnimator {
     const hipYaw = Math.cos(this.phase * TAU) * p.hipYaw * amp * (1 - this.runBlend * 0.4);
     rig.body.position.x = (stepSide * amp * p.bob * p.shift + idleShift * p.bob * 0.5) * (p.gait === 'biped' ? 1 : 0.5);
     rig.body.rotation.z = rig.restZ(rig.body) + stepSide * p.sway * amp + idleShift * p.sway * 0.6 + struggle;
-    rig.body.rotation.x = rig.restX(rig.body) + (s.groundPitch || 0) + c.charge * 0.12 - c.attack * 0.08 + this.runBlend * amp * 0.05;
+    // capped: dinosaurs run down walls far steeper than they can stand on (sim/dinos.js walkable)
+    const pitch = Math.max(-0.7, Math.min(0.7, s.groundPitch || 0));
+    rig.body.rotation.x = rig.restX(rig.body) + pitch + c.charge * 0.12 - c.attack * 0.08 + this.runBlend * amp * 0.05;
     rig.body.rotation.y = -this.yawRate * 0.08 + hipYaw;
     if (rig.chest) {
       const b = 1 + breathe;

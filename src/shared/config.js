@@ -62,6 +62,10 @@ export const CONFIG = {
     mouseSensitivity: 0.0022,
     fov: 74,
     respawnDelay: 5,
+    bleedOutTime: 30,        // downed: teammates can revive you for this long, then you are defeated
+    reviveTime: 4,           // seconds a teammate holds E to revive (Rescuer shortens it)
+    reviveRange: 2.6,
+    reviveHpFrac: 0.5,       // revived with this fraction of max HP
     hutHealRadius: 14,
     hutHealPerSecond: 12,
     knockdownTime: 1.1,

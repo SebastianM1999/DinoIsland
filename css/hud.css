@@ -317,26 +317,27 @@
 .hud-center { position: absolute; left: 50%; top: 50%; width: 0; height: 0; }
 .hud-cross {
   --spread: 1;
-  --len: 0.95em;
-  --off: calc(0.55em + 0.85em * var(--spread));
+  --len: 0.7em;
+  --off: calc(0.42em + 0.7em * var(--spread));
   position: absolute;
   left: 0; top: 0;
+  opacity: 0.8;
 }
 .hud-cross i {
   position: absolute;
   display: block;
   background: #fff;
   border-radius: 1em;
-  box-shadow: 0 0 0 0.09em rgba(20, 28, 48, 0.55);
+  box-shadow: 0 0 0.12em 0.05em rgba(20, 28, 48, 0.6);
   transition: transform 0.06s linear;
 }
-.hud-cross .t, .hud-cross .b { width: 0.28em; height: var(--len); left: -0.14em; }
-.hud-cross .l, .hud-cross .r { height: 0.28em; width: var(--len); top: -0.14em; }
+.hud-cross .t, .hud-cross .b { width: 0.2em; height: var(--len); left: -0.1em; }
+.hud-cross .l, .hud-cross .r { height: 0.2em; width: var(--len); top: -0.1em; }
 .hud-cross .t { top: 0; transform: translateY(calc(-1 * var(--off) - var(--len))); }
 .hud-cross .b { top: 0; transform: translateY(var(--off)); }
 .hud-cross .l { left: 0; transform: translateX(calc(-1 * var(--off) - var(--len))); }
 .hud-cross .r { left: 0; transform: translateX(var(--off)); }
-.hud-cross .dot { width: 0.3em; height: 0.3em; left: -0.15em; top: -0.15em; opacity: 0.9; }
+.hud-cross .dot { width: 0.24em; height: 0.24em; left: -0.12em; top: -0.12em; }
 .hud-cross.is-drawn i { background: var(--yellow); }
 .hud-cross[data-mode='place'] .dot { width: 0.6em; height: 0.6em; left: -0.3em; top: -0.3em; background: var(--yellow); }
 
@@ -425,11 +426,13 @@
   display: flex;
   align-items: center;
   gap: 0.5em;
-  margin-left: -0.35em;
-  padding: 0.4em 1em 0.4em 0.75em;
+  /* a small gap, not an overlap: both backgrounds are translucent, so overlapping shows a dark seam */
+  margin-left: 0.3em;
+  padding: 0.4em 0.9em 0.4em 0.65em;
   font-weight: 700;
-  font-size: 1.1em;
+  font-size: 1em;
 }
+.hud-keys-lab kbd { font-size: 0.85em; }
 .hud-keys-lab.brush::before { background: rgba(var(--navy-rgb), 0.78); }
 
 /* ------------------------------------------------------------ bottom-center */
@@ -1207,4 +1210,90 @@
   .wd-body { grid-template-columns: 1fr; }
   .wd-canvas { height: 15em; }
   .wd-name { min-width: 8em; }
+}
+
+/* ------------------------------------------------------------ XP ring, perks, downed (skill tree) */
+.hud-portrait-wrap { position: relative; z-index: 1; width: 7.4em; height: 7.4em; flex: none; }
+.hud-portrait-wrap .hud-portrait { position: absolute; inset: 0; width: auto; height: auto; }
+/* `.hud .hud-xpring`: the generic `.hud svg { width: 100% }` would otherwise shrink the ring to the portrait and leave it off-centre */
+.hud .hud-xpring {
+  position: absolute; left: -0.7em; top: -0.7em; width: 8.8em; height: 8.8em;
+  z-index: 2; pointer-events: none; overflow: visible;
+}
+.hud-xpring circle { fill: none; stroke-width: 5.5; }
+.hud-xpring .bg { stroke: rgba(10, 16, 32, 0.55); }
+.hud-xpring .fg {
+  stroke: var(--yellow); stroke-linecap: round;
+  stroke-dasharray: 100; stroke-dashoffset: 100;
+  transform: rotate(-90deg); transform-origin: 50% 50%;
+  transition: stroke-dashoffset 0.6s ease-out;
+  filter: drop-shadow(0 0 0.15em rgba(255, 201, 51, 0.7));
+}
+.hud-portrait-wrap.is-snap .fg { transition: none; }
+.hud-level {
+  position: absolute; left: -0.6em; bottom: -0.35em; z-index: 3;
+  min-width: 2.3em; height: 2.3em; padding: 0 0.3em; display: grid; place-items: center;
+  border-radius: 99em; border: 0.2em solid var(--navy);
+  background: var(--yellow); color: var(--navy); font-weight: 800; font-size: 0.95em; line-height: 1;
+  box-shadow: 0 0.15em 0.3em rgba(0, 0, 0, 0.35);
+}
+.hud-points {
+  position: absolute; right: -0.45em; top: -0.35em; z-index: 3;
+  min-width: 1.9em; height: 1.9em; padding: 0 0.25em; display: grid; place-items: center;
+  border-radius: 99em; border: 0.18em solid var(--navy);
+  background: var(--orange); color: var(--navy); font-weight: 800; font-size: 0.85em; line-height: 1;
+  animation: hud-dot 1.3s ease-in-out infinite;
+}
+@keyframes hud-dot {
+  0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255, 154, 46, 0.6); }
+  50% { transform: scale(1.14); box-shadow: 0 0 0 0.45em rgba(255, 154, 46, 0); }
+}
+.hud-xp-pops {
+  position: absolute; left: 0.6em; top: calc(100% + 0.7em); z-index: 4;
+  display: grid; gap: 0.2em; justify-items: start; pointer-events: none; white-space: nowrap;
+}
+.hud-xp-pop {
+  padding: 0.1em 0.7em; border-radius: 99em; font-weight: 800; font-size: 1.05em;
+  color: var(--yellow); background: rgba(var(--navy-rgb), 0.85); text-shadow: var(--shadow-text);
+}
+
+.hud-perks { display: flex; gap: 0.5em; padding-left: 2.3em; }
+.hud-perk {
+  position: relative; display: inline-flex; align-items: center; gap: 0.35em; overflow: hidden;
+  padding: 0.12em 0.7em 0.12em 0.4em; border-radius: 99em; background: var(--track);
+  font-size: 0.85em; font-weight: 800; color: var(--ink-dim);
+}
+.hud-perk > * { position: relative; z-index: 1; }
+.hud-perk kbd { font-size: 0.85em; min-width: 1.5em; height: 1.5em; }
+.hud-perk svg { width: 1.2em; height: 1.2em; }
+.hud-perk-fill {
+  position: absolute !important; inset: 0; z-index: 0 !important; transform-origin: left center;
+  background: rgba(124, 203, 69, 0.35); transition: transform 0.1s linear;
+}
+.hud-perk.is-ready { color: var(--ink); }
+.hud-perk.is-ready .hud-perk-fill { background: rgba(124, 203, 69, 0.55); }
+.is-adren[data-state='active'] { color: var(--ink); animation: hud-dot 0.7s ease-in-out infinite; }
+.is-adren[data-state='active'] .hud-perk-fill { background: rgba(255, 201, 51, 0.6); }
+.is-adren[data-state='cooldown'] .hud-perk-fill { background: rgba(185, 195, 220, 0.3); }
+.is-adren[data-state='ready'] .hud-perk-fill { background: rgba(124, 203, 69, 0.55); }
+
+.hud-mate.is-downed { color: #ff9aa5; }
+.hud-mate.is-downed .hud-mate-ic { animation: hud-pulse 0.8s ease-in-out infinite; }
+.hud-mate.is-downed .hud-mate-fill { background: #8a2a3a; }
+
+.hud-downed { position: absolute; inset: 0; display: grid; place-items: center; background: radial-gradient(ellipse at center, rgba(40, 10, 20, 0.1), rgba(110, 10, 25, 0.55)); }
+.hud-downed-card {
+  display: grid; justify-items: center; gap: 0.3em; padding: 1.2em 2.6em 1.3em; text-align: center;
+  animation: hud-pop 0.35s ease-out;
+}
+.hud-downed-card h2 { font-size: 2.1em; font-weight: 800; line-height: 1.05; color: #ff8a97; text-shadow: var(--shadow-text); }
+.hud-downed-sub { color: var(--ink-dim); font-size: 1.1em; }
+.hud-downed-count { font-size: 1.4em; font-weight: 800; color: var(--yellow); }
+.hud-downed-key { display: flex; align-items: center; gap: 0.5em; color: var(--ink-dim); font-weight: 700; }
+
+.hud-assist { top: 10.5em; }
+.hud-assist-bar { width: 7em; height: 0.7em; border-radius: 99em; background: var(--track); overflow: hidden; }
+.hud-assist-bar i { display: block; height: 100%; background: var(--green); transform-origin: left center; transform: scaleX(0); transition: transform 0.1s linear; }
+@media (prefers-reduced-motion: reduce) {
+  .hud-points, .is-adren[data-state='active'], .hud-mate.is-downed .hud-mate-ic { animation: none; }
 }

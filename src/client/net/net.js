@@ -5,6 +5,8 @@
 import { CONFIG } from '../../shared/config.js';
 import { MSG, EV } from '../../shared/protocol.js';
 import { connectSteam } from './steamTransport.js';
+import { sanitizeProfile } from '../../shared/skills.js';
+import { saveProfile } from '../core/profile.js';
 
 export class Net {
   constructor(transport, mode) {
@@ -31,6 +33,7 @@ export class Net {
     this.lastSnapSeq = null;
     this.reliableSeq = 0;
     this.worldEpoch = null;
+    this.prof = null;               // newest private progression from the server (sanitized); the Game reads it when it is built
     this.pendingSnapshot = null;
     this.lastRenderTime = -Infinity;
     this.offsetSamples = [];
@@ -46,13 +49,13 @@ export class Net {
   }
 
   /** Connect to a co-op server and join with `name`. Resolves after the welcome. */
-  static steam(bridge, options, name, outfit) {
+  static steam(bridge, options, name, outfit, profile) {
     return connectSteam(bridge,
       () => options.host ? bridge.host(options.visibility) : bridge.join(options.lobbyId),
-      { t: MSG.HELLO, name, outfit }, transport => new Net(transport, 'online'));
+      { t: MSG.HELLO, name, outfit, profile }, transport => new Net(transport, 'online'));
   }
 
-  static connect(url, name, outfit) {
+  static connect(url, name, outfit, profile) {
     return new Promise((resolve, reject) => {
       let ws;
       try {
@@ -72,7 +75,7 @@ export class Net {
       const timer = setTimeout(() => {
         if (!settled) { settled = true; ws.close(); reject(new Error('The server did not answer')); }
       }, 6000);
-      ws.onopen = () => transport.send({ t: MSG.HELLO, name, outfit });
+      ws.onopen = () => transport.send({ t: MSG.HELLO, name, outfit, profile });
       ws.onmessage = (e) => {
         let msg;
         try { msg = JSON.parse(e.data); } catch { return; }
@@ -98,7 +101,7 @@ export class Net {
    * Resolves after the welcome. Testing aids in `opts`: level (0-based start island),
    * baseStage (base already standing), raidIn (seconds until the first raid).
    */
-  static local(name, outfit, opts = {}) {
+  static local(name, outfit, opts = {}, profile) {
     return new Promise((resolve, reject) => {
       const worker = new Worker(new URL('../../sim/worker.js', import.meta.url), { type: 'module' });
       const transport = {
@@ -119,7 +122,7 @@ export class Net {
         if (!net.welcome) reject(new Error('The island could not be started'));
         else transport.onClose?.('The island simulation stopped');
       };
-      worker.postMessage({ type: 'start', name, outfit, opts });
+      worker.postMessage({ type: 'start', name, outfit, opts, profile });
     });
   }
 
@@ -258,8 +261,13 @@ export class Net {
       }
     } else if (msg.t === MSG.SNAP) {
       if (!this.#acceptSnapshot(msg, local)) return;
-    } else if (msg.t === MSG.CORRECT || (msg.t === MSG.EV && msg.e === EV.RESPAWN && msg.id === this.myId)) {
+    } else if (msg.t === MSG.CORRECT || (msg.t === MSG.EV && (msg.e === EV.RESPAWN || msg.e === EV.REVIVED) && msg.id === this.myId)) {
       if (Number.isFinite(msg.k)) this.epoch = msg.k;
+    }
+    // The profile can arrive while the island is still loading (no Game yet): validate, keep and save it here.
+    if (msg.t === MSG.PROF) {
+      this.prof = msg.prof = sanitizeProfile(msg.prof);
+      saveProfile(this.prof);
     }
     if (msg.t !== MSG.SNAP && Number.isFinite(msg.r)) this.reliableSeq = Math.max(this.reliableSeq, msg.r);
     if ((msg.t === MSG.SNAP || msg.t === MSG.WELCOME || msg.t === MSG.PONG) && Number.isFinite(msg.now)) this.#clock(msg, local);

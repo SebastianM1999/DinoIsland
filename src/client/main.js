@@ -5,6 +5,7 @@ import { Net } from './net/net.js';
 import { CONFIG } from '../shared/config.js';
 import { ICON_SPRITE, initSettings, renderPause } from './ui/menus.js';
 import { savedOutfit } from './ui/wardrobe.js';
+import { loadProfile } from './core/profile.js';
 import { preloadDinoModels } from './models/dino/glbDino.js';
 import { GameAudio } from './audio/audio.js';
 import { initSteamLobby } from './ui/steamLobby.js';
@@ -85,9 +86,10 @@ async function start(mode, options = {}) {
   let net;
   try {
     const outfit = savedOutfit();
+    const profile = loadProfile();   // saved XP and skills; the host re-validates them
     if (mode === 'internet') options.url = await internetTest.start();
-    net = mode === 'steam' ? await Net.steam(window.dinoSteam, options, name, outfit) :
-      mode === 'online' || mode === 'internet' ? await Net.connect(websocketAddress(options.url ?? serverInput.value), name, outfit) : await Net.local(name, outfit, { level: DEBUG_ISLAND, baseStage: DEBUG_BASE, raidIn: DEBUG_RAID });
+    net = mode === 'steam' ? await Net.steam(window.dinoSteam, options, name, outfit, profile) :
+      mode === 'online' || mode === 'internet' ? await Net.connect(websocketAddress(options.url ?? serverInput.value), name, outfit, profile) : await Net.local(name, outfit, { level: DEBUG_ISLAND, baseStage: DEBUG_BASE, raidIn: DEBUG_RAID }, profile);
   } catch (err) {
     if (mode === 'internet') internetTest.stop();
     busy = false;

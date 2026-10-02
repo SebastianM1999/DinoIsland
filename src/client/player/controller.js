@@ -6,6 +6,7 @@
 import { CONFIG } from '../../shared/config.js';
 import { resolveCircle, penetration, standTop } from '../../shared/collision.js';
 import { settings } from '../core/settings.js';
+import { skillMods, DASH } from '../../shared/skills.js';
 
 const P = CONFIG.player;
 const tmp = { x: 0, z: 0, hit: false };
@@ -44,8 +45,20 @@ export class PlayerController {
     this.yaw = 0;                       // 0 = looking north (-z)
     this.pitch = 0;
     this.onGround = false;
+    this.mods = skillMods({});          // skill effects (set by the game via setMods)
+    this.maxStamina = P.maxStamina;     // Deep Lungs raises it
     this.stamina = P.maxStamina;
     this.staminaDelay = 0;
+    this.hpFrac = 1;                    // current / max HP, set by the game each frame (Adrenaline trigger)
+    /** Adrenaline: stamina is free while `active`, then `cooldownLeft` s until it can fire again (for the HUD). */
+    this.adrenaline = { active: false, left: 0, cooldownLeft: 0 };
+    /** Dash (key Q): `active` during the burst, `ready` when the cooldown is over (for the HUD). */
+    this.dash = { active: false, cooldownLeft: 0, ready: true };
+    this.dashT = 0;                     // seconds of burst left
+    this.dashDir = { x: 0, z: -1 };
+    this.dashEnding = false;
+    this.prevDash = false;
+    this.onDash = null;                 // callback at the start of a dash (the game tells the server)
     this.sprinting = false;
     this.speedFactor = 1;               // carry weight / eating slowdowns (set by game)
     this.frozen = false;                // dead / knocked down
@@ -65,6 +78,16 @@ export class PlayerController {
     this.barrierHit = false;
   }
 
+  /** Apply bought skill ranks; keeps the stamina fraction when the maximum changes. */
+  setMods(mods) {
+    this.mods = mods;
+    const max = P.maxStamina * mods.staminaMul;
+    if (max !== this.maxStamina) {
+      this.stamina = this.stamina / this.maxStamina * max;
+      this.maxStamina = max;
+    }
+  }
+
   setCreative(on) {
     this.creative = on;
     if (!on) this.flying = false;
@@ -79,7 +102,9 @@ export class PlayerController {
     this.pitch = 0;
     this.onGround = true;
     this.flying = false;
-    this.stamina = P.maxStamina;
+    this.stamina = this.maxStamina;
+    this.dashT = 0;
+    this.dashEnding = false;
   }
 
   /** External impulse (dinosaur hits). */
@@ -108,6 +133,24 @@ export class PlayerController {
     const t = this.terrain;
     if (this.knockTimer > 0) this.knockTimer -= dt;
     const controllable = !this.frozen && this.knockTimer <= 0;
+    const mods = this.mods;
+    const ad = this.adrenaline, ds = this.dash;
+
+    // --- adrenaline: low HP starts a window of free stamina, then a long cooldown
+    if (ad.active) {
+      ad.left -= dt;
+      if (ad.left <= 0) { ad.active = false; ad.left = 0; ad.cooldownLeft = mods.adrenalineCooldown; }
+    } else if (ad.cooldownLeft > 0) ad.cooldownLeft = Math.max(0, ad.cooldownLeft - dt);
+    if (mods.adrenaline && !ad.active && ad.cooldownLeft <= 0 && !this.frozen && this.hpFrac > 0 && this.hpFrac < mods.adrenalineBelow) {
+      ad.active = true;
+      ad.left = mods.adrenalineTime;
+    }
+    if (!mods.adrenaline) { ad.active = false; ad.left = 0; }
+    const free = ad.active;
+    ds.cooldownLeft = Math.max(0, ds.cooldownLeft - dt);
+    const dashPress = !!intent.dash && !this.prevDash;
+    this.prevDash = !!intent.dash;
+    if (!controllable) this.dashT = 0;
 
     // --- creative: double-tap Space toggles flying
     this.clock += dt;
@@ -135,17 +178,19 @@ export class PlayerController {
     const ilen = Math.hypot(ix, iz);
     const moving = ilen > 0.01;
     const wantsSprint = controllable && !flying && intent.sprint && intent.forward && moving;
-    this.sprinting = wantsSprint && this.stamina > 1 && this.onGround ? true : this.sprinting && wantsSprint && this.stamina > 1;
+    const canSprint = free || this.stamina > 1;
+    this.sprinting = wantsSprint && canSprint && this.onGround ? true : this.sprinting && wantsSprint && canSprint;
 
+    const max = this.maxStamina;
     if (this.sprinting) {
-      this.stamina -= P.staminaDrain * dt;
-      this.staminaDelay = P.staminaRegenDelay;
+      if (!free) this.stamina -= P.staminaDrain * mods.sprintDrainMul * dt;
+      this.staminaDelay = P.staminaRegenDelay * mods.regenDelayMul;
     } else if (this.staminaDelay > 0) {
       this.staminaDelay -= dt;
     } else {
-      this.stamina += P.staminaRegen * dt;
+      this.stamina += P.staminaRegen * mods.staminaRegenMul * dt;
     }
-    this.stamina = this.creative ? P.maxStamina : Math.max(0, Math.min(P.maxStamina, this.stamina));
+    this.stamina = this.creative ? max : Math.max(0, Math.min(max, this.stamina));
 
     const depth = t.waterDepthAt(this.pos.x, this.pos.z);
     this.inWater = depth;
@@ -154,6 +199,20 @@ export class PlayerController {
     const floatY = lake !== null && lake - t.heightAt(this.pos.x, this.pos.z) > SW.depth ? lake - SW.float : null;
     this.swimming = !flying && floatY !== null && this.pos.y <= floatY + 0.3;
     if (this.swimming) this.sprinting = false;
+
+    // --- dash (Q): a short burst along the input direction (or where we look); the cost is paid up front
+    if (dashPress && mods.dash && controllable && !flying && !this.swimming && ds.cooldownLeft <= 0 && (free || this.stamina >= DASH.cost)) {
+      let dx = (intent.right ? 1 : 0) - (intent.left ? 1 : 0), dz = (intent.back ? 1 : 0) - (intent.forward ? 1 : 0);
+      if (!dx && !dz) dz = -1;
+      const dl = Math.hypot(dx, dz), sin = Math.sin(this.yaw), cos = Math.cos(this.yaw);
+      dx /= dl; dz /= dl;
+      this.dashDir.x = dx * cos + dz * sin;
+      this.dashDir.z = -dx * sin + dz * cos;
+      this.dashT = DASH.duration;
+      ds.cooldownLeft = DASH.cooldown;
+      if (!free) { this.stamina = Math.max(0, this.stamina - DASH.cost); this.staminaDelay = P.staminaRegenDelay * mods.regenDelayMul; }
+      this.onDash?.();
+    }
     const waterSlow = depth > 0.2 ? Math.max(0.55, 1 - depth * 0.35) : 1;
     let speed = flying ? C.flySpeed
       : this.swimming ? SW.speed * this.speedFactor
@@ -202,12 +261,35 @@ export class PlayerController {
       }
     }
 
-    // --- jump
-    if (controllable && !flying && intent.jump && this.onGround && !this.sliding && this.stamina > P.jumpStaminaCost) {
-      this.vel.y = P.jumpSpeed * (depth > 0.8 ? 0.6 : 1);
+    // --- dash: overrides the horizontal velocity; the last frame is partial so the total is exactly DASH.distance
+    if (this.dashT > 0 && dt > 0) {
+      const step = Math.min(dt, this.dashT), v = DASH.distance / DASH.duration * step / dt;
+      this.vel.x = this.dashDir.x * v;
+      this.vel.z = this.dashDir.z * v;
+      this.dashT -= step;
+      if (this.dashT <= 1e-9) { this.dashT = 0; this.dashEnding = true; }
+    } else if (this.dashEnding) {
+      // burst over: on the ground drop straight to the walking input (no skid beyond DASH.distance);
+      // in the air keep the heading but never faster than a sprint
+      this.dashEnding = false;
+      if (this.onGround) { this.vel.x = wx; this.vel.z = wz; } else {
+        const sp = Math.hypot(this.vel.x, this.vel.z);
+        if (sp > P.sprintSpeed) { this.vel.x *= P.sprintSpeed / sp; this.vel.z *= P.sprintSpeed / sp; }
+      }
+    }
+    ds.active = this.dashT > 0;
+    ds.ready = ds.cooldownLeft <= 0;
+
+    // --- jump (Light Feet: free; Adrenaline: free for a while). Jump height goes with v^2, so the
+    // "+10% / +20% height" of Springy Legs scales the speed by its square root.
+    const jumpCost = free || mods.lightFeet ? 0 : P.jumpStaminaCost;
+    if (controllable && !flying && intent.jump && this.onGround && !this.sliding && (jumpCost === 0 || this.stamina > jumpCost)) {
+      this.vel.y = P.jumpSpeed * Math.sqrt(mods.jumpMul) * (depth > 0.8 ? 0.6 : 1);
       this.onGround = false;
-      this.stamina -= P.jumpStaminaCost;
-      this.staminaDelay = P.staminaRegenDelay;
+      if (jumpCost > 0) {
+        this.stamina -= jumpCost;
+        this.staminaDelay = P.staminaRegenDelay * mods.regenDelayMul;
+      }
     }
 
     // --- gravity (flying: Space up, Shift down, otherwise hover; swimming: bob at the surface)

@@ -17,7 +17,7 @@ export function gunAction(world, player, message) {
   if (message.a === ACT.RELOAD) {
     if (player.inv.reloading || ammo.loaded >= spec.magazine || ammo.reserve <= 0) return;
     player.inv.reloading = kind;
-    player.reloadUntil = world.now + spec.reloadTime;
+    player.reloadUntil = world.now + spec.reloadTime * player.mods.reloadMul;   // Steady Hands
     world.sendInv(player); return;
   }
   if (player.inv.reloading || ammo.loaded <= 0 || world.now + 1 / CONFIG.net.tickRate < player.nextFireAt) return;

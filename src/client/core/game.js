@@ -9,6 +9,10 @@ import { buildLayout } from '../../shared/layout.js';
 import { planIsland } from '../../shared/island.js';
 import { RELICS } from '../../shared/relics.js';
 import { MSG, EV, PF, DS, ACT } from '../../shared/protocol.js';
+import { skillMods, DASH } from '../../shared/skills.js';
+import { loadProfile } from './profile.js';
+import { SkillPanel } from '../ui/skillPanel.js';
+import { nearCamp } from '../ui/skillModel.js';
 import { CONTRACTS } from '../../shared/missions.js';
 import { Renderer } from './renderer.js';
 import { Input } from '../input/input.js';
@@ -79,6 +83,13 @@ export class Game {
     this.gfx.applyBiome(this.layout.biome.sky);
     this.input = reuse?.input ?? new Input(canvas);
     this.player = new PlayerController(this.terrain, this.layout.playerColliders, this.layout.rockSurfaceAt);
+    // progression: the net layer keeps the newest server profile (it can arrive while the island loads), else the saved one
+    this.profile = net.prof ?? loadProfile();
+    this.mods = skillMods(this.profile.skills);   // skill effects of the local player (the setter feeds the controller)
+    this.player.onDash = () => this.net.act(ACT.DASH, {});
+    this.downed = null;         // { left, t, canGiveUp, reviveBy?, reviveT? } while the server has us downed (bleeding out)
+    this.reviveTarget = null;   // { id, name, progress } downed teammate in reach (set by PlayerActions)
+    this.medicTarget = null;    // { id, name } hurt teammate we could heal with fruit (Field Medic)
     // Primeval Grove: an invisible wall until the player may enter (TODO(grove-unlock) in shared/grove.js)
     const grove = this.layout.grove;
     if (grove) {
@@ -118,6 +129,7 @@ export class Game {
     this.stepCadence = new StepCadence();
     this.hud = new Hud(document.getElementById('hud'));
     this.hud.initMinimap(this.terrain, this.layout);
+    this.hud.setXp(this.profile);
     try { this.hud.trackedContract = localStorage.getItem(storageKey('tracked')) || null; } catch { /* storage blocked */ }
     this.hud.onTrackContract = (id) => {
       try { if (id) localStorage.setItem(storageKey('tracked'), id); else localStorage.removeItem(storageKey('tracked')); } catch { /* ignore */ }
@@ -137,6 +149,7 @@ export class Game {
       else if (action === 'boat') open = this.hud.togglePanel('boat');
       else if (action === 'crafting') open = this.hud.togglePanel('crafting');
       else if (action === 'base') open = this.hud.togglePanel('base');
+      else if (action === 'skills') open = this.hud.togglePanel('skills');
       else if (action === 'grove') open = this.hud.togglePanel('grove');
       else {
         this.hud.toggleInventory(false);
@@ -146,6 +159,7 @@ export class Game {
         this.hud.togglePanel('boat', false);
         this.hud.togglePanel('crafting', false);
         this.hud.togglePanel('base', false);
+        this.hud.togglePanel('skills', false);
         if (this.hud.isExtraOpen('grove')) this.hud.togglePanel('grove', false);
         open = false;
       }
@@ -218,6 +232,13 @@ export class Game {
       onClose: () => this.input.onPanelToggle('close'),
     });
     this.hud.addPanel('base', { el: this.basePanel.el, onOpen: () => { this.#syncBase(); this.basePanel.onOpen(); } });
+    this.skillPanel = new SkillPanel({
+      onBuy: (id) => this.net.act(ACT.SKILL, { op: 'buy', id }),
+      onReset: () => this.net.act(ACT.SKILL, { op: 'reset' }),
+      onClose: () => this.input.onPanelToggle('close'),
+    });
+    this.skillPanel.setProfile(this.profile);
+    this.hud.addPanel('skills', { el: this.skillPanel.el, onOpen: () => { this.skillPanel.setAtCamp(this.#atCamp()); this.skillPanel.onOpen(); } });
     this.grovePrompt = new GrovePrompt({
       onClose: () => this.input.onPanelToggle('close'),
       speaker: () => this.me.name,
@@ -412,6 +433,8 @@ export class Game {
       for (const row of m.p) {
         if (row[0] === this.me.id) {
           this.me.hp = row[9];
+          if (row[12] > 0) this.me.mhp = row[12];
+          this.#syncDowned(row[8]);
           continue;
         }
         this.remotes.onRow(m.now, row);
@@ -419,6 +442,9 @@ export class Game {
       for (const sys of this.systems) sys.onSnapshot?.(m);
     });
     net.on(MSG.INV, (m) => { this.me.inv = m.inv; this.#syncCrafting(); });
+    // the net layer already sanitized and saved m.prof; here it reaches the movement mods, the HUD ring and the panel
+    net.on(MSG.PROF, (m) => this.#setProfile(m.prof));
+    net.on(`ev:${EV.XP}`, (m) => this.hud.xpGain(m));
     net.on(MSG.CORRECT, (m) => {
       const pos = this.player.pos, o = this.corrOffset;
       this.corrections++;
@@ -492,7 +518,9 @@ export class Game {
           this.hud.damageSource(`${name} · ${direction}`);
         }
         this.audio.play('hurt');
-        if (m.kx || m.kz) this.player.knock(m.kx, m.kz, m.down ? 5 : 3, m.down ? CONFIG.player.knockdownTime : 0.15);
+        // Unshakable: the server scales the knockback; the knockdown time shrinks with it (0 = no knock at all)
+        const km = this.mods.knockMul;
+        if ((m.kx || m.kz) && km > 0) this.player.knock(m.kx, m.kz, m.down ? 5 : 3, m.down ? CONFIG.player.knockdownTime * km : 0.15);
       }
     });
     net.on(`ev:${EV.DEATH}`, (m) => {
@@ -501,12 +529,33 @@ export class Game {
         this.me.deathT = CONFIG.player.respawnDelay;
         this.audio.play('death');
         this.player.frozen = true;
+        this.downed = null;
       }
+    });
+    // downed: frozen and lying, teammates may revive us until the countdown ends (then DEATH follows)
+    net.on(`ev:${EV.DOWN}`, (m) => {
+      if (m.id !== this.me.id) return;
+      this.#setDowned(m.t);
+    });
+    net.on(`ev:${EV.REVIVE}`, (m) => {
+      if (m.id !== this.me.id || !this.downed) return;
+      this.downed.reviveBy = m.t > 0 ? m.by : null;
+      this.downed.reviveT = m.t;
+      this.downed.reviveAt = this.time;
+    });
+    net.on(`ev:${EV.REVIVED}`, (m) => {
+      if (m.id !== this.me.id) return;
+      this.me.alive = true;
+      this.downed = null;
+      this.player.frozen = false;
+      this.player.teleport(m.x, m.z, this.player.yaw);   // like a respawn: the server reset our position and epoch
+      this.hud.setDeath(false);
     });
     net.on(`ev:${EV.RESPAWN}`, (m) => {
       if (m.id === this.me.id) {
         this.me.alive = true;
-        this.me.hp = CONFIG.player.maxHealth;
+        this.me.hp = this.maxHp;
+        this.downed = null;
         this.player.frozen = false;
         this.player.teleport(m.x, m.z, m.yaw);
         this.hud.setDeath(false);
@@ -518,6 +567,30 @@ export class Game {
     };
   }
 
+  #setProfile(profile) {
+    this.profile = profile;
+    this.mods = skillMods(profile.skills);
+    this.hud.setXp(profile);
+    this.skillPanel.setProfile(profile);
+  }
+
+  /** Near a camp station (hut / landing camp / base): skills can only be reset there. The server decides in the end. */
+  #atCamp() {
+    const p = this.player.pos;
+    const r = CONFIG.player.hutHealRadius + 4;
+    return nearCamp(this.stations(), p, r);
+  }
+
+  /** Skill effects of the local player; assigning feeds the movement controller. */
+  get mods() { return this._mods; }
+  set mods(m) {
+    this._mods = m;
+    this.player?.setMods(m);
+  }
+
+  /** Max HP: the server's value from our snapshot row, else base + Thick Skin. */
+  get maxHp() { return this.me?.mhp > 0 ? this.me.mhp : CONFIG.player.maxHealth + this.mods.maxHpAdd; }
+
   #state() {
     const p = this.player;
     const state = {
@@ -525,10 +598,28 @@ export class Game {
       yaw: +p.yaw.toFixed(3), pitch: +p.pitch.toFixed(3),
       spd: +p.moveSpeed.toFixed(2),
       eq: this.eq,
-      fl: this.flags | (p.sprinting ? PF.SPRINT : 0) | (p.onGround ? PF.GROUND : 0) | (p.knockTimer > 0 ? PF.KNOCKED : 0),
+      fl: this.flags | (p.sprinting ? PF.SPRINT : 0) | (p.onGround ? PF.GROUND : 0) | (p.knockTimer > 0 ? PF.KNOCKED : 0) | (p.dash.active ? PF.DASH : 0),
     };
     this.flags &= ~PF.ATTACK; // one-shot animation pulse
     return state;
+  }
+
+  #setDowned(left) {
+    if (this.downed) { this.downed.left = left; return; }
+    this.downed = { left, t: 0, canGiveUp: false, reviveBy: null, reviveT: 0, reviveAt: 0 };
+    this.player.frozen = true;
+    this.player.vel.x = this.player.vel.z = 0;
+    this.audio.play('hurt');
+  }
+
+  /** The PF.DOWNED flag in our own snapshot row: sets the state if the event was missed, clears it once the server lets go. */
+  #syncDowned(fl) {
+    if ((fl & PF.DOWNED) !== 0) {
+      if (!this.downed && this.me.alive) this.#setDowned(CONFIG.player.bleedOutTime);
+    } else if (this.downed && this.downed.t > 1) {
+      this.downed = null;
+      if (this.me.alive) this.player.frozen = false;
+    }
   }
 
   #sendState() { this.net.sendState(this.#state()); }
@@ -566,6 +657,7 @@ export class Game {
     this.hud.dispose();
     this.overlay.remove();
     this.wardrobe.dispose?.();
+    this.skillPanel.dispose();
     this.net.clearHandlers();
     this.net.stateProvider = null;
     this.net.onStateSent = null;
@@ -624,7 +716,16 @@ export class Game {
       this.debugGroup.visible = this.debug;
     }
     if (input.wasPressed('stats')) setSetting('stats', (settings.stats + 1) % 3);   // compact → detailed → off
-    const canMove = this.me.alive && !this.hud.isPanelOpen();
+    const canMove = this.me.alive && !this.downed && !this.hud.isPanelOpen();
+    p.hpFrac = this.me.hp / this.maxHp;
+    if (this.downed) {
+      const d = this.downed;
+      d.t += dt;
+      d.left = Math.max(0, d.left - dt);
+      d.canGiveUp = d.t >= CONFIG.player.respawnDelay;
+      // give up (Space) once the delay has passed; the server enforces the delay as well
+      if (d.canGiveUp && input.wasPressed('jump') && !d.gaveUp) { d.gaveUp = true; this.net.act(ACT.RESPAWN, {}); }
+    }
     const previousPos = { ...p.pos };
     p.update(dt, {
       forward: canMove && input.isHeld('forward'),
@@ -633,6 +734,7 @@ export class Game {
       right: canMove && input.isHeld('right'),
       jump: canMove && input.isHeld('jump'),
       sprint: canMove && input.isHeld('sprint'),
+      dash: canMove && input.isHeld('dash'),   // the controller reacts to the press edge
     });
     if (this.me.alive && !p.creative) {
       const contact = resolveDinoContact(previousPos, p.pos, this.dinos.map.values(), this.layout.playerColliders);
@@ -823,14 +925,15 @@ export class Game {
   #updateHud(dt) {
     const hud = this.hud;
     const p = this.player;
-    hud.setHealth(this.me.hp, CONFIG.player.maxHealth);
-    hud.setStamina(p.stamina, CONFIG.player.maxStamina);
+    hud.setHealth(this.me.hp, this.maxHp);
+    hud.setStamina(p.stamina, p.maxStamina);
     hud.setCompass(p.yaw, this.compassMarkers());
-    const team = [{ id: this.me.id, name: this.me.name, slot: this.me.slot, hp: this.me.hp, alive: this.me.alive, isYou: true }];
-    for (const rp of this.remotes.map.values()) team.push({ id: rp.id, name: rp.name, slot: rp.slot, hp: rp.hp, alive: rp.alive, isYou: false });
+    const team = [{ id: this.me.id, name: this.me.name, slot: this.me.slot, hp: this.me.hp, mhp: this.maxHp, alive: this.me.alive, downed: !!this.downed, isYou: true }];
+    for (const rp of this.remotes.map.values()) team.push({ id: rp.id, name: rp.name, slot: rp.slot, hp: rp.hp, mhp: rp.mhp, alive: rp.alive, downed: (rp.fl & PF.DOWNED) !== 0, isYou: false });
     team.sort((a, b) => a.slot - b.slot);
     this.team = team;
     hud.setTeam(team);
+    this.#updateSkillHud(hud, p);
     hud.setMinimap({
       x: p.pos.x, z: p.pos.z, yaw: p.yaw,
       players: [...this.remotes.map.values()].map((rp) => ({ x: rp.pos.x, z: rp.pos.z, yaw: rp.yaw, color: CONFIG.playerColors[rp.slot % 4] })),
@@ -840,6 +943,23 @@ export class Game {
     if (!this.me.alive) {
       hud.setDeath(true, Math.ceil(this.me.deathT));
     }
+  }
+
+  /** XP-tree extras of the HUD: perk chips, downed overlay, revive / medic prompts, the panel's camp state. */
+  #updateSkillHud(hud, p) {
+    const m = this.mods;
+    const dash = m.dash && p.dash ? { ready: p.dash.ready ?? p.dash.cooldownLeft <= 0, frac: 1 - (p.dash.cooldownLeft ?? 0) / DASH.cooldown } : null;
+    const ad = m.adrenaline ? p.adrenaline : null;
+    const adren = ad ? (ad.active ? { state: 'active', frac: ad.left / m.adrenalineTime }
+      : ad.cooldownLeft > 0 ? { state: 'cooldown', frac: 1 - ad.cooldownLeft / m.adrenalineCooldown } : { state: 'ready', frac: 1 }) : null;
+    hud.setPerks({ dash, adren });
+    const d = this.downed;
+    // giving up is Space once the respawn delay has passed (see update())
+    hud.setDowned(d ? { left: d.left, key: d.canGiveUp ? 'Space' : '' } : null);
+    const rt = this.reviveTarget, mt = this.medicTarget;
+    const nameOf = (t) => t.name ?? this.remotes.get(t.id)?.name ?? 'teammate';
+    hud.setAssist(rt ? { kind: 'revive', name: nameOf(rt), progress: rt.progress } : mt ? { kind: 'medic', name: nameOf(mt) } : null);
+    if (this.hud.isExtraOpen('skills')) this.skillPanel.setAtCamp(this.#atCamp());
   }
 
   /** Compass markers: the hut, the boat and teammates. */
@@ -877,7 +997,9 @@ export class Game {
     const bobY = Math.abs(Math.sin(phase)) * 0.07 * bobAmt;
     const bobX = Math.cos(phase) * 0.035 * bobAmt;
     p.landImpact = Math.max(0, p.landImpact - dt * 3);
-    const deadDrop = this.me.alive ? 0 : 1.2;
+    // lying down: dead = low and rolled over, downed = low and slightly tilted (eased in)
+    this.downBlend = (this.downBlend ?? 0) + ((this.downed ? 1 : 0) - (this.downBlend ?? 0)) * Math.min(1, dt * 5);
+    const deadDrop = this.me.alive ? this.downBlend * 1.1 : 1.2;
     const o = this.corrOffset;
     const decay = Math.exp(-dt / 0.035);   // ~0.1 s to (almost) nothing
     const len = Math.hypot(o.x, o.y, o.z);
@@ -888,9 +1010,9 @@ export class Game {
       p.pos.y + o.y + CONFIG.player.eyeHeight + bobY - p.landImpact * 0.25 - deadDrop,
       p.pos.z + o.z - Math.sin(p.yaw) * bobX,
     );
-    const roll = this.me.alive ? (p.knockTimer > 0 ? Math.sin(this.time * 20) * 0.05 : 0) : 0.5;
+    const roll = this.me.alive ? (p.knockTimer > 0 ? Math.sin(this.time * 20) * 0.05 : 0) + this.downBlend * 0.35 : 0.5;
     cam.rotation.set(p.pitch, p.yaw, roll, 'YXZ');
-    const targetFov = settings.fov + (p.sprinting ? 6 : 0);
+    const targetFov = settings.fov + (p.sprinting ? 6 : 0) + (p.dash.active ? 5 : 0);
     cam.fov += (targetFov - cam.fov) * Math.min(1, dt * 6);
     cam.updateProjectionMatrix();
     this.gfx.followSun(p.pos.x, p.pos.y, p.pos.z);

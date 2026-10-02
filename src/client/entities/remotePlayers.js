@@ -35,7 +35,7 @@ export class RemotePlayers {
       id: info.id, slot: info.slot, name: info.name,
       model, tag, hpBar: tag.querySelector('.np-hp i'),
       buf: new InterpBuffer([YAW]),
-      hp: info.hp, alive: info.alive, eq: 0, fl: 0, carry: 0,
+      hp: info.hp, mhp: CONFIG.player.maxHealth, alive: info.alive, eq: 0, fl: 0, carry: 0,
       pos: new THREE.Vector3(info.x, info.y, info.z), yaw: info.yaw || 0, pitch: 0, spd: 0,
     };
     this.map.set(info.id, rp);
@@ -54,7 +54,7 @@ export class RemotePlayers {
 
   setOutfit(id, outfit) { this.map.get(id)?.model.setOutfit(outfit); }
 
-  /** Snapshot row: [id, x, y, z, yaw, pitch, spd, eq, fl, hp, alive, carry] */
+  /** Snapshot row: [id, x, y, z, yaw, pitch, spd, eq, fl, hp, alive, carry, mhp] */
   onRow(t, row) {
     const rp = this.map.get(row[0]);
     if (!rp) return;
@@ -64,6 +64,7 @@ export class RemotePlayers {
     rp.hp = row[9];
     rp.alive = !!row[10];
     rp.carry = row[11];
+    if (row[12] > 0) rp.mhp = row[12];   // max HP (Thick Skin)
   }
 
   update(dt, renderTime) {
@@ -88,7 +89,7 @@ export class RemotePlayers {
         attacking: (rp.fl & PF.ATTACK) !== 0,
         grounded: (rp.fl & PF.GROUND) !== 0 || rp.spd < 0.1,
         carry: rp.carry,
-        alive: rp.alive,
+        alive: rp.alive && (rp.fl & PF.DOWNED) === 0,   // downed players lie on the ground like dead ones
       });
 
       // nameplate above the head
@@ -100,8 +101,9 @@ export class RemotePlayers {
         const sx = (V.x * 0.5 + 0.5) * w, sy = (-V.y * 0.5 + 0.5) * h;
         const s = Math.max(0.6, Math.min(1, 14 / dist));
         rp.tag.style.transform = `translate(${sx.toFixed(1)}px, ${sy.toFixed(1)}px) translate(-50%, -100%) scale(${s.toFixed(3)})`;
-        rp.hpBar.style.width = `${Math.max(0, rp.hp)}%`;
+        rp.hpBar.style.width = `${Math.max(0, Math.min(100, rp.hp / rp.mhp * 100))}%`;
         rp.tag.classList.toggle('dead', !rp.alive);
+        rp.tag.classList.toggle('downed', (rp.fl & PF.DOWNED) !== 0);
       }
     }
   }
