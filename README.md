@@ -4,7 +4,7 @@ A first-person, 1–4 player co-op dinosaur hunting demo. The authoritative worl
 
 ## Run and test
 
-Requires Node.js 18 or newer.
+Requires Node.js 22 or newer.
 
 ```powershell
 npm ci
@@ -19,7 +19,11 @@ npm run desktop
 npm run build:win
 ```
 
-The Windows build is in `dist/win-unpacked/`. Keep the entire folder together when running or distributing it. The desktop app hosts a LAN co-op server on port 8080; set `DINO_DESKTOP_PORT` before launch to use another port.
+The Windows build is in `dist/win-unpacked/`. Keep the entire folder together when running or distributing it. The desktop app chooses an available LAN port; expand **LAN / direct connection** to see it in the server address. Set `DINO_DESKTOP_PORT` before launch to use a fixed port. Browser builds use port 8080 by default.
+
+Steam desktop co-op has **Host game**, **Join friend**, public lobby browsing, and **Invite friends** in the pause menu. Configure the game's App ID and add the SDK runtime before building for Steam; see [Steam setup and release checks](docs/steam-coop.md). Builds without Steam configuration show the reason and keep solo/LAN available.
+
+For remote friend tests before Steam setup, click **Host internet test**. The Windows host downloads a verified Cloudflare tunnel helper on first use, starts a temporary relay, and shows a `wss://` address with a copy button. Share the whole address; friends paste it into **Friend’s internet address** and click **Join internet test** in their own copy of the game. The pause menu also has the address/copy button. No router changes are needed. Leaving or closing the host stops the tunnel. This uses Cloudflare's temporary test service; it is separate from the Steam release networking.
 
 ## Game plan status
 
@@ -29,7 +33,7 @@ The game is level based: every level is one oblong, randomly generated island (`
 
 Each fruit plant starts with 1–4 fruit and regrows a new random crop after it is picked clean. Fruit is found in the world, not on the map. Dinosaur map markers appear only after a player sees the animal; that discovery is shared with teammates and players who join later. The music shifts from a calm theme to a danger theme when hostile dinosaurs approach.
 
-The Windows desktop folder build is ready for local testing. Steamworks setup, upload, store configuration, and testing on target player machines still require the project's Steam account and release process. The desktop build currently uses Electron's default executable icon and has no Steam lobby or overlay integration.
+The Windows desktop folder build is ready for local testing. Steam upload, store configuration, and two-account internet testing still require the project's Steam account and release process. The co-op UI uses in-game friend selection and Steam lobby invites, without depending on Electron's Steam overlay rendering.
 
 
 ## Firearms and weapon preview

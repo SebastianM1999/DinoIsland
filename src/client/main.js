@@ -7,6 +7,9 @@ import { ICON_SPRITE, initSettings, renderPause } from './ui/menus.js';
 import { savedOutfit } from './ui/wardrobe.js';
 import { preloadDinoModels } from './models/dino/glbDino.js';
 import { GameAudio } from './audio/audio.js';
+import { initSteamLobby } from './ui/steamLobby.js';
+import { initLanAddress, websocketAddress } from './net/lan.js';
+import { initInternetTest } from './ui/internetTest.js';
 
 // SVG filter that gives HUD and menu panels their brush-stroke edges.
 document.body.insertAdjacentHTML('beforeend', `
@@ -26,7 +29,9 @@ const canvas = $('game');
 const status = $('lobby-status');
 const nameInput = $('player-name');
 const serverInput = $('server-url');
-const buttons = [$('btn-join'), $('btn-solo')];
+const buttons = [$('btn-join'), $('btn-solo'), $('btn-host'), $('btn-host-lan'), $('btn-friends'), $('btn-host-internet'), $('btn-join-internet')];
+const internetTest = initInternetTest();
+let busy = false;
 
 let game = null;
 let menuAudio = null;
@@ -55,11 +60,14 @@ const served = location.protocol.startsWith('http');
 
 function setBusy(busy, text = '') {
   for (const b of buttons) b.disabled = busy;
+  $('btn-friends').disabled = busy || !steamLobby.available;
   status.textContent = text;
   if (text) delete status.dataset.auto;
 }
 
-async function start(mode) {
+async function start(mode, options = {}) {
+  if (busy || game?.running) return;
+  busy = true;
   playMenuMusic();
   const name = nameInput.value.trim() || 'Explorer';
   try { localStorage.setItem('di.name', name); } catch { /* storage may be blocked */ }
@@ -67,14 +75,20 @@ async function start(mode) {
   let net;
   try {
     const outfit = savedOutfit();
-    net = mode === 'online' ? await Net.connect(serverInput.value.trim(), name, outfit) : await Net.local(name, outfit);
+    if (mode === 'internet') options.url = await internetTest.start();
+    net = mode === 'steam' ? await Net.steam(window.dinoSteam, options, name, outfit) :
+      mode === 'online' || mode === 'internet' ? await Net.connect(websocketAddress(options.url ?? serverInput.value), name, outfit) : await Net.local(name, outfit);
   } catch (err) {
+    if (mode === 'internet') internetTest.stop();
+    busy = false;
     setBusy(false, err.message || String(err));
     return;
   }
   menu.hidden = true;
+  steamLobby.updateSession(net.steamSession);
   menuAudio?.stopMusic();
   if (await launch(net)) setBusy(false, '');
+  busy = false;
 }
 
 /**
@@ -82,6 +96,8 @@ async function start(mode) {
  * renderer, audio and input of the previous island's game.
  */
 async function launch(net, reuse = null) {
+  let disconnectReason = 'Disconnected while loading the island';
+  net.onClose = reason => { disconnectReason = reason || disconnectReason; };
   const lv = net.welcome.world.level;
   loadingText.textContent = reuse ? `Sailing to island ${lv.index + 1}…` : 'Building the island…';
   loading.hidden = false;
@@ -91,11 +107,13 @@ async function launch(net, reuse = null) {
     await preloadDinoModels((done, total) => {
       loadingText.textContent = `Loading dinosaurs… ${done}/${total}`;
     });
+    if (net.closed) throw new Error(disconnectReason);
     loadingText.textContent = 'Building the island…';
     game = new Game(canvas, net, reuse ?? (menuAudio ? { audio: menuAudio } : null));
   } catch (err) {
     console.error(err);
     net.close();
+    internetTest.stop();
     loading.hidden = true;
     menu.hidden = false;
     menuAudio?.startMenuMusic();
@@ -122,6 +140,7 @@ async function launch(net, reuse = null) {
 }
 
 function backToMenu(reason) {
+  internetTest.stop();
   game?.audio.stopMusic();
   // Simplest robust teardown: reload with the reason in the hash.
   location.hash = reason ? `msg=${encodeURIComponent(reason)}` : '';
@@ -130,9 +149,25 @@ function backToMenu(reason) {
 
 $('join-form').addEventListener('submit', (e) => {
   e.preventDefault();
-  start('online');
+  if (document.activeElement === $('friend-internet-address')) start('online', { url: $('friend-internet-address').value });
+  else start('online');
 });
 $('btn-solo').addEventListener('click', () => start('local'));
+$('btn-host-internet').addEventListener('click', () => start('internet', { url: `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}` }));
+$('btn-join-internet').addEventListener('click', () => start('online', { url: $('friend-internet-address').value }));
+$('btn-host-lan').addEventListener('click', () => start('online', { url: `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}` }));
+$('btn-host').addEventListener('click', async () => {
+  await steamLobby.ready;
+  if (steamLobby.available) void start('steam', { host: true, visibility: $('lobby-visibility').value });
+  else void start('online', { url: `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}` });
+});
+const steamLobby = initSteamLobby({
+  join: lobbyId => start('steam', { lobbyId }),
+  isPlaying: () => busy || !!game?.running,
+  leaveToJoin: () => { game?.net.close(); backToMenu(''); },
+  notifyInvite: () => game?.hud.toast('Steam invite received. Open the pause menu to join your friend.'),
+  releasePointer: () => { game?.input.exitLock(); if (game?.running) setPaused(true); },
+});
 function resumeGame() {
   if (!game?.running) return;
   setPaused(false);
@@ -190,7 +225,7 @@ if (hashMsg) {
 
 // Lobby: show who is already on the server.
 async function pollLobby() {
-  if (!menu.hidden && served) {
+  if (!menu.hidden && served && !busy && !steamLobby.available) {
     try {
       const res = await fetch('/status', { cache: 'no-store' });
       const s = await res.json();
@@ -209,10 +244,10 @@ async function pollLobby() {
         if (s.players.length >= s.maxPlayers) status.textContent = 'The server is full (4/4).';
       }
     } catch {
-      $('btn-join').disabled = true;
       status.textContent = 'No co-op server found – you can still play solo.';
     }
   }
   setTimeout(pollLobby, 2000);
 }
 pollLobby();
+void initLanAddress();

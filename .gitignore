@@ -21,6 +21,7 @@ pnpm-debug.log*
 
 # Steam
 steam_appid.txt
+steamworks_sdk/
 
 # Editor / IDE
 .vscode/
@@ -41,3 +42,4 @@ coverage/
 # Playwright MCP screenshots / snapshots
 .playwright-mcp/
 output/playwright/
+.playwright-cli/

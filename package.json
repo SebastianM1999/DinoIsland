@@ -10,7 +10,9 @@
     "dev": "node --watch server/index.js",
     "test": "node --test",
     "desktop": "electron .",
-    "build:win": "electron-builder --win dir"
+    "build:win": "electron-builder --win dir",
+    "verify:steam": "node scripts/verify-steam.cjs",
+    "build:steam": "npm run verify:steam && electron-builder --win dir"
   },
   "build": {
     "appId": "com.dinosaurisland.game",
@@ -27,14 +29,20 @@
       "index.html",
       "package.json"
     ],
+    "asarUnpack": ["node_modules/koffi/**/*", "node_modules/steamworks-ffi-node/prebuilds/**/*"],
+    "extraResources": [
+      { "from": ".", "to": ".", "filter": ["steamworks_sdk/redistributable_bin/win64/steam_api64.dll"] },
+      { "from": "node_modules/three/examples/jsm", "to": "three-addons", "filter": ["**/*"] }
+    ],
     "win": {
       "target": "dir"
     }
   },
   "engines": {
-    "node": ">=18"
+    "node": ">=22"
   },
   "dependencies": {
+    "steamworks-ffi-node": "0.11.3",
     "three": "^0.180.0",
     "ws": "^8.18.0"
   },

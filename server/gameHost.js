@@ -9,8 +9,8 @@ import { ServerWorld } from '../src/sim/world.js';
 const NET = CONFIG.net;
 const MAX_MSG_BYTES = 8 * 1024;
 
-export function startGameHost(httpServer) {
-  const wss = new WebSocketServer({ server: httpServer, maxPayload: MAX_MSG_BYTES });
+export function startGameHost(httpServer = null, { onConnection } = {}) {
+  const wss = httpServer ? new WebSocketServer({ server: httpServer, maxPayload: MAX_MSG_BYTES }) : null;
   /** @type {Map<number, import('ws').WebSocket>} */
   const sockets = new Map();
 
@@ -27,20 +27,23 @@ export function startGameHost(httpServer) {
     log: (...a) => console.log('[world]', ...a),
   });
 
-  wss.on('connection', (ws, req) => {
+  function attachConnection(ws, addr = 'local') {
     let playerId = null;
-    const addr = req.socket.remoteAddress;
+    let joined = false;
     ws.on('message', (raw) => {
+      if (Buffer.byteLength(raw) > MAX_MSG_BYTES) { ws.close(4002, 'Message too large'); return; }
       let msg;
       try {
         msg = JSON.parse(raw.toString());
       } catch {
         return; // ignore malformed input
       }
+      if (!msg || typeof msg !== 'object' || Array.isArray(msg)) return;
       if (playerId === null) {
         if (msg.t !== MSG.HELLO) return;
         const res = world.join(msg.name, (id) => {
           playerId = id;
+          joined = true;
           sockets.set(id, ws);
         }, msg.outfit);
         if (!res.ok) {
@@ -54,13 +57,18 @@ export function startGameHost(httpServer) {
       world.receive(playerId, msg);
     });
     ws.on('close', () => {
-      if (playerId !== null) {
+      if (playerId !== null && joined) {
+        joined = false;
         sockets.delete(playerId);
         world.leave(playerId);
         console.log(`[net] player #${playerId} disconnected`);
       }
     });
     ws.on('error', () => {});
+  }
+  wss?.on('connection', (ws, req) => {
+    attachConnection(ws, req.socket.remoteAddress);
+    onConnection?.(ws, req);
   });
 
   // Fixed-rate simulation + snapshot broadcast.
@@ -93,10 +101,11 @@ export function startGameHost(httpServer) {
 
   return {
     world,
+    attachConnection,
     stop() {
       clearInterval(interval);
       for (const ws of sockets.values()) ws.terminate();
-      wss.close();
+      wss?.close();
     },
     status() {
       return {

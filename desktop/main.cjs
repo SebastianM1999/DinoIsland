@@ -1,15 +1,20 @@
 const { app, BrowserWindow, shell } = require('electron');
+const path = require('node:path');
+const { installSteam } = require('./steam.cjs');
 
 let server;
 let gameHost;
+let stopSteam;
+let internet;
 
 async function launch() {
   const { createGameServer } = await import('../server/index.js');
-  const { httpServer, host } = createGameServer();
+  const { httpServer, host, internet: internetHost } = createGameServer();
+  internet = internetHost;
   server = httpServer;
   gameHost = host;
   // The desktop game also hosts a WebSocket server for LAN co-op.
-  const requestedPort = Number(process.env.DINO_DESKTOP_PORT) || 8080;
+  const requestedPort = Number(process.env.DINO_DESKTOP_PORT) || 0;
   const port = await new Promise((resolve, reject) => {
     httpServer.once('error', reject);
     httpServer.listen(requestedPort, '0.0.0.0', () => {
@@ -24,8 +29,8 @@ async function launch() {
     minWidth: 960,
     minHeight: 640,
     backgroundColor: '#1f2a44',
-    title: `Dinosaur Island — co-op port ${port}`,
-    webPreferences: { nodeIntegration: false, contextIsolation: true, sandbox: true },
+    title: 'Dinosaur Island',
+    webPreferences: { preload: path.join(__dirname, 'preload.cjs'), nodeIntegration: false, contextIsolation: true, sandbox: true },
   });
   win.webContents.setWindowOpenHandler(({ url }) => {
     // Local credit notices are plain text. Artist and license pages open in
@@ -49,6 +54,7 @@ async function launch() {
   win.webContents.on('will-navigate', (event, url) => {
     if (!url.startsWith(localUrl)) event.preventDefault();
   });
+  stopSteam = await installSteam(app, win, localUrl);
   await win.loadURL(localUrl);
 }
 
@@ -58,4 +64,4 @@ app.whenReady().then(launch).catch((error) => {
 });
 
 app.on('window-all-closed', () => app.quit());
-app.on('before-quit', () => { gameHost?.stop(); server?.close(); });
+app.on('before-quit', () => { internet?.stop(); stopSteam?.(); stopSteam = null; gameHost?.stop(); server?.close(); });

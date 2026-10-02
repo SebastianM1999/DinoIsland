@@ -4,6 +4,7 @@
 
 import { CONFIG } from '../../shared/config.js';
 import { MSG } from '../../shared/protocol.js';
+import { connectSteam } from './steamTransport.js';
 
 export class Net {
   constructor(transport, mode) {
@@ -23,6 +24,12 @@ export class Net {
   }
 
   /** Connect to a co-op server and join with `name`. Resolves after the welcome. */
+  static steam(bridge, options, name, outfit) {
+    return connectSteam(bridge,
+      () => options.host ? bridge.host(options.visibility) : bridge.join(options.lobbyId),
+      { t: MSG.HELLO, name, outfit }, transport => new Net(transport, 'online'));
+  }
+
   static connect(url, name, outfit) {
     return new Promise((resolve, reject) => {
       let ws;

@@ -32,13 +32,52 @@
       <p class="tagline">Track. Hunt. Survive.</p>
       <form id="join-form" autocomplete="off">
         <label for="player-name">Your name</label>
-        <input id="player-name" name="name" maxlength="14" placeholder="Explorer" required>
-        <label for="server-url">Server</label>
-        <input id="server-url" name="server" spellcheck="false">
+        <input id="player-name" name="name" maxlength="14" placeholder="Explorer">
+        <label for="lobby-visibility" id="visibility-label" hidden>Who can join?</label>
+        <select id="lobby-visibility" hidden>
+          <option value="friends">Friends only</option>
+          <option value="private">Invite only</option>
+          <option value="public">Anyone</option>
+        </select>
         <div class="menu-buttons">
-          <button type="submit" class="btn btn-primary" id="btn-join">Join co-op</button>
+          <button type="button" class="btn btn-primary" id="btn-host">Host game</button>
+          <button type="button" class="btn" id="btn-host-internet">Host internet test</button>
+          <button type="button" class="btn" id="btn-friends" disabled>Join friend</button>
           <button type="button" class="btn" id="btn-solo">Play solo (offline)</button>
         </div>
+        <p id="steam-status" class="lobby-status" role="status">Checking Steam…</p>
+        <section class="internet-test" aria-label="Internet co-op test">
+          <label for="internet-address">Address to send your friends</label>
+          <div class="host-address-row">
+            <input id="internet-address" readonly spellcheck="false" placeholder="Host an internet test to get an address">
+            <button type="button" class="btn copy-address" id="btn-copy-internet" aria-label="Copy internet address" title="Copy internet address" disabled>
+              <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V4a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h4"/></svg>
+            </button>
+          </div>
+          <p id="internet-status" class="lobby-note" role="status" aria-live="polite">Temporary Cloudflare tunnel. No router setup. First start downloads the tunnel helper.</p>
+          <button type="button" class="btn" id="btn-stop-internet" hidden>Stop internet test</button>
+          <label for="friend-internet-address">Friend’s internet address</label>
+          <input id="friend-internet-address" spellcheck="false" placeholder="Paste the wss:// address your friend sent">
+          <button type="button" class="btn" id="btn-join-internet">Join internet test</button>
+        </section>
+        <details class="controls-help lan-options">
+          <summary>LAN / direct connection</summary>
+          <button type="button" class="btn" id="btn-host-lan">Host LAN game</button>
+          <label for="host-address">Your host address</label>
+          <div class="host-address-row">
+            <input id="host-address" readonly spellcheck="false" placeholder="Finding your LAN address…">
+            <button type="button" class="btn copy-address" id="btn-copy-address" aria-label="Copy host address" title="Copy host address" disabled>
+              <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V4a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h4"/></svg>
+            </button>
+          </div>
+          <label for="host-network" id="host-network-label" hidden>Network to share</label>
+          <select id="host-network" hidden></select>
+          <p id="lan-status" class="lobby-note" role="status" aria-live="polite"></p>
+          <label for="server-url">Friend’s IP or WebSocket address</label>
+          <input id="server-url" name="server" spellcheck="false" placeholder="ws://192.168.1.10:8080">
+          <button type="submit" class="btn" id="btn-join">Join LAN game</button>
+          <p class="lobby-note">Same network: share the address above. Other networks: use the host’s public IP with port forwarding.</p>
+        </details>
         <p id="lobby-status" class="lobby-status" role="status" aria-live="polite"></p>
         <ul id="lobby-players" class="lobby-players" aria-label="Players on the server"></ul>
       </form>
@@ -84,6 +123,17 @@
           <section class="pause-block">
             <h3>Team</h3>
             <ul id="pause-team" class="pause-team"></ul>
+            <p id="steam-session-info" class="lobby-note" hidden></p>
+            <section id="pause-internet" hidden>
+              <label for="pause-internet-address">Share this internet address</label>
+              <div class="host-address-row">
+                <input id="pause-internet-address" readonly spellcheck="false">
+                <button type="button" class="btn copy-address" id="btn-copy-pause-internet" aria-label="Copy internet address" title="Copy internet address">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V4a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2h4"/></svg>
+                </button>
+              </div>
+              <p id="pause-internet-status" class="lobby-note" role="status" aria-live="polite">Keep this game open while your friends play.</p>
+            </section>
           </section>
         </div>
         <nav class="pause-actions" aria-label="Pause menu">
@@ -99,12 +149,34 @@
           <button type="button" class="btn btn-icon" id="btn-creative" aria-pressed="false">
             <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-wing"/></svg><span>Creative mode: Off</span>
           </button>
+          <button type="button" class="btn" id="btn-invite" hidden>Invite friends</button>
+          <button type="button" class="btn" id="btn-accept-invite" hidden>Leave and join friend</button>
           <button type="button" class="btn btn-icon btn-danger" id="btn-leave">
             <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-door"/></svg><span>Leave game</span>
           </button>
         </nav>
       </div>
       <p class="pause-hint">Click anywhere outside to jump back in</p>
+    </section>
+  </div>
+
+  <div id="steam-friends" class="screen" hidden>
+    <section class="friends-card brush" role="dialog" aria-modal="true" aria-labelledby="friends-title">
+      <h2 id="friends-title">Join a friend</h2>
+      <p id="friends-status" class="lobby-status" role="status" aria-live="polite"></p>
+      <ul id="friends-list" class="friends-list" aria-label="Steam friends"></ul>
+      <form id="lobby-id-form">
+        <label for="lobby-id">Or enter a lobby ID</label>
+        <div class="lobby-id-row">
+          <input id="lobby-id" inputmode="numeric" maxlength="20" autocomplete="off" required>
+          <button class="btn" type="submit">Join</button>
+        </div>
+      </form>
+      <div class="menu-buttons friends-actions">
+        <button class="btn" id="btn-browse-lobbies" type="button">Browse public games</button>
+        <button class="btn" id="btn-refresh-friends" type="button">Refresh</button>
+        <button class="btn" id="btn-close-friends" type="button">Back</button>
+      </div>
     </section>
   </div>
 
