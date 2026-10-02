@@ -1,3 +1,4 @@
+import { retainResource } from '../../core/resources.js';
 // Relic models (the boat parts hidden on every island, see shared/relics.js).
 //
 // API (all return a THREE.Group, origin on the ground, model resting at y=0):
@@ -243,7 +244,7 @@ const cache = new Map();
 function relicParts(kind) {
   if (!BUILDERS[kind]) throw new Error(`unknown relic kind: ${kind}`);
   let r = cache.get(kind);
-  if (!r) { r = build(kind); cache.set(kind, r); }
+  if (!r) { r = build(kind); for (const part of r.parts) retainResource(part.geo); cache.set(kind, r); }
   return r;
 }
 
@@ -327,6 +328,7 @@ function beamMaterial(color) {
       transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
     }),
   };
+  for (const material of Object.values(m)) retainResource(material);
   beamMats.set(color, m);
   return m;
 }

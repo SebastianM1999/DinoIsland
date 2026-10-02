@@ -1,3 +1,4 @@
+import { retainResource } from '../../core/resources.js';
 // Shared helpers for the site props (boat, relics, cave, ruins, nest, volcano):
 // smooth 3D noise, soft-beveled blocks, an SDF -> smooth mesh mesher (surface
 // nets, used for the cave), orienting parts along a direction, per-grid cloth
@@ -42,7 +43,7 @@ const mats = new Map();
 const cachedMat = (key, make) => {
   let m = mats.get(key);
   if (!m) { m = make(); mats.set(key, m); }
-  return m;
+  return retainResource(m);
 };
 
 /**
@@ -59,7 +60,7 @@ export function tintGlow(intensity = 0.4, roughness = 0.35, metalness = 0) {
       );
     };
     m.customProgramCacheKey = () => 'props-vcolor-glow';
-    return m;
+    return retainResource(m);
   });
 }
 
@@ -68,7 +69,7 @@ export function doubleSided(base = MAT.standard) {
   return cachedMat(`ds:${base.uuid}`, () => {
     const m = base.clone();
     m.side = THREE.DoubleSide;
-    return m;
+    return retainResource(m);
   });
 }
 

@@ -4,14 +4,15 @@
 // their wind settings (same format as VEG_TUNING in vegetation.js).
 
 import { THREE, merge, place, paint, tube, blob, spike, smoothNormals } from '../../models/kit.js';
-import { clump, leafStrip, arcPath } from './shapes.js';
+import { clump, leafStrip, arcPath, getGeometryDetail } from './shapes.js';
 
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
 const TAU = Math.PI * 2;
 const cache = new Map();
 const cached = (key, fn) => {
+  key += ':' + getGeometryDetail();
   let g = cache.get(key);
-  if (!g) { g = fn(); cache.set(key, g); }
+  if (!g) { g = fn(); g.userData.sharedResource = true; cache.set(key, g); }
   return g;
 };
 

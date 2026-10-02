@@ -1,3 +1,4 @@
+import { retainResource } from '../../core/resources.js';
 // Pteranodon: teal/turquoise membrane wings (lighter underside), cream body,
 // backswept red-orange crest, long pointed beak, short hind legs. Walks on its
 // hind legs with folded wings; the wings are animated by pteraExtraUpdate
@@ -69,6 +70,8 @@ const HUM = 0.5, FORE = 0.8, FIN1 = 0.95, FIN2 = 0.92;
 // Smooth-shaded membrane (normals are recomputed every frame from the posed wing).
 const MAT_TOP = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.75, metalness: 0, side: THREE.FrontSide, shadowSide: THREE.DoubleSide });
 const MAT_BOT = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.8, metalness: 0, side: THREE.BackSide });
+
+retainResource(MAT_TOP); retainResource(MAT_BOT);
 
 // Membrane grid: SUB columns per bone span (4 spans) × ROWS rows from the leading to the trailing edge.
 const SUB = 6, ROWS = 7;

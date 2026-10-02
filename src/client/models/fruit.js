@@ -1,3 +1,4 @@
+import { retainResource } from '../core/resources.js';
 // Fruit models (held / dropped / previews, and the fruit on the island plants).
 // Geometry is built once per type and shared; materials glow in their own hue.
 
@@ -101,7 +102,7 @@ export function fruitGeometry(type) {
   let g = geoCache.get(type);
   if (!g) {
     g = type === 'mango' ? mango() : type === 'dragon' ? dragon() : berry();
-    geoCache.set(type, g);
+    retainResource(g); geoCache.set(type, g);
   }
   return g;
 }

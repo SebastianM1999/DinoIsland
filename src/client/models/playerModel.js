@@ -1,3 +1,4 @@
+import { retainResource } from '../core/resources.js';
 // Co-op explorer character (see inspiration/model-art.png): chunky body, big
 // round head in the player color with a friendly face, and a customizable
 // outfit (10 hats, 10 shirts/jackets, 10 pants – see shared/outfits.js),
@@ -29,7 +30,7 @@ const EYE = '#15131c';
 const geoCache = new Map();
 const cached = (key, build) => {
   if (!geoCache.has(key)) geoCache.set(key, build());
-  return geoCache.get(key);
+  return retainResource(geoCache.get(key));
 };
 
 const col = (hex) => new THREE.Color(hex);

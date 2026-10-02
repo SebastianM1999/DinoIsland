@@ -70,6 +70,7 @@ export class ServerWorld {
 
   /** Build the island for `level` (everything that belongs to one island). */
   #loadLevel(level, variant = 1 + Math.floor(Math.random() * 1e6)) {
+    this.worldEpoch = (this.worldEpoch ?? 0) + 1;
     this.levelIndex = level;
     this.variant = variant;
     this.terrain = new Terrain(planIsland(level, variant));
@@ -120,8 +121,8 @@ export class ServerWorld {
   id() { return this.nextId++; }
   rollFruitCount() { return 1 + Math.floor(this.fruitRng() * 4); }
 
-  send(to, msg) { this.host.send(to, msg); }
-  broadcast(msg, except) { this.host.send('*', msg, except); }
+  send(to, msg) { this.host.send(to, { ...msg, w: this.worldEpoch }); }
+  broadcast(msg, except) { this.host.send('*', { ...msg, w: this.worldEpoch }, except); }
   event(e, data, except) { this.broadcast({ t: MSG.EV, e, ...data }, except); }
   toast(text, icon = 'info', to = '*') { this.send(to, { t: MSG.EV, e: EV.TOAST, text, icon }); }
 
@@ -481,7 +482,7 @@ export class ServerWorld {
     p.lastInput = this.now;
     switch (msg.t) {
       case MSG.STATE: return this.onState(p, msg);
-      case MSG.ACT: return this.onAct(p, msg);
+      case MSG.ACT: return this.receiveAction(p, msg);
       case MSG.PING: return this.send(id, { t: MSG.PONG, c: msg.c, now: r3(this.now) });
     }
   }
@@ -493,16 +494,16 @@ export class ServerWorld {
    */
   correct(p, extra) {
     p.epoch++;
-    this.send(p.id, { t: MSG.CORRECT, x: r2(p.x), y: r2(p.y), z: r2(p.z), k: p.epoch, ...extra });
+    this.send(p.id, { t: MSG.CORRECT, x: r2(p.x), y: r2(p.y), z: r2(p.z), k: p.epoch, s: p.lastSeq, ...extra });
   }
 
-  onState(p, m) {
-    if (!p.alive) return;
+  onState(p, m, { historical = false, at = this.now } = {}) {
+    if (!p.alive) return false;
     const num = (v, d) => (Number.isFinite(v) ? v : d);
     // stale (sent before the last correction/teleport) or overtaken (unreliable transport)
-    if (num(m.k, p.epoch) < p.epoch) return;
+    if (num(m.k, p.epoch) !== p.epoch) return false;
     if (Number.isFinite(m.s)) {
-      if (m.s <= p.lastSeq) return;
+      if (m.s <= p.lastSeq) return false;
       p.lastSeq = m.s;
     }
     const previous = { x: p.x, y: p.y, z: p.z };
@@ -511,9 +512,9 @@ export class ServerWorld {
     // A small distance reserve accommodates packet bunching without allowing
     // repeated state packets to move faster than the player's sprint.
     const creative = p.creative;
-    p.moveBudget = Math.min(creative ? 10 : this.now < p.knockBudgetUntil ? 7 : MOVE_RESERVE,
-      p.moveBudget + Math.max(0, this.now - p.lastMoveAt) * (creative ? P.creative.flySpeed + 4 : 11));
-    p.lastMoveAt = this.now;
+    p.moveBudget = Math.min(creative ? 10 : at < p.knockBudgetUntil ? 7 : MOVE_RESERVE,
+      p.moveBudget + Math.max(0, at - p.lastMoveAt) * (creative ? P.creative.flySpeed + 4 : 11));
+    p.lastMoveAt = at;
     const distance = Math.hypot(x - p.x, z - p.z);
     const lim = CONFIG.world.size / 2 - 5;
     const ground = this.layout.groundAt(x, z, y + P.stepHeight);
@@ -523,8 +524,8 @@ export class ServerWorld {
         !Number.isFinite(ground) || y < ground - 2 || y > ground + (creative ? P.creative.maxHeight + 5 : 20) ||
         // rivers and lakes may be swum; only the open sea is off-limits
         (!creative && this.terrain.seaDepthAt(x, z) > CONFIG.world.maxWadeDepth + 0.2) || blocked) {
-      this.correct(p);
-      return;
+      if (!historical) this.correct(p);
+      return false;
     }
     p.moveBudget -= distance;
     p.x = x; p.z = z; p.y = y;
@@ -533,7 +534,45 @@ export class ServerWorld {
     p.spd = Math.max(0, Math.min(20, num(m.spd, 0)));
     p.eq = Math.max(0, Math.min(EQUIP.length - 1, m.eq | 0));
     p.fl = (m.fl | 0) & 63;
-    this.resolvePlayerDinos(p, previous);
+    if (!historical) {
+      this.resolvePlayerDinos(p, previous);
+      const h = (p.stateHistory ??= []);
+      h.push({ s: p.lastSeq, at, epoch: p.epoch, x: p.x, y: p.y, z: p.z, yaw: p.yaw, pitch: p.pitch,
+        spd: p.spd, eq: p.eq, fl: p.fl, moveBudget: p.moveBudget, lastMoveAt: at });
+      while (h.length > 64) h.shift();
+    }
+    return true;
+  }
+
+  receiveAction(p, m) {
+    const state = m.state;
+    if (!state) return this.onAct(p, m); // compatible with older clients
+    if (!Number.isSafeInteger(state.s) || !Number.isSafeInteger(state.k) || state.k !== p.epoch ||
+        !['x', 'y', 'z', 'yaw', 'pitch', 'spd', 'eq', 'fl'].every(key => Number.isFinite(state[key]))) return;
+    if (state.s > p.lastSeq) {
+      if (this.onState(p, state)) this.onAct(p, m);
+      return;
+    }
+    // A newer unreliable state may overtake this reliable action. Validate
+    // its origin between the two accepted checkpoints, without moving the
+    // current player backwards or bypassing distance/collision authority.
+    const h = p.stateHistory ?? [];
+    const exact = h.find(s => s.s === state.s && s.epoch === p.epoch);
+    let pose = exact;
+    if (!pose) {
+      const before = h.findLast(s => s.s < state.s && s.epoch === p.epoch);
+      const after = h.find(s => s.s > state.s && s.epoch === p.epoch);
+      if (!before || !after) return;
+      const candidate = { ...p, ...before, lastSeq: before.s };
+      if (!this.onState(candidate, state, { historical: true, at: after.at }) ||
+          Math.hypot(candidate.x - after.x, candidate.z - after.z) > candidate.moveBudget + 0.05) return;
+      pose = candidate;
+    }
+    if (m.a === ACT.UNSTUCK || m.a === ACT.CREATIVE) return this.onAct(p, m);
+    const keys = ['x', 'y', 'z', 'yaw', 'pitch', 'spd', 'eq', 'fl'];
+    const saved = Object.fromEntries(keys.map(key => [key, p[key]]));
+    Object.assign(p, Object.fromEntries(keys.map(key => [key, pose[key]])));
+    try { return this.onAct(p, m); } finally { Object.assign(p, saved); }
   }
 
   resolvePlayerDinos(p, previous = p) {
@@ -1149,7 +1188,7 @@ export class ServerWorld {
       return false;
     };
     const rows = this.dinos.snapshotRows(this.snapSeq % N.farSnapshotEvery === 0 ? null : near);
-    return { t: MSG.SNAP, now: r3(this.now), p, d: rows };
+    return { t: MSG.SNAP, now: r3(this.now), w: this.worldEpoch, n: this.snapSeq, tickMs: r2(this.tickDurationMs ?? 0), p, d: rows };
   }
 
   fullState() {

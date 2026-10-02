@@ -1,3 +1,4 @@
+import { retainResource } from '../../core/resources.js';
 // The boat on the east beach (see shared/boatShape.js for size + colliders).
 // Broken: hull stranded and rolled onto the sand with a jagged hole in the
 // starboard side, snapped mast (top half lying in the sand), torn sail rags,
@@ -420,7 +421,7 @@ function socketGeometry() {
 
 // ------------------------------------------------------------ the boat
 const geoCache = {};
-const cachedGeo = (k, fn) => (geoCache[k] ||= fn());
+const cachedGeo = (k, fn) => retainResource(geoCache[k] ||= fn());
 
 export function buildBoat(b) {
   const group = new THREE.Group();

@@ -62,6 +62,8 @@ export class Hud {
     this._mapOpen = false;
     this._inv = null;
     this._invDirty = true;
+    this._mapRefreshAt = -Infinity;
+    this._timers = new Set();
     this._build();
   }
 
@@ -287,6 +289,23 @@ export class Hud {
 
   show(visible) { this.root.hidden = !visible; }
 
+  dispose() {
+    this._ro?.disconnect();
+    clearTimeout(this._threatTimer);
+    for (const timer of this._timers) clearTimeout(timer);
+    this._timers.clear();
+    for (const toast of this.$toasts.children) clearTimeout(toast._timer);
+    for (const element of this.root.querySelectorAll('*')) element.getAnimations?.().forEach(a => a.cancel());
+    this._mapBase = this._mapState = null;
+    this.root.replaceChildren();
+  }
+
+  _later(fn, ms) {
+    const timer = setTimeout(() => { this._timers.delete(timer); fn(); }, ms);
+    this._timers.add(timer);
+    return timer;
+  }
+
   setPlayer({ name, slot } = {}) {
     const key = `${name}|${slot}`;
     if (this._c.player === key) return;
@@ -378,6 +397,9 @@ export class Hud {
 
   setMinimap(state) {
     this._mapState = state;
+    const now = performance.now();
+    if (now - this._mapRefreshAt < 1000 / 20) return;
+    this._mapRefreshAt = now;
     this._drawMinimap();
     if (this._mapOpen) this._drawBigMap();
   }
@@ -592,9 +614,10 @@ export class Hud {
 
   _scheduleToastOut(t, ms) {
     clearTimeout(t._timer);
-    t._timer = setTimeout(() => {
+    this._timers.delete(t._timer);
+    t._timer = this._later(() => {
       t.classList.add('is-out');
-      setTimeout(() => t.remove(), 320);
+      this._later(() => t.remove(), 320);
     }, ms);
   }
 

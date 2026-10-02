@@ -36,8 +36,7 @@ import { GameAudio } from '../audio/audio.js';
 import { inBossMusicArea } from '../audio/region.js';
 import { footstepSurface, woodSupports } from '../audio/surface.js';
 import { StepCadence } from '../audio/steps.js';
-import { settings, setSetting, onSettings } from './settings.js';
-import { QUALITY } from './renderer.js';
+import { settings, setSetting, onSettings, FPS_LIMITS } from './settings.js';
 import { PerfStats } from '../ui/perfStats.js';
 import { storageKey } from '../../shared/brand.js';
 import { Wardrobe } from '../ui/wardrobe.js';
@@ -51,6 +50,7 @@ import { GrovePrompt } from '../ui/grovePrompt.js';
 import { mayEnterGrove, GROVE_STONE_REACH } from '../../shared/grove.js';
 import { buildBossArena } from '../world/bossArena.js';
 import { BIOMES } from '../../shared/levels.js';
+import { disposeIslandScenes } from './resources.js';
 
 /** The air over the boss arena: the volcano island's ash, darker and redder. */
 const BOSS_SKY = {
@@ -97,6 +97,10 @@ export class Game {
     this.debug = false;
     this.sendTimer = 0;
     this.pingTimer = 0;
+    this.hudTimer = 0;
+    this.audioQueryTimer = 0;
+    this.audioForward = new THREE.Vector3();
+    this.audioUp = new THREE.Vector3();
     this.renderTime = 0;      // server time remote entities are drawn at (sent with hits for lag compensation)
     this.corrections = 0;     // server position corrections received (performance overlay)
     // Camera-only offset after a small correction: the body snaps, the view glides.
@@ -156,7 +160,11 @@ export class Game {
     this.stats = new PerfStats(this.overlay);
     this.unsubSettings = onSettings((s) => {
       this.stats.setMode(s.stats);
-      this.vegetation.setDensity((QUALITY[s.quality] ?? QUALITY[2]).grass);
+    });
+    this.unsubGraphics = this.gfx.onGraphics((g) => {
+      this.vegetation.setQuality(g);
+      this.rocks.setQuality(g);
+      this.vegetation.setDensity(g.grass);
     });
     this.remotes = new RemotePlayers(this.gfx.scene, this.gfx.camera, this.overlay);
 
@@ -219,9 +227,11 @@ export class Game {
     this.sites.boat.setRepaired?.(!!w.world.boat?.repaired);
     this.sites.boat.setParts?.((w.world.relics || []).filter((r) => r.found).map((r) => r.kind));
     this.#bindNet();
+    this.net.stateProvider = () => this.#state();
 
     this.clock = new THREE.Clock(false);
     this.loop = this.loop.bind(this);
+    this.lastFrameAt = -Infinity;   // FPS limiter
   }
 
   #buildWorld() {
@@ -241,7 +251,7 @@ export class Game {
     this.logs = buildLogs(this.terrain, this.layout);
     this.bossArena = buildBossArena(this.terrain, this.layout);
     scene.add(this.sky.group, this.water.group, this.vegetation.group, this.rocks.group, this.fruitPlants.group, this.hut.group, this.baseView.group, this.sites.group, this.grove.group, this.logs.group, this.bossArena.group);
-    this.worldUpdaters = [this.sky, this.water, this.vegetation, this.fruitPlants, this.hut, this.baseView, this.sites, this.grove, this.bossArena];
+    this.worldUpdaters = [this.sky, this.water, this.vegetation, this.rocks, this.fruitPlants, this.hut, this.baseView, this.sites, this.grove, this.bossArena];
     this.moodK = 0;
 
     // Debug view of colliders (F3).
@@ -414,6 +424,7 @@ export class Game {
       this.corrections++;
       // small corrections glide the camera over (~0.1 s); teleports and unstuck snap
       const jump = Math.hypot(m.x - pos.x, m.y - pos.y, m.z - pos.z);
+      this.correctionInfo = { distance: jump, reason: m.reason ?? '' };
       if (!m.unstuck && jump < 1.5) { o.x += pos.x - m.x; o.y += pos.y - m.y; o.z += pos.z - m.z; } else o.x = o.y = o.z = 0;
       pos.x = m.x;
       pos.y = m.y;
@@ -507,17 +518,20 @@ export class Game {
     };
   }
 
-  #sendState() {
+  #state() {
     const p = this.player;
-    this.net.sendState({
+    const state = {
       x: +p.pos.x.toFixed(2), y: +p.pos.y.toFixed(2), z: +p.pos.z.toFixed(2),
       yaw: +p.yaw.toFixed(3), pitch: +p.pitch.toFixed(3),
       spd: +p.moveSpeed.toFixed(2),
       eq: this.eq,
       fl: this.flags | (p.sprinting ? PF.SPRINT : 0) | (p.onGround ? PF.GROUND : 0) | (p.knockTimer > 0 ? PF.KNOCKED : 0),
-    });
+    };
     this.flags &= ~PF.ATTACK; // one-shot animation pulse
+    return state;
   }
+
+  #sendState() { this.net.sendState(this.#state()); }
 
   // ------------------------------------------------------------------ loop
 
@@ -530,14 +544,9 @@ export class Game {
     this.hud.show(true);
     this.clock.start();
     requestAnimationFrame(this.loop);
-    // Heartbeat on a timer: background tabs pause rAF, but must not time out.
-    this.heartbeat = setInterval(() => {
-      if (document.hidden) this.net.send({ t: MSG.PING, c: performance.now() / 1000 });
-    }, 2000);
   }
 
   stop() {
-    clearInterval(this.heartbeat);
     this.running = false;
     this.audio.stopMusic();
     this.input.enabled = false;
@@ -551,10 +560,15 @@ export class Game {
   dispose() {
     this.stop();
     this.unsubSettings();
+    this.unsubGraphics();
     this.dinos.dispose();
+    disposeIslandScenes(this.gfx.scene, this.gfx.viewScene);
+    this.hud.dispose();
     this.overlay.remove();
     this.wardrobe.dispose?.();
     this.net.clearHandlers();
+    this.net.stateProvider = null;
+    this.net.onStateSent = null;
     this.hud.show(false);
     this.input.onPanelToggle = null;
     this.input.onLockChange = null;
@@ -562,16 +576,27 @@ export class Game {
     return { gfx: this.gfx, audio: this.audio, input: this.input };
   }
 
-  loop() {
+  loop(now = performance.now()) {
     if (!this.running) return;
     requestAnimationFrame(this.loop);
+    // FPS limiter: skip display refreshes until the next frame is due. The
+    // 1 ms slack keeps a cap equal to the refresh rate from halving it.
+    const cap = FPS_LIMITS[settings.fpsLimit] ?? 0;
+    if (cap) {
+      const interval = 1000 / cap, elapsed = now - this.lastFrameAt;
+      if (elapsed < interval - 1) return;
+      this.lastFrameAt = elapsed > interval * 2 ? now : this.lastFrameAt + interval;
+    }
     const rawDt = this.clock.getDelta();
     const dt = Math.min(rawDt, 0.05);
     this.time += dt;
+    const updateStart = performance.now();
     this.update(dt);
-    this.gfx.render();
+    const cpuUpdateMs = performance.now() - updateStart;
+    this.gfx.render(rawDt);
     this.input.endFrame();
-    this.stats.frame(rawDt, { renderer: this.gfx.renderer, net: this.net, corrections: this.corrections });
+    this.stats.frame(rawDt, { renderer: this.gfx.renderer, net: this.net, corrections: this.corrections,
+      cpuUpdateMs, graphics: this.gfx.metrics, correctionInfo: this.correctionInfo });
   }
 
   /** Creative mode: invincible (server-side) and double-tap Space to fly. */
@@ -624,16 +649,13 @@ export class Game {
     // network
     this.sendTimer -= dt;
     if (this.sendTimer <= 0) {
-      this.sendTimer = 1 / CONFIG.net.clientSendRate;
+      const interval = 1 / CONFIG.net.clientSendRate;
+      this.sendTimer += interval;
+      if (this.sendTimer <= 0) this.sendTimer = interval;
       this.#sendState();
     }
-    this.pingTimer -= dt;
-    if (this.pingTimer <= 0) {
-      this.pingTimer = 2;
-      this.net.send({ t: MSG.PING, c: performance.now() / 1000 });
-    }
 
-    const renderTime = this.renderTime = this.net.serverNow() - this.net.interpDelay;
+    const renderTime = this.renderTime = this.net.renderNow();
     this.remotes.update(dt, renderTime);
 
     WIND.uTime.value = this.time;
@@ -641,7 +663,9 @@ export class Game {
     this.#mood(dt, cam);
     for (const u of this.worldUpdaters) u.update?.(dt, this.time, cam);
     for (const sys of this.systems) sys.update?.(dt, renderTime);
-    this.#updateHud(dt);
+    if (!this.me.alive) this.me.deathT = Math.max(0, this.me.deathT - dt);
+    this.hudTimer -= dt;
+    if (this.hudTimer <= 0) { this.hudTimer += 1 / 30; this.#updateHud(dt); }
     this.#updateAudio(dt);
   }
 
@@ -663,8 +687,8 @@ export class Game {
 
   #updateAudio(dt) {
     const cam = this.gfx.camera;
-    const fwd = new THREE.Vector3(0, 0, -1).applyQuaternion(cam.quaternion);
-    const up = new THREE.Vector3(0, 1, 0).applyQuaternion(cam.quaternion);
+    const fwd = this.audioForward.set(0, 0, -1).applyQuaternion(cam.quaternion);
+    const up = this.audioUp.set(0, 1, 0).applyQuaternion(cam.quaternion);
     this.audio.setListener(cam.position, fwd, up);
     const p = this.player;
     // footsteps (in water: a splashing step and a ring on the surface)
@@ -682,7 +706,13 @@ export class Game {
     const rim = Math.hypot(p.pos.x / plan.A, p.pos.z / plan.B);
     const coast = Math.max(0, Math.min(1, (rim - 0.7) / 0.3)) * (g < 6 ? 1 : 0.3);
     this.bossMusicArea = inBossMusicArea(this.layout, p.pos, this.bossMusicArea);
-    this.audio.update(dt, { coast, water: this.#waterSoundscape(cam.position), danger: this.#inDanger(), bossArea: this.bossMusicArea });
+    this.audioQueryTimer -= dt;
+    if (this.audioQueryTimer <= 0) {
+      this.audioQueryTimer += 0.1;
+      this.audioWater = this.#waterSoundscape(cam.position);
+      this.audioDanger = this.#inDanger();
+    }
+    this.audio.update(dt, { coast, water: this.audioWater, danger: this.audioDanger, bossArea: this.bossMusicArea });
   }
 
   /**
@@ -808,7 +838,6 @@ export class Game {
       markers: this.#collect('minimapMarkers'),
     });
     if (!this.me.alive) {
-      this.me.deathT = Math.max(0, this.me.deathT - dt);
       hud.setDeath(true, Math.ceil(this.me.deathT));
     }
   }

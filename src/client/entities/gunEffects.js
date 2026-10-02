@@ -1,7 +1,8 @@
+import { retainResource } from '../core/resources.js';
 import * as THREE from 'three';
 import { EV } from '../../shared/protocol.js';
 
-const geometry = new THREE.CylinderGeometry(0.009, 0.009, 1, 5);
+const geometry = retainResource(new THREE.CylinderGeometry(0.009, 0.009, 1, 5));
 const material = new THREE.MeshBasicMaterial({ color: '#ffe1a0', transparent: true, depthWrite: false });
 const up = new THREE.Vector3(0, 1, 0);
 export class GunEffects {

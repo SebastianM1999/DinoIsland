@@ -3,23 +3,17 @@
 
 import * as THREE from 'three';
 import { CONFIG } from '../../shared/config.js';
-import { onSettings } from './settings.js';
+import { onSettings, settings, FPS_LIMITS } from './settings.js';
+import { GpuTimer } from './gpuTimer.js';
+import { WorldPost } from './worldPost.js';
+import { TIERS, GraphicsAutoTune, gpuName } from './graphicsTier.js';
 
 const R = CONFIG.render;
 const _tmpColor = new THREE.Color();
 
-/**
- * Graphics presets (settings.quality is the index); "High" is the original look.
- * shadowEvery re-renders the sun's shadow map every N frames: static shadows
- * stay exact in between, only moving casters lag by a frame.
- * grass is the share of grass/flower instances drawn.
- */
-export const QUALITY = [
-  { pixelRatio: 1, shadows: false, shadowSize: 1024, soft: false, shadowEvery: 1, grass: 0.35 },
-  { pixelRatio: 1.25, shadows: true, shadowSize: 1024, soft: false, shadowEvery: 2, grass: 0.65 },
-  { pixelRatio: R.maxPixelRatio, shadows: true, shadowSize: R.shadowMapSize, soft: true, shadowEvery: 1, grass: 1 },
-  { pixelRatio: 2, shadows: true, shadowSize: 4096, soft: true, shadowEvery: 1, grass: 1 },
-];
+/** World antialiasing (MSAA samples) and upscaling sharpness, both fixed. */
+const MSAA_SAMPLES = 4;
+const SHARPNESS = 0.35;
 
 export class Renderer {
   constructor(canvas) {
@@ -29,54 +23,80 @@ export class Renderer {
     r.toneMapping = THREE.ACESFilmicToneMapping;
     r.toneMappingExposure = 1.05;
     r.autoClear = false;
-    r.shadowMap.autoUpdate = false;   // render() decides when (QUALITY.shadowEvery)
+    r.shadowMap.enabled = true;
+    r.shadowMap.type = THREE.PCFSoftShadowMap;
+    r.shadowMap.autoUpdate = false;   // render() and followSun() decide when
     r.info.autoReset = false;         // count every pass of a frame, not just the last
-    this.frame = 0;
-    this.quality = null;
-    this.renderScale = 1;
+
+    this.renderScale = null;
+    this.aoStrength = 0;
+    this.gpuTimer = new GpuTimer(r.getContext());
+    this.post = null;
+    this.metrics = { cpuRenderMs: 0, gpuMs: null, worldScale: 1, tier: '' };
+    this.lastPostSize = '';
+    // Graphics level: chosen per PC by GraphicsAutoTune (see graphicsTier.js).
+    this.graphics = TIERS[TIERS.length - 1];
+    this.graphicsListeners = new Set();
 
     this.camera = new THREE.PerspectiveCamera(CONFIG.player.fov, 1, 0.1, R.viewDistance);
     this.camera.rotation.order = 'YXZ';
     this.reset();
     addEventListener('resize', () => this.resize());
-    onSettings((st) => this.applySettings(st));
+    this.unsubSettings = onSettings((st) => this.applySettings(st));
+    this.autoTune = new GraphicsAutoTune((tier) => this.setTier(tier), gpuName(r.getContext()));
+    this.setTier(this.autoTune.tier);
   }
 
-  /** Graphics quality and render scale, applied live (no restart). */
+  /** Render scale and contact shading, applied live (no restart). */
   applySettings(st) {
-    const q = QUALITY[st.quality] ?? QUALITY[2];
-    const scale = (st.renderScale ?? 100) / 100;
-    if (q === this.quality && scale === this.renderScale) return;
-    const r = this.renderer;
-    const type = q.soft ? THREE.PCFSoftShadowMap : THREE.PCFShadowMap;
-    const recompile = this.quality && (q.shadows !== r.shadowMap.enabled || type !== r.shadowMap.type);
-    this.quality = q;
-    this.renderScale = scale;
-    r.shadowMap.enabled = q.shadows;
-    r.shadowMap.type = type;
-    r.setPixelRatio(Math.min(devicePixelRatio, q.pixelRatio) * scale);
-    this.#applyShadowSize();
-    // shadows on/off and the filter type are compiled into the shaders
-    if (recompile) for (const sc of [this.scene, this.viewScene]) sc.traverse((o) => {
-      for (const m of [o.material].flat()) if (m) m.needsUpdate = true;
-    });
-    this.resize();
-    this.onQuality?.(q);
+    this.renderScale = (st.renderScale ?? 100) / 100;
+    this.aoStrength = (st.ambientOcclusion ?? 0) / 100;
   }
 
-  #applyShadowSize() {
-    const sh = this.sun.shadow;
-    const size = (this.quality ?? QUALITY[2]).shadowSize;
-    if (sh.mapSize.x !== size) {
-      sh.mapSize.set(size, size);
+  /** Switch the internal graphics level (live; listeners rebuild vegetation LOD/density). */
+  setTier(tier) {
+    const g = TIERS[tier] ?? TIERS[TIERS.length - 1];
+    const r = this.renderer;
+    this.graphics = g;
+    // The canvas remains at output resolution. Only the world target scales;
+    // the viewmodel and HTML HUD retain their output-resolution silhouettes.
+    r.setPixelRatio(Math.min(devicePixelRatio, g.pixelRatio));
+    if (r.shadowMap.enabled !== g.shadows) {
+      r.shadowMap.enabled = g.shadows;
+      // shadows on/off are compiled into the shaders
+      for (const sc of [this.scene, this.viewScene]) sc.traverse((o) => {
+        for (const m of [o.material].flat()) if (m) m.needsUpdate = true;
+      });
+    }
+    this.#applyShadow();
+    this.resize();
+    for (const fn of this.graphicsListeners) fn(g);
+  }
+
+  /** Calls fn(graphics) now and on every level change; returns an unsubscribe. */
+  onGraphics(fn) {
+    this.graphicsListeners.add(fn);
+    fn(this.graphics);
+    return () => this.graphicsListeners.delete(fn);
+  }
+
+  #applyShadow() {
+    const sh = this.sun.shadow, g = this.graphics;
+    if (sh.mapSize.x !== g.shadowSize) {
+      sh.mapSize.set(g.shadowSize, g.shadowSize);
       sh.map?.dispose();
       sh.map = null;
     }
+    Object.assign(sh.camera, { left: -g.shadowRange, right: g.shadowRange, top: g.shadowRange, bottom: -g.shadowRange });
+    sh.camera.updateProjectionMatrix();
+    this.shadowCenter = null;   // re-snap to the new texel size
     this.renderer.shadowMap.needsUpdate = true;
   }
 
   /** Fresh, empty scenes (a new island reuses the renderer). */
   reset() {
+    this.sun?.shadow.dispose();
+    // Post targets are renderer-owned and reused between islands.
     this.scene = new THREE.Scene();
     this.scene.fog = new THREE.Fog(0xa8dcf7, R.fogNear, R.fogFar);
     this.scene.background = new THREE.Color(0x7cc8f5);
@@ -86,7 +106,6 @@ export class Renderer {
     this.viewCamera = new THREE.PerspectiveCamera(62, 1, 0.01, 10);
     this.viewScene.add(this.viewCamera);
     this.#setupLights();
-    this.#applyShadowSize();
     this.resize();
     this.renderer.renderLists.dispose();
   }
@@ -99,10 +118,10 @@ export class Renderer {
     this.scene.fog.far = sky.fogFar ?? R.fogFar;
     this.scene.background = new THREE.Color(sky.background);
     this.sun.color.set(sky.sun);
-    this.sun.intensity = sky.sunIntensity ?? 2.6;
+    this.sun.intensity = (sky.sunIntensity ?? 2.6) * 1.03;
     this.hemi.color.set(sky.hemiSky);
     this.hemi.groundColor.set(sky.hemiGround);
-    this.hemi.intensity = sky.hemiIntensity ?? 1.6;
+    this.hemi.intensity = (sky.hemiIntensity ?? 1.6) * 0.9;
     this.renderer.toneMappingExposure = sky.exposure ?? 1.05;
   }
 
@@ -121,10 +140,10 @@ export class Renderer {
     if (!(this.scene.background instanceof THREE.Color)) this.scene.background = new THREE.Color();
     col(this.scene.background, a.background, b.background);
     col(this.sun.color, a.sun, b.sun);
-    this.sun.intensity = L(a.sunIntensity, b.sunIntensity, 2.6);
+    this.sun.intensity = L(a.sunIntensity, b.sunIntensity, 2.6) * 1.03;
     col(this.hemi.color, a.hemiSky, b.hemiSky);
     col(this.hemi.groundColor, a.hemiGround, b.hemiGround);
-    this.hemi.intensity = L(a.hemiIntensity, b.hemiIntensity, 1.6);
+    this.hemi.intensity = L(a.hemiIntensity, b.hemiIntensity, 1.6) * 0.9;
     this.renderer.toneMappingExposure = L(a.exposure, b.exposure, 1.05);
   }
 
@@ -132,8 +151,8 @@ export class Renderer {
     // Warm sun from the south-west, high afternoon.
     const sun = new THREE.DirectionalLight(0xfff0d6, 2.6);
     sun.castShadow = true;
-    sun.shadow.mapSize.set(R.shadowMapSize, R.shadowMapSize);
-    const s = R.shadowRange;
+    sun.shadow.mapSize.set(this.graphics.shadowSize, this.graphics.shadowSize);
+    const s = this.graphics.shadowRange;
     Object.assign(sun.shadow.camera, { left: -s, right: s, top: s, bottom: -s, near: 1, far: 400 });
     sun.shadow.bias = -0.0004;
     sun.shadow.normalBias = 0.6;
@@ -157,10 +176,17 @@ export class Renderer {
   followSun(x, y, z) {
     const d = 160;
     // Snap to shadow texels to avoid shimmering.
-    const texel = (R.shadowRange * 2) / this.sun.shadow.mapSize.x;
+    const texel = (this.graphics.shadowRange * 2) / this.sun.shadow.mapSize.x;
     const sx = Math.round(x / texel) * texel, sz = Math.round(z / texel) * texel;
     this.sun.target.position.set(sx, y, sz);
     this.sun.position.set(sx + this.sunDir.x * d, y + this.sunDir.y * d, sz + this.sunDir.z * d);
+    // A moving shadow camera invalidates static shadows even on skipped frames.
+    const previous = this.shadowCenter;
+    if (!previous || previous.x !== sx || previous.y !== y || previous.z !== sz) {
+      this.renderer.shadowMap.needsUpdate = true;
+      this.shadowCenter ??= new THREE.Vector3();
+      this.shadowCenter.set(sx,y,sz);
+    }
   }
 
   resize() {
@@ -170,15 +196,59 @@ export class Renderer {
     this.camera.updateProjectionMatrix();
     this.viewCamera.aspect = w / h;
     this.viewCamera.updateProjectionMatrix();
+    this.lastPostSize = '';
   }
 
-  render() {
+  async prepare() {
+    // Avoid compiling the largest scene shaders during the first playable frame.
+    await this.renderer.compileAsync(this.scene, this.camera);
+    await this.renderer.compileAsync(this.viewScene, this.viewCamera);
+  }
+
+  render(rawDt = 0) {
     const r = this.renderer;
+    const started = performance.now();
+    const gpu = this.gpuTimer.poll();
+    const cap = FPS_LIMITS[settings.fpsLimit] ?? 0;
+    this.autoTune.frame(rawDt, gpu, cap > 0 && cap < 60);
+    this.gpuTimer.begin();
     r.info.reset();
-    if (++this.frame % this.quality.shadowEvery === 0) r.shadowMap.needsUpdate = true;
-    r.clear();
-    r.render(this.scene, this.camera);
+    r.shadowMap.needsUpdate = true;
+    const scale = this.renderScale;
+    // The canvas is created with MSAA; the world target only exists when it
+    // is scaled or shaded, and then carries its own MSAA samples.
+    if (scale < 0.999 || this.aoStrength > 0) {
+      this.post ??= new WorldPost(r);
+      const size = r.getDrawingBufferSize(_bufferSize);
+      const w = Math.max(1, Math.round(size.x * scale)), h = Math.max(1, Math.round(size.y * scale));
+      const samples = Math.min(MSAA_SAMPLES, r.capabilities.maxSamples);
+      const key = `${w}:${h}:${samples}:${this.aoStrength > 0}`;
+      if (key !== this.lastPostSize) {
+        this.post.resize(w, h, samples, this.aoStrength > 0);
+        this.lastPostSize = key;
+      }
+      this.post.render(this.scene, this.camera, scale < 0.999 ? SHARPNESS : 0, this.aoStrength);
+    } else {
+      r.setRenderTarget(null);
+      r.clear();
+      r.render(this.scene, this.camera);
+    }
     r.clearDepth();
     r.render(this.viewScene, this.viewCamera);
+    this.gpuTimer.end();
+    this.metrics.cpuRenderMs = performance.now()-started;
+    this.metrics.gpuMs = this.gpuTimer.ms;
+    this.metrics.worldScale = this.renderScale;
+    this.metrics.tier = `${this.graphics.name} (${this.autoTune.state})`;
+  }
+
+  dispose() {
+    this.unsubSettings?.();
+    this.post?.dispose();
+    this.sun?.shadow.dispose();
+    this.gpuTimer.dispose();
+    this.renderer.dispose();
   }
 }
+
+const _bufferSize = new THREE.Vector2();

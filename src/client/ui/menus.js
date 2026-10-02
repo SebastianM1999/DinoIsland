@@ -25,21 +25,24 @@ export const ICON_SPRITE = `
 export function initSettings({ onClose } = {}) {
   const root = $('settings');
   const panel = $('settings-general');
-  const tabs = { general: $('tab-general'), controls: $('tab-controls') };
-  const panels = { general: panel, controls: $('settings-controls') };
+  const tabs = { general: $('tab-general'), graphics: $('tab-graphics'), controls: $('tab-controls') };
+  const panels = { general: panel, graphics: $('settings-graphics'), controls: $('settings-controls') };
+  const order = Object.keys(tabs);
   let returnFocus = null;
 
   // Build one labelled slider row per setting, grouped by heading.
   let group = '';
   const rows = new Map();
   for (const d of SETTING_DEFS) {
-    if (d.group !== group) {
-      group = d.group;
+    // Graphics settings get their own tab; the rest share "Sound & view".
+    const target = d.group === 'Graphics' ? panels.graphics : panel;
+    if (d.group !== group && target === panel) {
       const h = document.createElement('h3');
       h.className = 'settings-group';
-      h.textContent = group;
-      panel.append(h);
+      h.textContent = d.group;
+      target.append(h);
     }
+    group = d.group;
     const row = document.createElement('div');
     row.className = 'setting-row';
     const id = `set-${d.id}`;
@@ -52,7 +55,7 @@ export function initSettings({ onClose } = {}) {
     if (toggle) input.addEventListener('change', () => setSetting(d.id, input.checked ? 1 : 0));
     else input.addEventListener('input', () => setSetting(d.id, Number(input.value)));
     rows.set(d.id, { input, out: row.querySelector('output'), d });
-    panel.append(row);
+    target.append(row);
   }
   onSettings((s) => {
     for (const { input, out, d } of rows.values()) {
@@ -92,11 +95,11 @@ export function initSettings({ onClose } = {}) {
       panels[k].hidden = k !== name;
     }
   }
-  tabs.general.addEventListener('click', () => selectTab('general'));
-  tabs.controls.addEventListener('click', () => selectTab('controls'));
+  for (const k of order) tabs[k].addEventListener('click', () => selectTab(k));
   root.querySelector('[role=tablist]').addEventListener('keydown', (e) => {
     if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
-    const next = tabs.general.getAttribute('aria-selected') === 'true' ? 'controls' : 'general';
+    const current = order.findIndex((k) => tabs[k].getAttribute('aria-selected') === 'true');
+    const next = order[(current + (e.key === 'ArrowRight' ? 1 : order.length - 1)) % order.length];
     selectTab(next);
     tabs[next].focus();
   });
@@ -105,7 +108,7 @@ export function initSettings({ onClose } = {}) {
     returnFocus = document.activeElement;
     selectTab(tab);
     root.hidden = false;
-    (tab === 'general' ? rows.get('master').input : tabs.controls).focus();
+    (tab === 'general' ? rows.get('master').input : tab === 'graphics' ? rows.get('renderScale').input : tabs.controls).focus();
   }
   function close() {
     if (root.hidden) return;

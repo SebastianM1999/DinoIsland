@@ -1,3 +1,4 @@
+import { retainResource } from '../../core/resources.js';
 // Adapter for the MIT-licensed Claude-of-Duty P-19 and M4A1 geometry.
 // Preserve the original assemblies; use lightweight materials for this renderer.
 import * as THREE from 'three';
@@ -15,7 +16,7 @@ function material(key) {
     materials.set(key, new THREE.MeshStandardMaterial({ color, roughness: plastic ? 0.88 : bright ? 0.38 : 0.68,
       metalness: plastic ? 0 : 0.45, transparent: /glass/.test(key), opacity: /glass/.test(key) ? 0.35 : 1 }));
   }
-  return materials.get(key);
+  return retainResource(materials.get(key));
 }
 function data(kind) {
   if (!cache.has(kind)) {
@@ -31,7 +32,7 @@ export function makeFirearm(kind) {
   root.name = kind === 'pistol' ? 'P-19' : 'M4A1';
   const add = (geometries, parent) => {
     for (const [key, geometry] of geometries) {
-      const m = new THREE.Mesh(geometry, material(key)); m.castShadow = true; parent.add(m);
+      const m = new THREE.Mesh(retainResource(geometry), material(key)); m.castShadow = true; parent.add(m);
     }
   };
   add(model.body, root);

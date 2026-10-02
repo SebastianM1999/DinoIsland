@@ -1,3 +1,4 @@
+import { retainResource } from '../../core/resources.js';
 // Spring cave: the rocky grotto a waterfall pours out of, set into a steep
 // cliff / mountain face. One smooth SDF rock mass (a chunk of cliff face,
 // two cheeks and a heavy brow around the mountain opening, plus a
@@ -172,7 +173,7 @@ export function buildSpringCave(s, biome) {
   const seed = springSeed(s);
   const key = `${seed}:${width.toFixed(2)}:${biome?.id || 'jungle'}`;
   let g = cache.get(key);
-  if (!g) { g = buildGeometry(width, seed, biome); cache.set(key, g); }
+  if (!g) { g = buildGeometry(width, seed, biome); retainResource(g); cache.set(key, g); }
   const group = new THREE.Group();
   group.name = 'springCave';
   group.position.set(s.x, s.y ?? 0, s.z);

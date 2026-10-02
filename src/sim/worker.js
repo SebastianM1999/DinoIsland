@@ -11,12 +11,14 @@ import { ServerWorld } from './world.js';
 let world = null;
 let playerId = null;
 let interval = null;
+let reliableSeq = 0;
 
 function start(name, outfit, { level = 0, baseStage = 0, raidIn = 0 } = {}) {
   world = new ServerWorld({
     send(to, msg, except) {
       if (playerId === null || (to === '*' ? except === playerId : to !== playerId)) return;
-      postMessage(msg);
+      if (msg.t !== 'snap') reliableSeq++;
+      postMessage({ ...msg, r: reliableSeq });
     },
   }, { level });
   // testing aid (?base=1..3): the base already stands on the first plot
@@ -36,11 +38,15 @@ function start(name, outfit, { level = 0, baseStage = 0, raidIn = 0 } = {}) {
     const now = performance.now();
     acc += Math.min(250, now - last);
     last = now;
+    let snapshotDue = false;
+    const tickStart = performance.now();
     while (acc >= tickMs) {
       world.step(tickMs / 1000);
       acc -= tickMs;
-      if (world.snapshotDue(tickMs / 1000)) world.host.send(playerId, world.snapshot());
+      if (world.snapshotDue(tickMs / 1000)) snapshotDue = true;
     }
+    world.tickDurationMs = performance.now() - tickStart;
+    if (snapshotDue) world.host.send(playerId, world.snapshot());
   }, tickMs / 2);
 }
 

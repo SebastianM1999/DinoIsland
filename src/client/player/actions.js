@@ -28,6 +28,7 @@ const SLOT_LABEL = { spear: 'Spear', bow: 'Bow', trap: 'Trap', bait: 'Meat bait'
 const _fwd = new THREE.Vector3();
 const _right = new THREE.Vector3();
 const _up = new THREE.Vector3();
+const _eye = new THREE.Vector3();
 
 export class PlayerActions {
   constructor(game) {
@@ -95,7 +96,11 @@ export class PlayerActions {
     cam.getWorldDirection(_fwd);
     _right.set(1, 0, 0).applyQuaternion(cam.quaternion);
     _up.set(0, 1, 0).applyQuaternion(cam.quaternion);
-    return { origin: cam.position, dir: _fwd, right: _right, up: _up };
+    // Gameplay origin: the eye without head bob, landing dip or correction
+    // glide, i.e. the point the server validates shots against.
+    const p = this.game.player.pos;
+    _eye.set(p.x, p.y + P.eyeHeight, p.z);
+    return { origin: _eye, dir: _fwd, right: _right, up: _up };
   }
 
   bestFruit() {

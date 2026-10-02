@@ -1,3 +1,4 @@
+import { retainResource } from '../../core/resources.js';
 // Cave: a big smooth rock dome with a hollow inside and a thick arched
 // entrance, set into a hillside (see shared/caveShape.js for size, colliders,
 // the hillside rock masses and the rubble around the mouth). The rock is one
@@ -302,7 +303,7 @@ export function buildCave(c, biome) {
   const seed = (c.seed ?? 1) | 0;
   const key = `${seed}:${biome?.id || 'jungle'}`;
   let g = geoCache.get(key);
-  if (!g) { g = buildGeometry(seed, biome); geoCache.set(key, g); }
+  if (!g) { g = buildGeometry(seed, biome); retainResource(g); geoCache.set(key, g); }
   const group = new THREE.Group();
   group.name = 'cave';
   group.position.set(c.x, c.y ?? 0, c.z);

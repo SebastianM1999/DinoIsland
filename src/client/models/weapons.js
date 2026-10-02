@@ -1,3 +1,4 @@
+import { retainResource } from '../core/resources.js';
 // Weapons and tools: spear, bow, arrow, trap, meat bait.
 // Built once, geometry cached. Orientation: tools point along +Y from the grip.
 
@@ -11,7 +12,7 @@ export const ARROW_TIP_Y = 0.92;
 const cache = new Map();
 const cached = (key, fn) => {
   if (!cache.has(key)) cache.set(key, fn());
-  return cache.get(key);
+  return retainResource(cache.get(key));
 };
 
 const WOOD = '#8a5a35';

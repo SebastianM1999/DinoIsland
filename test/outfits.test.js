@@ -47,5 +47,5 @@ test('players join with an outfit and can only change it at the hut wardrobe', (
   const ev = outfitEvents();
   assert.equal(ev.length, 1);
   assert.equal(ev[0].to, '*');
-  assert.deepEqual(ev[0].message, { t: MSG.EV, e: EV.OUTFIT, id: a.id, outfit: { hat: 9, top: 9, pants: 9 } });
+  assert.deepEqual(ev[0].message, { t: MSG.EV, e: EV.OUTFIT, id: a.id, outfit: { hat: 9, top: 9, pants: 9 }, w: world.worldEpoch });
 });

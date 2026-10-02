@@ -121,6 +121,9 @@ async function launch(net, reuse = null) {
     loadingText.textContent = 'Building the island…';
     game = new Game(canvas, net, reuse ?? (menuAudio ? { audio: menuAudio } : null));
     if (DEBUG_QUERY.has('debug')) window.dinoGame = game;   // testing aid: inspect the running game
+    loadingText.textContent = 'Preparing shaders…';
+    // Compile up front so the first playable frames do not hitch; optional.
+    await game.gfx.prepare().catch((e) => console.warn('Shader precompile failed', e));
   } catch (err) {
     console.error(err);
     net.close();
@@ -131,6 +134,8 @@ async function launch(net, reuse = null) {
     setBusy(false, `Could not start the game: ${err.message}`);
     return false;
   }
+  // The game took over net.onClose; a disconnect during the precompile had no onLeave yet.
+  if (net.closed) { backToMenu('Disconnected while loading the island'); return false; }
   window.__game = game; // handy for debugging in the console
   game.input.onLockChange = (locked) => {
     setPaused(!locked && game?.running && !game.hud.isPanelOpen() && !game.input.lockPending);

@@ -1,3 +1,4 @@
+import { retainResource } from '../core/resources.js';
 // Server-owned world objects shown on the client: loot and dropped
 // arrows/spears lodged in terrain or dinosaurs, traps and meat bait.
 
@@ -9,7 +10,7 @@ import { spearGeometry, arrowGeometry, trapGeometry, meatGeometry } from '../mod
 
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
 const geoCache = new Map();
-const cached = (k, fn) => (geoCache.has(k) ? geoCache.get(k) : (geoCache.set(k, fn()), geoCache.get(k)));
+const cached = (k, fn) => retainResource(geoCache.has(k) ? geoCache.get(k) : (geoCache.set(k, fn()), geoCache.get(k)));
 
 /** Loot models (roughly 0.3–0.6 m) built from the kit. */
 const LOOT_GEO = {

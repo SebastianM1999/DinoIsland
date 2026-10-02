@@ -10,7 +10,8 @@ import { insideBossArena } from '../../shared/bossArena.js';
 import { MAT } from '../models/kit.js';
 import { treeGeometry, treeMatrix, TREE_WIND, TREE_VARIANTS } from './veg/trees.js';
 import * as plants from './veg/plants.js';
-import { windPair, LEAF_MAT, instanced, finishInstanced, foliageTint } from './veg/shapes.js';
+import { windPair, LEAF_MAT, instanced, foliageTint, withGeometryDetail } from './veg/shapes.js';
+import { SpatialInstances } from './veg/spatialInstances.js';
 
 const TAU = Math.PI * 2;
 const C = (h) => new THREE.Color(h);
@@ -27,6 +28,7 @@ export const VEG_TUNING = {
 export function buildVegetation(terrain, layout) {
   const group = new THREE.Group();
   group.name = 'vegetation';
+  const spatial = new SpatialInstances(group);
   const m4 = new THREE.Matrix4();
   const q = new THREE.Quaternion();
   const e = new THREE.Euler();
@@ -58,14 +60,15 @@ export function buildVegetation(terrain, layout) {
       const b = 0.88 + 0.12 * ((t.hue * 7.3) % 1);
       trunk.setColorAt(i, col.setRGB(b, b * 0.98, b * 0.96));
     });
-    group.add(finishInstanced(trunk), finishInstanced(leaves));
+    spatial.add(trunk, { wind });
+    spatial.add(leaves, { wind, geometries: [geo.foliage, treeGeometry(type, +variant, 1).foliage, treeGeometry(type, +variant, 2).foliage] });
   }
 
   // ---------------------------------------------------- bushes and ferns
-  const addSmall = (geo, list, windParams, name) => {
+  const addSmall = (geometries, list, windParams, name) => {
     if (!list.length) return;
     const w = windPair(LEAF_MAT, windParams);
-    const m = instanced(geo, w.mat, list.length, { cast: false, receive: true, name });
+    const m = instanced(geometries[0], w.mat, list.length, { cast: false, receive: true, name });
     list.forEach((b, i) => {
       e.set(0, b.rot, 0); q.setFromEuler(e);
       p.set(b.x, b.y - 0.06, b.z);
@@ -73,7 +76,7 @@ export function buildVegetation(terrain, layout) {
       m.setMatrixAt(i, m4.compose(p, q, s));
       m.setColorAt(i, foliageTint(b.hue, col));
     });
-    group.add(finishInstanced(m));
+    spatial.add(m, { geometries, wind: windParams });
   };
   // Bush types come from plants.js (BUSH_TYPES); unknown types fall back to a bush.
   const types = plants.BUSH_TYPES || {
@@ -86,7 +89,7 @@ export function buildVegetation(terrain, layout) {
     if (!byType.has(t)) byType.set(t, []);
     byType.get(t).push(b);
   }
-  for (const [t, list] of byType) addSmall(types[t].geometry(), list, types[t].wind || VEG_TUNING.bushWind, `bushes-${t}`);
+  for (const [t, list] of byType) addSmall([0, 1, 2].map(detail => withGeometryDetail(detail, types[t].geometry)), list, types[t].wind || VEG_TUNING.bushWind, `bushes-${t}`);
 
   // --------------------------------------------------- grass + flowers
   const plan = layout.plan;
@@ -153,7 +156,7 @@ export function buildVegetation(terrain, layout) {
     }
   }
   grass.count = gi;
-  group.add(finishInstanced(grass));
+  spatial.add(grass, { wind: VEG_TUNING.grassWind, density: true });
 
   const flowers = instanced(plants.flowerGeometry(), grassW.mat, Math.max(1, flowerCount), { cast: false, receive: true, name: 'flowers' });
   let fi = 0;
@@ -178,16 +181,16 @@ export function buildVegetation(terrain, layout) {
     }
   }
   flowers.count = fi;
-  if (fi > 0) group.add(finishInstanced(flowers));
+  spatial.add(flowers, { wind: VEG_TUNING.grassWind, density: true });
 
   return {
     group,
-    // Wind is shader-driven (WIND.uTime), nothing to do per frame.
-    update() {},
+    spatial,
+    update(dt, time, cam) { if (cam) spatial.update(cam); },
+    setQuality(q) { spatial.setQuality(q); },
     /** Draw only a share (0..1) of the grass and flowers. Instances are in random order, so any prefix is evenly spread. */
     setDensity(k) {
-      grass.count = Math.round(gi * k);
-      flowers.count = Math.round(fi * k);
+      spatial.setDensity(k);
     },
   };
 }

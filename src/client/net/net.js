@@ -25,9 +25,22 @@ export class Net {
     this.minSnapNow = -Infinity;    // snapshots older than the last welcome belong to the previous island
     this.closed = false;
     this.onClose = null;
+    this.stateProvider = null;
+    this.onStateSent = null;
+    this.lastSnapNow = -Infinity;
+    this.lastSnapSeq = null;
+    this.reliableSeq = 0;
+    this.worldEpoch = null;
+    this.pendingSnapshot = null;
+    this.lastRenderTime = -Infinity;
+    this.offsetSamples = [];
+    this.pongSamples = [];
+    this.rttSamples = [];
+    this.telemetry = { snapshots: 0, staleSnapshots: 0, missingSnapshots: 0, bufferUnderruns: 0, snapshotAge: 0, rttP50: 0, rttP95: 0 };
     transport.onMessage = (msg) => this.#dispatch(msg);
     transport.onClose = (reason) => {
       this.closed = true;
+      clearInterval(this.heartbeat);
       this.onClose?.(reason);
     };
   }
@@ -114,6 +127,8 @@ export class Net {
   clearHandlers() {
     this.handlers.clear();
     this.onClose = null;
+    this.stateProvider = null;
+    this.onStateSent = null;
   }
 
   on(type, fn) {
@@ -126,17 +141,31 @@ export class Net {
   }
 
   act(a, data = {}) {
-    this.send({ t: MSG.ACT, a, ...data });
+    // An action must not depend on an earlier unreliable movement packet.
+    // The bundled state goes through exactly the same server validation.
+    const state = this.stateProvider ? this.#state(this.stateProvider()) : undefined;
+    this.send({ t: MSG.ACT, a, ...data, ...(state ? { state } : {}) });
+    if (state) this.onStateSent?.(state.s);
   }
 
   close() {
     this.closed = true;
+    clearInterval(this.heartbeat);
     this.transport.close();
   }
 
   /** Estimated current server time in seconds. */
   serverNow() {
     return performance.now() / 1000 + (this.serverOffset ?? 0);
+  }
+
+  /** Remote playback never runs backwards when delay or clock estimates change. */
+  renderNow() {
+    const target = this.serverNow() - this.interpDelay;
+    this.lastRenderTime = Math.max(this.lastRenderTime, target);
+    this.telemetry.snapshotAge = Number.isFinite(this.lastSnapNow) ? Math.max(0, this.serverNow() - this.lastSnapNow) : 0;
+    if (Number.isFinite(this.lastSnapNow) && this.lastRenderTime > this.lastSnapNow) this.telemetry.bufferUnderruns++;
+    return this.lastRenderTime;
   }
 
   /**
@@ -153,31 +182,94 @@ export class Net {
 
   /** A movement update for the server (fields of MSG.STATE without t/s/k). */
   sendState(fields) {
-    this.send({ t: MSG.STATE, s: ++this.stateSeq, k: this.epoch, ...fields });
+    const state = this.#state(fields);
+    this.send({ t: MSG.STATE, ...state });
+    this.onStateSent?.(state.s);
+    return state.s;
+  }
+
+  #state(fields) { return { ...fields, s: ++this.stateSeq, k: this.epoch }; }
+
+  #clock(msg, local) {
+    if (msg.t === MSG.PONG && Number.isFinite(msg.c) && msg.c <= local) {
+      this.rtt = local - msg.c;
+      this.rttSamples.push(this.rtt);
+      if (this.rttSamples.length > 60) this.rttSamples.shift();
+      const sorted = [...this.rttSamples].sort((a, b) => a - b);
+      this.telemetry.rttP50 = sorted[Math.floor((sorted.length - 1) * 0.5)];
+      this.telemetry.rttP95 = sorted[Math.ceil((sorted.length - 1) * 0.95)];
+      this.pongSamples.push({ at: local, rtt: this.rtt, offset: msg.now - (msg.c + local) / 2 });
+    }
+    this.offsetSamples.push({ at: local, offset: msg.now - local });
+    while (this.offsetSamples.length && local - this.offsetSamples[0].at > 5) this.offsetSamples.shift();
+    while (this.pongSamples.length && local - this.pongSamples[0].at > 10) this.pongSamples.shift();
+    // Highest arrival offset is the least delayed snapshot; a minimum-RTT
+    // ping refines it with both ends of the measured round trip.
+    const bestPong = this.pongSamples.reduce((a, b) => !a || b.rtt < a.rtt ? b : a, null);
+    const target = bestPong ? bestPong.offset : Math.max(...this.offsetSamples.map(s => s.offset));
+    if (this.serverOffset === null) this.serverOffset = target;
+    else this.serverOffset += (target - this.serverOffset) * 0.05;
+  }
+
+  #acceptSnapshot(msg, local) {
+    if (!Number.isFinite(msg.now) || msg.now < this.minSnapNow || msg.now <= this.lastSnapNow ||
+        (Number.isFinite(msg.r) && msg.r < this.reliableSeq) ||
+        (this.worldEpoch !== null && Number.isFinite(msg.w) && msg.w !== this.worldEpoch)) {
+      this.telemetry.staleSnapshots++;
+      return false;
+    }
+    if (Number.isFinite(msg.r) && msg.r > this.reliableSeq) {
+      // A snapshot can overtake reliable death/respawn/add/remove events.
+      // Keep only the newest and release after its reliable prerequisites.
+      if (!this.pendingSnapshot || msg.now > this.pendingSnapshot.now) this.pendingSnapshot = msg;
+      return false;
+    }
+    if (Number.isFinite(msg.n) && this.lastSnapSeq !== null) this.telemetry.missingSnapshots += Math.max(0, msg.n - this.lastSnapSeq - 1);
+    if (Number.isFinite(msg.n)) this.lastSnapSeq = msg.n;
+    if (this.lastSnapshotArrival !== undefined) {
+      const arrivalGap = local - this.lastSnapshotArrival;
+      const serverGap = msg.now - this.lastSnapNow;
+      this.#adaptInterp(Math.max(Math.abs(arrivalGap - serverGap), serverGap - 1 / CONFIG.net.snapshotRate));
+    }
+    this.lastSnapshotArrival = local;
+    this.lastSnapNow = msg.now;
+    this.telemetry.snapshots++;
+    return true;
   }
 
   #dispatch(msg) {
+    if (this.closed || !msg || typeof msg !== 'object') return;
+    const local = performance.now() / 1000;
     if (msg.t === MSG.WELCOME) {
       this.myId = msg.id;
       this.epoch = msg.k ?? 0;
       this.minSnapNow = msg.now;
+      this.worldEpoch = Number.isFinite(msg.w) ? msg.w : null;
+      this.lastSnapNow = -Infinity;
+      this.lastSnapSeq = null;
+      this.lastSnapshotArrival = undefined;
+      this.lastRenderTime = -Infinity;
+      this.pendingSnapshot = null;
+      if (!this.heartbeat) {
+        // Arm before the first ping: a synchronous transport may answer re-entrantly.
+        this.heartbeat = setInterval(() => this.send({ t: MSG.PING, c: performance.now() / 1000 }), 2000);
+        this.heartbeat.unref?.();
+        this.send({ t: MSG.PING, c: local });
+      }
     } else if (msg.t === MSG.SNAP) {
-      if (msg.now < this.minSnapNow) return;   // overtaken by the welcome (unreliable transport)
+      if (!this.#acceptSnapshot(msg, local)) return;
     } else if (msg.t === MSG.CORRECT || (msg.t === MSG.EV && msg.e === EV.RESPAWN && msg.id === this.myId)) {
       if (Number.isFinite(msg.k)) this.epoch = msg.k;
     }
-    if (msg.t === MSG.SNAP || msg.t === MSG.WELCOME || msg.t === MSG.PONG) {
-      const local = performance.now() / 1000;
-      const target = msg.now - local;
-      // Take the smallest offset seen recently (least delayed packet), drift slowly.
-      if (this.serverOffset === null) this.serverOffset = target;
-      else if (target > this.serverOffset) this.serverOffset += (target - this.serverOffset) * 0.05;
-      else this.serverOffset += (target - this.serverOffset) * 0.3;
-      if (msg.t === MSG.SNAP) this.#adaptInterp(Math.max(0, this.serverOffset - target));
-    }
-    if (msg.t === MSG.PONG) this.rtt = performance.now() / 1000 - msg.c;
+    if (msg.t !== MSG.SNAP && Number.isFinite(msg.r)) this.reliableSeq = Math.max(this.reliableSeq, msg.r);
+    if ((msg.t === MSG.SNAP || msg.t === MSG.WELCOME || msg.t === MSG.PONG) && Number.isFinite(msg.now)) this.#clock(msg, local);
     const key = msg.t === MSG.EV ? `ev:${msg.e}` : msg.t;
     const list = this.handlers.get(key);
     if (list) for (const fn of list) fn(msg);
+    if (msg.t !== MSG.SNAP && this.pendingSnapshot && this.pendingSnapshot.r <= this.reliableSeq) {
+      const pending = this.pendingSnapshot;
+      this.pendingSnapshot = null;
+      this.#dispatch(pending);
+    }
   }
 }

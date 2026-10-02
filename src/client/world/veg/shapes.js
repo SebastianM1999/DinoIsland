@@ -5,6 +5,15 @@ import { THREE, MAT, deform, paint, jitter, windMaterial, smoothNormals } from '
 import { noise3 } from '../../models/props/common.js';
 
 const _col = new THREE.Color();
+let geometryDetail = 0;
+export const getGeometryDetail = () => geometryDetail;
+
+/** Scope tessellation changes to synchronous cached LOD construction. */
+export function withGeometryDetail(detail, build) {
+  const previous = geometryDetail;
+  geometryDetail = detail;
+  try { return build(); } finally { geometryDetail = previous; }
+}
 
 /**
  * Foliage clump: a softly lumped, squashed icosphere with a flattened
@@ -15,7 +24,7 @@ export function clump(r, {
   top = '#8fd14f', mid = '#6cb83e', mid2 = '#62ad3a', bottom = '#4a8f33',
 } = {}) {
   // enough subdivisions that even big canopy masses keep a round silhouette
-  const sub = Math.min(maxDetail, Math.max(detail, r > 2.4 ? 4 : r > 1.0 ? 3 : r > 0.45 ? 2 : 1));
+  const sub = Math.max(1, Math.min(maxDetail, Math.max(detail, r > 2.4 ? 4 : r > 1.0 ? 3 : r > 0.45 ? 2 : 1)) - geometryDetail);
   let g = new THREE.IcosahedronGeometry(r, sub);
   g = deform(g, (v) => {
     // smooth low-frequency lumps: soft leafy bulges, no per-vertex noise
@@ -51,6 +60,10 @@ export function clump(r, {
  * @param {{side:THREE.Vector3, ridge?:number, serrate?:number, color?:(t:number, half:number)=>any}} opts
  */
 export function leafStrip(pts, width, { side, ridge = 0.3, serrate = 0.35, color = (t, h) => (h ? '#5bb035' : '#3f8f2c') }) {
+  if (geometryDetail) {
+    const step = geometryDetail + 1;
+    pts = pts.filter((_, i) => i % step === 0 || i === pts.length - 1);
+  }
   const n = pts.length;
   const L = [], R = [], M = [];
   const tan = new THREE.Vector3(), up = new THREE.Vector3();
@@ -106,13 +119,19 @@ export function arcPath(from, dirX, dirZ, length, rise, droop, segs = 7) {
 const matCache = new Map();
 export function sharedMat(key, make) {
   let m = matCache.get(key);
-  if (!m) { m = make(); matCache.set(key, m); }
+  if (!m) {
+    m = make();
+    if (m.isMaterial) m.userData.sharedResource = true;
+    else for (const value of Object.values(m)) if (value?.isMaterial) value.userData.sharedResource = true;
+    matCache.set(key, m);
+  }
   return m;
 }
 
 /** Base material for thin leaves (double sided). */
 export const LEAF_MAT = MAT.standard.clone();
 LEAF_MAT.side = THREE.DoubleSide;
+LEAF_MAT.userData.sharedResource = true;
 
 /** Wind material + matching shadow depth material so shadows sway too. */
 export function windPair(base, params) {

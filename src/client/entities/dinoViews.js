@@ -17,6 +17,7 @@ import { buildRaptor, RAPTOR_ANIM, raptorExtraUpdate } from '../models/dino/rapt
 import { buildPtera, PTERA_ANIM, pteraExtraUpdate } from '../models/dino/ptera.js';
 import { buildTrex, TREX_ANIM, trexExtraUpdate } from '../models/dino/trex.js';
 import { buildGLBDino } from '../models/dino/glbDino.js';
+import { disposeIslandScenes } from '../core/resources.js';
 
 /** Every server species needs a visible model and its animation tuning. */
 export const SPECIES = {
@@ -39,7 +40,7 @@ const _frustum = new THREE.Frustum();
 const _m4 = new THREE.Matrix4();
 const _sphere = new THREE.Sphere();
 
-class DinoView {
+export class DinoView {
   constructor(desc, ctx) {
     const sp = SPECIES[desc.type];
     this.id = desc.id;
@@ -87,6 +88,8 @@ class DinoView {
   dispose() {
     this.anim.dispose?.();
     this.rig.dispose?.();
+    // Cached GLB resources are retained; procedural rigs belong to this view.
+    disposeIslandScenes(this.root);
     this.ctx.scene.remove(this.root);
     this.bar.remove();
   }
@@ -99,7 +102,7 @@ class DinoView {
     this.alive = this.st !== DS.DEAD;
   }
 
-  update(dt, renderTime) {
+  samplePose(dt, renderTime) {
     const prevX = this.pos.x, prevZ = this.pos.z, prevYaw = this.yaw;
     if (this.buf.sample(renderTime, this.tmp)) {
       this.pos.set(this.tmp[X], this.tmp[Y], this.tmp[Z]);
@@ -115,20 +118,36 @@ class DinoView {
     }
     this.root.rotation.y = this.yaw;
 
+    this.animDistance = (this.animDistance || 0) + dist;
+    this.animTurn = (this.animTurn || 0) + angleDiff(prevYaw, this.yaw);
+    this.animElapsed = (this.animElapsed || 0) + dt;
+    this.attackT = Math.max(0, this.attackT - dt);
+    this.roarT = Math.max(0, this.roarT - dt);
+    this.flinch = Math.max(0, this.flinch - dt * 4);
+    this.barT = Math.max(0, this.barT - dt);
+  }
+
+  update(dt, renderTime, sampled = false) {
+    if (!sampled) this.samplePose(dt, renderTime);
+    const elapsed = Math.max(this.animElapsed || dt, 1e-4);
+    const dist = this.animDistance || 0;
+    const yawRate = (this.animTurn || 0) / elapsed;
+    const speed = dist / elapsed / this.scale;
+    // Avoid advancing a long-hidden animation by several seconds in one frame.
+    const animationDt = Math.min(elapsed, 0.25);
+    this.animDistance = this.animTurn = this.animElapsed = 0;
+
     const t = this.ctx.terrain;
     const fx = -Math.sin(this.yaw), fz = -Math.cos(this.yaw);
     const reach = 2.5 * this.root.scale.x;
     const groundPitch = this.type === 'ptera' && !this.grounded() ? 0
       : Math.atan2(t.heightAt(this.pos.x + fx * reach, this.pos.z + fz * reach) - t.heightAt(this.pos.x - fx * reach, this.pos.z - fz * reach), reach * 2);
 
-    this.attackT = Math.max(0, this.attackT - dt);
-    this.roarT = Math.max(0, this.roarT - dt);
-    this.flinch = Math.max(0, this.flinch - dt * 4);
     const pose = this.pose();
     // gait in model units: a bigger animal takes proportionally longer strides
-    this.anim.update(dt, {
-      speed: dist / Math.max(dt, 1e-4) / this.scale,
-      dist: dist / this.scale,
+    this.anim.update(animationDt, {
+      speed,
+      dist: speed * animationDt,
       yawRate,
       dead: !this.alive,
       trapped: this.st === DS.TRAPPED,
@@ -147,7 +166,7 @@ class DinoView {
       if (half !== this.lastHalf && dist > 0.005) this.ctx.onStep?.(this);
       this.lastHalf = half;
     }
-    this.sp.extraUpdate?.(this, dt);
+    this.sp.extraUpdate?.(this, animationDt);
     this.updateBar(dt);
   }
 
@@ -178,7 +197,6 @@ class DinoView {
   }
 
   updateBar(dt) {
-    this.barT = Math.max(0, this.barT - dt);
     const show = this.barT > 0 && this.alive;
     if (!show) {
       if (!this.bar.hidden) this.bar.hidden = true;
@@ -282,27 +300,30 @@ export class DinoViews {
   update(dt, renderTime) {
     const camera = this.game.gfx.camera;
     const cam = camera.position;
+    camera.updateMatrixWorld();
     _frustum.setFromProjectionMatrix(_m4.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse));
     // past the fog nothing can be seen: don't draw or animate at all
-    const hide = (this.game.gfx.scene.fog?.far ?? Infinity) + 10;
+    const hide = this.game.gfx.scene.fog?.far ?? Infinity;
     for (const v of this.map.values()) {
+      v.samplePose(dt, renderTime);
       const d2 = v.pos.distanceToSquared(cam);
-      const hidden = d2 > hide * hide;
+      _sphere.center.copy(v.pos);
+      _sphere.radius = v.sp.barHeight * 1.6 * v.scale + 2;
+      // Three's fog uses view-space depth, not radial distance. Keep the whole
+      // body visible until its nearest point is behind the fog's far plane.
+      const depth = -V.copy(v.pos).applyMatrix4(camera.matrixWorldInverse).z;
+      const hidden = depth - _sphere.radius > hide;
       if (v.root.visible === hidden) v.root.visible = !hidden;
       // far away or off-screen dinosaurs animate at a lower rate (still
       // interpolated every frame; off-screen ones may still cast a visible shadow)
-      _sphere.center.copy(v.pos);
-      _sphere.radius = v.sp.barHeight * 1.6 * v.scale + 2;
       const far = hidden || d2 > 180 * 180 || !_frustum.intersectsSphere(_sphere);
       v.skip = far ? (v.skip || 0) + dt : 0;
       if (far && (hidden || v.skip < 0.1)) {
         if (hidden && !v.bar.hidden) v.bar.hidden = true;
-        v.buf.sample(renderTime, v.tmp);
-        v.pos.set(v.tmp[X], v.tmp[Y], v.tmp[Z]);
-        v.root.position.copy(v.pos);
+        if (!hidden) v.updateBar(dt);
         continue;
       }
-      v.update(far ? Math.min(v.skip, 0.25) : dt, renderTime);   // no huge step after a long time hidden
+      v.update(dt, renderTime, true);
       v.skip = 0;
     }
     this.#updateHitDebug(cam);

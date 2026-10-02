@@ -1,3 +1,4 @@
+import { retainResource } from '../core/resources.js';
 // Model kit: small helpers for building soft, rounded models in code.
 //
 // Workflow: start from a primitive geometry, shape it with deform(), paint
@@ -25,6 +26,8 @@ export const MAT = {
   /** Unlit-ish glow for fruit, fire, eye highlights. */
   glow: new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.5, emissive: 0xffffff, emissiveIntensity: 0.35 }),
 };
+
+for (const material of Object.values(MAT)) retainResource(material);
 
 /** Default crease angle: faces meeting at a sharper angle keep a hard edge. */
 export const CREASE = (72 * Math.PI) / 180;

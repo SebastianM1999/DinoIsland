@@ -8,6 +8,7 @@ import { MAT, deform, paint, place, merge, jitter, smoothNormals } from '../mode
 import { treeGeometry, treeMatrix, TREE_WIND } from './veg/trees.js';
 import { clump, windPair, LEAF_MAT, instanced, finishInstanced, foliageTint } from './veg/shapes.js';
 import { rockTable } from '../../shared/rockShapes.js';
+import { SpatialInstances } from './veg/spatialInstances.js';
 
 const TAU = Math.PI * 2;
 const DEFAULT_ROCKS = { colors: ['#9c93a8', '#8a8199', '#a79c9a'], moss: '#6fa845' };
@@ -66,6 +67,7 @@ export function rockGeo(variant, mossy, palette = DEFAULT_ROCKS) {
     return tmp;
   });
   g.computeBoundingSphere();
+  g.userData.sharedResource = true;
   rockCache.set(key, g);
   return g;
 }
@@ -139,6 +141,7 @@ function stackGeometry(st, idx, rng, CLIFF, seedBase, green) {
 export function buildRocks(terrain, layout) {
   const group = new THREE.Group();
   group.name = 'rocks';
+  const spatial = new SpatialInstances(group);
   const m4 = new THREE.Matrix4();
   const q = new THREE.Quaternion();
   const e = new THREE.Euler();
@@ -174,7 +177,7 @@ export function buildRocks(terrain, layout) {
       const b = 0.88 + 0.12 * ((r.id * 0.377) % 1);
       m.setColorAt(i, col.setRGB(b, b * (0.97 + 0.03 * (r.id % 2)), b));
     });
-    group.add(finishInstanced(m));
+    spatial.add(m);
   }
 
   // --------------------------------------------------------- sea stacks
@@ -209,8 +212,9 @@ export function buildRocks(terrain, layout) {
       leaves.setMatrixAt(i, m4);
       leaves.setColorAt(i, foliageTint(t.hue, col));
     });
-    group.add(finishInstanced(trunk), finishInstanced(leaves));
+    spatial.add(trunk, { wind: TREE_WIND.palm });
+    spatial.add(leaves, { wind: TREE_WIND.palm, geometries: [geo.foliage, treeGeometry('palm', 1, 1).foliage, treeGeometry('palm', 1, 2).foliage] });
   }
 
-  return { group };
+  return { group, spatial, update(dt, time, cam) { if (cam) spatial.update(cam); }, setQuality(q) { spatial.setQuality(q); } };
 }

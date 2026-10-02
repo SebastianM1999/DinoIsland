@@ -1,3 +1,4 @@
+import { retainObjectResources } from '../../core/resources.js';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { clone } from 'three/addons/utils/SkeletonUtils.js';
@@ -30,6 +31,7 @@ export function registerDinoGLTF(type, gltf) {
       o.frustumCulled = false; // animated skins can escape bind-pose bounds
     }
   });
+  retainObjectResources(scene);
   templates.set(type, { scene, clips, box, size });
 }
 

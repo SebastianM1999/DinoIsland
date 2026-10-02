@@ -10,7 +10,7 @@
 // masses mix 2–3 greens plus yellow-green / teal accents.
 
 import { THREE, tube, blob, merge, place, paint, deform, jitter, spike } from '../../models/kit.js';
-import { clump, leafStrip, arcPath } from './shapes.js';
+import { clump, leafStrip, arcPath, withGeometryDetail } from './shapes.js';
 import { TRUNKS, TREE_SINK } from '../../../shared/treeShapes.js';
 import { makeRng } from '../../../shared/rng.js';
 import { noise3 } from '../../models/props/common.js';
@@ -574,11 +574,13 @@ const BUILD = {
 };
 const cache = new Map();
 /** @returns {{trunk:THREE.BufferGeometry, foliage:THREE.BufferGeometry, height:number}} */
-export function treeGeometry(type, variant = 0) {
-  const key = `${type}:${variant}`;
+export function treeGeometry(type, variant = 0, detail = 0) {
+  const key = `${type}:${variant}:${detail}`;
   let g = cache.get(key);
   if (!g) {
-    g = (BUILD[type] || buildMango)(variant);
+    g = withGeometryDetail(detail, () => (BUILD[type] || buildMango)(variant));
+    g.trunk.userData.sharedResource = true;
+    g.foliage.userData.sharedResource = true;
     cache.set(key, g);
   }
   return g;

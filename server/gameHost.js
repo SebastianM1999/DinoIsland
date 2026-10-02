@@ -13,15 +13,25 @@ export function startGameHost(httpServer = null, { onConnection } = {}) {
   const wss = httpServer ? new WebSocketServer({ server: httpServer, maxPayload: MAX_MSG_BYTES }) : null;
   /** @type {Map<number, import('ws').WebSocket>} */
   const sockets = new Map();
+  const reliableSeq = new Map();
+
+  function sendTo(id, ws, msg) {
+    if (!ws || ws.readyState !== ws.OPEN) return;
+    // Unreliable snapshots identify the reliable messages that must arrive
+    // first. Counters are per recipient, including private inventory updates.
+    const r = (reliableSeq.get(id) ?? 0) + (msg.t === MSG.SNAP ? 0 : 1);
+    reliableSeq.set(id, r);
+    if (msg.t === MSG.SNAP && ws.bufferedAmount > 64 * 1024) return;
+    ws.send(JSON.stringify({ ...msg, r }));
+  }
 
   const world = new ServerWorld({
     send(to, msg, except) {
-      const data = JSON.stringify(msg);
       if (to === '*') {
-        for (const [id, ws] of sockets) if (id !== except && ws.readyState === ws.OPEN) ws.send(data);
+        for (const [id, ws] of sockets) if (id !== except) sendTo(id, ws, msg);
       } else {
         const ws = sockets.get(to);
-        if (ws && ws.readyState === ws.OPEN) ws.send(data);
+        sendTo(to, ws, msg);
       }
     },
     log: (...a) => console.log('[world]', ...a),
@@ -60,6 +70,7 @@ export function startGameHost(httpServer = null, { onConnection } = {}) {
       if (playerId !== null && joined) {
         joined = false;
         sockets.delete(playerId);
+        reliableSeq.delete(playerId);
         world.leave(playerId);
         console.log(`[net] player #${playerId} disconnected`);
       }
@@ -79,11 +90,15 @@ export function startGameHost(httpServer = null, { onConnection } = {}) {
     const now = performance.now();
     acc += Math.min(250, now - last);
     last = now;
+    let snapshotDue = false;
+    const tickStart = performance.now();
     while (acc >= tickMs) {
       world.step(tickMs / 1000);
       acc -= tickMs;
-      if (world.snapshotDue(tickMs / 1000) && sockets.size > 0) world.host.send('*', world.snapshot());
+      if (world.snapshotDue(tickMs / 1000)) snapshotDue = true;
     }
+    world.tickDurationMs = performance.now() - tickStart;
+    if (snapshotDue && sockets.size > 0) world.host.send('*', world.snapshot());
     // drop silent clients (closed laptop lids, crashed tabs)
     for (const p of world.players.values()) {
       if ((world.now - p.lastInput) * 1000 > NET.timeoutMs) {
@@ -91,6 +106,7 @@ export function startGameHost(httpServer = null, { onConnection } = {}) {
         console.log(`[net] player #${p.id} timed out`);
         ws?.terminate();
         sockets.delete(p.id);
+        reliableSeq.delete(p.id);
         world.leave(p.id);
       }
     }
