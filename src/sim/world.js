@@ -548,7 +548,7 @@ export class ServerWorld {
     return true;
   }
 
-  /** Creative mode: a full quiver, spear, traps, bait and gun reserves, topped up again and again. */
+  /** Creative mode: a full quiver, spear, traps and gun reserves, topped up again and again. */
   creativeSupply(p) {
     const inv = p.inv, caps = this.caps();
     let changed = false;
@@ -561,8 +561,8 @@ export class ServerWorld {
     set('spear', true);
     set('spearHealth', W.spear.durability);
     set('traps', Math.max(inv.traps, caps.traps));
-    set('baits', Math.max(inv.baits, caps.baits));
     for (const [k, ammo] of Object.entries(inv.guns)) {
+      if (ammo.owned === false) { ammo.owned = true; changed = true; }
       const full = CONFIG.weapons[k].reserve;
       if (ammo.reserve < full) { ammo.reserve = full; changed = true; }
     }

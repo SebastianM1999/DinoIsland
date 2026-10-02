@@ -88,3 +88,12 @@ test('firearms retain ammunition when dropped, cancel reload and can be recovere
   act(ACT.PICKUP, { item: item.id });
   assert.deepEqual(p.inv.guns.rifle, { loaded: 8, reserve: 19, owned: true });
 });
+
+test('creative supplies restore a dropped firearm and keep numeric inventory fields finite', () => {
+  const { world, p, act } = setup();
+  act(ACT.DROP, { kind: 'pistol' });
+  world.creativeSupply(p);
+  assert.equal(p.inv.guns.pistol.owned, true);
+  assert.ok(p.inv.guns.pistol.reserve > 0);
+  for (const value of Object.values(p.inv)) if (typeof value === 'number') assert.ok(Number.isFinite(value));
+});
