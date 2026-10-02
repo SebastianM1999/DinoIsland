@@ -111,6 +111,16 @@ export function progress(prof) {
   };
 }
 
+/**
+ * Creative mode: every skill at max rank and nothing left to spend. Not a valid saved
+ * profile (sanitizeProfile would trim it), so it is only ever shown, never saved.
+ */
+export function creativeProfile() {
+  const skills = Object.fromEntries(SKILL_IDS.map((id) => [id, maxRank(id)]));
+  const level = levelFromXp(MAX_XP);
+  return { xp: MAX_XP, bonus: Math.max(0, spentPoints(skills) - level), skills, creative: true };
+}
+
 /** Can the next rank of `id` be bought? -> { ok, reason? } */
 export function canBuy(prof, id) {
   const s = SKILLS[id];

@@ -265,7 +265,8 @@ export class Net {
       if (Number.isFinite(msg.k)) this.epoch = msg.k;
     }
     // The profile can arrive while the island is still loading (no Game yet): validate, keep and save it here.
-    if (msg.t === MSG.PROF) {
+    // Creative mode sends every skill at max rank: shown only, never kept or saved.
+    if (msg.t === MSG.PROF && !msg.prof?.creative) {
       this.prof = msg.prof = sanitizeProfile(msg.prof);
       saveProfile(this.prof);
     }

@@ -14,7 +14,7 @@ import { CONFIG } from '../shared/config.js';
 import { Terrain } from '../shared/terrain.js';
 import { buildLayout } from '../shared/layout.js';
 import { MSG, ACT, EV, EQUIP, PF } from '../shared/protocol.js';
-import { sanitizeProfile, skillMods, progress, buy, canBuy, SKILL_IDS, MAX_XP, MAX_BONUS_POINTS, RELIC_XP, RELIC_POINTS, DASH } from '../shared/skills.js';
+import { sanitizeProfile, creativeProfile, skillMods, progress, buy, canBuy, SKILL_IDS, MAX_XP, MAX_BONUS_POINTS, RELIC_XP, RELIC_POINTS, DASH } from '../shared/skills.js';
 import { DinoSystem } from './dinos.js';
 import { Mission } from './mission.js';
 import { resolveCircle, penetration } from '../shared/collision.js';
@@ -439,13 +439,15 @@ export class ServerWorld {
   // ------------------------------------------------------------------ skills / xp
 
   sendProf(p) {
-    this.send(p.id, { t: MSG.PROF, prof: { xp: p.prof.xp, bonus: p.prof.bonus, skills: p.prof.skills } });
+    const prof = p.creative ? creativeProfile() : { xp: p.prof.xp, bonus: p.prof.bonus, skills: p.prof.skills };
+    this.send(p.id, { t: MSG.PROF, prof });
   }
 
   /** The bought skills changed: new mods and max HP (a higher max also raises current HP by the same amount). */
   refreshMods(p) {
     const old = p.maxHp;
-    p.mods = skillMods(p.prof.skills);
+    // creative mode: every skill at max rank (the earned profile stays untouched underneath)
+    p.mods = skillMods(p.creative ? creativeProfile().skills : p.prof.skills);
     p.maxHp = P.maxHealth + p.mods.maxHpAdd;
     if (p.maxHp > old) p.hp += p.maxHp - old;
     p.hp = Math.min(p.hp, p.maxHp);
@@ -467,6 +469,7 @@ export class ServerWorld {
   skillAction(p, m) {
     if (this.now < p.nextSkillAt) return;
     p.nextSkillAt = this.now + 0.1;
+    if (p.creative) return this.toast('Creative mode already has every skill', 'info', p.id);
     if (m.op === 'buy') {
       // SKILLS is a plain object: only real ids may reach buy() ("constructor" would crash it)
       if (typeof m.id !== 'string' || !SKILL_IDS.includes(m.id)) return;
@@ -541,6 +544,35 @@ export class ServerWorld {
     return { ...b, building: b.building && { stage: b.building.stage, left: r2(Math.max(0, b.building.until - this.now)) }, towers: b.towers.map(({ cool, ...t }) => t) };
   }
 
+  /** Take `cost` from the hut store; false when the team can't afford it. Creative mode builds for free. */
+  pay(p, cost) {
+    if (p.creative) return true;
+    if (!canAfford({ cost }, this.store)) return false;
+    for (const [k, n] of Object.entries(cost)) this.store[k] -= n;
+    return true;
+  }
+
+  /** Creative mode: a full quiver, spear, traps, bait and gun reserves, topped up again and again. */
+  creativeSupply(p) {
+    const inv = p.inv, caps = this.caps();
+    let changed = false;
+    const set = (k, v) => { if (inv[k] !== v) { inv[k] = v; changed = true; } };
+    if (inv.arrows < caps.arrows || inv.arrowUses.some((u) => u < W.bow.uses)) {
+      inv.arrows = caps.arrows;
+      inv.arrowUses = Array(caps.arrows).fill(W.bow.uses);
+      changed = true;
+    }
+    set('spear', true);
+    set('spearHealth', W.spear.durability);
+    set('traps', Math.max(inv.traps, caps.traps));
+    set('baits', Math.max(inv.baits, caps.baits));
+    for (const [k, ammo] of Object.entries(inv.guns)) {
+      const full = CONFIG.weapons[k].reserve;
+      if (ammo.reserve < full) { ammo.reserve = full; changed = true; }
+    }
+    if (changed) this.sendInv(p);
+  }
+
   /** Build (op 'build' on a plot) or grow (op 'upgrade') the team's base from the hut store. */
   baseAction(p, m) {
     const b = this.base;
@@ -561,9 +593,7 @@ export class ServerWorld {
       if (b.stage >= MAX_STAGE) return deny('Your base is fully built');
       stage = b.stage + 1;
     } else return;
-    const cost = stageCost(stage, this.levelIndex);
-    if (!canAfford({ cost }, this.store)) return deny('Not enough loot in the hut store');
-    for (const [k, n] of Object.entries(cost)) this.store[k] -= n;
+    if (!this.pay(p, stageCost(stage, this.levelIndex))) return deny('Not enough loot in the hut store');
     if (m.op === 'build') b.plot = m.plot;
     b.building = { stage, until: this.now + BUILD_TIME, by: p.id };
     this.event(EV.STORE, { store: this.store });
@@ -594,9 +624,7 @@ export class ServerWorld {
       kind = have.kind;
       level = 2;
     }
-    const cost = towerCost(kind, level, this.levelIndex);
-    if (!canAfford({ cost }, this.store)) return deny('Not enough loot in the hut store');
-    for (const [k, n] of Object.entries(cost)) this.store[k] -= n;
+    if (!this.pay(p, towerCost(kind, level, this.levelIndex))) return deny('Not enough loot in the hut store');
     const T = TOWERS[kind];
     if (have) {
       have.level = 2;
@@ -618,8 +646,7 @@ export class ServerWorld {
     if (!plot || !this.near(p, plot.x, plot.z, plot.r + PLOT_REACH)) return;
     const cost = repairCost(b, this.levelIndex);
     if (!cost) return this.toast('Nothing to repair', 'crate', p.id);
-    if (!canAfford({ cost }, this.store)) return this.toast('Not enough loot in the hut store', 'crate', p.id);
-    for (const [k, n] of Object.entries(cost)) this.store[k] -= n;
+    if (!this.pay(p, cost)) return this.toast('Not enough loot in the hut store', 'crate', p.id);
     if (b.damaged) { b.damaged = false; b.hp = b.maxHp; }
     for (const t of b.towers) if (t.damaged) { t.damaged = false; t.hp = t.maxHp; }
     this._safe = undefined;
@@ -863,7 +890,9 @@ export class ServerWorld {
         const on = !!m.on;
         if (on === !!p.creative) return;
         p.creative = on;
-        if (on && p.alive) p.hp = p.maxHp;
+        this.refreshMods(p);
+        this.sendProf(p);
+        if (on && p.alive) { p.hp = p.maxHp; this.creativeSupply(p); }
         this.toast(`${p.name} ${on ? 'switched to' : 'left'} creative mode`, 'bolt');
         return;
       }
@@ -1170,8 +1199,7 @@ export class ServerWorld {
       if (r.give.baits && inv.baits >= caps.baits) return deny('You carry as much bait as you can');
       if (r.give.spear && inv.spear) return deny('You still have your spear');
     }
-    if (!canAfford(r, this.store)) return deny('Not enough loot in the hut store');
-    for (const [k, n] of Object.entries(r.cost)) this.store[k] -= n;
+    if (!this.pay(p, r.cost)) return deny('Not enough loot in the hut store');
     if (r.kind === 'upgrade') {
       this.upgrades.add(r.id);
       this.toast(`${p.name} built: ${r.name}!`, 'quest');
@@ -1307,6 +1335,10 @@ export class ServerWorld {
 
     for (const p of this.players.values()) {
       updateGunReload(this, p);
+      if (p.creative && p.alive && this.now >= (p.nextSupplyAt ?? 0)) {
+        p.nextSupplyAt = this.now + 0.5;
+        this.creativeSupply(p);
+      }
       if (p.butcher) this.updateButcher(p);
       if (!p.alive) {
         if (p.downed) this.updateDowned(p, dt);

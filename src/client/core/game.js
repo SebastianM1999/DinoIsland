@@ -372,6 +372,7 @@ export class Game {
       store: this.store,
       upgrades: this.me.inv?.upgrades || [],
       island: this.mission?.level?.number ?? 1,
+      creative: this.player.creative,
     });
   }
 
@@ -403,7 +404,7 @@ export class Game {
     if (!this.basePanel) return;
     const plot = this.basePlot ?? -1;
     this.basePanel.setState({
-      store: this.store, base: this.base, island: this.layout.level.number,
+      store: this.store, base: this.base, island: this.layout.level.number, creative: this.player.creative,
       plot, plotKind: (this.layout.basePlots[plot] || this.layout.basePlots[this.base?.plot ?? -1])?.kind ?? null,
     });
   }
@@ -695,6 +696,9 @@ export class Game {
   setCreative(on) {
     this.player.setCreative(on);
     this.net.act(ACT.CREATIVE, { on });
+    this.boatPanel.setCreative(on);
+    this.#syncCrafting();
+    this.#syncBase();
     this.hud.toast(on ? 'Creative mode on – double-tap Space to fly' : 'Creative mode off', 'bolt');
   }
 

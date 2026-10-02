@@ -31,10 +31,12 @@ test('find the parts, repair the boat and sail to the next island together', () 
   const p = world.players.get(a.id);
   p.creative = true;                                   // keep dinosaurs out of the test
 
-  // repair is refused while parts are missing
+  // repair is refused while parts are missing (creative mode would skip them)
   const boat = world.layout.boat;
   Object.assign(p, { x: boat.interact.x, z: boat.interact.z });
+  p.creative = false;
   world.receive(a.id, { t: MSG.ACT, a: ACT.REPAIR });
+  p.creative = true;
   assert.equal(world.mission.phase, 'search');
 
   // walking up to each relic finds it

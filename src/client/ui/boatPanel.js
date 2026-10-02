@@ -24,6 +24,12 @@ export class BoatPanel {
     });
   }
 
+  /** Creative mode repairs the boat without the parts. */
+  setCreative(on) {
+    this.creative = !!on;
+    if (!this.el.hidden) this.render();
+  }
+
   /** Latest mission state (relics, boat, objectives). */
   setMission(m) {
     this.mission = m;
@@ -50,8 +56,8 @@ export class BoatPanel {
     let status, action = '';
     if (repaired) {
       status = `The boat is seaworthy! ${esc(sail?.text || 'Gather everyone here to set sail.')}`;
-    } else if (all) {
-      status = 'All parts are here. Fix her up and get ready to sail!';
+    } else if (all || this.creative) {
+      status = all ? 'All parts are here. Fix her up and get ready to sail!' : 'Creative mode: the boat can be repaired without the parts.';
       action = `<button type="button" class="wd-btn wd-primary" data-act="repair">${icon('boat')} Repair the boat</button>`;
     } else {
       status = `${relics.length - found} part${relics.length - found === 1 ? '' : 's'} still missing. Search the island – the hints tell you where.`;

@@ -55,7 +55,7 @@ test('no raid while nobody is near the base', () => {
 });
 
 test('raiders wreck the base (never destroy it) and the team repairs it', () => {
-  const { world, act, run, goTo, plot } = campWithPlayer();
+  const { world, p, act, run, goTo, plot } = campWithPlayer();
   world.raids.nextAt = world.now;          // straight to the raid
   run(RAID.warn + 1);
   assert.equal(world.raids.phase, 'active');
@@ -67,6 +67,7 @@ test('raiders wreck the base (never destroy it) and the team repairs it', () => 
   const cost = repairCost(world.base, 1);
   const before = { ...world.store };
   goTo(plotPoint(plot, [0, -plot.r + 3]));
+  p.creative = false;            // creative mode would repair for free
   act({ a: ACT.BASE, op: 'repair' });
   assert.ok(!world.base.damaged && world.base.hp === world.base.maxHp);
   for (const [k, n] of Object.entries(cost)) assert.equal(world.store[k], before[k] - n);

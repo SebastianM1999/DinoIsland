@@ -206,7 +206,7 @@ export class SkillPanel {
           <div class="sk-tiles">${g.skills.map((s) => this.#tileHtml(s)).join('')}</div>`).join('')}
       </section>`).join('');
     const resetLabel = this.confirming ? `Refund ${refund} point${refund === 1 ? '' : 's'} - confirm` : 'Reset skills';
-    const resetOff = !this.atCamp || refund === 0;
+    const resetOff = !this.atCamp || refund === 0 || !!this.view.creative;
     // DOM/classes follow the other HUD panels: hud-panel-head + hud-panel-close, a craft-stockbar strip, wd-foot / wd-btn
     this.el.innerHTML = `
       <header class="hud-panel-head sk-head">

@@ -104,7 +104,8 @@ export class Mission {
   /** Try to repair the boat; returns a reason string when it can't be done. */
   repair(p) {
     if (this.phase !== 'search') return null;
-    const missing = this.world.relics.filter((r) => !r.found);
+    // creative mode repairs the boat without the parts
+    const missing = p.creative ? [] : this.world.relics.filter((r) => !r.found);
     if (missing.length) return `Still missing: ${missing.map((r) => RELICS[r.kind].name).join(', ')}`;
     this.phase = 'repaired';
     this.world.toast(`${p.name} repaired the boat! Gather the whole team at the boat to set sail.`, 'quest');

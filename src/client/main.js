@@ -107,6 +107,7 @@ async function start(mode, options = {}) {
  * Build and start a Game for the island in net.welcome. `reuse` hands over the
  * renderer, audio and input of the previous island's game.
  */
+let keepCreative = false;
 async function launch(net, reuse = null) {
   let disconnectReason = 'Disconnected while loading the island';
   net.onClose = reason => { disconnectReason = reason || disconnectReason; };
@@ -146,12 +147,14 @@ async function launch(net, reuse = null) {
   game.onLeave = (reason) => backToMenu(reason);
   // The team set sail: the server sends a fresh welcome for the next island.
   game.onNewIsland = (welcome) => {
+    keepCreative = !!game.player.creative;   // the server keeps creative mode across islands; the new Game must too
     const shared = game.dispose();
     net.welcome = welcome;
     launch(net, shared);
   };
   loading.hidden = true;
   game.start();
+  if (keepCreative) game.setCreative(true);
   game.input.requestLock();
   setPaused(!game.input.locked);
   return true;

@@ -40,6 +40,9 @@ export class BasePanel {
   }
 
   /** Store, base state, island number (1-based) and the plot the panel was opened at. */
+  /** Enough loot in the hut store? Creative mode always is. */
+  afford(r) { return !!this.state.creative || canAfford(r, this.state.store); }
+
   setState(state) {
     this.state = { ...this.state, ...state };
     if (!this.el.hidden) this.render();
@@ -48,7 +51,7 @@ export class BasePanel {
   costHtml(cost) {
     const have = this.state.store || {};
     return Object.entries(cost).map(([k, n]) => {
-      const ok = (have[k] || 0) >= n;
+      const ok = !!this.state.creative || (have[k] || 0) >= n;
       return `<span class="craft-cost${ok ? '' : ' is-short'}" title="${esc(CONFIG.loot[k].name)}: ${have[k] || 0} in store">${icon(k)}<b>${n}</b></span>`;
     }).join('');
   }
@@ -62,7 +65,7 @@ export class BasePanel {
     const done = base.stage >= stage;
     const next = !done && !building && base.stage === stage - 1 && !base.building;
     // the first stage can only be started from a plot stake; later ones anywhere at the base
-    const canStart = next && (stage > 1 || this.state.plot >= 0) && canAfford({ cost }, this.state.store);
+    const canStart = next && (stage > 1 || this.state.plot >= 0) && this.afford({ cost });
     let label = 'Locked';
     if (done) label = 'Built';
     else if (building) label = `${Math.ceil(base.building.left ?? 0)} s`;
@@ -87,7 +90,7 @@ export class BasePanel {
     return `<li class="craft-row${broken.length ? ' is-hurt' : ''}"><span class="craft-ic">${icon('heart')}</span>
       <span class="craft-txt"><b>Base health <em>${pct}%</em></b><span class="base-hp"><i style="width:${pct}%"></i></span><small>${esc(sub)}</small></span>
       <span class="craft-costs">${cost ? this.costHtml(cost) : ''}</span>
-      <button type="button" class="wd-btn${cost ? ' wd-primary' : ''}" data-act="repair"${cost && canAfford({ cost }, this.state.store) ? '' : ' disabled'}>Repair</button></li>`;
+      <button type="button" class="wd-btn${cost ? ' wd-primary' : ''}" data-act="repair"${cost && this.afford({ cost }) ? '' : ' disabled'}>Repair</button></li>`;
   }
 
   /** One row per tower spot: locked, free (choose a tower) or built (upgrade). */
@@ -107,7 +110,7 @@ export class BasePanel {
       if (!t) {
         const choice = Object.entries(TOWERS).map(([kind, T]) => {
           const cost = towerCost(kind, 1, levelIndex);
-          const ok = canAfford({ cost }, this.state.store);
+          const ok = this.afford({ cost });
           return `<button type="button" class="wd-btn" data-act="tower" data-slot="${slot}" data-kind="${kind}" title="${esc(T.text)}"${ok ? '' : ' disabled'}>${icon(T.icon)}${esc(T.name)} ${this.costHtml(cost)}</button>`;
         }).join('');
         return `<li class="craft-row"><span class="craft-ic">${icon('tower')}</span>
@@ -117,7 +120,7 @@ export class BasePanel {
       const T = TOWERS[t.kind];
       const maxed = t.level >= 2;
       const cost = towerCost(t.kind, 2, levelIndex);
-      const ok = !maxed && canAfford({ cost }, this.state.store);
+      const ok = !maxed && this.afford({ cost });
       const sub = t.damaged ? 'Damaged – it fires again once repaired.' : maxed ? T.text : `Upgrade: ${T.upgrade.name} – ${T.upgrade.text}`;
       return `<li class="craft-row${maxed ? ' is-done' : ''}"><span class="craft-ic">${icon(T.icon)}</span>
         <span class="craft-txt"><b>${esc(maxed ? T.upgrade.name : T.name)} <em>spot ${slot + 1}</em></b><small>${esc(sub)}</small></span>

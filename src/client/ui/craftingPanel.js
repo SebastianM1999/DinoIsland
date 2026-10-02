@@ -33,6 +33,9 @@ export class CraftingPanel {
   }
 
   /** Latest hut store, built upgrade ids and island number. */
+  /** Enough loot in the hut store? Creative mode always is. */
+  afford(r) { return !!this.state.creative || canAfford(r, this.state.store); }
+
   setState(state) {
     this.state = { ...this.state, ...state };
     if (!this.el.hidden) this.render();
@@ -41,7 +44,7 @@ export class CraftingPanel {
   costHtml(r) {
     const have = this.state.store || {};
     return Object.entries(r.cost).map(([k, n]) => {
-      const ok = (have[k] || 0) >= n;
+      const ok = !!this.state.creative || (have[k] || 0) >= n;
       return `<span class="craft-cost${ok ? '' : ' is-short'}" title="${esc(CONFIG.loot[k].name)}: ${have[k] || 0} in store">${icon(k)}<b>${n}</b></span>`;
     }).join('');
   }
@@ -52,7 +55,7 @@ export class CraftingPanel {
     const isUpgrade = r.kind === 'upgrade';
     const done = isUpgrade && built.has(r.id);
     const needsPrev = isUpgrade && r.requires && !built.has(r.requires);
-    const afford = canAfford(r, this.state.store);
+    const afford = this.afford(r);
     let label = 'Craft';
     if (done) label = 'Built';
     else if (locked) label = `Island ${unlockIsland(r)}`;
