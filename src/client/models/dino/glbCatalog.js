@@ -110,6 +110,25 @@ GLB_DINOS.ptera.extraHitZones = [
   ['WingFingerR', 2.47, 1.11, -0.35, 0.22],
   ['WingFingerR', 2.94, 1.1, -0.45, 0.18],
 ].map(([bone, x, y, fwd, radius]) => ({ zone: 'wing', bone, at: [x, y, fwd], radius }));
+// The generic joint spheres miss the long beak, the crest and the (zone-less) flyer legs.
+GLB_DINOS.ptera.extraHitZones.push(...[
+  ['head', 'Head', 0, 1.43, 0.88, 0.13],
+  ['head', 'Head', 0, 1.39, 1.08, 0.11],
+  ['head', 'Head', 0, 1.37, 1.32, 0.09],
+  ['head', 'Head', 0, 1.35, 1.58, 0.07],
+  ['head', 'Head', 0, 1.34, 1.82, 0.05],
+  ['head', 'Head', 0, 1.58, 0.78, 0.12],
+  ['head', 'Head', 0, 1.7, 0.55, 0.1],
+  ['head', 'Head', 0, 1.8, 0.36, 0.07],
+  ['leg', 'BackUpLegL', -0.11, 0.73, -0.25, 0.09],
+  ['leg', 'BackLowLegL', -0.125, 0.5, -0.26, 0.07],
+  ['leg', 'BackLowLegL', -0.13, 0.25, -0.28, 0.07],
+  ['leg', 'BackFootL', -0.13, 0.07, -0.22, 0.11],
+  ['leg', 'BackUpLegR', 0.11, 0.73, -0.25, 0.09],
+  ['leg', 'BackLowLegR', 0.125, 0.5, -0.26, 0.07],
+  ['leg', 'BackLowLegR', 0.13, 0.25, -0.28, 0.07],
+  ['leg', 'BackFootR', 0.13, 0.07, -0.22, 0.11],
+].map(([zone, bone, x, y, fwd, radius]) => ({ zone, bone, at: [x, y, fwd], radius })));
 // Cycles per second, bounded independently of unusually short source run strides.
 GLB_DINOS.raptor.maxCadence = 2.4;
 GLB_DINOS.trex.maxCadence = 1.25;
