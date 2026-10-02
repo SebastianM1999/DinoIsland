@@ -1018,6 +1018,36 @@
 .hud-boat .wd-btn:disabled { opacity: 0.5; cursor: default; }
 .hud-boat button { cursor: url('../assets/cursor-hand.svg') 12 3, pointer; }
 
+/* ---------------------------------------------------------------- crafting box */
+.hud-craft { width: min(44em, 94vw); }
+.hud-craft .hud-panel-head h2 { display: flex; align-items: center; gap: 0.4em; }
+.hud-craft .hud-panel-head h2 svg { width: 1.2em; height: 1.2em; }
+.craft-stockbar { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5em 0.9em; margin: 0 0 0.8em; padding: 0.5em 0.8em; border-radius: 0.7em; background: rgba(10, 15, 28, 0.45); }
+.craft-stock-label { display: flex; align-items: center; gap: 0.35em; font-weight: 800; color: var(--ink-dim); margin-right: auto; }
+.craft-stock-label svg, .craft-stock svg, .craft-cost svg { width: 1.3em; height: 1.3em; flex: none; }
+.craft-stock { display: inline-flex; align-items: center; gap: 0.25em; font-weight: 800; }
+.craft-stock.is-zero { opacity: 0.45; }
+.craft-tabs { display: flex; gap: 0.5em; margin-bottom: 0.7em; }
+.craft-tab { flex: 1; padding: 0.5em 0.8em; border-radius: 0.7em; border: 0.12em solid rgba(255, 255, 255, 0.15); background: rgba(10, 15, 28, 0.45); color: var(--ink-dim); font: inherit; font-weight: 800; }
+.craft-tab.is-on { color: var(--ink); border-color: var(--green); background: rgba(124, 203, 69, 0.14); }
+.craft-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.55em; max-height: 52vh; overflow-y: auto; }
+.craft-row { display: flex; align-items: center; gap: 0.8em; padding: 0.55em 0.8em; border-radius: 0.7em; background: rgba(10, 15, 28, 0.45); border: 0.12em solid rgba(255, 255, 255, 0.12); }
+.craft-row.is-done { border-color: var(--green); background: rgba(124, 203, 69, 0.12); }
+.craft-row.is-locked { opacity: 0.55; }
+.craft-ic { width: 2.4em; height: 2.4em; flex: none; }
+.craft-txt { display: grid; flex: 1; line-height: 1.25; min-width: 0; }
+.craft-txt b { font-weight: 800; }
+.craft-txt em { font-style: normal; font-weight: 700; font-size: 0.8em; color: var(--ink-dim); margin-left: 0.3em; }
+.craft-txt small { color: var(--ink-dim); font-weight: 700; }
+.craft-costs { display: flex; gap: 0.5em; flex: none; }
+.craft-cost { display: inline-flex; align-items: center; gap: 0.15em; font-weight: 800; }
+.craft-cost.is-short { color: #ff7b7b; }
+.hud-craft .wd-btn { display: inline-flex; align-items: center; gap: 0.4em; }
+.hud-craft .wd-btn svg { width: 1.3em; height: 1.3em; }
+.hud-craft .wd-btn:disabled { opacity: 0.5; cursor: default; }
+.hud-craft button { cursor: url('../assets/cursor-hand.svg') 12 3, pointer; }
+@media (max-width: 38em) { .craft-row { flex-wrap: wrap; } .craft-costs { order: 3; } }
+
 /* ---------------------------------------------------------------- primeval grove prompt */
 .hud-grove { width: min(30em, 92vw); }
 .hud-grove button { cursor: url('../assets/cursor-hand.svg') 12 3, pointer; }

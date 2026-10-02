@@ -36,6 +36,7 @@ import { StepCadence } from '../audio/steps.js';
 import { settings } from './settings.js';
 import { Wardrobe } from '../ui/wardrobe.js';
 import { BoatPanel } from '../ui/boatPanel.js';
+import { CraftingPanel } from '../ui/craftingPanel.js';
 import { Relics } from '../entities/relics.js';
 import { buildSites } from '../world/sites.js';
 import { buildGrove } from '../world/grove.js';
@@ -110,7 +111,7 @@ export class Game {
     };
     this.input.onPanelToggle = (action) => {
       if (action === 'interact') {
-        if (!(this.hud._boardOpen || this.hud.isExtraOpen('wardrobe') || this.hud.isExtraOpen('boat'))) return false;
+        if (!(this.hud._boardOpen || this.hud.isExtraOpen('wardrobe') || this.hud.isExtraOpen('boat') || this.hud.isExtraOpen('crafting'))) return false;
         action = 'close';
       }
       if (action === 'close' && !this.hud.isPanelOpen()) return false;
@@ -120,6 +121,7 @@ export class Game {
       else if (action === 'board') open = this.hud.toggleBoard();
       else if (action === 'wardrobe') open = this.hud.togglePanel('wardrobe');
       else if (action === 'boat') open = this.hud.togglePanel('boat');
+      else if (action === 'crafting') open = this.hud.togglePanel('crafting');
       else if (action === 'grove') open = this.hud.togglePanel('grove');
       else {
         this.hud.toggleInventory(false);
@@ -127,6 +129,7 @@ export class Game {
         this.hud.toggleBoard(false);
         this.hud.togglePanel('wardrobe', false);
         this.hud.togglePanel('boat', false);
+        this.hud.togglePanel('crafting', false);
         if (this.hud.isExtraOpen('grove')) this.hud.togglePanel('grove', false);
         open = false;
       }
@@ -174,6 +177,13 @@ export class Game {
       onClose: () => this.input.onPanelToggle('close'),
     });
     this.hud.addPanel('boat', { el: this.boatPanel.el, onOpen: () => this.boatPanel.onOpen() });
+    this.craftingPanel = new CraftingPanel({
+      onCraft: (recipe) => this.net.act(ACT.CRAFT, { recipe }),
+      onRefill: () => this.net.act(ACT.REFILL),
+      onClose: () => this.input.onPanelToggle('close'),
+    });
+    this.hud.addPanel('crafting', { el: this.craftingPanel.el, onOpen: () => { this.#syncCrafting(); this.craftingPanel.onOpen(); } });
+    this.#syncCrafting();
     this.grovePrompt = new GrovePrompt({
       onClose: () => this.input.onPanelToggle('close'),
       speaker: () => this.me.name,
@@ -290,6 +300,20 @@ export class Game {
     if (!this.hud.isPanelOpen()) this.input.onPanelToggle('boat');
   }
 
+  /** E at the hut workbench. */
+  openCrafting() {
+    if (!this.hud.isPanelOpen()) this.input.onPanelToggle('crafting');
+  }
+
+  /** Push the hut store, built upgrades and island number into the crafting panel. */
+  #syncCrafting() {
+    this.craftingPanel.setState({
+      store: this.store,
+      upgrades: this.me.inv?.upgrades || [],
+      island: this.mission?.level?.number ?? 1,
+    });
+  }
+
   /** E at the mission board. */
   openBoard() {
     if (!this.hud.isPanelOpen()) this.input.onPanelToggle('board');
@@ -321,7 +345,7 @@ export class Game {
       }
       for (const sys of this.systems) sys.onSnapshot?.(m);
     });
-    net.on(MSG.INV, (m) => { this.me.inv = m.inv; });
+    net.on(MSG.INV, (m) => { this.me.inv = m.inv; this.#syncCrafting(); });
     net.on(MSG.CORRECT, (m) => {
       this.player.pos.x = m.x;
       this.player.pos.y = m.y;
@@ -359,7 +383,7 @@ export class Game {
       this.boatPanel.setMission(m.mission);
       this.hud.missionComplete(m.mission.complete, { completedIn: m.mission.completedIn, won: m.mission.won, next: m.mission.level?.number + 1 });
     });
-    net.on(`ev:${EV.STORE}`, (m) => { this.store = m.store; });
+    net.on(`ev:${EV.STORE}`, (m) => { this.store = m.store; this.#syncCrafting(); });
     net.on(`ev:${EV.HURT}`, (m) => {
       if (m.id === this.me.id) {
         this.me.hp = m.hp;

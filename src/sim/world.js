@@ -25,6 +25,7 @@ import { planIsland } from '../shared/island.js';
 import { levelDef, LEVEL_COUNT } from '../shared/levels.js';
 import { findUnstuckSpot, goodSpot } from './unstuck.js';
 import { insideGrove, mayEnterGrove } from '../shared/grove.js';
+import { RECIPE_BY_ID, upgradeMods, unlockIsland, canAfford } from '../shared/crafting.js';
 
 const P = CONFIG.player;
 const W = CONFIG.weapons;
@@ -49,6 +50,7 @@ export class ServerWorld {
     this.players = new Map();
     this.nextId = 1;
     this.store = Object.fromEntries(LOOT_KEYS.map((k) => [k, 0]));
+    this.upgrades = new Set();          // team upgrades built at the workbench (survive islands)
     this.fruitRng = makeRng((Math.random() * 0xffffffff) >>> 0);
     this.#loadLevel(opts.level ?? 0, opts.variant);
     this.mission = new Mission(this);
@@ -94,6 +96,7 @@ export class ServerWorld {
       p.inv.spearHealth = W.spear.durability;
       p.inv.guns = gunInventory(); p.inv.reloading = null;
       p.inv.caps = caps;
+      p.inv.upgrades = [...this.upgrades];
     }
     for (const p of this.players.values()) {
       this.send(p.id, { t: MSG.WELCOME, id: p.id, slot: p.slot, now: r3(this.now), inv: p.inv, world: this.fullState() });
@@ -141,6 +144,7 @@ export class ServerWorld {
     };
     this.players.set(p.id, p);
     p.inv.caps = this.caps();
+    p.inv.upgrades = [...this.upgrades];
     attach?.(p.id);
     this.send(p.id, {
       t: MSG.WELCOME,
@@ -186,17 +190,22 @@ export class ServerWorld {
 
   sendInv(p) {
     p.inv.caps = this.caps();
+    p.inv.upgrades = [...this.upgrades];
     this.send(p.id, { t: MSG.INV, inv: p.inv });
   }
 
-  /** Inventory limits: config base values plus team upgrades from contracts. */
+  /** Effects of the team's workbench upgrades. */
+  mods() { return upgradeMods(this.upgrades); }
+
+  /** Inventory limits: config base values plus team upgrades from contracts and the workbench. */
   caps() {
     const b = this.mission ? this.mission.bonus() : { arrows: 0, fruit: 0, carry: 0, traps: 0, baits: 0 };
+    const u = this.mods();
     return {
-      arrows: W.bow.maxArrows + b.arrows,
+      arrows: W.bow.maxArrows + b.arrows + u.quiver,
       fruit: CONFIG.fruit.maxCarried + b.fruit,
       carry: P.maxCarryWeight + b.carry,
-      traps: W.trap.startCount + b.traps,
+      traps: W.trap.startCount + b.traps + u.traps,
       baits: W.bait.startCount + b.baits,
     };
   }
@@ -408,7 +417,7 @@ export class ServerWorld {
         if (!d || !d.alive) return;
         if (!validVec(m.p) || !this.validMeleeHit(p, d, m.p)) return;
         p.nextMeleeAt = this.now + W.spear.cooldown;
-        this.dinos.damage(d, W.spear.damage, m.zone, p.id, 'spear');
+        this.dinos.damage(d, W.spear.damage * (1 + this.mods().spearDamage), m.zone, p.id, 'spear');
         inv.spearHealth = Math.max(0, (inv.spearHealth ?? W.spear.durability) - W.spear.useWear);
         if (!inv.spearHealth) { inv.spear = false; this.toast('Your spear broke - refill at the hut', 'spear', p.id); }
         this.sendInv(p);
@@ -421,7 +430,8 @@ export class ServerWorld {
         if (this.projectiles.has(`${p.id}:${m.pid}`)) return;
         const originDistance = Math.hypot(m.o[0] - p.x, m.o[2] - p.z);
         const speed = Math.hypot(...m.v);
-        const maxSpeed = kind === 'spear' ? W.spear.throwSpeed + 5 : W.bow.maxSpeed + 5;
+        const u = this.mods();
+        const maxSpeed = kind === 'spear' ? W.spear.throwSpeed * (1 + u.throwSpeed) + 5 : W.bow.maxSpeed + u.bowSpeed + 5;
         if (originDistance > 2.5 || Math.abs(m.o[1] - (p.y + P.eyeHeight)) > 2.5 ||
             speed < 5 || speed > maxSpeed) return;
         let health;
@@ -436,7 +446,7 @@ export class ServerWorld {
           inv.spear = false;
           inv.spearHealth = 0;
         }
-        p.nextFireAt = this.now + (kind === 'spear' ? W.spear.throwCooldown : W.bow.cooldown);
+        p.nextFireAt = this.now + (kind === 'spear' ? W.spear.throwCooldown * (1 + u.throwCooldown) : W.bow.cooldown);
         this.projectiles.set(`${p.id}:${m.pid}`, { kind, health, t: this.now, pw: Math.max(0, Math.min(1, Number(m.pw) || 0)), o: m.o.slice(), v: m.v.slice() });
         this.sendInv(p);
         this.event(EV.FIRE, { by: p.id, kind, o: m.o, v: m.v, pid: m.pid }, p.id);
@@ -470,10 +480,10 @@ export class ServerWorld {
             this.event(EV.ITEM_ADD, { item });
           }
           if (proj.kind === 'arrow') {
-            const dmg = W.bow.damage * (0.45 + 0.55 * Math.min(1, proj.pw));
+            const dmg = W.bow.damage * (1 + this.mods().bowDamage) * (0.45 + 0.55 * Math.min(1, proj.pw));
             this.dinos.damage(d, dmg, m.zone, p.id, 'arrow');
           } else {
-            this.dinos.damage(d, W.spear.throwDamage, m.zone, p.id, 'spear');
+            this.dinos.damage(d, W.spear.throwDamage * (1 + this.mods().spearDamage), m.zone, p.id, 'spear');
           }
           return;
         }
@@ -638,19 +648,54 @@ export class ServerWorld {
       case ACT.REFILL: {
         const h = this.layout.hut.arrowRack;
         if (!p.alive || !this.near(p, h.x, h.z, 6)) return;
-        const caps = this.caps();
-        inv.arrows = caps.arrows;
+        // free basic resupply only; everything else is crafted (ACT.CRAFT)
+        inv.arrows = Math.max(inv.arrows, Math.min(W.bow.startArrows, this.caps().arrows));
         this.normalizeArrows(inv);
-        inv.traps = Math.max(inv.traps, caps.traps);
-        inv.baits = Math.max(inv.baits, caps.baits);
         if (!inv.spear) inv.spearHealth = W.spear.durability;
         inv.spear = true;
         inv.guns = gunInventory(); inv.reloading = null;
         this.sendInv(p);
-        this.toast('Ammunition, traps and bait refilled', 'arrow', p.id);
+        this.toast('Basic ammunition resupplied', 'arrow', p.id);
         return;
       }
+      case ACT.CRAFT: return this.craft(p, m.recipe);
     }
+  }
+
+  /** Craft a supply or a team upgrade from the hut store at the workbench. */
+  craft(p, id) {
+    const h = this.layout.hut.arrowRack;
+    const r = RECIPE_BY_ID[id];
+    if (!r || !p.alive || !this.near(p, h.x, h.z, 6)) return;
+    const inv = p.inv;
+    const deny = (text) => this.toast(text, 'crate', p.id);
+    if (unlockIsland(r) > this.levelIndex + 1) return deny(`${r.name} unlocks on island ${unlockIsland(r)}`);
+    if (r.kind === 'upgrade') {
+      if (this.upgrades.has(r.id)) return deny(`${r.name} is already built`);
+      if (r.requires && !this.upgrades.has(r.requires)) return deny(`Build ${RECIPE_BY_ID[r.requires].name} first`);
+    } else {
+      const caps = this.caps();
+      if (r.give.arrows && inv.arrows >= caps.arrows) return deny('Your quiver is full');
+      if (r.give.traps && inv.traps >= caps.traps) return deny('You carry as many traps as you can');
+      if (r.give.baits && inv.baits >= caps.baits) return deny('You carry as much bait as you can');
+      if (r.give.spear && inv.spear) return deny('You still have your spear');
+    }
+    if (!canAfford(r, this.store)) return deny('Not enough loot in the hut store');
+    for (const [k, n] of Object.entries(r.cost)) this.store[k] -= n;
+    if (r.kind === 'upgrade') {
+      this.upgrades.add(r.id);
+      this.toast(`${p.name} built: ${r.name}!`, 'quest');
+      this.onCapsChanged();
+    } else {
+      const caps = this.caps();
+      if (r.give.arrows) { inv.arrows = Math.min(caps.arrows, inv.arrows + r.give.arrows); this.normalizeArrows(inv); }
+      if (r.give.traps) inv.traps = Math.min(caps.traps, inv.traps + r.give.traps);
+      if (r.give.baits) inv.baits = Math.min(caps.baits, inv.baits + r.give.baits);
+      if (r.give.spear) { inv.spear = true; inv.spearHealth = W.spear.durability; }
+      this.sendInv(p);
+      this.toast(`Crafted: ${r.name}`, 'crate', p.id);
+    }
+    this.event(EV.STORE, { store: this.store });
   }
 
   validMeleeHit(p, d, point) {

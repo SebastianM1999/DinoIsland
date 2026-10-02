@@ -19,17 +19,17 @@ export const ITEM_INFO = {
   arrow: {
     name: 'Arrows', kind: 'Ammunition',
     text: `Arrows deal ${W.bow.damage} base damage and can be recovered from the ground or a dinosaur. Each arrow lasts ${W.bow.uses} shots, then breaks. Worn arrows are fired first.`,
-    use: 'Slot 2 · hold left click to draw, release to shoot · refill at the hut workbench',
+    use: 'Slot 2 · hold left click to draw, release to shoot · craft more at the hut workbench',
   },
   trap: {
     name: 'Trap', kind: 'Tool',
     text: `A spiked wooden frame. A dinosaur that steps in is stuck for ${W.trap.holdTime} s and takes ${W.trap.damage} damage – perfect for a team ambush.`,
-    use: 'Slot 3 · left click to place · refill at the hut workbench',
+    use: 'Slot 3 · left click to place · craft more at the hut workbench',
   },
   bait: {
     name: 'Meat bait', kind: 'Tool',
     text: `A chunk of meat that lures Velociraptors and the T-Rex from up to ${W.bait.attractRadius} m. They stop to eat and are distracted for ${W.bait.eatTime} s.`,
-    use: 'Slot 4 · left click to place · combine with a trap!',
+    use: 'Slot 4 · left click to place · combine with a trap! · craft more at the hut workbench',
   },
   berry: {
     name: F.berry.name, kind: 'Fruit',

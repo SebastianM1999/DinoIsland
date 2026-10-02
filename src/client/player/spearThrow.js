@@ -5,12 +5,13 @@ import { CONFIG } from '../../shared/config.js';
 export const SPEAR_THROW = { windup: 0.13, release: 0.28, duration: 0.68, origin: [0.25, -0.1, -0.9] };
 export const spearReleaseDirection = new THREE.Vector3(0, 1.5, -CONFIG.weapons.spear.throwSpeed).normalize();
 export const spearReleaseRotation = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), spearReleaseDirection);
-export function spearLaunch(camera) {
+/** `speedMul` > 1 for upgraded spears (workbench). */
+export function spearLaunch(camera, speedMul = 1) {
   camera.updateMatrixWorld(true);
   return {
     origin: camera.localToWorld(new THREE.Vector3(...SPEAR_THROW.origin)),
     rotation: camera.quaternion.clone().multiply(spearReleaseRotation),
-    velocity: new THREE.Vector3(0, 1.5, -CONFIG.weapons.spear.throwSpeed).applyQuaternion(camera.quaternion),
+    velocity: new THREE.Vector3(0, 1.5, -CONFIG.weapons.spear.throwSpeed * speedMul).applyQuaternion(camera.quaternion),
   };
 }
 
