@@ -22,58 +22,11 @@ import { clump, leafStrip, arcPath, LEAF_MAT } from '../../world/veg/shapes.js';
 import { fernGeometry } from '../../world/veg/plants.js';
 import { makeRng } from '../../../shared/rng.js';
 import { TAU, fbm3, noise3, smoothstep, sdfMesh, sdfRay } from './common.js';
-import { ell3, ell2, smin, smax } from './cave.js';
-import { SPRING_LIP_OFFSET, SPRING_FLOOR, SPRING_WATER_OFFSET } from '../../../shared/springShape.js';
-export { SPRING_LIP_OFFSET, SPRING_FLOOR } from '../../../shared/springShape.js';
-
-/** Opening height above the lip. */
-export const SPRING_OPENING_HEIGHT = 4.0;
+import { SPRING_LIP_OFFSET, SPRING_FLOOR, SPRING_WATER_OFFSET, springSdf, springSeed } from '../../../shared/springShape.js';
+export { SPRING_LIP_OFFSET, SPRING_FLOOR, SPRING_OPENING_HEIGHT, springSdf } from '../../../shared/springShape.js';
 
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
 
-export function springSdf(width, seed) {
-  const W = width;
-  const hw = W / 2 + 1.0;                         // opening half-width (~ width + 2 m wide)
-  const rng = makeRng(((seed | 0) * 2654435761 + 13) >>> 0);
-  const masses = [
-    { x: 0, y: 0.6, z: 2.7, rx: hw + 5.6, ry: 6.8, rz: 3.4 },                       // chunk of cliff face
-    { x: -(hw + 1.3), y: 1.2, z: -0.5, rx: 2.1, ry: 4.0, rz: 2.3 },                  // cheeks
-    { x: hw + 1.3, y: 1.4, z: -0.4, rx: 2.0, ry: 4.2, rz: 2.2 },
-    { x: 0, y: 4.9, z: -0.5, rx: hw + 2.0, ry: 1.9, rz: 2.3 },                       // brow
-    { x: -(hw + 2.4), y: -2.6, z: -0.3, rx: 1.8, ry: 2.3, rz: 1.8 },                 // stacked boulders below the cheeks
-    { x: hw + 2.6, y: -2.9, z: -0.1, rx: 1.9, ry: 2.2, rz: 1.7 },
-  ];
-  // a few extra lumps on top and around the frame (never in the water's path)
-  for (let k = 0; k < 7; k++) {
-    const side = k % 2 ? 1 : -1;
-    const top = k < 3;
-    const r = 0.9 + rng() * 0.9;
-    const x = top ? (rng() - 0.5) * (hw * 2 + 3) : side * (hw + 1.6 + rng() * 3.2);
-    const y = top ? 5.6 + rng() * 1.0 : -3.5 + rng() * 8.5;
-    masses.push({ x, y, z: -0.2 + rng() * 1.2, rx: r * (1 + rng() * 0.4), ry: r * (0.7 + rng() * 0.3), rz: r });
-  }
-  // stream bed: the opening, flat floor just below the lip, closed ~3 m in
-  const cavity = (x, y, z) => {
-    const c2 = Math.max(ell2(x, y - 0.4, hw, SPRING_OPENING_HEIGHT - 0.4), SPRING_FLOOR - y);
-    return smax(c2 + 0.12 * noise3(x * 0.9, y * 0.9, z * 0.9, seed + 5), z - 2.1, 1.1);
-  };
-  const outer = (x, y, z) => {
-    let d = 1e9;
-    for (const m of masses) {
-      const dx = x - m.x, dy = y - m.y, dz = z - m.z;
-      if (Math.abs(dx) > m.rx + 2.5 || Math.abs(dy) > m.ry + 2.5 || Math.abs(dz) > m.rz + 2.5) continue;
-      d = smin(d, ell3(dx, dy, dz, m.rx, m.ry, m.rz), 1.4);
-    }
-    d += 0.12 * Math.sin(y * 2.2 + 1.5 * noise3(x * 0.25, y * 0.1, z * 0.25, seed + 9));   // rock layers
-    // calmer rock right at the lip so the water always leaves at the same spot
-    const k = 0.2 + 0.8 * smoothstep(0.6, 2.4, Math.hypot(Math.max(0, Math.abs(x) - W / 2), y + 0.3, z + SPRING_LIP_OFFSET));
-    return d - k * 0.4 * fbm3(x * 0.35, y * 0.35, z * 0.35, seed) - k * 0.2 * noise3(x * 0.15, y * 0.15, z * 0.15, seed + 3);
-  };
-  // keep the free-fall zone below the lip clear so the water never clips rock
-  const chute = (x, y, z) => Math.max(Math.abs(x) - (W / 2 + 0.9), y - SPRING_FLOOR, z + SPRING_LIP_OFFSET - 0.5);
-  const sdf = (x, y, z) => smax(smax(outer(x, y, z), -cavity(x, y, z), 0.5), -chute(x, y, z), 0.3);
-  return { sdf, cavity, hw, bounds: { min: [-(hw + 8), -7, -4.2], max: [hw + 8, 8.4, 6.6] } };
-}
 
 function palette(biome) {
   const id = biome?.id || 'jungle';
@@ -216,7 +169,7 @@ function buildGeometry(width, seed, biome) {
 
 export function buildSpringCave(s, biome) {
   const width = Math.max(2, s.width ?? 4.5);
-  const seed = (Math.round((s.x ?? 0) * 13.1 + (s.z ?? 0) * 7.7) & 0xffff) + 1;
+  const seed = springSeed(s);
   const key = `${seed}:${width.toFixed(2)}:${biome?.id || 'jungle'}`;
   let g = cache.get(key);
   if (!g) { g = buildGeometry(width, seed, biome); cache.set(key, g); }

@@ -13,7 +13,7 @@ import { boatColliders, boatInteractPoint } from './boatShape.js';
 import { insideGrove } from './grove.js';
 import { standTop } from './collision.js';
 import { causewayQuery, insideBossArena } from './bossArena.js';
-import { SPRING_LIP_OFFSET, SPRING_FLOOR } from './springShape.js';
+import { SPRING_LIP_OFFSET, SPRING_FLOOR, springColliders } from './springShape.js';
 
 const TAU = Math.PI * 2;
 
@@ -113,6 +113,7 @@ export function buildLayout(terrain) {
     const { x, z, width, dir, pool } = plan.waterfall;
     const behind = terrain.heightAt(x + dir.x * 6, z + dir.z * 6);
     const source = { x, z, y: Math.max(pool.level + 3, Math.min(pool.level + 10, behind - 2)), rot: Math.atan2(dir.x, dir.z), width };
+    boxes.push(...springColliders(source));
     const lip = { x: x - dir.x * SPRING_LIP_OFFSET, y: source.y + SPRING_FLOOR, z: z - dir.z * SPRING_LIP_OFFSET };
     // A single vertical curtain: its footprint is entirely over the basin.
     const impact = { x: lip.x, z: lip.z, y: pool.level };
@@ -798,7 +799,7 @@ export function buildLayout(terrain) {
   // Players collide with everything except rocks (those are ground, see above).
   layout.playerColliders = { circles: circles.filter((c) => c.kind !== 'rock'), boxes };
   /** Ground a player stands on: terrain, the top of a rock or of a `stand` collider (fallen trunk, ruin stone). */
-  layout.groundAt = (x, z) => Math.max(terrain.heightAt(x, z), layout.rockHeightAt(x, z), standTop(layout.playerColliders, x, z));
+  layout.groundAt = (x, z, maxTop = Infinity) => Math.max(terrain.heightAt(x, z), layout.rockHeightAt(x, z), standTop(layout.playerColliders, x, z, 0, maxTop));
 
   return layout;
 }

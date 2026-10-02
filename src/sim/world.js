@@ -300,7 +300,7 @@ export class ServerWorld {
     p.lastMoveAt = this.now;
     const distance = Math.hypot(x - p.x, z - p.z);
     const lim = CONFIG.world.size / 2 - 5;
-    const ground = this.layout.groundAt(x, z);
+    const ground = this.layout.groundAt(x, z, y + P.stepHeight);
     resolveCircle(x, z, P.radius, this.layout.playerColliders, collisionResult, y + 0.05, y + P.height, P.stepHeight - 0.05);
     const blocked = Math.hypot(collisionResult.x - x, collisionResult.z - z) > 0.6 || this.groveBlocks(p, x, z);
     if (distance > p.moveBudget + 0.05 || Math.abs(x) > lim || Math.abs(z) > lim ||
@@ -330,7 +330,7 @@ export class ServerWorld {
     });
     if (Math.hypot(result.x - p.x, result.z - p.z) > 0.005) {
       p.x = result.x; p.z = result.z;
-      p.y = Math.max(p.y, this.layout.groundAt(p.x, p.z));
+      p.y = Math.max(p.y, this.layout.groundAt(p.x, p.z, p.y + P.stepHeight));
       this.send(p.id, { t: MSG.CORRECT, x: r2(p.x), y: r2(p.y), z: r2(p.z) });
     }
   }
