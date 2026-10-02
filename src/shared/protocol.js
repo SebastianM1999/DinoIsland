@@ -63,6 +63,7 @@ export const ACT = {
   REPAIR: 'repair',     // {}                                  repair the boat with the found parts
   UNSTUCK: 'unstuck',   // { manual? }                         move me to the nearest free spot (auto: client stuck detector,
                         //                                     manual: U key); server-validated and rate-limited
+  BUTCHER: 'butcher',   // { dino, stop? }                     start (hold V) / stop butchering a carcass with the knife
 };
 
 /** Server events (msg.e). */
@@ -99,6 +100,8 @@ export const EV = {
   OUTFIT: 'outfit',         // { id, outfit }                    a player changed clothes
   RELIC: 'relic',           // { id, kind, by }                  a boat part was found
   BOAT: 'boat',             // { repaired }                      the boat got repaired
+  BUTCHER: 'butcher',       // { id, dino, t }                   player id started butchering (t = seconds; t 0 = stopped)
+  BUTCHERED: 'butchered',   // { id }                            carcass id was butchered (sinks away)
 };
 
 /** Player snapshot tuple layout. */

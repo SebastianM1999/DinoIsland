@@ -9,6 +9,7 @@ import { ACT, EV, PF, EQUIP } from '../../shared/protocol.js';
 import { shotEnd } from '../../shared/gunshots.js';
 import { insideGrove } from '../../shared/grove.js';
 import { segmentColliders } from '../../shared/collision.js';
+import { dinoBodyCircles } from '../../shared/dinoContact.js';
 import { upgradeMods } from '../../shared/crafting.js';
 import { GunEffects } from '../entities/gunEffects.js';
 import { spearLaunch } from './spearThrow.js';
@@ -36,6 +37,8 @@ export class PlayerActions {
     this.drawT = 0;
     this.drawing = false;
     this.eatingT = 0;
+    this.butcher = null;     // { dino, t, time, x, z, confirmed } while holding V at a carcass
+    this.butcherRetry = 0;
     this.autoPickT = 0;
     this.pickRequested = new Map();   // item id -> time until we may ask again
     this.nextFullAlert = 0;
@@ -57,6 +60,11 @@ export class PlayerActions {
       this.eatingT = CONFIG.fruit.eatTime;
       this.vm.eat(m.fruit, CONFIG.fruit.eatTime);
       game.audio?.play('eat');
+    });
+    net.on(`ev:${EV.BUTCHER}`, (m) => {
+      if (m.id !== game.me.id) return;
+      if (!m.dino) this.butcher = null;                       // finished or cancelled by the server
+      else if (this.butcher?.dino === m.dino) { this.butcher.confirmed = true; this.butcher.time = m.t; }
     });
     net.on(`ev:${EV.DINO_HIT}`, (m) => {
       if (m.by !== game.me.id) return;
@@ -133,7 +141,7 @@ export class PlayerActions {
 
     // --- carry slowdown (and eating makes you slow and vulnerable)
     const w = this.carryWeight();
-    g.player.speedFactor = Math.max(P.minCarrySpeed, 1 - w * P.carrySlowPerUnit) * (eating ? 0.5 : 1);
+    g.player.speedFactor = Math.max(P.minCarrySpeed, 1 - w * P.carrySlowPerUnit) * (eating ? 0.5 : 1) * (this.butcher ? 0.35 : 1);
 
     const tool = this.tool;
     const canAct = alive && !eating && !panel && input.locked;
@@ -194,7 +202,8 @@ export class PlayerActions {
     if (alive && !panel && input.wasPressed('eat')) this.eat();
     if (alive && !panel && input.wasPressed('give')) this.give();
 
-    // --- interactions (E) + prompt
+    // --- knife (hold V at a carcass), then interactions (E) + prompt
+    this.updateKnife(dt, alive && !panel && !eating && input.locked, input.isHeld('knife'));
     this.updateInteraction(alive && !panel, input.wasPressed('interact'));
 
     // --- automatic looting: walk over items to collect them
@@ -210,6 +219,7 @@ export class PlayerActions {
     // --- viewmodel
     const fruitType = this.bestFruit();
     this.vm.setTool(tool, { hasSpear: this.inv.spear, fruitType, hasArrow: this.inv.arrows > 0 });
+    this.vm.setKnife(!!this.butcher);
     this.vm.root.visible = alive;
     this.vm.update(dt, { speed: g.player.moveSpeed, sprint: g.player.sprinting, grounded: g.player.onGround, lookX: g.lastMouse?.x || 0, lookY: g.lastMouse?.y || 0 });
 
@@ -343,6 +353,53 @@ export class PlayerActions {
 
   // ------------------------------------------------------------------ interactions
 
+  /**
+   * The nearest carcass within knife reach that can still be butchered
+   * (fallen pterosaurs only once they lie on the ground), roughly in front.
+   */
+  findCarcass() {
+    const g = this.game;
+    const pos = g.player.pos;
+    const { dir } = this.aim();
+    let best = null, bd = Infinity;
+    for (const v of g.dinos.map.values()) {
+      if (v.alive || v.butchered || !v.grounded()) continue;
+      for (const [x, z, r] of dinoBodyCircles(v, v.pos.x, v.pos.z, v.yaw)) {
+        const dx = x - pos.x, dz = z - pos.z;
+        const d = Math.max(0, Math.hypot(dx, dz) - r);
+        const facing = (dx * dir.x + dz * dir.z) / (Math.hypot(dx, dz) || 1);
+        if (d <= W.knife.reach && (facing > 0.2 || d < 0.6) && d < bd) { bd = d; best = v; }
+      }
+    }
+    return best;
+  }
+
+  updateKnife(dt, enabled, held) {
+    const g = this.game;
+    const pos = g.player.pos;
+    this.butcherRetry = Math.max(0, this.butcherRetry - dt);
+    const b = this.butcher;
+    if (b) {
+      b.t += dt;
+      const v = g.dinos.map.get(b.dino);
+      const moved = Math.hypot(pos.x - b.x, pos.z - b.z) > W.knife.moveCancel;
+      // the server did not take it (too far, someone else is faster): don't hammer it
+      const refused = !b.confirmed && b.t > 0.6;
+      if (!enabled || !held || !v || v.butchered || moved || refused) {
+        if (!refused) g.net.act(ACT.BUTCHER, { stop: 1 });
+        this.butcher = null;
+        if (refused) this.butcherRetry = 1;
+      }
+      return;
+    }
+    if (!enabled || !held || this.butcherRetry > 0) return;
+    const v = this.findCarcass();
+    if (!v) return;
+    this.butcher = { dino: v.id, t: 0, time: CONFIG.dinos[v.type].butcher.time, x: pos.x, z: pos.z, confirmed: false };
+    g.net.act(ACT.BUTCHER, { dino: v.id });
+    g.audio?.play('swing');
+  }
+
   updateInteraction(enabled, pressed) {
     const g = this.game;
     const hud = g.hud;
@@ -379,6 +436,10 @@ export class PlayerActions {
       if (inv.fruit.length >= this.caps.fruit) return { text: `Fruit pouch full (${this.caps.fruit})`, run: null };
       return { text: `Pick ${name} (${g.fruitCounts[best.id]} left)`, run: () => net.act(ACT.HARVEST, { spot: best.id }) };
     }
+    // 2. a carcass to butcher with the knife (hold V)
+    if (this.butcher) return { text: 'Butchering…', key: 'V', run: null };
+    const carcass = this.findCarcass();
+    if (carcass) return { text: `Hold to butcher the ${CONFIG.dinos[carcass.type].name}`, key: 'V', run: null };
     // 3. hut
     const h = g.layout.hut;
     if (near(h.dropOff, 4)) {
@@ -499,7 +560,8 @@ export class PlayerActions {
       draw: this.drawing ? this.drawT / W.bow.maxDrawTime : 0,
       mode: !g.me.alive ? 'none' : tool === 'trap' || tool === 'bait' ? 'place' : 'default',
     });
-    hud.eatProgress(this.eatingT > 0 ? 1 - this.eatingT / CONFIG.fruit.eatTime : null);
+    hud.eatProgress(this.butcher ? Math.min(1, this.butcher.t / this.butcher.time)
+      : this.eatingT > 0 ? 1 - this.eatingT / CONFIG.fruit.eatTime : null);
     this.updateHint();
   }
 

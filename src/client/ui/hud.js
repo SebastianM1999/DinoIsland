@@ -33,7 +33,7 @@ const fmtTime = (s) => {
   return `${m}:${String(s % 60).padStart(2, '0')}`;
 };
 
-const LOOT_KEYS = ['meat', 'hide', 'teeth', 'plates', 'claws'];
+const LOOT_KEYS = Object.keys(CONFIG.loot);   // meat, hide, teeth, plates, claws, bones, skull
 const FRUIT_KEYS = ['berry', 'mango', 'dragon'];
 const lootName = (k) => CONFIG.loot?.[k]?.name || k;
 const fruitName = (k) => CONFIG.fruit?.types?.[k]?.name || k;
@@ -144,7 +144,7 @@ export class Hud {
     // ---------- bottom-left: key hints
     const bl = el('ul', 'hud-keys');
     bl.setAttribute('aria-label', 'Key hints');
-    for (const [ic, key, label] of [['bag', 'Tab', 'Inventory'], ['map', 'M', 'Map'], ['give', 'G', 'Give fruit'], ['eat', 'F', 'Eat']]) {
+    for (const [ic, key, label] of [['bag', 'Tab', 'Inventory'], ['map', 'M', 'Map'], ['give', 'G', 'Give fruit'], ['eat', 'F', 'Eat'], ['knife', 'V', 'Butcher']]) {
       bl.insertAdjacentHTML('beforeend', `<li><span class="hud-keys-ic brush">${icon(ic)}</span><span class="hud-keys-lab brush"><kbd>${key}</kbd>${label}</span></li>`);
     }
 

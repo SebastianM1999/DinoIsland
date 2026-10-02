@@ -102,6 +102,7 @@ export class DinoSystem {
     const desc = { id: d.id, type: d.type, x: r2(d.x), y: r2(d.y), z: r2(d.z), yaw: r3(d.yaw), st: d.st, hp: Math.ceil(d.hp), maxHp: d.maxHp, alive: d.alive, fl: d.fl };
     if (d.scale) desc.sc = d.scale;       // oversized animal (the grove's titan)
     if (d.title) desc.name = d.title;
+    if (d.butchered) desc.bu = 1;          // carved up with the knife
     return desc;
   }
 

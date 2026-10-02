@@ -117,6 +117,13 @@ export const CONFIG = {
       eatTime: 10,
       lifetime: 90,
     },
+    // Knife (hold V, not on the hotbar): butchers a carcass for extra drops
+    // (CONFIG.dinos.<type>.butcher). Moving away or getting hit cancels.
+    knife: {
+      reach: 3.5,            // meters from the carcass' hit spheres (client) / body radius (server)
+      moveCancel: 2,         // moving this far from the start position cancels
+      sinkTime: 6,           // a butchered carcass disappears after this many seconds
+    },
   },
 
   // Weak spot damage multipliers per hit zone.
@@ -148,6 +155,9 @@ export const CONFIG = {
     teeth:  { name: 'Teeth',  weight: 0.5 },
     plates: { name: 'Plates', weight: 2 },
     claws:  { name: 'Claws',  weight: 0.5 },
+    // from butchering carcasses with the knife (V); building material for the base
+    bones:  { name: 'Bones',  weight: 1.5 },
+    skull:  { name: 'Skull',  weight: 4 },
   },
   pickupRange: 2.4,
   lootDespawn: 300,
@@ -174,6 +184,7 @@ export const CONFIG = {
       body: [[0, 1.6], [2.1, 1.65], [3.7, 0.9], [-2.0, 1.6], [-3.4, 0.9], [-4.8, 0.7]],
       scale: 1,
       loot: { meat: 4, hide: 2 },
+      butcher: { time: 6, loot: { bones: 6, skull: 1 } },   // knife (V) on the carcass: seconds, extra drops
       respawn: 120,
     },
     stego: {
@@ -202,6 +213,7 @@ export const CONFIG = {
       // footprint [forward offset m, radius m] measured from art/sources/stego (tail tip and spikes left out)
       body: [[0, 1.0], [1.23, 0.85], [2.12, 0.38], [2.8, 0.33], [-0.72, 0.95], [-1.87, 0.6], [-2.88, 0.38]],
       loot: { meat: 2, hide: 1, plates: 2 },
+      butcher: { time: 4, loot: { bones: 4, skull: 1, plates: 1 } },
       respawn: 150,
     },
     raptor: {
@@ -219,6 +231,7 @@ export const CONFIG = {
       radius: 0.7,
       body: [[0, 0.25], [0.6, 0.18]],
       loot: { meat: 1, teeth: 2 },
+      butcher: { time: 2.5, loot: { bones: 2, skull: 1 } },
       respawn: 90,
     },
     ptera: {
@@ -236,6 +249,7 @@ export const CONFIG = {
       attackCooldown: 9,
       radius: 1.2,
       loot: { meat: 1, claws: 2 },
+      butcher: { time: 2, loot: { bones: 1, hide: 1 } },
       respawn: 90,
     },
     trex: {
@@ -255,6 +269,7 @@ export const CONFIG = {
       // footprint against trees/rocks: [forward offset m, radius m] along the body (measured from the model)
       body: [[0.2, 1.15], [1.7, 0.95], [3.1, 0.6], [4.1, 0.4], [-1.6, 0.8], [-2.9, 0.55]],
       loot: { meat: 6, teeth: 4 },
+      butcher: { time: 6, loot: { bones: 6, skull: 1, teeth: 2 } },
       respawn: 300,
     },
   },

@@ -179,6 +179,27 @@ export function meatGeometry() {
   });
 }
 
+/** Flint skinning knife: blade along +Y (tip up), handle wrapped in leather. Origin at the grip. */
+export function knifeGeometry() {
+  return cached('knife', () => {
+    let blade = new THREE.OctahedronGeometry(1, 0);
+    blade = deform(blade, (v) => {
+      v.y = v.y > 0 ? v.y * 0.2 : v.y * 0.02;
+      v.x *= v.y > 0 ? 0.034 : 0.04;
+      v.z *= 0.008;
+      v.x += jitter(v, 0.002, 4);
+    });
+    blade = paint(blade, (c, n) => (n.x > 0 ? STONE : STONE_DARK));
+    const handle = paint(new THREE.CylinderGeometry(0.017, 0.02, 0.12, 7), () => WOOD_DARK);
+    return merge([
+      place(blade, [0, 0.07, 0]),
+      place(handle, [0, -0.01, 0]),
+      place(wrap(0.023, 0.08, 6, '#59402e'), [0, -0.01, 0]),
+      place(wrap(0.025, 0.02, 2, ROPE), [0, 0.055, 0]),
+    ]);
+  });
+}
+
 export function makeSpear() { return mesh(spearGeometry()); }
 export function makeBow() { return mesh(bowGeometry()); }
 export function makeArrow() { return mesh(arrowGeometry()); }

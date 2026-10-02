@@ -13,6 +13,20 @@ export const ICONS = {
   heart: svg(`<path d="M16 28 C6 20 2 15.5 2 10.5 2 6.4 5.2 3.5 9 3.5c2.9 0 5.3 1.6 7 4 1.7-2.4 4.1-4 7-4 3.8 0 7 2.9 7 7C30 15.5 26 20 16 28z" fill="#ee4d5f"/>
     <path d="M7.5 8.5c1-1.6 2.6-2 3.8-1.6" stroke="#ff9aa6" stroke-width="2.2" stroke-linecap="round" fill="none"/>`),
 
+  bones: svg(`<path d="M8.5 6.2a3 3 0 0 1 5 1.6l9 9a3 3 0 1 1 1.7 5 3 3 0 1 1-5 1.6l-9-9a3 3 0 1 1-1.7-5 3 3 0 0 1 0-3.2z" fill="#f2e8d0" stroke="${OUT}" stroke-width="1" stroke-linejoin="round"/>
+    <path d="M23.5 6.2a3 3 0 0 0-5 1.6l-2.3 2.3 3.2 3.2 2.3-2.3a3 3 0 1 0 1.8-4.8z" fill="#e1d3b2" stroke="${OUT}" stroke-width="1" stroke-linejoin="round"/>
+    <path d="M12 14.5l-3.4 3.4a3 3 0 1 0-1.8 4.8 3 3 0 0 0 5 1.6l3.4-3.4z" fill="#e1d3b2" stroke="${OUT}" stroke-width="1" stroke-linejoin="round"/>`),
+
+  skull: svg(`<path d="M16 3.5c-7 0-11.5 4.6-11.5 11 0 3.6 1.6 6 3.8 7.4V26c0 1.4 1 2.5 2.4 2.5h10.6c1.4 0 2.4-1.1 2.4-2.5v-4.1c2.2-1.4 3.8-3.8 3.8-7.4 0-6.4-4.5-11-11.5-11z" fill="#f2e8d0" stroke="${OUT}" stroke-width="1.1"/>
+    <ellipse cx="11.2" cy="15.5" rx="3" ry="3.4" fill="${OUT}"/><ellipse cx="20.8" cy="15.5" rx="3" ry="3.4" fill="${OUT}"/>
+    <path d="M16 19.5l-1.6 3h3.2z" fill="${OUT}"/>
+    <path d="M12.5 25.5v3M16 25.5v3M19.5 25.5v3" stroke="#c9b993" stroke-width="1.2"/>`),
+
+  knife: svg(`<path d="M6 26.5 9.5 23" stroke="#6b4228" stroke-width="4" stroke-linecap="round"/>
+    <path d="M6 26.5 9.5 23" stroke="#c7995a" stroke-width="1.3" stroke-dasharray="1.6 1.4" stroke-linecap="round"/>
+    <path d="M9 23.5 27 4.5c.8 3.8-.6 8.7-4.4 12.5L12.5 26.5z" fill="#c5cbd0" stroke="${OUT}" stroke-width="1" stroke-linejoin="round"/>
+    <path d="M12 23.5 25 9.5" stroke="#eef1f3" stroke-width="1.1" stroke-linecap="round"/>`),
+
   bolt: svg(`<path d="M18.5 2 6 18h8l-2.5 12L26 13h-8.2L20.5 2z" fill="#ffc933" stroke="#e39a12" stroke-width="1.2" stroke-linejoin="round"/>`),
 
   spear: svg(`<path d="M5 28 L20 11" stroke="#9a5b2e" stroke-width="3.2" stroke-linecap="round"/>

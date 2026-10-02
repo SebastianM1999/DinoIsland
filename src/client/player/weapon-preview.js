@@ -85,6 +85,7 @@ function frame(now) {
     }
   }
   vm.setGunPose(document.querySelector('#aim').checked, reloading?.kind === tool.value ? reloading.elapsed / CONFIG.weapons[tool.value].reloadTime : 0);
+  vm.setKnife(document.querySelector('#knife').checked);
   effects.update(dt);
   if (flyingSpear && !flyingSpear.landed) {
     const oldDirection = flyingSpear.velocity.clone().normalize();

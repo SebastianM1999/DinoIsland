@@ -61,6 +61,8 @@ class DinoView {
     this.maxHp = desc.maxHp;
     this.alive = desc.alive;
     this.fl = desc.fl || 0;
+    this.butchered = !!desc.bu;   // carved up with the knife: sinks into the ground
+    this.sink = 0;
     this.attackT = 0;
     this.roarT = 0;
     this.flinch = 0;
@@ -107,6 +109,10 @@ class DinoView {
     const dist = Math.hypot(this.pos.x - prevX, this.pos.z - prevZ);
     const yawRate = dt > 0 ? angleDiff(prevYaw, this.yaw) / dt : 0;
     this.root.position.copy(this.pos);
+    if (this.butchered) {
+      this.sink = Math.min(this.sink + dt * 0.4, 3 * this.scale);
+      this.root.position.y -= this.sink;
+    }
     this.root.rotation.y = this.yaw;
 
     const t = this.ctx.terrain;
@@ -229,6 +235,7 @@ export class DinoViews {
       const v = this.map.get(m.id);
       if (v) { v.alive = false; v.st = DS.DEAD; v.bar.hidden = true; }
     });
+    net.on(`ev:${EV.BUTCHERED}`, (m) => { const v = this.map.get(m.id); if (v) v.butchered = true; });
     net.on(`ev:${EV.ATTACK}`, (m) => { const v = this.map.get(m.id); if (v) { v.attackT = 0.45; game.onDinoAttack?.(v); } });
     net.on(`ev:${EV.ROAR}`, (m) => { const v = this.map.get(m.id); if (v) { v.roarT = 1.6; game.onRoar?.(v); } });
     net.on(`ev:${EV.SPOT}`, (m) => {

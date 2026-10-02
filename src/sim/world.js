@@ -17,7 +17,7 @@ import { MSG, ACT, EV, EQUIP } from '../shared/protocol.js';
 import { DinoSystem } from './dinos.js';
 import { Mission } from './mission.js';
 import { resolveCircle } from '../shared/collision.js';
-import { resolveDinoContact, DINO_CONTACT } from '../shared/dinoContact.js';
+import { resolveDinoContact, DINO_CONTACT, dinoBodyCircles } from '../shared/dinoContact.js';
 import { makeRng } from '../shared/rng.js';
 import { lineBlocked } from '../shared/visibility.js';
 import { sanitizeOutfit, sameOutfit } from '../shared/outfits.js';
@@ -242,6 +242,7 @@ export class ServerWorld {
     if (!p.alive || dmg <= 0 || p.creative) return;
     p.hp = Math.max(0, p.hp - dmg);
     if (p.eating) p.eating = null;   // getting hit interrupts eating
+    this.stopButcher(p);             // ... and butchering
     // A dinosaur's knockback can briefly exceed normal sprint speed.
     if (kx || kz) {
       p.knockBudgetUntil = this.now + 1;
@@ -251,7 +252,52 @@ export class ServerWorld {
     if (p.hp <= 0) this.killPlayer(p, src);
   }
 
+  // ------------------------------------------------------------------ knife
+
+  /** How far `p` is from the nearest part of carcass `d` (0 = touching). */
+  carcassDistance(p, d) {
+    let best = Infinity;
+    for (const [x, z, r] of dinoBodyCircles(d)) best = Math.min(best, Math.hypot(p.x - x, p.z - z) - r);
+    return Math.max(0, best);
+  }
+
+  /** Hold V at a carcass: starts butchering (finished in updateButcher). */
+  startButcher(p, id) {
+    const d = this.dinos.get(id);
+    const K = W.knife;
+    // a carcass on the ground (fallen pterosaurs only once they landed), not yet butchered
+    if (!p.alive || p.eating || p.butcher || !d || d.alive || d.butchered || !d.lootDropped) return;
+    if (this.carcassDistance(p, d) > K.reach + P.radius || Math.abs(p.y - d.y) > 4 * (d.scale || 1)) return;
+    const time = CONFIG.dinos[d.type].butcher.time;
+    p.butcher = { dino: d.id, until: this.now + time, x: p.x, z: p.z };
+    d.deadT = Math.max(d.deadT, time + 2);   // the carcass stays until it is done
+    this.event(EV.BUTCHER, { id: p.id, dino: d.id, t: time });
+  }
+
+  stopButcher(p) {
+    if (!p.butcher) return;
+    p.butcher = null;
+    this.event(EV.BUTCHER, { id: p.id, dino: null, t: 0 });
+  }
+
+  updateButcher(p) {
+    const b = p.butcher;
+    const d = this.dinos.get(b.dino);
+    if (!p.alive || !d || d.butchered || Math.hypot(p.x - b.x, p.z - b.z) > W.knife.moveCancel) return this.stopButcher(p);
+    if (this.now < b.until) return;
+    p.butcher = null;
+    d.butchered = true;
+    d.deadT = Math.min(d.deadT, W.knife.sinkTime);
+    const { loot } = CONFIG.dinos[d.type].butcher;
+    this.dropLoot(d.x, d.z, loot);
+    this.event(EV.BUTCHER, { id: p.id, dino: null, t: 0 });
+    this.event(EV.BUTCHERED, { id: d.id });
+    const parts = Object.entries(loot).map(([k, n]) => `${n} ${CONFIG.loot[k].name.toLowerCase()}`).join(', ');
+    this.toast(`${p.name} butchered the ${CONFIG.dinos[d.type].name}: ${parts}`, 'bones');
+  }
+
   killPlayer(p, src) {
+    p.butcher = null;
     p.alive = false;
     p.deadT = P.respawnDelay;
     p.eating = null;
@@ -676,6 +722,7 @@ export class ServerWorld {
         return;
       }
       case ACT.UNSTUCK: return this.unstuck(p, !!m.manual);
+      case ACT.BUTCHER: return m.stop ? this.stopButcher(p) : this.startButcher(p, m.dino);
       case ACT.REFILL: {
         const h = this.layout.hut.arrowRack;
         if (!p.alive || !this.near(p, h.x, h.z, 6)) return;
@@ -841,6 +888,7 @@ export class ServerWorld {
 
     for (const p of this.players.values()) {
       updateGunReload(this, p);
+      if (p.butcher) this.updateButcher(p);
       if (!p.alive) {
         p.deadT -= dt;
         if (p.deadT <= 0) this.respawnPlayer(p);

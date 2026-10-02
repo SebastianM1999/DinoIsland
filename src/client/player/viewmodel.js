@@ -7,7 +7,7 @@ import * as THREE from 'three';
 import { CONFIG } from '../../shared/config.js';
 import { TOPS } from '../../shared/outfits.js';
 import { MAT, merge, mesh, tube } from '../models/kit.js';
-import { spearGeometry, bowGeometry, arrowGeometry, trapGeometry, meatGeometry, makeBowString, BOW_REST, ARROW_TIP_Y } from '../models/weapons.js';
+import { spearGeometry, bowGeometry, arrowGeometry, trapGeometry, meatGeometry, knifeGeometry, makeBowString, BOW_REST, ARROW_TIP_Y } from '../models/weapons.js';
 import { handGeometry } from '../models/hands.js';
 import { SPEAR_THROW, spearReleaseRotation, cameraPlaneScale } from './spearThrow.js';
 import { makeFirearm } from '../models/firearms/index.js';
@@ -92,6 +92,13 @@ export class Viewmodel {
     this.meat = mesh(meatGeometry(), MAT.glossy, { cast: false });
     this.meat.position.set(-0.05, 0.08, -0.06);
     this.rHand.add(this.meat);
+    // skinning knife (V): replaces the held tool while butchering a carcass
+    this.knife = mesh(knifeGeometry(), MAT.standard, { cast: false });
+    this.knife.rotation.set(-1.25, 0, 0.35);   // blade forward and down, toward the carcass
+    this.knife.position.set(0, 0.02, -0.03);
+    this.rHand.add(this.knife);
+    this.knifeOn = 0;      // 0..1 blend in/out
+    this.knifeWanted = false;
     this.fruitHolder = new THREE.Group();
     this.fruitHolder.position.set(-0.03, 0.08, -0.07);
     this.rHand.add(this.fruitHolder);
@@ -172,8 +179,13 @@ export class Viewmodel {
     this.pendingTool = tool === this.tool ? null : tool;
   }
 
+  /** Butchering with the knife (V): the held tool is put away meanwhile. */
+  setKnife(on) { this.knifeWanted = !!on; }
+
   applyVisibility() {
-    const t = this.tool;
+    // the knife hides every tool; the tool comes back once it is put away
+    this.knife.visible = this.knifeOn > 0;
+    const t = this.knifeOn > 0 ? 'knife' : this.tool;
     this.spear.visible = t === 'spear' && ((this.throwT > 0 && !this.throwReleased) || (this.hasSpear && this.throwT === 0));
     this.bow.visible = t === 'bow';
     this.nocked.visible = t === 'bow' && this.hasArrow;
@@ -238,6 +250,7 @@ export class Viewmodel {
     this.flashT = Math.max(0, this.flashT - dt);
     this.adsVis = damp(this.adsVis, this.ads, 14, dt);
     this.drawVis = damp(this.drawVis, this.draw, 18, dt);
+    this.knifeOn = this.knifeWanted ? Math.min(1, this.knifeOn + dt * 6) : Math.max(0, this.knifeOn - dt * 6);
     this.applyVisibility();
 
     // walk bob + mouse sway
@@ -356,6 +369,18 @@ export class Viewmodel {
       if (this.tool === 'rifle') this.lPalm.rotation.x = -Math.PI / 2;
     }
     for (const [kind, other] of Object.entries(this.guns)) if (kind !== this.tool) other.userData.flash.visible = false;
+    if (this.knifeOn > 0) {
+      // butchering: right hand low and forward, sawing back and forth
+      const k = this.knifeOn;
+      const saw = Math.sin(this.time * 11);
+      r.lerp(V(0.12 + saw * 0.06 + this.sway.x, -0.3 + Math.abs(saw) * 0.02 + this.sway.y, -0.5 - saw * 0.05), k);
+      this.rHand.quaternion.identity();
+      this.rHand.rotation.set(-0.35 * k, 0.25 * k, 0);
+      this.rPalm.quaternion.identity();
+      this.rPalm.rotation.set(0, 0, 0);
+      this.rPalm.visible = true;
+      this.rPinch.visible = false;
+    }
     this.aimArm(this.rArm, this.rHand, 1);
     this.aimArm(this.lArm, this.lHand, -1);
     // Launch after the release pose is evaluated, in the same animation frame.

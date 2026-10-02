@@ -39,6 +39,25 @@ const LOOT_GEO = {
     };
     return merge([place(c(1), [-0.06, 0, 0], [0.3, 0, 0.2]), place(c(0.85), [0.07, 0, 0.02], [0.4, 0, -0.25])]);
   }),
+  bones: () => cached('bones', () => {
+    // two long bones with knobbly ends, crossed
+    const bone = (len) => {
+      const shaft = paint(new THREE.CylinderGeometry(0.045, 0.05, len, 7), '#efe3c8');
+      const knob = paint(new THREE.SphereGeometry(0.075, 7, 5), '#e2d3b0');
+      return merge([shaft, place(knob, [0.035, len / 2, 0]), place(knob.clone(), [-0.035, len / 2, 0]),
+        place(knob.clone(), [0.035, -len / 2, 0]), place(knob.clone(), [-0.035, -len / 2, 0])]);
+    };
+    return merge([place(bone(0.55), [0, 0.07, 0], [Math.PI / 2, 0, 0.5]), place(bone(0.45), [0, 0.15, 0], [Math.PI / 2, 0, -0.6])]);
+  }),
+  skull: () => cached('skull', () => {
+    // long reptile skull: cranium, snout, eye holes and a row of teeth
+    let head = deform(new THREE.SphereGeometry(0.2, 10, 7), (v) => { v.z *= 1.9; v.y *= 0.75; if (v.z < 0) v.y *= 1 + v.z * 0.8; });
+    head = paint(head, (c, n) => (n.y < -0.4 ? '#d6c49f' : '#efe3c8'));
+    const eye = paint(new THREE.SphereGeometry(0.06, 6, 4), '#3a2e26');
+    const teeth = [];
+    for (let i = 0; i < 5; i++) for (const s of [-1, 1]) teeth.push(place(spike(0.018, 0.07, '#fbf5e3', '#e8dcc0', 4), [s * 0.1, -0.1, -0.12 - i * 0.055], [Math.PI, 0, 0]));
+    return merge([place(head, [0, 0.16, 0]), place(eye, [0.12, 0.22, 0.05]), place(eye.clone(), [-0.12, 0.22, 0.05]), ...teeth.map((t) => place(t, [0, 0.16, 0]))]);
+  }),
   arrow: () => arrowGeometry(),
   spear: () => spearGeometry(),
 };
@@ -51,7 +70,7 @@ function glowRing(color) {
   return r;
 }
 
-const RING = { meat: '#ff6a5a', hide: '#ffc46a', teeth: '#fff4d0', plates: '#ff8a4a', claws: '#fff4d0', arrow: '#ffe07a', spear: '#ffe07a' };
+const RING = { meat: '#ff6a5a', hide: '#ffc46a', teeth: '#fff4d0', plates: '#ff8a4a', claws: '#fff4d0', bones: '#fff4d0', skull: '#fff4d0', arrow: '#ffe07a', spear: '#ffe07a' };
 
 export class Items {
   constructor(game) {

@@ -71,4 +71,14 @@ export const ITEM_INFO = {
     text: `Curved Pteranodon claws (weight ${L.claws.weight}). Proof you shot one out of the sky.`,
     use: 'Picked up automatically · drop off at the hut crates',
   },
+  bones: {
+    name: L.bones.name, kind: 'Material',
+    text: `Big dinosaur bones (weight ${L.bones.weight}). Hold V at a carcass to butcher it with your knife. Building material for your base.`,
+    use: 'Picked up automatically · drop off at the hut crates',
+  },
+  skull: {
+    name: L.skull.name, kind: 'Trophy',
+    text: `A whole dinosaur skull (weight ${L.skull.weight}) – one per butchered carcass. Heavy, but the finest base builds need them.`,
+    use: 'Picked up automatically · drop off at the hut crates',
+  },
 };
