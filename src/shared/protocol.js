@@ -43,7 +43,7 @@ export const ACT = {
   RELOAD: 'reload',     // { kind: 'pistol'|'rifle' }
   MELEE: 'melee',       // { dino, zone }                     spear stab hit
   FIRE: 'fire',         // { kind: 'arrow'|'spear', o:[x,y,z], v:[x,y,z], pid }
-  LAND: 'land',         // { kind, pid, p:[x,y,z], dino?, zone? } projectile came to rest / hit
+  LAND: 'land',         // { kind, pid, p:[x,y,z], dino?, zone?, attach?, pose? } projectile impact
   PICKUP: 'pickup',     // { item }
   HARVEST: 'harvest',   // { spot }
   EAT: 'eat',           // { fruit? }                          start eating (type optional)

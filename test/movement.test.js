@@ -158,7 +158,7 @@ test('UNSTUCK gets a player out of a steep pit; automatic requests on free groun
 
 test('initial dinosaur spawns stand on valid ground, clear of colliders (islands 1 and 2)', () => {
   for (const level of [0, 1]) {
-    for (const variant of [1, 2, 3, 5]) {
+    for (const variant of Array.from({ length: 16 }, (_, i) => i + 1)) {
       const world = new ServerWorld({ send() {} }, { level, variant });
       const sys = world.dinos;
       assert.ok(sys.list.length > 0);

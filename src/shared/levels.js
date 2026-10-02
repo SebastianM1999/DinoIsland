@@ -87,7 +87,7 @@ export const LEVELS = [
   // the first island only has raptors and pteranodons – plus the giant locked
   // away in the Primeval Grove (shared/grove.js), a teaser for later islands –
   // and the Boss Arena, a lava islet beside the boat (shared/bossArena.js)
-  { name: 'Emerald Jungle', biome: 'jungle', dinos: { brachio: 0, stego: 0 }, grove: true, bossArena: true },
+  { name: 'Emerald Jungle', biome: 'jungle', dinos: { brachio: 0, stego: 0, raptor: 4 }, grove: true, bossArena: true },
   { name: 'Ashfall Isle', biome: 'volcano' },
 ];
 

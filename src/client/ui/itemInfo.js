@@ -9,11 +9,16 @@ const W = CONFIG.weapons;
 
 /** @type {Record<string, {name:string, kind:string, text:string, use?:string}>} */
 export const ITEM_INFO = {
+  spear: {
+    name: 'Spear', kind: 'Tool',
+    text: `Stab or throw, then recover it. Each successful stab or throw removes ${W.spear.useWear}% health; it breaks at zero. Recovery keeps its current health.`,
+    use: 'Slot 1 · left click to stab · right click to throw · replace a broken spear at the hut',
+  },
   pistol: { name: 'P-19 pistol', kind: 'Firearm', text: `Semi-automatic pistol. ${W.pistol.damage} base damage, ${W.pistol.magazine} rounds per magazine.`, use: 'Slot 6 - click to fire - right click to aim - R to reload - refill at hut workbench' },
   rifle: { name: 'M4A1 assault rifle', kind: 'Firearm', text: `Automatic rifle. ${W.rifle.damage} base damage, ${W.rifle.magazine} rounds per magazine.`, use: 'Slot 7 - hold left click to fire - right click to aim - R to reload - refill at hut workbench' },
   arrow: {
     name: 'Arrows', kind: 'Ammunition',
-    text: `Ammunition for the bow. Arrows deal ${W.bow.damage} base damage (more on a full draw and on weak spots) and are the answer to Pteranodons. Collect them again after shooting.`,
+    text: `Arrows deal ${W.bow.damage} base damage and can be recovered from the ground or a dinosaur. Each arrow lasts ${W.bow.uses} shots, then breaks. Worn arrows are fired first.`,
     use: 'Slot 2 · hold left click to draw, release to shoot · refill at the hut workbench',
   },
   trap: {

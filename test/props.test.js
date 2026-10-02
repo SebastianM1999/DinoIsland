@@ -128,11 +128,11 @@ test('spring cave builds for both biomes with a clear lip and a free fall zone',
     assert.ok(Math.abs(g.rotation.y - 0.8) < 1e-9);
     assert.ok(g.userData.water?.isMesh, 'stream surface exposed');
   }
-  assert.ok(SPRING_LIP_OFFSET > 0.5 && SPRING_LIP_OFFSET < 3);
+  assert.ok(SPRING_LIP_OFFSET > 0 && SPRING_LIP_OFFSET < 0.6, 'outlet has no projecting shelf');
   for (const seed of [1, 77, 500, 3333, 9000]) {
     const { sdf } = springSdf(4.5, seed);
     // the stream bed inside the opening sits just below the lip height
-    for (const [x, z] of [[0, 0.5], [1.5, 0], [-1.5, -0.8]]) {
+    for (const [x, z] of [[0, 1.5], [1.5, 1], [-1.5, 1]]) {
       let floor = null;
       for (let y = 1; y > -1.5; y -= 0.02) if (sdf(x, y, z) < 0) { floor = y; break; }
       assert.ok(floor !== null && floor > SPRING_FLOOR - 0.3 && floor < 0.1, `seed ${seed}: floor at ${x},${z} = ${floor}`);

@@ -425,6 +425,7 @@ export class PlayerActions {
     const caps = this.caps;
     let weight = this.carryWeight();
     for (const { data: it } of g.items.items.values()) {
+      if ((it.dino || it.pose) && Math.abs(it.y - (pos.y + P.eyeHeight)) > 3.5) continue;
       if (Math.abs(it.x - pos.x) > R || Math.abs(it.z - pos.z) > R || Math.hypot(it.x - pos.x, it.z - pos.z) > R) continue;
       if (now < (this.pickRequested.get(it.id) ?? 0)) continue;   // already asked, wait for the server
       let full = null;
@@ -465,7 +466,7 @@ export class PlayerActions {
     const hud = g.hud;
     const inv = this.inv;
     hud.setHotbar([
-      { id: 'spear', label: SLOT_LABEL.spear, count: null, enabled: inv.spear },
+      { id: 'spear', label: `${SLOT_LABEL.spear} health`, count: inv.spear ? `${inv.spearHealth ?? 100}%` : null, enabled: inv.spear },
       { id: 'bow', label: SLOT_LABEL.bow, count: inv.arrows, enabled: inv.arrows > 0 },
       { id: 'trap', label: SLOT_LABEL.trap, count: inv.traps, enabled: inv.traps > 0 },
       { id: 'bait', label: SLOT_LABEL.bait, count: inv.baits, enabled: inv.baits > 0 },
@@ -476,6 +477,9 @@ export class PlayerActions {
     hud.setInventory({
       guns: inv.guns, reloading: inv.reloading, weapon: this.tool,
       arrows: inv.arrows,
+      arrowUses: inv.arrowUses,
+      spear: inv.spear,
+      spearHealth: inv.spearHealth,
       maxArrows: caps.arrows,
       fruit: inv.fruit,
       maxFruit: caps.fruit,

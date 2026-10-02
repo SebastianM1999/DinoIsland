@@ -87,9 +87,11 @@ export class ServerWorld {
         lastMoveAt: this.now, moveBudget: 3.5,
       });
       p.inv.arrows = caps.arrows;
+      p.inv.arrowUses = Array(caps.arrows).fill(W.bow.uses);
       p.inv.traps = Math.max(p.inv.traps, caps.traps);
       p.inv.baits = Math.max(p.inv.baits, caps.baits);
       p.inv.spear = true;
+      p.inv.spearHealth = W.spear.durability;
       p.inv.guns = gunInventory(); p.inv.reloading = null;
       p.inv.caps = caps;
     }
@@ -168,7 +170,9 @@ export class ServerWorld {
     return {
       guns: gunInventory(), reloading: null,
       arrows: W.bow.startArrows,
+      arrowUses: Array(W.bow.startArrows).fill(W.bow.uses),
       spear: true,
+      spearHealth: W.spear.durability,
       traps: W.trap.startCount,
       baits: W.bait.startCount,
       fruit: [],
@@ -252,6 +256,8 @@ export class ServerWorld {
     p.moveBudget = 3.5;
     p.knockBudgetUntil = 0;
     p.inv.arrows = Math.max(p.inv.arrows, W.bow.startArrows);
+    this.normalizeArrows(p.inv);
+    if (!p.inv.spear) p.inv.spearHealth = W.spear.durability;
     p.inv.spear = true;
     p.inv.guns = gunInventory(); p.inv.reloading = null;
     this.sendInv(p);
@@ -403,6 +409,9 @@ export class ServerWorld {
         if (!validVec(m.p) || !this.validMeleeHit(p, d, m.p)) return;
         p.nextMeleeAt = this.now + W.spear.cooldown;
         this.dinos.damage(d, W.spear.damage, m.zone, p.id, 'spear');
+        inv.spearHealth = Math.max(0, (inv.spearHealth ?? W.spear.durability) - W.spear.useWear);
+        if (!inv.spearHealth) { inv.spear = false; this.toast('Your spear broke - refill at the hut', 'spear', p.id); }
+        this.sendInv(p);
         return;
       }
       case ACT.FIRE: {
@@ -415,15 +424,20 @@ export class ServerWorld {
         const maxSpeed = kind === 'spear' ? W.spear.throwSpeed + 5 : W.bow.maxSpeed + 5;
         if (originDistance > 2.5 || Math.abs(m.o[1] - (p.y + P.eyeHeight)) > 2.5 ||
             speed < 5 || speed > maxSpeed) return;
+        let health;
         if (kind === 'arrow') {
           if (inv.arrows <= 0) return;
+          this.normalizeArrows(inv);
+          health = inv.arrowUses.shift() - 1;
           inv.arrows--;
         } else {
           if (!inv.spear) return;
+          health = Math.max(0, (inv.spearHealth ?? W.spear.durability) - W.spear.useWear);
           inv.spear = false;
+          inv.spearHealth = 0;
         }
         p.nextFireAt = this.now + (kind === 'spear' ? W.spear.throwCooldown : W.bow.cooldown);
-        this.projectiles.set(`${p.id}:${m.pid}`, { kind, t: this.now, pw: Math.max(0, Math.min(1, Number(m.pw) || 0)), o: m.o.slice(), v: m.v.slice() });
+        this.projectiles.set(`${p.id}:${m.pid}`, { kind, health, t: this.now, pw: Math.max(0, Math.min(1, Number(m.pw) || 0)), o: m.o.slice(), v: m.v.slice() });
         this.sendInv(p);
         this.event(EV.FIRE, { by: p.id, kind, o: m.o, v: m.v, pid: m.pid }, p.id);
         return;
@@ -433,39 +447,78 @@ export class ServerWorld {
         const proj = this.projectiles.get(key);
         if (!proj) return;
         if (!validVec(m.p) || !this.validProjectileLanding(proj, m.p)) return;
-        this.projectiles.delete(key);
         const [x, y, z] = m.p;
         const d = m.dino != null ? this.dinos.get(m.dino) : null;
         if (d && d.alive) {
           const reach = d.type === 'ptera' ? 9 : d.radius + 4 * (d.scale || 1);
           const maxHeight = { brachio: 17, trex: 12, stego: 7, raptor: 5, ptera: 6 }[d.type] * (d.scale || 1);
           if (dist2(x, z, d.x, d.z) > reach * reach || Math.abs(y - d.y) > maxHeight) return;
+          this.projectiles.delete(key);
+          if (proj.health > 0) {
+            const item = this.spawnItem(proj.kind, x, z, 1, y, proj.health, false);
+            const dx = x - d.x, dz = z - d.z, c = Math.cos(d.yaw), s = Math.sin(d.yaw);
+            item.dino = d.id;
+            item.offset = [dx * c - dz * s, y - d.y, dx * s + dz * c];
+            item.direction = proj.v.slice();
+            // Bone coordinates only affect rendering; pickup positions come from the validated hit.
+            if (m.attach && Number.isInteger(m.attach.joint) && m.attach.joint >= 0 && m.attach.joint < 100 &&
+                validVec(m.attach.p) && Math.hypot(...m.attach.p) < 25 &&
+                Array.isArray(m.attach.q) && m.attach.q.length === 4 && m.attach.q.every(Number.isFinite) &&
+                (!m.attach.s || (validVec(m.attach.s) && m.attach.s.every(n => n > 0 && n < 100)))) {
+              item.attach = { joint: m.attach.joint, p: m.attach.p.slice(), q: m.attach.q.slice(), ...(m.attach.s ? { s: m.attach.s.slice() } : {}) };
+            }
+            this.event(EV.ITEM_ADD, { item });
+          }
           if (proj.kind === 'arrow') {
             const dmg = W.bow.damage * (0.45 + 0.55 * Math.min(1, proj.pw));
-            d.arrowsStuck = (d.arrowsStuck || 0) + 1;
             this.dinos.damage(d, dmg, m.zone, p.id, 'arrow');
           } else {
             this.dinos.damage(d, W.spear.throwDamage, m.zone, p.id, 'spear');
-            this.spawnItem('spear', d.x + (Math.random() - 0.5) * 2, d.z + (Math.random() - 0.5) * 2, 1);
           }
           return;
         }
         // nothing from outside comes to rest inside the grove (it couldn't be picked up)
         if (insideGrove(this.layout, x, z, 1) && !insideGrove(this.layout, p.x, p.z)) return;
-        if (Math.abs(y - this.layout.groundAt(x, z)) <= 2) this.spawnItem(proj.kind, x, z, 1, y);
+        this.projectiles.delete(key);
+        const ground = this.layout.groundAt(x, z);
+        if (proj.health > 0 && y >= ground - 0.2 && y <= ground + 20) {
+          const item = this.spawnItem(proj.kind, x, z, 1, y, proj.health, false);
+          if (m.pose && validVec(m.pose.p) && Math.hypot(m.pose.p[0] - x, m.pose.p[1] - y, m.pose.p[2] - z) < 2 &&
+              Array.isArray(m.pose.q) && m.pose.q.length === 4 && m.pose.q.every(Number.isFinite)) item.pose = { p: m.pose.p.slice(), q: m.pose.q.slice() };
+          this.event(EV.ITEM_ADD, { item });
+        }
         return;
       }
       case ACT.PICKUP: {
         if (!p.alive) return;
         const it = this.items.get(m.item);
-        if (!it || !this.near(p, it.x, it.z, CONFIG.pickupRange + 1.5)) return;
+        if (it?.dino) this.updateAttachedItem(it);
+        if (!it) return;
+        const corpse = it.dino && this.dinos.get(it.dino);
+        const groundedCorpse = corpse && !corpse.alive && (corpse.type !== 'ptera' || corpse.grounded);
+        // The server has body coordinates rather than render bones. A collapsed carcass
+        // can rotate a hit point around the body, so retrieve across its occupied area.
+        const extraReach = groundedCorpse ? corpse.radius + 4 * (corpse.scale || 1) : 0;
+        if (!this.near(p, it.x, it.z, CONFIG.pickupRange + 1.5 + extraReach)) return;
+        const pickupY = groundedCorpse ? this.layout.groundAt(it.x, it.z) + 1 : it.y;
+        if ((it.dino || it.pose) && Math.abs(pickupY - (p.y + P.eyeHeight)) > 3.5) return;
         const caps = this.caps();
         if (it.kind === 'arrow') {
           if (inv.arrows >= caps.arrows) return this.fullAlert(p, 'Your quiver is full', 'arrow');
-          inv.arrows = Math.min(caps.arrows, inv.arrows + it.n);
+          this.normalizeArrows(inv);
+          const take = Math.min(caps.arrows - inv.arrows, it.n);
+          inv.arrowUses.push(...Array(take).fill(it.health ?? W.bow.uses));
+          inv.arrows += take;
+          if (take < it.n) {
+            it.n -= take;
+            this.event(EV.ITEM_REMOVE, { id: it.id });
+            this.event(EV.ITEM_ADD, { item: it });
+            this.sendInv(p); return;
+          }
         } else if (it.kind === 'spear') {
           if (inv.spear) return;
           inv.spear = true;
+          inv.spearHealth = it.health ?? W.spear.durability;
         } else if (CONFIG.loot[it.kind]) {
           const weight = CONFIG.loot[it.kind].weight * it.n;
           if (this.carryWeight(p) + weight > caps.carry + 1e-6) {
@@ -587,8 +640,10 @@ export class ServerWorld {
         if (!p.alive || !this.near(p, h.x, h.z, 6)) return;
         const caps = this.caps();
         inv.arrows = caps.arrows;
+        this.normalizeArrows(inv);
         inv.traps = Math.max(inv.traps, caps.traps);
         inv.baits = Math.max(inv.baits, caps.baits);
+        if (!inv.spear) inv.spearHealth = W.spear.durability;
         inv.spear = true;
         inv.guns = gunInventory(); inv.reloading = null;
         this.sendInv(p);
@@ -640,14 +695,37 @@ export class ServerWorld {
 
   // ------------------------------------------------------------------ items
 
-  spawnItem(kind, x, z, n = 1, y = null) {
+  normalizeArrows(inv) {
+    inv.arrowUses ??= [];
+    inv.arrowUses.length = Math.min(inv.arrowUses.length, inv.arrows);
+    while (inv.arrowUses.length < inv.arrows) inv.arrowUses.push(W.bow.uses);
+    // Use worn arrows first so their three-shot lifetime is visible to the player.
+    inv.arrowUses.sort((a, b) => a - b);
+  }
+
+  updateAttachedItem(it) {
+    const d = this.dinos.get(it.dino);
+    if (!d) {
+      delete it.dino; delete it.attach;
+      it.y = this.layout.groundAt(it.x, it.z) + 0.05;
+      this.event(EV.ITEM_REMOVE, { id: it.id });
+      this.event(EV.ITEM_ADD, { item: it });
+      return;
+    }
+    const [x, y, z] = it.offset, c = Math.cos(d.yaw), s = Math.sin(d.yaw);
+    it.x = r2(d.x + x * c + z * s); it.y = r2(d.y + y); it.z = r2(d.z - x * s + z * c);
+  }
+
+  spawnItem(kind, x, z, n = 1, y = null, health = null, publish = true) {
     const lim = CONFIG.world.size / 2 - 2;
     x = Math.max(-lim, Math.min(lim, x));
     z = Math.max(-lim, Math.min(lim, z));
     const ground = this.layout.groundAt(x, z);
     const it = { id: this.id(), kind, n, x: r2(x), y: r2(y == null ? ground : Math.max(ground, Math.min(y, ground + 3))), z: r2(z), t: this.now };
+    if (!publish && y != null) it.y = r2(y); // an airborne target's hit point
+    if (kind === 'arrow' || kind === 'spear') it.health = health ?? (kind === 'arrow' ? W.bow.uses : W.spear.durability);
     this.items.set(it.id, it);
-    this.event(EV.ITEM_ADD, { item: it });
+    if (publish) this.event(EV.ITEM_ADD, { item: it });
     return it;
   }
 
@@ -741,6 +819,7 @@ export class ServerWorld {
     }
     // stale items
     for (const it of this.items.values()) {
+      if (it.dino) this.updateAttachedItem(it);
       const life = it.kind === 'arrow' ? W.bow.arrowLifetime * 3 : it.kind === 'spear' ? Infinity : CONFIG.lootDespawn;
       if (this.now - it.t > life) this.removeItem(it.id);
     }

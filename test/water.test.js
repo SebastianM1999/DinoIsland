@@ -7,9 +7,10 @@ import { planIsland } from '../src/shared/island.js';
 import { Terrain } from '../src/shared/terrain.js';
 import { buildLayout } from '../src/shared/layout.js';
 import { buildWater } from '../src/client/world/water.js';
+import { SPRING_LIP_OFFSET, SPRING_FLOOR, SPRING_WATER_OFFSET } from '../src/shared/springShape.js';
 
 const islands = [];
-for (const [lv, v] of [[0, 1], [0, 2], [0, 3], [0, 4], [0, 5], [0, 6], [0, 7], [0, 8], [1, 1], [1, 2]]) {
+for (const [lv, v] of Array.from({ length: 16 }, (_, i) => [0, i + 1]).concat([[1, 1], [1, 2]])) {
   const terrain = new Terrain(planIsland(lv, v));
   islands.push({ name: `island ${lv + 1}/${v}`, terrain, layout: buildLayout(terrain) });
 }
@@ -45,7 +46,7 @@ test('every waterfall lands in water: its impact point lies in the basin, not on
       // nothing grows on the water's way down
       for (const t of layout.trees) {
         const vx = wf.impact.x - wf.top.x, vz = wf.impact.z - wf.top.z;
-        const u = Math.max(0, Math.min(1, ((t.x - wf.top.x) * vx + (t.z - wf.top.z) * vz) / (vx * vx + vz * vz)));
+        const u = wf.vertical ? 0 : Math.max(0, Math.min(1, ((t.x - wf.top.x) * vx + (t.z - wf.top.z) * vz) / (vx * vx + vz * vz)));
         assert.ok(Math.hypot(wf.top.x + vx * u - t.x, wf.top.z + vz * u - t.z) > wf.width / 2 + 0.5, `${name}: tree in the waterfall`);
       }
     }
@@ -61,11 +62,24 @@ test('the waterfall sheet follows the cliff down into the basin and never cuts i
     assert.equal(sheets.length, layout.waterfalls.length, `${name}: one sheet per fall`);
     for (const [k, sheet] of sheets.entries()) {
       const wf = layout.waterfalls[k];
+      assert.equal(wf.vertical, true, `${name}: straight vertical waterfall`);
+      assert.equal(wf.impact.x, wf.top.x, `${name}: impact directly below source x`);
+      assert.equal(wf.impact.z, wf.top.z, `${name}: impact directly below source z`);
       const pos = sheet.geometry.attributes.position;
       const fall = sheet.geometry.attributes.aFall;
+      assert.ok(Math.abs(wf.top.x - (wf.source.x + wf.dirX * SPRING_LIP_OFFSET)) < 1e-6, `${name}: lip x follows grotto`);
+      assert.ok(Math.abs(wf.top.z - (wf.source.z + wf.dirZ * SPRING_LIP_OFFSET)) < 1e-6, `${name}: lip z follows grotto`);
+      assert.ok(Math.abs(wf.top.y - wf.source.y - SPRING_FLOOR) < 1e-6, `${name}: lip height follows grotto`);
+      for (let j = 0; j < 9; j++) {
+        assert.ok(Math.abs(pos.getY(j) - wf.top.y - SPRING_WATER_OFFSET) < 1e-5, `${name}: sheet starts at the grotto stream, vertex ${j}`);
+        assert.ok(Math.abs((pos.getX(j) - wf.top.x) * wf.dirX + (pos.getZ(j) - wf.top.z) * wf.dirZ) < 1e-5, `${name}: sheet starts at the lip, vertex ${j}`);
+      }
       let lastRow = 0;
       for (let i = 0; i < pos.count; i++) {
         const x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i);
+        assert.equal(fall.getZ(i), 0, `${name}: free-falling water never uses rock-contact foam`);
+        assert.ok(Math.abs((x - wf.top.x) * wf.dirX + (z - wf.top.z) * wf.dirZ) < 1e-5, `${name}: vertex ${i} stays in the vertical fall plane`);
+        assert.ok(terrain.waterDepthAt(x, z) > 0.4, `${name}: entire fall is over the pool, vertex ${i}`);
         // above the rock (a hair of tolerance for the grid's triangles), or on the water
         assert.ok(y >= terrain.heightAt(x, z) + 0.02 || y >= wf.impact.y, `${name}: vertex ${i} inside the cliff`);
         // the middle of the last row: right in the plunge, at the water surface

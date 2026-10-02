@@ -14,16 +14,15 @@
 // waterfall.
 // Lava (rivers + pools): opaque glowing molten core with dark cooling crust
 // plates drifting downstream, lightly fogged.
-// Waterfalls: streak sheets that fall freely from the grotto's lip and, where
-// the cliff juts out, run down the rock as white-water cascades – always all
-// the way into the basin (layout waterfall.impact) – with splash droplets and
-// mist at the plunge.
+// Waterfalls: vertical streak curtains from a mountain opening straight into
+// the basin, with splash droplets and mist at the plunge.
 // TODO(water-sim): the water is not simulated – no real flow around obstacles,
 // no wakes behind dinosaurs, no puddles from rain; ripples are shader rings.
 
 import * as THREE from 'three';
 import { CONFIG } from '../../shared/config.js';
 import { makeRng } from '../../shared/rng.js';
+import { SPRING_WATER_OFFSET } from '../../shared/springShape.js';
 import { riverGeometry, discGeometry, withSheetAttrs } from './rivers.js';
 
 /** Ring ripples alive at once (footsteps, wading, splashes) – shader array size. */
@@ -607,19 +606,17 @@ export function buildWater(terrain, layout = {}, sunDir = new THREE.Vector3(-0.4
     if (Math.hypot(dx, dz) < 1e-6) dx = 1;
     const dir = new THREE.Vector3(dx, 0, dz).normalize();
     const side = new THREE.Vector3(-dir.z, 0, dir.x);
-    const top = new THREE.Vector3(wf.top.x, wf.top.y + 0.25, wf.top.z);
+    const top = new THREE.Vector3(wf.top.x, wf.top.y + SPRING_WATER_OFFSET, wf.top.z);
     const width = wf.width > 0 ? wf.width : 4;
     // where the water meets its basin (layout: a little way out into the pool)
     const end = new THREE.Vector3(wf.impact?.x ?? wf.bottom.x, wf.impact?.y ?? wf.bottom.y, wf.impact?.z ?? wf.bottom.z);
     const run = Math.max(1, (end.x - top.x) * dir.x + (end.z - top.z) * dir.z);
 
-    // The water's path: it leaves the lip at a walking pace and falls freely;
-    // wherever the cliff juts out below, it runs down the rock instead (a
-    // cascade), every vertex kept just above the ground under it, until it
-    // reaches the basin. So it never ends in the hillside.
+    // Mountain water falls straight down into the pool. Legacy lava cascades
+    // retain their terrain-following path when they have no vertical flag.
     const v0 = 2.6;                                            // m/s over the lip
-    const s0 = -1.5;                                           // starts a little behind the lip
-    const steps = Math.max(24, Math.ceil((run - s0) / 0.45)), cols = 8;
+    const s0 = 0;                                              // attached to the grotto's lip
+    const steps = Math.max(24, Math.ceil((wf.vertical ? top.y - end.y : run - s0) / 0.45)), cols = 8;
     const pos = [], uvs = [], fall = [], idx = [];
     const prevY = new Array(cols + 1).fill(Infinity);
     const rowArc = [0];
@@ -634,14 +631,14 @@ export function buildWater(terrain, layout = {}, sunDir = new THREE.Vector3(-0.4
       const row = [];
       for (let j = 0; j <= cols; j++) {
         const a = (j / cols - 0.5) * width * spread;
-        const x = top.x + dir.x * s + side.x * a, z = top.z + dir.z * s + side.z * a;
+        const x = top.x + dir.x * (wf.vertical ? 0 : s) + side.x * a, z = top.z + dir.z * (wf.vertical ? 0 : s) + side.z * a;
         const ground = terrain.heightAt(x, z) + 0.12;
-        let y = Math.max(free, end.y + 0.02);
+        let y = wf.vertical ? THREE.MathUtils.lerp(top.y, end.y + 0.02, t) : Math.max(free, end.y + 0.02);
         if (i === steps) y = end.y + 0.02;
         y = Math.min(y, prevY[j]);                             // water never climbs ...
-        y = Math.max(y, ground);                               // ... nor sinks into the rock
+        if (!wf.vertical) y = Math.max(y, ground);                               // ... nor sinks into the rock
         prevY[j] = y;
-        const contact = s > 0 && i < steps ? THREE.MathUtils.clamp((ground - free) / 0.5, 0, 1) : 0;
+        const contact = !wf.vertical && s > 0 && i < steps ? THREE.MathUtils.clamp((ground - free) / 0.5, 0, 1) : 0;
         row.push([x, y, z, contact]);
       }
       const c = row[cols >> 1];

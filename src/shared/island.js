@@ -252,6 +252,19 @@ export function islandHeight(plan, x, z) {
   // pool the river flows out of: its basin must stay a basin (no levee hump in
   // the middle of it, where the waterfall comes down)
   if (q && q.d >= q.width / 2 && q.surface > 0.3 && !inWaterPool(plan, x, z)) h = Math.max(h, Math.min(hr, q.surface + 0.35 + (q.d - q.width / 2) * 0.12));
+  // Cut the cliff foot and clear the grotto opening. The drop has no shelf
+  // or ramp: all ground directly beneath the outlet lies under the pool.
+  if (plan.waterfall) {
+    const f = plan.waterfall, dx = x - f.x, dz = z - f.z;
+    const back = dx * f.dir.x + dz * f.dir.z;
+    const side = Math.abs(dx * f.dir.z - dz * f.dir.x);
+    const shoulder = (1 - smoothstep(f.width / 2 + 3, f.width / 2 + 10, side))
+      * smoothstep(2.8, 4.2, back) * (1 - smoothstep(12, 20, back));
+    h = lerp(h, Math.max(h, f.pool.level + 12), shoulder);
+    const across = 1 - smoothstep(f.width / 2 + 1.5, f.width / 2 + 5, side);
+    const face = 1 - smoothstep(2.8, 4.2, back);
+    if (back > -f.pool.r && across > 0 && face > 0) h = lerp(h, Math.min(h, f.pool.level - f.pool.depth), across * face);
+  }
   // the boss arena's islet beside the boat (shared/bossArena.js)
   if (plan.bossArena) h = bossArenaHeight(plan.bossArena, x, z, h, plan.seed);
   return h;
@@ -431,7 +444,7 @@ export function planIsland(levelIndex = 0, variant = 1) {
       x: main.x + dir.x * main.radius * 0.7, z: main.z + dir.z * main.radius * 0.7,
       radius: 26 * Math.max(0.7, K), height: 22 * Math.max(0.65, K), terrace: K < 0.7 ? 7 : 10, sharp: 0.86, rough: 2, spur: true,
     });
-    const pool = { x: spur.x + dir.x * spur.radius * 1.05, z: spur.z + dir.z * spur.radius * 1.05, r: 10 * Math.max(0.8, K), depth: 3, kind: 'water' };
+    const pool = { x: spur.x + dir.x * spur.radius * 1.05, z: spur.z + dir.z * spur.radius * 1.05, r: 14 * Math.max(0.8, K), depth: 3, kind: 'water' };
     // pool level from the ground around it
     let ring = 0;
     for (let k = 0; k < 12; k++) {
@@ -441,6 +454,8 @@ export function planIsland(levelIndex = 0, variant = 1) {
     pool.level = Math.max(2.2, ring / 12 - 0.4);
     plan.pools.push(pool);
     plan.waterfallDir = { x: -dir.x, z: -dir.z };   // from the pool toward the cliff (water flows the other way)
+    // The outlet faces a broad pool, with the mountain rising behind it.
+    plan.waterfall = { x: pool.x - dir.x * (pool.r * 0.55 + 0.45), z: pool.z - dir.z * (pool.r * 0.55 + 0.45), width: 4.5, dir: plan.waterfallDir, pool };
     plan.spur = spur;
     plan.mainPeak = main;
   }

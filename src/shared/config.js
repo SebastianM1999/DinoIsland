@@ -79,6 +79,8 @@ export const CONFIG = {
       throwGravity: 11,
       throwCooldown: 0.9,
       pickupRange: 2.6,
+      durability: 100,
+      useWear: 10,
     },
     bow: {
       damage: 16,
@@ -90,6 +92,7 @@ export const CONFIG = {
       cooldown: 0.25,
       maxArrows: 12,
       startArrows: 12,
+      uses: 3,
       arrowLifetime: 60,     // seconds an arrow stays on the ground as pickup
     },
     // spread: random cone half-angle (radians) of each shot; moving adds up to spreadMove on top

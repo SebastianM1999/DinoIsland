@@ -1,5 +1,5 @@
 // Server-owned world objects shown on the client: loot and dropped
-// arrows/spears lying on the ground, traps and meat bait.
+// arrows/spears lodged in terrain or dinosaurs, traps and meat bait.
 
 import * as THREE from 'three';
 import { CONFIG } from '../../shared/config.js';
@@ -83,7 +83,7 @@ export class Items {
     if (!make) return;
     const obj = new THREE.Group();
     const m = mesh(make(), it.kind === 'meat' ? MAT.glossy : MAT.standard);
-    if (it.kind === 'arrow' || it.kind === 'spear') {
+    if ((it.kind === 'arrow' || it.kind === 'spear') && !it.dino && !it.pose) {
       m.rotation.set(Math.PI / 2, Math.random() * 6, 0);
       m.position.y = 0.06;
       m.scale.setScalar(it.kind === 'spear' ? 1 : 1.3);
@@ -91,8 +91,10 @@ export class Items {
     const spin = new THREE.Group();
     spin.add(m);
     obj.add(spin, glowRing(RING[it.kind] || '#fff'));
-    obj.position.set(it.x, this.game.terrain.heightAt(it.x, it.z) + 0.05, it.z);
-    obj.userData = { spin, phase: Math.random() * 6, flat: it.kind === 'arrow' || it.kind === 'spear', popT: 0 };
+    obj.position.set(it.x, it.y ?? this.game.layout.groundAt(it.x, it.z) + 0.05, it.z);
+    if (it.pose) { obj.position.fromArray(it.pose.p); obj.quaternion.fromArray(it.pose.q).normalize(); }
+    obj.userData = { spin, phase: Math.random() * 6, flat: it.kind === 'arrow' || it.kind === 'spear', popT: it.dino || it.pose ? 1 : 0 };
+    obj.children[1].visible = !it.dino && !it.pose;
     this.scene.add(obj);
     this.items.set(it.id, { data: it, obj });
   }
@@ -100,7 +102,7 @@ export class Items {
   removeItem(id) {
     const e = this.items.get(id);
     if (!e) return;
-    this.scene.remove(e.obj);
+    e.obj.removeFromParent();
     this.items.delete(id);
   }
 
@@ -149,8 +151,37 @@ export class Items {
 
   update(dt) {
     this.time += dt;
-    for (const { obj } of this.items.values()) {
+    for (const { obj, data } of this.items.values()) {
       const u = obj.userData;
+      if (data.dino) {
+        const view = this.game.dinos.map.get(data.dino);
+        if (view) {
+          const [x, y, z] = data.offset;
+          const c = Math.cos(view.yaw), s = Math.sin(view.yaw);
+          data.x = view.pos.x + x * c + z * s; data.y = view.pos.y + y; data.z = view.pos.z - x * s + z * c;
+          if (!u.attached) {
+            const joint = data.attach && view.hitSpheres()[data.attach.joint]?.joint;
+            if (joint) {
+              joint.add(obj);
+              obj.position.fromArray(data.attach.p);
+              obj.quaternion.fromArray(data.attach.q).normalize();
+              if (data.attach.s) obj.scale.fromArray(data.attach.s);
+            } else {
+              view.root.updateWorldMatrix(true, false);
+              obj.position.set(data.x, data.y, data.z);
+              obj.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), new THREE.Vector3(...data.direction).normalize());
+              const lead = data.kind === 'spear' ? 1.25 : 0.8;
+              obj.position.addScaledVector(new THREE.Vector3(...data.direction).normalize(), -lead * 0.85);
+              view.root.attach(obj);
+            }
+            u.attached = true;
+          }
+          // Pickup prompts must follow the animated mesh, including a collapsing carcass.
+          const hitPoint = obj.localToWorld(new THREE.Vector3(0, (data.kind === 'spear' ? 1.25 : 0.8) * 0.85, 0));
+          data.x = hitPoint.x; data.y = hitPoint.y; data.z = hitPoint.z;
+        }
+        continue;
+      }
       u.popT = Math.min(1, u.popT + dt * 3);
       const s = u.popT < 1 ? 0.3 + 0.7 * Math.sin(u.popT * Math.PI * 0.5) * 1.1 : 1;
       obj.scale.setScalar(s);
@@ -167,6 +198,7 @@ export class Items {
   nearestItem(pos, range) {
     let best = null, bd = range;
     for (const e of this.items.values()) {
+      if ((e.data.dino || e.data.pose) && Math.abs(e.data.y - (pos.y + CONFIG.player.eyeHeight)) > 3.5) continue;
       const d = Math.hypot(e.data.x - pos.x, e.data.z - pos.z);
       if (d < bd) { bd = d; best = e.data; }
     }

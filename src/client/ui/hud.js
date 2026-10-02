@@ -117,7 +117,7 @@ export class Hud {
     this.$hint.hidden = true;
     tc.append(this.$compass, this.$hint);
 
-    // ---------- top-right: minimap
+    // ---------- top-right: minimap + information messages
     const tr = el('div', 'hud-tr');
     this.$minimap = el('div', 'hud-minimap');
     this.$minimap.setAttribute('aria-hidden', 'true');
@@ -167,7 +167,7 @@ export class Hud {
     }
     bc.append(this.$carry, this.$hotbar);
 
-    // ---------- bottom-right: team + toasts
+    // ---------- bottom-right: team
     const br = el('div', 'hud-br');
     this.$team = el('ul', 'hud-team brush');
     this.$team.setAttribute('aria-label', 'Team');
@@ -177,6 +177,7 @@ export class Hud {
     this.$toasts = el('div', 'hud-toasts');
     this.$toasts.setAttribute('aria-live', 'polite');
     this.$toasts.setAttribute('role', 'log');
+    tr.append(this.$toasts);
 
     // ---------- overlays
     this.$flash = el('div', 'hud-flash');
@@ -246,7 +247,7 @@ export class Hud {
     this.$invPanel.addEventListener('pointermove', (e) => showTip(e.target.closest('[data-tip]'), e.clientX, e.clientY));
     this.$invPanel.addEventListener('pointerleave', () => { this.$tip.hidden = true; });
 
-    r.append(this.$flash, tl, tc, tr, cc, bl, bc, br, this.$toasts, this.$death, this.$win, this.$invPanel, this.$mapPanel, this.$board, this.$tip);
+    r.append(this.$flash, tl, tc, tr, cc, bl, bc, br, this.$death, this.$win, this.$invPanel, this.$mapPanel, this.$board, this.$tip);
 
     // Canvas backing-store sizes follow their CSS size (no per-frame layout reads).
     this._mm = { w: 0, h: 0, dpr: 1 };
@@ -436,6 +437,8 @@ export class Hud {
     this._inv = inv;
     // quiver
     const gunAmmo = inv.guns?.[inv.weapon];
+    const nextArrowUses = inv.arrowUses?.length ? Math.min(...inv.arrowUses) : CONFIG.weapons.bow.uses;
+    this.$quiver.title = gunAmmo ? 'Loaded rounds / reserve' : `Next arrow: ${inv.arrows ? nextArrowUses : 0} shots left`;
     const q = gunAmmo ? `${inv.reloading ? 'Reloading - ' : ''}${gunAmmo.loaded}/${gunAmmo.reserve}` : `${inv.arrows ?? 0}/${inv.maxArrows ?? CONFIG.weapons.bow.maxArrows}`;
     if (this._c.quiver !== q) {
       this._c.quiver = q;
@@ -477,7 +480,7 @@ export class Hud {
     // Only rebuild when the contents change – rebuilding every frame would
     // break hover tooltips.
     const maxCarry = inv.maxCarry ?? CONFIG.player.maxCarryWeight;
-    const sig = JSON.stringify([inv.guns, inv.reloading, inv.arrows, inv.maxArrows, inv.maxFruit, maxCarry, inv.traps, inv.baits, inv.fruit, inv.loot, inv.store, Math.round((inv.carryWeight || 0) * 10), Math.round((inv.speedFactor ?? 1) * 100)]);
+    const sig = JSON.stringify([inv.guns, inv.reloading, inv.spear, inv.spearHealth, inv.arrowUses, inv.arrows, inv.maxArrows, inv.maxFruit, maxCarry, inv.traps, inv.baits, inv.fruit, inv.loot, inv.store, Math.round((inv.carryWeight || 0) * 10), Math.round((inv.speedFactor ?? 1) * 100)]);
     if (this._c.invSig === sig) return;
     this._c.invSig = sig;
     const cell = (ic, n, name, tip = ic) => `<li class="hud-cell${n ? '' : ' is-zero'}" data-tip="${tip}" tabindex="-1"><span class="hud-cell-ic">${icon(ic)}</span><span class="hud-cell-n">${n ?? ''}</span><span class="sr">${esc(name)}</span></li>`;
@@ -485,6 +488,7 @@ export class Hud {
     for (const f of inv.fruit || []) fruitCounts[f] = (fruitCounts[f] || 0) + 1;
     const loot = inv.loot || {}, store = inv.store || {};
     const gear = [
+      cell('spear', inv.spear ? `${inv.spearHealth ?? 100}%` : 0, 'Spear health'),
       ...['pistol', 'rifle'].map(k => cell(k, `${inv.guns?.[k]?.loaded ?? 0}/${inv.guns?.[k]?.reserve ?? 0}`, k === 'pistol' ? 'Pistol' : 'Assault rifle')),
       cell('arrow', `${inv.arrows ?? 0}/${inv.maxArrows ?? CONFIG.weapons.bow.maxArrows}`, 'Arrows'),
       cell('trap', inv.traps ?? 0, 'Traps'),

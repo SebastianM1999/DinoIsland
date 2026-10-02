@@ -13,6 +13,7 @@ import { boatColliders, boatInteractPoint } from './boatShape.js';
 import { insideGrove } from './grove.js';
 import { standTop } from './collision.js';
 import { causewayQuery, insideBossArena } from './bossArena.js';
+import { SPRING_LIP_OFFSET, SPRING_FLOOR } from './springShape.js';
 
 const TAU = Math.PI * 2;
 
@@ -108,57 +109,17 @@ export function buildLayout(terrain) {
   }
 
   // --------------------------------------------------------- waterfall
-  if (plan.spur && plan.pools.length) {
-    const pool = plan.pools.find((p) => p.kind === 'water');
-    const dir = plan.waterfallDir;                        // pool -> cliff
-    let bottom = null, top = null;
-    for (let d = 0; d < 60; d += 0.25) {
-      const x = pool.x + dir.x * d, z = pool.z + dir.z * d;
-      const h = terrain.heightAt(x, z);
-      if (!bottom && h > pool.level - 0.3) bottom = { x, z, y: pool.level };
-      if (bottom && h > pool.level + 8) {
-        // walk on until the ground flattens: that is the lip of the cliff
-        let lx = x, lz = z, lh = h;
-        for (let e = d; e < 80; e += 0.25) {
-          const x2 = pool.x + dir.x * e, z2 = pool.z + dir.z * e, h2 = terrain.heightAt(x2, z2);
-          if (h2 - lh < 0.08) break;
-          lx = x2; lz = z2; lh = h2;
-        }
-        top = { x: lx, z: lz, y: lh };
-        break;
-      }
-    }
-    if (bottom && top) {
-      // The water springs from a cave in the cliff face (about a third of the way
-      // down from the rim), not from the flat mountain top.
-      const drop = top.y - pool.level;
-      let src = top;
-      for (let d = 0; d < 80; d += 0.25) {
-        const x = pool.x + dir.x * d, z = pool.z + dir.z * d;
-        if (terrain.heightAt(x, z) > pool.level + drop * 0.62) {
-          src = { x: x + dir.x * 0.9, z: z + dir.z * 0.9, y: pool.level + drop * 0.62 };
-          break;
-        }
-      }
-      const width = 4.5;
-      const source = { x: src.x, y: src.y, z: src.z, rot: Math.atan2(dir.x, dir.z), width };
-      // the water leaves the grotto over its lip, 2 m in front of the opening and
-      // just below it (SPRING_LIP_OFFSET / SPRING_FLOOR in props/springCave.js)
-      const lip = { x: src.x - dir.x * 2.0, y: src.y - 0.12, z: src.z - dir.z * 2.0 };
-      // Where the falling water meets the basin: a little way out into the
-      // water from the cliff foot (never on the dry bank), so the chain is always
-      // source -> fall / cascade -> impact in the basin -> river out of it.
-      // The plunge (ripples, churn, splash) varies with the drop and the basin.
-      let impact = { x: bottom.x, z: bottom.z, y: pool.level };
-      for (let d = 0; d < pool.r; d += 0.25) {
-        const x = bottom.x - dir.x * d, z = bottom.z - dir.z * d;
-        if (pool.level - terrain.heightAt(x, z) > 0.45) { impact = { x: x - dir.x * 0.8, z: z - dir.z * 0.8, y: pool.level }; break; }
-      }
-      const rw = makeRng(S ^ 0x3a7e5);
-      const plunge = { r: Math.min(pool.r * 0.6, 1.6 + drop * 0.07 + rw.range(-0.3, 0.5)), churn: Math.min(1, 0.45 + drop / 30) };
-      layout.waterfall = { top: lip, bottom, impact, plunge, dirX: -dir.x, dirZ: -dir.z, width, kind: 'water', source, pool: { x: pool.x, z: pool.z, r: pool.r, level: pool.level } };
-      layout.waterfalls.push(layout.waterfall);
-    }
+  if (plan.waterfall) {
+    const { x, z, width, dir, pool } = plan.waterfall;
+    const behind = terrain.heightAt(x + dir.x * 6, z + dir.z * 6);
+    const source = { x, z, y: Math.max(pool.level + 3, Math.min(pool.level + 10, behind - 2)), rot: Math.atan2(dir.x, dir.z), width };
+    const lip = { x: x - dir.x * SPRING_LIP_OFFSET, y: source.y + SPRING_FLOOR, z: z - dir.z * SPRING_LIP_OFFSET };
+    // A single vertical curtain: its footprint is entirely over the basin.
+    const impact = { x: lip.x, z: lip.z, y: pool.level };
+    const drop = lip.y - pool.level;
+    const plunge = { r: Math.min(pool.r * 0.4, 1.8 + drop * 0.09), churn: Math.min(1, 0.5 + drop / 20) };
+    layout.waterfall = { top: lip, bottom: impact, impact, plunge, dirX: -dir.x, dirZ: -dir.z, width, kind: 'water', source, vertical: true, pool: { x: pool.x, z: pool.z, r: pool.r, level: pool.level } };
+    layout.waterfalls.push(layout.waterfall);
   }
   if (plan.volcano) {
     const v = plan.volcano;
@@ -653,7 +614,9 @@ export function buildLayout(terrain) {
   }
   for (let i = 0; i < D.raptor; i++) {
     // the first pack guards the nest
-    const c = i === 0 && layout.nest && !volcanic ? { x: layout.nest.x, z: layout.nest.z } : randomZoneCenter(100 + i * 10);
+    const separated = (x, z) => layout.dinoZones.raptor.every((zone) => Math.hypot(x - zone.x, z - zone.z) >= 48);
+    const c = i === 0 && layout.nest && !volcanic ? { x: layout.nest.x, z: layout.nest.z }
+      : plan.level.index === 0 ? randomZoneCenter(90, separated) : randomZoneCenter(100 + i * 10);
     layout.dinoZones.raptor.push({ x: c.x, z: c.z, radius: 34, spawns: pickDry(c.x, c.z, 14, 5), size: i === 0 ? 3 : 2 + (i % 2) });
   }
 

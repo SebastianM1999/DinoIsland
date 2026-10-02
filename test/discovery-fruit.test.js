@@ -70,9 +70,9 @@ test('a valid dinosaur sighting is shared with the co-op team and late joiners',
 });
 
 test('fruit plant visuals show exactly the remaining harvests', () => {
-  const { world } = setup();
-  const plants = buildFruitPlants(world.terrain, world.layout);
-  const berry = world.layout.fruitSpots.find((spot) => spot.type === 'berry');
+  // This checks rendering, independent of whether a random island has berries.
+  const berry = { id: 1, type: 'berry', x: 0, y: 0, z: 0 };
+  const plants = buildFruitPlants({}, { trees: [], fruitSpots: [berry] });
   const mesh = plants.group.getObjectByName('fruit-berries');
   const matrix = new THREE.Matrix4();
   const scale = new THREE.Vector3();

@@ -1,10 +1,10 @@
 // Spring cave: the rocky grotto a waterfall pours out of, set into a steep
 // cliff / mountain face. One smooth SDF rock mass (a chunk of cliff face,
-// two cheeks, a heavy brow and a rounded ledge the water spills over, plus a
+// two cheeks and a heavy brow around the mountain opening, plus a
 // few stacked boulders), minus a tall arched opening that runs ~3 m into the
 // rock and is closed at the back. The cavity is painted almost black with
 // depth so it reads as a deep dark hole; a stream surface fills its floor and
-// runs out to the lip. Jungle: moss, wet algae below the lip, vines curtaining
+// meets the vertical falling curtain without a projecting shelf. Jungle: moss, wet algae below the lip, vines curtaining
 // the opening, ferns and bushes on the ledges. Other biomes: darker rock,
 // wet streaks, ash dust on top (volcano).
 //
@@ -23,11 +23,9 @@ import { fernGeometry } from '../../world/veg/plants.js';
 import { makeRng } from '../../../shared/rng.js';
 import { TAU, fbm3, noise3, smoothstep, sdfMesh, sdfRay } from './common.js';
 import { ell3, ell2, smin, smax } from './cave.js';
+import { SPRING_LIP_OFFSET, SPRING_FLOOR, SPRING_WATER_OFFSET } from '../../../shared/springShape.js';
+export { SPRING_LIP_OFFSET, SPRING_FLOOR } from '../../../shared/springShape.js';
 
-/** Distance (m) in front of s (local -z) where the water leaves the ledge. */
-export const SPRING_LIP_OFFSET = 2.0;
-/** Height of the grotto floor / lip rock relative to s.y. */
-export const SPRING_FLOOR = -0.12;
 /** Opening height above the lip. */
 export const SPRING_OPENING_HEIGHT = 4.0;
 
@@ -42,7 +40,6 @@ export function springSdf(width, seed) {
     { x: -(hw + 1.3), y: 1.2, z: -0.5, rx: 2.1, ry: 4.0, rz: 2.3 },                  // cheeks
     { x: hw + 1.3, y: 1.4, z: -0.4, rx: 2.0, ry: 4.2, rz: 2.2 },
     { x: 0, y: 4.9, z: -0.5, rx: hw + 2.0, ry: 1.9, rz: 2.3 },                       // brow
-    { x: 0, y: -0.3, z: -0.45, rx: hw + 0.6, ry: 0.5, rz: 1.45 },                     // ledge / spout
     { x: -(hw + 2.4), y: -2.6, z: -0.3, rx: 1.8, ry: 2.3, rz: 1.8 },                 // stacked boulders below the cheeks
     { x: hw + 2.6, y: -2.9, z: -0.1, rx: 1.9, ry: 2.2, rz: 1.7 },
   ];
@@ -73,7 +70,7 @@ export function springSdf(width, seed) {
     return d - k * 0.4 * fbm3(x * 0.35, y * 0.35, z * 0.35, seed) - k * 0.2 * noise3(x * 0.15, y * 0.15, z * 0.15, seed + 3);
   };
   // keep the free-fall zone below the lip clear so the water never clips rock
-  const chute = (x, y, z) => Math.max(Math.abs(x) - (W / 2 + 0.4), y - SPRING_FLOOR + 0.35, z + SPRING_LIP_OFFSET - 0.5);
+  const chute = (x, y, z) => Math.max(Math.abs(x) - (W / 2 + 0.9), y - SPRING_FLOOR, z + SPRING_LIP_OFFSET - 0.5);
   const sdf = (x, y, z) => smax(smax(outer(x, y, z), -cavity(x, y, z), 0.5), -chute(x, y, z), 0.3);
   return { sdf, cavity, hw, bounds: { min: [-(hw + 8), -7, -4.2], max: [hw + 8, 8.4, 6.6] } };
 }
@@ -191,7 +188,7 @@ function buildGeometry(width, seed, biome) {
   }
 
   // ---- stream surface in the opening, running out to the lip
-  const L0 = 2.3, L1 = -SPRING_LIP_OFFSET - 0.05;
+  const L0 = 0.15, L1 = -SPRING_LIP_OFFSET;
   const cols = 10, rows = 14;
   const wg = new THREE.PlaneGeometry(1, 1, cols, rows);
   wg.rotateX(-Math.PI / 2);
@@ -202,7 +199,7 @@ function buildGeometry(width, seed, biome) {
     const u = wp.getX(i) + 0.5, v = wp.getZ(i) + 0.5;         // v: 0 = back, 1 = lip
     const z = L0 + (L1 - L0) * v;
     const x = (u - 0.5) * 2 * (hw - 0.05);
-    const y = SPRING_FLOOR + 0.1 - v * v * 0.06 + 0.015 * Math.sin(x * 3 + z * 5);
+    const y = SPRING_FLOOR + SPRING_WATER_OFFSET + (1 - v * v) * 0.06 + (1 - v) * 0.015 * Math.sin(x * 3 + z * 5);
     wp.setXYZ(i, x, y, z);
     tmp.copy(deep).lerp(mid, smoothstep(0.1, 0.6, v)).lerp(shallow, smoothstep(0.6, 1, v) * 0.6);
     tmp.lerp(P.dark, (1 - smoothstep(0, 0.55, v)) * 0.7);                         // dark in the back

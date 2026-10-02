@@ -123,7 +123,7 @@ class DinoView {
       yawRate,
       dead: !this.alive,
       trapped: this.st === DS.TRAPPED,
-      groundAt: (x, z) => t.heightAt(x, z),
+      groundAt: this.grounded() ? (x, z) => t.heightAt(x, z) : null,
       groundPitch: -groundPitch,
       pose,
       hurt: this.flinch,
@@ -142,7 +142,12 @@ class DinoView {
     this.updateBar(dt);
   }
 
-  grounded() { return this.st !== DS.FLY && this.st !== DS.DIVE; }
+  grounded() {
+    if (this.type === 'ptera') {
+      return this.pos.y <= this.ctx.terrain.heightAt(this.pos.x, this.pos.z) + 0.2;
+    }
+    return true;
+  }
 
   /** Map the server state to animation pose targets. */
   pose() {

@@ -452,8 +452,8 @@ export class DinoSystem {
     const dmg = amount * mult;
     d.hp -= dmg;
     this.world.event(EV.DINO_HIT, { id: d.id, zone: hitZone, dmg: Math.round(dmg), by: byId, weak: mult > 1.2, armor: mult < 0.5 });
-    BRAINS[d.type].onHurt?.(d, this, byId, dmg, weapon);
     if (d.hp <= 0) this.kill(d, byId);
+    else BRAINS[d.type].onHurt?.(d, this, byId, dmg, weapon);
   }
 
   kill(d, byId) {
@@ -463,19 +463,27 @@ export class DinoSystem {
     d.spd = 0;
     d.deadT = CARCASS_TIME;
     if (d.type === 'ptera') {
-      // falls to the ground
-      d.y = this.terrain.heightAt(d.x, d.z);
+      // Preserve position and flight momentum; the dead-body tick handles gravity.
+      d.grounded = d.y <= this.terrain.heightAt(d.x, d.z);
+      d.vx = d.vx || 0; d.vy = d.vy || 0; d.vz = d.vz || 0;
     }
+    if (d.type !== 'ptera' || d.grounded) this.dropCarcassLoot(d);
     const c = CONFIG.dinos[d.type];
-    const loot = { ...c.loot };
-    if (d.carryingMeat) loot.meat = (loot.meat || 0) + 1;
-    this.world.dropLoot(d.x, d.z, loot, d.arrowsStuck);
-    d.arrowsStuck = 0;
     const killer = this.world.players.get(byId);
     this.world.event(EV.DINO_DIE, { id: d.id, by: byId });
     this.world.toast(`${killer ? killer.name : 'The team'} brought down a ${c.name}!`, 'dino');
     this.world.mission.onDinoKilled(d);
     this.respawnQueue.push({ type: d.type, at: this.world.now + c.respawn, group: d.group });
+  }
+
+  dropCarcassLoot(d) {
+    if (d.lootDropped) return;
+    d.lootDropped = true;
+    const c = CONFIG.dinos[d.type];
+    const loot = { ...c.loot };
+    if (d.carryingMeat) loot.meat = (loot.meat || 0) + 1;
+    this.world.dropLoot(d.x, d.z, loot, d.arrowsStuck);
+    d.arrowsStuck = 0;
   }
 
   // ------------------------------------------------------------------ tick
@@ -486,6 +494,21 @@ export class DinoSystem {
     for (let i = this.list.length - 1; i >= 0; i--) {
       const d = this.list[i];
       if (!d.alive) {
+        if (d.type === 'ptera' && !d.grounded) {
+          d.x += d.vx * dt;
+          d.z += d.vz * dt;
+          d.y += d.vy * dt - CONFIG.player.gravity * dt * dt * 0.5;
+          d.vy -= CONFIG.player.gravity * dt;
+          const drag = Math.exp(-0.6 * dt);
+          d.vx *= drag; d.vz *= drag;
+          const ground = this.terrain.heightAt(d.x, d.z);
+          if (d.y <= ground) {
+            d.y = ground;
+            d.vx = d.vy = d.vz = 0;
+            d.grounded = true;
+            this.dropCarcassLoot(d);
+          }
+        }
         d.deadT -= dt;
         if (d.deadT <= 0) this.remove(d);
         continue;

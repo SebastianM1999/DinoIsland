@@ -1,7 +1,7 @@
 // Arrows and thrown spears in flight. Own projectiles are simulated here
 // (simple ballistics) and their result is reported to the server; remote
 // players' projectiles are replayed from FIRE events for visuals only.
-// Arrows that hit a dinosaur stay stuck in it until it dies.
+// The server creates recoverable items at impacts, including bone-attached weapons.
 
 import * as THREE from 'three';
 import { CONFIG } from '../../shared/config.js';
@@ -24,11 +24,8 @@ export class Projectiles {
     this.game = game;
     this.scene = game.gfx.scene;
     this.list = [];
-    this.stuck = [];     // { obj, dinoId }
     this.nextPid = 1;
     game.net.on(`ev:${EV.FIRE}`, (m) => this.spawn(m.kind, m.o, m.v, false, m.pid));
-    game.net.on(`ev:${EV.DINO_DIE}`, (m) => this.clearStuck(m.id));
-    game.net.on(`ev:${EV.DINO_REMOVE}`, (m) => this.clearStuck(m.id));
   }
 
   /** Fire an own projectile. Returns its pid. */
@@ -133,15 +130,26 @@ export class Projectiles {
         }
         if (hit) {
           const hp = ta.clone().lerp(tb, hit.f);
-          p.pos.copy(hp).addScaledVector(dir, -lead * 0.6);
+          p.pos.copy(hp).addScaledVector(dir, -lead * 0.85);
           this.orient(p);
           p.done = true;
           if (p.own) {
-            this.game.net.act(ACT.LAND, { kind: p.kind, pid: p.pid, p: [+hp.x.toFixed(2), +hp.y.toFixed(2), +hp.z.toFixed(2)], dino: hit.view.id, zone: hit.sph.zone });
+            const joint = hit.sph.joint;
+            let attach;
+            if (joint) {
+              joint.updateWorldMatrix(true, false);
+              const position = joint.worldToLocal(p.obj.position.clone());
+              const rotation = joint.getWorldQuaternion(new THREE.Quaternion()).invert().multiply(p.obj.quaternion);
+              const scale = joint.getWorldScale(new THREE.Vector3());
+              scale.set(1 / scale.x, 1 / scale.y, 1 / scale.z);
+              attach = { joint: hit.view.hitSpheres().findIndex(s => s.joint === joint && s.zone === hit.sph.zone), p: position.toArray(), q: rotation.toArray(), s: scale.toArray() };
+            }
+            this.game.net.act(ACT.LAND, { kind: p.kind, pid: p.pid, p: [+hp.x.toFixed(2), +hp.y.toFixed(2), +hp.z.toFixed(2)], dino: hit.view.id, zone: hit.sph.zone, attach });
             this.game.onProjectileHit?.(p, hit.view, hit.sph.zone);
           }
-          if (p.kind === 'arrow') this.stick(p, hit.view, hit.sph.joint);
-          else p.restT = 10; // spear bounces off: the server drops it next to the dinosaur
+          // The authoritative recoverable item owns the embedded mesh on every client.
+          p.obj.visible = false;
+          p.restT = 10;
           break;
         }
         // terrain and rocks
@@ -159,7 +167,7 @@ export class Projectiles {
           p.pos.copy(hp).addScaledVector(dir, -lead);
           this.orient(p);
           p.done = true;
-          if (p.own) this.land(p, hp, groundAt(hp.x, hp.z));
+          if (p.own) this.land(p, hp, hp.y);
           break;
         }
         // out of the world / timeout
@@ -168,36 +176,15 @@ export class Projectiles {
           if (p.own) this.land(p, tb, groundAt(tb.x, tb.z));
         }
       }
-      if (!p.done) this.orient(p);
-      else if (!p.stuck) this.orient(p);
+      this.orient(p);
     }
   }
 
   land(p, tip, ground) {
-    // come to rest on the ground at the tip position
     const x = tip.x, z = tip.z;
-    this.game.net.act(ACT.LAND, { kind: p.kind, pid: p.pid, p: [+x.toFixed(2), +(ground + 0.05).toFixed(2), +z.toFixed(2)] });
-  }
-
-  /** Keep an arrow stuck in a dinosaur joint (visual). */
-  stick(p, view, joint) {
-    if (!joint) return;
-    p.stuck = true;
-    this.list.splice(this.list.indexOf(p), 1);
-    joint.updateMatrixWorld(true);
-    joint.attach(p.obj);   // keeps the world transform
-    this.stuck.push({ obj: p.obj, dinoId: view.id });
-    if (this.stuck.length > 60) {
-      const old = this.stuck.shift();
-      old.obj.removeFromParent();
-    }
-  }
-
-  clearStuck(dinoId) {
-    this.stuck = this.stuck.filter((s) => {
-      if (s.dinoId !== dinoId) return true;
-      s.obj.removeFromParent();
-      return false;
-    });
+    p.pos.set(x, ground + 0.05, z).addScaledVector(p.vel.clone().normalize(), -(p.kind === 'spear' ? 1.25 : 0.8) * 0.85);
+    this.orient(p);
+    this.game.net.act(ACT.LAND, { kind: p.kind, pid: p.pid, p: [+x.toFixed(2), +(ground + 0.05).toFixed(2), +z.toFixed(2)],
+      pose: { p: p.obj.position.toArray(), q: p.obj.quaternion.toArray() } });
   }
 }

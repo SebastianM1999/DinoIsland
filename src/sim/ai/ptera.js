@@ -1,7 +1,7 @@
 // Pteranodon: nests on cliffs, circles above the beach and hills, dives at
 // players (preferring lone, injured or meat-carrying ones), knocks them
-// down, steals carried meat and flies off with it. After an attack it lands
-// briefly and is vulnerable to melee; in the air the bow is the answer.
+// down, steals carried meat and flies off with it. Every attack is a fly-by:
+// it immediately climbs back to its circling altitude.
 
 import { CONFIG } from '../../shared/config.js';
 import { DS, EV, MSG } from '../../shared/protocol.js';
@@ -42,6 +42,16 @@ function flyTo(sys, d, tx, ty, tz, speed, dt, agility = 2.2) {
 function nestHeight(sys, n) {
   const ground = Math.max(sys.world.layout.groundAt(n.x, n.z), 0);
   return Number.isFinite(n.y) ? Math.max(n.y, ground) : ground;
+}
+
+function climb(d, cooldown = C.attackCooldown) {
+  d.mode = 'climb';
+  d.modeT = 0;
+  d.st = DS.FLY;
+  d.grounded = false;
+  // Arrest the dive before steering upward, without snapping its position.
+  d.vy = Math.max(0, d.vy);
+  d.cool = cooldown;
 }
 
 function pickTarget(sys, d) {
@@ -93,8 +103,7 @@ export const pteraBrain = {
   },
 
   onHurt(d, sys) {
-    if (d.mode === 'landed') { d.mode = 'climb'; d.modeT = 0; }
-    else if (d.mode === 'dive') { d.mode = 'climb'; d.modeT = 0; d.cool = C.attackCooldown * 0.5; }
+    if (d.mode === 'dive' || d.mode === 'landed') climb(d, C.attackCooldown * 0.5);
   },
 
   update(d, sys, dt) {
@@ -125,7 +134,7 @@ export const pteraBrain = {
       case 'dive': {
         d.st = DS.DIVE;
         const p = sys.world.players.get(d.targetId);
-        if (!p || !p.alive || sys.inSafeZone(p) || d.modeT > 7) { d.mode = 'climb'; d.modeT = 0; d.cool = 4; break; }
+        if (!p || !p.alive || sys.inSafeZone(p) || d.modeT > 7) { climb(d, 4); break; }
         // lead the target a little
         const dist = flyTo(sys, d, p.x, p.y + 1.0, p.z, C.diveSpeed, dt, 3.2);
         if (dist < 2.3) {
@@ -139,23 +148,13 @@ export const pteraBrain = {
             sys.world.toast(`A Pteranodon snatched meat from ${p.name}! Shoot it down to get it back.`, 'meat');
             sys.world.mission.onLootChanged();
           }
-          // land next to the victim, briefly vulnerable
-          d.mode = d.carryingMeat ? 'climb' : 'landed';
-          d.modeT = 0;
-          d.vx *= 0.2; d.vz *= 0.2; d.vy = 0;
+          climb(d);
         }
         break;
       }
       case 'landed': {
-        d.grounded = true;
-        d.spd = 0;
-        d.vx = d.vy = d.vz = 0;
-        d.y = sys.terrain.heightAt(d.x, d.z);
-        d.st = d.modeT < 0.6 ? DS.LANDED : DS.IDLE;
-        // turn toward the nearest player, hiss
-        const p = sys.nearestPlayer(d, 15);
-        if (p) sys.turnTo(d, Math.atan2(-(p.x - d.x), -(p.z - d.z)), dt, 3);
-        if (d.modeT > C.landTime) { d.mode = 'climb'; d.modeT = 0; }
+        // Recover old/debug state without putting the bird on the ground.
+        climb(d);
         break;
       }
       case 'climb': {
