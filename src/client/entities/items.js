@@ -1,12 +1,14 @@
 import { retainResource } from '../core/resources.js';
 // Server-owned world objects shown on the client: loot and dropped
-// arrows/spears lodged in terrain or dinosaurs, traps and meat bait.
+// arrows/spears lodged in terrain or dinosaurs, and traps.
 
 import * as THREE from 'three';
+import { makeFirearm } from '../models/firearms/index.js';
 import { CONFIG } from '../../shared/config.js';
 import { EV } from '../../shared/protocol.js';
 import { MAT, paint, place, part, merge, mesh, blob, spike, tube, deform, jitter } from '../models/kit.js';
 import { spearGeometry, arrowGeometry, trapGeometry, meatGeometry } from '../models/weapons.js';
+import { makeFruitMesh } from '../models/fruit.js';
 
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
 const geoCache = new Map();
@@ -61,6 +63,7 @@ const LOOT_GEO = {
   }),
   arrow: () => arrowGeometry(),
   spear: () => spearGeometry(),
+  trap: () => trapGeometry(false),
 };
 
 function glowRing(color) {
@@ -79,7 +82,6 @@ export class Items {
     this.scene = game.gfx.scene;
     this.items = new Map();   // id -> { data, obj }
     this.traps = new Map();
-    this.baits = new Map();
     this.time = 0;
     const net = game.net;
     net.on(`ev:${EV.ITEM_ADD}`, (m) => this.addItem(m.item));
@@ -87,22 +89,21 @@ export class Items {
     net.on(`ev:${EV.TRAP_ADD}`, (m) => this.addTrap(m.trap));
     net.on(`ev:${EV.TRAP_REMOVE}`, (m) => this.removeTrap(m.id));
     net.on(`ev:${EV.TRAP_SNAP}`, (m) => this.snapTrap(m.id));
-    net.on(`ev:${EV.BAIT_ADD}`, (m) => this.addBait(m.bait));
-    net.on(`ev:${EV.BAIT_REMOVE}`, (m) => this.removeBait(m.id));
   }
 
   onWelcome(world) {
     for (const it of world.items) this.addItem(it);
     for (const t of world.traps) this.addTrap(t);
-    for (const b of world.baits) this.addBait(b);
   }
 
   addItem(it) {
     if (this.items.has(it.id)) return;
     const make = LOOT_GEO[it.kind];
-    if (!make) return;
+    const isFruit = Object.hasOwn(CONFIG.fruit.types, it.kind);
+    const isGun = it.kind === 'pistol' || it.kind === 'rifle';
+    if (!make && !isFruit && !isGun) return;
     const obj = new THREE.Group();
-    const m = mesh(make(), it.kind === 'meat' ? MAT.glossy : MAT.standard);
+    const m = isGun ? makeFirearm(it.kind) : isFruit ? makeFruitMesh(it.kind) : mesh(make(), it.kind === 'meat' ? MAT.glossy : MAT.standard);
     if ((it.kind === 'arrow' || it.kind === 'spear') && !it.dino && !it.pose) {
       m.rotation.set(Math.PI / 2, Math.random() * 6, 0);
       m.position.y = 0.06;
@@ -150,25 +151,6 @@ export class Items {
     this.traps.delete(id);
   }
 
-  addBait(b) {
-    if (this.baits.has(b.id)) return;
-    const obj = new THREE.Group();
-    const meat = mesh(meatGeometry(), MAT.glossy);
-    meat.scale.setScalar(1.6);
-    meat.position.y = 0.12;
-    obj.add(meat, glowRing('#ff6a5a'));
-    obj.position.set(b.x, this.game.terrain.heightAt(b.x, b.z) + 0.03, b.z);
-    this.scene.add(obj);
-    this.baits.set(b.id, { data: b, obj });
-  }
-
-  removeBait(id) {
-    const e = this.baits.get(id);
-    if (!e) return;
-    this.scene.remove(e.obj);
-    this.baits.delete(id);
-  }
-
   update(dt) {
     this.time += dt;
     for (const { obj, data } of this.items.values()) {
@@ -211,7 +193,6 @@ export class Items {
       }
       obj.children[1].material.opacity = 0.35 + Math.sin(this.time * 3 + u.phase) * 0.2;
     }
-    for (const { obj } of this.baits.values()) obj.children[1].material.opacity = 0.35 + Math.sin(this.time * 4) * 0.2;
   }
 
   /** Nearest item within range of the player position. */
@@ -225,9 +206,4 @@ export class Items {
     return best;
   }
 
-  minimapMarkers(out) {
-    for (const e of this.items.values()) {
-      if (CONFIG.loot[e.data.kind]) out.push({ x: e.data.x, z: e.data.z, kind: 'objective' });
-    }
-  }
 }

@@ -14,6 +14,7 @@ export function gunAction(world, player, message) {
   const kind = message.kind;
   if (!GUNS.includes(kind) || !player.alive || player.eating || EQUIP[player.eq] !== kind) return;
   const ammo = player.inv.guns[kind], spec = CONFIG.weapons[kind];
+  if (ammo.owned === false) return;
   if (message.a === ACT.RELOAD) {
     if (player.inv.reloading || ammo.loaded >= spec.magazine || ammo.reserve <= 0) return;
     player.inv.reloading = kind;

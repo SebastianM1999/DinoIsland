@@ -1,4 +1,4 @@
-// Local player actions: tool slots, spear/bow combat, trap + bait placement,
+// Local player actions: tool slots, spear/bow combat, trap placement,
 // eating and giving fruit, E-interactions (pickup, harvest, hut), carry
 // slowdown, and the HUD parts that depend on them (hotbar, prompt, hints).
 // Every gameplay effect is a request to the authoritative server.
@@ -17,14 +17,14 @@ import { GunEffects } from '../entities/gunEffects.js';
 import { spearLaunch } from './spearThrow.js';
 import { Viewmodel } from './viewmodel.js';
 import { mesh } from '../models/kit.js';
-import { trapGeometry, meatGeometry } from '../models/weapons.js';
+import { trapGeometry } from '../models/weapons.js';
 
 const W = CONFIG.weapons;
 const P = CONFIG.player;
 /** Warn about dinosaurs (all but the Brachiosaurus) closer than this (m). */
 const DINO_ALERT_RANGE = 50;
 const LOOT_KEYS = Object.keys(CONFIG.loot);
-const SLOT_LABEL = { spear: 'Spear', bow: 'Bow', trap: 'Trap', bait: 'Meat bait', fruit: 'Fruit', pistol: 'P-19 pistol', rifle: 'M4A1 rifle' };
+const SLOT_LABEL = { spear: 'Spear', bow: 'Bow', trap: 'Trap', fruit: 'Fruit', pistol: 'P-19 pistol', rifle: 'M4A1 rifle' };
 const _fwd = new THREE.Vector3();
 const _right = new THREE.Vector3();
 const _up = new THREE.Vector3();
@@ -54,12 +54,12 @@ export class PlayerActions {
     // placement ghosts
     const ghostMat = new THREE.MeshBasicMaterial({ color: '#ffe07a', transparent: true, opacity: 0.45, depthWrite: false });
     this.ghostTrap = new THREE.Mesh(trapGeometry(false), ghostMat);
-    this.ghostBait = new THREE.Mesh(meatGeometry(), ghostMat);
-    this.ghostBait.scale.setScalar(1.6);
-    this.ghostTrap.visible = this.ghostBait.visible = false;
-    game.gfx.scene.add(this.ghostTrap, this.ghostBait);
+    this.ghostTrap.visible = false;
+    game.gfx.scene.add(this.ghostTrap);
 
     const net = game.net;
+    game.hud.onInventoryDrop = (kind, store) => net.act(store ? ACT.DEPOSIT : ACT.DROP, { kind });
+    game.hud.onInventoryWheel = (step) => this.select((game.eq + step + EQUIP.length) % EQUIP.length);
     net.on(`ev:${EV.EAT}`, (m) => {
       if (m.id !== game.me.id) return;
       this.eatingT = CONFIG.fruit.eatTime;
@@ -185,7 +185,7 @@ export class PlayerActions {
       }
     } else if (tool === 'pistol' || tool === 'rifle') {
       const ammo = this.inv.guns?.[tool];
-      const ready = canAct && this.vm.tool === tool && !this.vm.pendingTool && this.vm.switchT < 0.05;
+      const ready = canAct && ammo?.owned !== false && this.vm.tool === tool && !this.vm.pendingTool && this.vm.switchT < 0.05;
       if (ready && input.wasPressed('reloadHint')) this.reloadGun();
       const trigger = tool === 'rifle' ? input.isHeld('primary') : input.wasPressed('primary');
       if (ready && trigger && this.cooldown <= 0 && !this.inv.reloading) {
@@ -203,16 +203,15 @@ export class PlayerActions {
     this.vm.setDraw(this.drawing ? this.drawT / W.bow.maxDrawTime : 0);
 
     // placement tools with a ghost preview
-    const placing = alive && (tool === 'trap' && this.inv.traps > 0 || tool === 'bait' && this.inv.baits > 0);
+    const placing = alive && tool === 'trap' && this.inv.traps > 0;
     const pp = this.placementPoint();
     this.ghostTrap.visible = placing && tool === 'trap';
-    this.ghostBait.visible = placing && tool === 'bait';
     if (placing) {
-      const gh = tool === 'trap' ? this.ghostTrap : this.ghostBait;
-      gh.position.set(pp.x, pp.y + (tool === 'bait' ? 0.15 : 0.02), pp.z);
+      const gh = this.ghostTrap;
+      gh.position.set(pp.x, pp.y + 0.02, pp.z);
       gh.rotation.y = pp.yaw;
       if (canAct && input.wasPressed('primary') && this.cooldown <= 0) {
-        net.act(tool === 'trap' ? ACT.TRAP : ACT.BAIT, { x: +pp.x.toFixed(2), z: +pp.z.toFixed(2), yaw: +pp.yaw.toFixed(3) });
+        net.act(ACT.TRAP, { x: +pp.x.toFixed(2), z: +pp.z.toFixed(2), yaw: +pp.yaw.toFixed(3) });
         this.vm.place();
         this.cooldown = 0.6;
         g.audio?.play('place');
@@ -244,8 +243,8 @@ export class PlayerActions {
     // --- viewmodel
     const fruitType = this.bestFruit();
     this.vm.setTool(tool, { hasSpear: this.inv.spear, fruitType, hasArrow: this.inv.arrows > 0 });
-    this.vm.setKnife(!!this.butcher);
-    this.vm.root.visible = alive;
+    this.vm.setKnife(!!this.butcher, this.butcher ? Math.min(1, this.butcher.t / this.butcher.time) : 0);
+    this.vm.root.visible = alive && (!!this.butcher || eating || this.inv.guns?.[tool]?.owned !== false);
     this.vm.update(dt, { speed: g.player.moveSpeed, sprint: g.player.sprinting, grounded: g.player.onGround, lookX: g.lastMouse?.x || 0, lookY: g.lastMouse?.y || 0 });
 
     this.updateHud(dt, fruitType, w);
@@ -485,6 +484,18 @@ export class PlayerActions {
     // (items on the ground are looted automatically – see autoLoot())
     // 0. a downed teammate: reviving beats everything else on E
     if (g.reviveTarget) return { text: this.reviving ? `Reviving ${g.reviveTarget.name}…` : `Hold to revive ${g.reviveTarget.name}`, run: null };
+    // Dropping a carried item never picks it straight back up; retrieve it deliberately.
+    let dropped = null, dropDistance = CONFIG.pickupRange;
+    for (const { data: it } of g.items.items.values()) {
+      if (it.droppedBy !== g.me.id) continue;
+      const distance = Math.hypot(it.x - pos.x, it.z - pos.z);
+      if (distance < dropDistance) { dropped = it; dropDistance = distance; }
+    }
+    if (dropped) {
+      const name = CONFIG.loot[dropped.kind]?.name || CONFIG.fruit.types[dropped.kind]?.name ||
+        (dropped.kind === 'arrow' ? 'Arrows' : SLOT_LABEL[dropped.kind]) || dropped.kind;
+      return { text: `Pick up ${name}${dropped.n > 1 ? ` ×${dropped.n}` : ''}`, run: () => net.act(ACT.PICKUP, { item: dropped.id }) };
+    }
     // 1. ripe fruit
     let best = null, bd = Infinity;
     for (const s of g.layout.fruitSpots) {
@@ -550,7 +561,7 @@ export class PlayerActions {
   get caps() {
     return this.inv.caps || {
       arrows: W.bow.maxArrows, fruit: CONFIG.fruit.maxCarried, carry: P.maxCarryWeight,
-      traps: W.trap.startCount, baits: W.bait.startCount,
+      traps: W.trap.startCount,
     };
   }
 
@@ -567,6 +578,7 @@ export class PlayerActions {
     const caps = this.caps;
     let weight = this.carryWeight();
     for (const { data: it } of g.items.items.values()) {
+      if (it.droppedBy === g.me.id) continue; // retrieve deliberately with E, never undo a drop automatically
       if ((it.dino || it.pose) && Math.abs(it.y - (pos.y + P.eyeHeight)) > 3.5) continue;
       if (Math.abs(it.x - pos.x) > R || Math.abs(it.z - pos.z) > R || Math.hypot(it.x - pos.x, it.z - pos.z) > R) continue;
       if (now < (this.pickRequested.get(it.id) ?? 0)) continue;   // already asked, wait for the server
@@ -575,6 +587,12 @@ export class PlayerActions {
         if (this.inv.arrows >= caps.arrows) full = ['Your quiver is full', 'arrow'];
       } else if (it.kind === 'spear') {
         if (this.inv.spear) continue;
+      } else if (it.kind === 'pistol' || it.kind === 'rifle') {
+        if (this.inv.guns[it.kind].owned !== false) continue;
+      } else if (it.kind === 'trap') {
+        if (this.inv.traps >= caps.traps) full = ['You carry as many traps as you can', 'trap'];
+      } else if (Object.hasOwn(CONFIG.fruit.types, it.kind)) {
+        if (this.inv.fruit.length >= caps.fruit) full = ['Your fruit pouch is full', 'fruit'];
       } else if (CONFIG.loot[it.kind]) {
         const w = CONFIG.loot[it.kind].weight * it.n;
         if (weight + w > caps.carry + 1e-6) full = [`Your pack is full (${Math.round(weight * 10) / 10}/${caps.carry}) – drop off loot at the hut`, 'weight'];
@@ -611,7 +629,6 @@ export class PlayerActions {
       { id: 'spear', label: `${SLOT_LABEL.spear} health`, count: inv.spear ? `${inv.spearHealth ?? 100}%` : null, enabled: inv.spear },
       { id: 'bow', label: SLOT_LABEL.bow, count: inv.arrows, enabled: inv.arrows > 0 },
       { id: 'trap', label: SLOT_LABEL.trap, count: inv.traps, enabled: inv.traps > 0 },
-      { id: 'bait', label: SLOT_LABEL.bait, count: inv.baits, enabled: inv.baits > 0 },
       { id: 'fruit', label: SLOT_LABEL.fruit, count: inv.fruit.length, enabled: inv.fruit.length > 0, sub: fruitType || undefined },
       ...['pistol', 'rifle'].map(id => ({ id, label: `${SLOT_LABEL[id]} - R reload`, count: inv.guns?.[id]?.loaded ?? 0, enabled: (inv.guns?.[id]?.loaded ?? 0) > 0 })),
     ], g.eq);
@@ -631,12 +648,11 @@ export class PlayerActions {
       speedFactor: g.player.speedFactor,
       store: g.store,
       traps: inv.traps,
-      baits: inv.baits,
     });
     const tool = this.tool;
     hud.setCrosshair({
       draw: this.drawing ? this.drawT / W.bow.maxDrawTime : 0,
-      mode: !g.me.alive ? 'none' : tool === 'trap' || tool === 'bait' ? 'place' : 'default',
+      mode: !g.me.alive ? 'none' : tool === 'trap' ? 'place' : 'default',
     });
     hud.eatProgress(this.butcher ? Math.min(1, this.butcher.t / this.butcher.time)
       : this.eatingT > 0 ? 1 - this.eatingT / CONFIG.fruit.eatTime : null);

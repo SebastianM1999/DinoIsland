@@ -681,6 +681,8 @@
 }
 .hud-cell.is-zero .hud-cell-ic { opacity: 0.3; filter: grayscale(1); }
 .hud-cell.is-zero .hud-cell-n { color: var(--ink-dim); }
+.hud-cell[draggable=true] { cursor: grab; }
+.hud-inv-drop { margin-top: 12px; padding: 12px; border: 2px dashed #8796af; border-radius: 8px; color: var(--ink-dim); }
 .hud-inv-store {
   padding: 0 0 0 1.6em;
   border-left: 0.12em solid rgba(255, 255, 255, 0.1);

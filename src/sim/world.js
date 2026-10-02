@@ -20,7 +20,7 @@ import { Mission } from './mission.js';
 import { resolveCircle, penetration } from '../shared/collision.js';
 import { resolveDinoContact, DINO_CONTACT, dinoBodyCircles } from '../shared/dinoContact.js';
 import { makeRng } from '../shared/rng.js';
-import { lineBlocked } from '../shared/visibility.js';
+import { lineBlocked, DINO_SIGHTING } from '../shared/visibility.js';
 import { sanitizeOutfit, sameOutfit } from '../shared/outfits.js';
 import { planIsland } from '../shared/island.js';
 import { levelDef, LEVEL_COUNT } from '../shared/levels.js';
@@ -84,7 +84,6 @@ export class ServerWorld {
     this.layout = buildLayout(this.terrain);
     this.items = new Map();
     this.traps = new Map();
-    this.baits = new Map();
     this.projectiles = new Map();
     this.tracks = [];
     this.fruit = this.layout.fruitSpots.map((s) => ({ spot: s.id, count: this.rollFruitCount(), regrowAt: 0 }));
@@ -114,7 +113,6 @@ export class ServerWorld {
       p.inv.arrows = caps.arrows;
       p.inv.arrowUses = Array(caps.arrows).fill(W.bow.uses);
       p.inv.traps = Math.max(p.inv.traps, caps.traps);
-      p.inv.baits = Math.max(p.inv.baits, caps.baits);
       p.inv.spear = true;
       p.inv.spearHealth = W.spear.durability;
       p.inv.guns = gunInventory(); p.inv.reloading = null;
@@ -221,7 +219,6 @@ export class ServerWorld {
       spear: true,
       spearHealth: W.spear.durability,
       traps: W.trap.startCount,
-      baits: W.bait.startCount,
       fruit: [],
       loot: Object.fromEntries(LOOT_KEYS.map((k) => [k, 0])),
     };
@@ -242,14 +239,13 @@ export class ServerWorld {
 
   /** Inventory limits: config base values plus team upgrades from contracts and the workbench. */
   caps() {
-    const b = this.mission ? this.mission.bonus() : { arrows: 0, fruit: 0, carry: 0, traps: 0, baits: 0 };
+    const b = this.mission ? this.mission.bonus() : { arrows: 0, fruit: 0, carry: 0, traps: 0 };
     const u = this.mods();
     return {
       arrows: W.bow.maxArrows + b.arrows + u.quiver,
       fruit: CONFIG.fruit.maxCarried + b.fruit,
       carry: P.maxCarryWeight + b.carry,
       traps: W.trap.startCount + b.traps + u.traps,
-      baits: W.bait.startCount + b.baits,
     };
   }
 
@@ -872,14 +868,14 @@ export class ServerWorld {
   canSpotDino(p, d) {
     const dx = d.x - p.x, dz = d.z - p.z;
     const horizontal = Math.hypot(dx, dz);
-    if (horizontal > 110) return false;
+    if (horizontal > DINO_SIGHTING.range) return false;
     const eyeY = p.y + P.eyeHeight;
     const targetY = d.y + (d.type === 'brachio' ? 5 : d.type === 'trex' ? 2.5 : 1);
     const dy = targetY - eyeY;
     const distance = Math.hypot(horizontal, dy);
-    if (distance > 115) return false;
+    if (distance > DINO_SIGHTING.range) return false;
     const forward = (-dx * Math.sin(p.yaw) - dz * Math.cos(p.yaw)) / Math.max(horizontal, 0.001);
-    if (forward < 0.45 || Math.abs(Math.atan2(dy, horizontal) - p.pitch) > 0.7) return false;
+    if (forward < DINO_SIGHTING.forward || Math.abs(Math.atan2(dy, horizontal) - p.pitch) > DINO_SIGHTING.pitch) return false;
     return !lineBlocked({ x: p.x, y: eyeY, z: p.z }, { x: d.x, y: targetY, z: d.z }, this.terrain, this.layout);
   }
 
@@ -1027,6 +1023,15 @@ export class ServerWorld {
           if (inv.spear) return;
           inv.spear = true;
           inv.spearHealth = it.health ?? W.spear.durability;
+        } else if (it.kind === 'pistol' || it.kind === 'rifle') {
+          if (inv.guns[it.kind].owned !== false) return;
+          inv.guns[it.kind] = { ...it.ammo, owned: true };
+        } else if (it.kind === 'trap') {
+          if (inv.traps + it.n > caps.traps) return this.fullAlert(p, 'You cannot carry more traps', 'trap');
+          inv.traps += it.n;
+        } else if (CONFIG.fruit.types[it.kind]) {
+          if (inv.fruit.length + it.n > caps.fruit) return this.fullAlert(p, 'Your fruit pouch is full', 'fruit');
+          inv.fruit.push(...Array(it.n).fill(it.kind));
         } else if (CONFIG.loot[it.kind]) {
           const weight = CONFIG.loot[it.kind].weight * it.n;
           if (this.carryWeight(p) + weight > caps.carry + 1e-6) {
@@ -1106,22 +1111,49 @@ export class ServerWorld {
         this.event(EV.TRAP_ADD, { trap });
         return;
       }
-      case ACT.BAIT: {
-        if (!p.alive || inv.baits <= 0) return;
-        const x = Number(m.x), z = Number(m.z);
-        if (!Number.isFinite(x) || !this.near(p, x, z, 6)) return;
-        inv.baits--;
-        const bait = { id: this.id(), x: r2(x), z: r2(z), y: r2(this.terrain.heightAt(x, z)), expires: this.now + W.bait.lifetime, eatenBy: null };
-        this.baits.set(bait.id, bait);
+      case ACT.DROP: {
+        if (!p.alive || p.downed) return;
+        const kind = m.kind;
+        let n = 0, health = null;
+        if (LOOT_KEYS.includes(kind)) { n = inv.loot[kind] || 0; inv.loot[kind] = 0; }
+        else if (Object.hasOwn(CONFIG.fruit.types, kind)) {
+          n = inv.fruit.filter(f => f === kind).length;
+          inv.fruit = inv.fruit.filter(f => f !== kind);
+        } else if (kind === 'pistol' || kind === 'rifle') {
+          if (inv.guns[kind].owned === false) return;
+          const ammo = { loaded: inv.guns[kind].loaded, reserve: inv.guns[kind].reserve };
+          inv.guns[kind] = { owned: false, loaded: 0, reserve: 0 };
+          if (inv.reloading === kind) inv.reloading = null;
+          this.dropInventoryItem(p, kind, 1, null, ammo);
+          this.sendInv(p); return;
+        } else if (kind === 'trap') { n = inv.traps; inv.traps = 0; }
+        else if (kind === 'spear' && inv.spear) {
+          n = 1; health = inv.spearHealth; inv.spear = false; inv.spearHealth = 0;
+        } else if (kind === 'arrow') {
+          this.normalizeArrows(inv);
+          const counts = new Map();
+          for (const uses of inv.arrowUses) counts.set(uses, (counts.get(uses) || 0) + 1);
+          for (const [uses, count] of counts) this.dropInventoryItem(p, kind, count, uses);
+          inv.arrows = 0; inv.arrowUses = [];
+          this.sendInv(p); return;
+        }
+        if (!n) return;
+        this.dropInventoryItem(p, kind, n, health);
         this.sendInv(p);
-        this.event(EV.BAIT_ADD, { bait: { id: bait.id, x: bait.x, y: bait.y, z: bait.z } });
+        this.mission.onLootChanged();
         return;
       }
       case ACT.DEPOSIT: {
-        if (!p.alive || !this.nearAny(p, this.stations().dropOff, 6)) return;
+        if (!p.alive) return;
+        if (m.kind != null && !LOOT_KEYS.includes(m.kind)) return;
+        if (!this.nearAny(p, this.stations().dropOff, 6)) {
+          if (m.kind != null) this.toast('Move closer to a hut drop-off to store loot', 'crate', p.id);
+          return;
+        }
         let total = 0;
         const parts = [];
         for (const k of LOOT_KEYS) {
+          if (m.kind != null && k !== m.kind) continue;
           const n = inv.loot[k];
           if (!n) continue;
           this.store[k] += n;
@@ -1196,7 +1228,6 @@ export class ServerWorld {
       const caps = this.caps();
       if (r.give.arrows && inv.arrows >= caps.arrows) return deny('Your quiver is full');
       if (r.give.traps && inv.traps >= caps.traps) return deny('You carry as many traps as you can');
-      if (r.give.baits && inv.baits >= caps.baits) return deny('You carry as much bait as you can');
       if (r.give.spear && inv.spear) return deny('You still have your spear');
     }
     if (!this.pay(p, r.cost)) return deny('Not enough loot in the hut store');
@@ -1208,7 +1239,6 @@ export class ServerWorld {
       const caps = this.caps();
       if (r.give.arrows) { inv.arrows = Math.min(caps.arrows, inv.arrows + r.give.arrows); this.normalizeArrows(inv); }
       if (r.give.traps) inv.traps = Math.min(caps.traps, inv.traps + r.give.traps);
-      if (r.give.baits) inv.baits = Math.min(caps.baits, inv.baits + r.give.baits);
       if (r.give.spear) { inv.spear = true; inv.spearHealth = W.spear.durability; }
       this.sendInv(p);
       this.toast(`Crafted: ${r.name}`, 'crate', p.id);
@@ -1278,6 +1308,13 @@ export class ServerWorld {
     }
     const [x, y, z] = it.offset, c = Math.cos(d.yaw), s = Math.sin(d.yaw);
     it.x = r2(d.x + x * c + z * s); it.y = r2(d.y + y); it.z = r2(d.z - x * s + z * c);
+  }
+
+  dropInventoryItem(p, kind, n, health, ammo = null) {
+    const item = this.spawnItem(kind, p.x - Math.sin(p.yaw) * 1.5, p.z - Math.cos(p.yaw) * 1.5, n, null, health, false);
+    item.droppedBy = p.id;
+    if (ammo) item.ammo = ammo;
+    this.event(EV.ITEM_ADD, { item });
   }
 
   spawnItem(kind, x, z, n = 1, y = null, health = null, publish = true) {
@@ -1413,13 +1450,6 @@ export class ServerWorld {
       const life = it.kind === 'arrow' ? W.bow.arrowLifetime * 3 : it.kind === 'spear' ? Infinity : CONFIG.lootDespawn;
       if (this.now - it.t > life) this.removeItem(it.id);
     }
-    // bait expiry
-    for (const b of this.baits.values()) {
-      if (this.now > b.expires) {
-        this.baits.delete(b.id);
-        this.event(EV.BAIT_REMOVE, { id: b.id });
-      }
-    }
     // forgotten projectiles
     for (const [k, pr] of this.projectiles) if (this.now - pr.t > 20) this.projectiles.delete(k);
     // old tracks
@@ -1481,7 +1511,6 @@ export class ServerWorld {
       fruit: this.fruit.map((f) => f.count),
       spottedDinos: [...this.spottedDinos],
       traps: [...this.traps.values()],
-      baits: [...this.baits.values()].map((b) => ({ id: b.id, x: b.x, y: b.y, z: b.z })),
       tracks: this.tracks.slice(-200),
       mission: this.mission.state(),
       store: this.store,

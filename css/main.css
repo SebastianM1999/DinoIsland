@@ -468,7 +468,7 @@ kbd {
 /* ---------------------------------------------------------------- settings */
 #settings { background: rgba(12, 17, 30, 0.55); z-index: 60; backdrop-filter: blur(2px); }
 .settings-card {
-  width: min(520px, 100%);
+  width: min(720px, 100%);
   /* one fixed size for every tab: switching tabs must not make the dialog jump; long tabs scroll inside */
   height: min(600px, calc(100vh - 40px));
   display: flex;
@@ -500,7 +500,7 @@ kbd {
 }
 .settings-tabs [role=tab][aria-selected=true] { background: #3a4a72; color: var(--ink); box-shadow: 0 2px 0 #1a233b; }
 .settings-tabs [role=tab]:focus-visible { outline: 3px solid var(--focus); outline-offset: 1px; }
-.settings-panel { flex: 1; min-height: 0; overflow-y: auto; padding-right: 6px; }
+.settings-panel { flex: 1; min-height: 0; min-width: 0; overflow-y: auto; overflow-x: hidden; padding-right: 6px; }
 .settings-panel[hidden] { display: none; }
 .audio-credits { margin-top: 12px; font-size: 0.85rem; line-height: 1.55; }
 .audio-credits[open] { max-height: 220px; overflow-y: auto; }
@@ -516,7 +516,7 @@ kbd {
 }
 .setting-row {
   display: grid;
-  grid-template-columns: 150px 1fr 52px;
+  grid-template-columns: 150px minmax(0, 1fr) 92px;
   align-items: center;
   gap: 12px;
   padding: 6px 0;
@@ -573,7 +573,7 @@ kbd {
 .settings-foot { display: flex; justify-content: space-between; gap: 10px; margin-top: 16px; }
 
 @media (max-width: 480px) {
-  .setting-row { grid-template-columns: 1fr 52px; }
+  .setting-row { grid-template-columns: minmax(0, 1fr) 92px; }
   .setting-row input[type=range] { grid-column: 1 / -1; grid-row: 2; }
 }
 

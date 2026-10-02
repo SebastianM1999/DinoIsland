@@ -91,7 +91,7 @@ test('dinosaurs on a rim run down the steep wall to a player below (all species,
   const stats = Object.fromEntries(TYPES.map((t) => [t, { n: 0, down: 0, fails: [] }]));
   for (const { level, variant } of VARIANTS) {
     const world = new ServerWorld({ send() {} }, { level, variant });
-    const { id } = world.join('Bait');
+    const { id } = world.join('Decoy');
     const p = world.players.get(id);
     p.creative = true;              // nobody gets hurt; the dinosaurs still hunt
     for (const type of TYPES) {

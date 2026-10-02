@@ -1,7 +1,6 @@
 // T-Rex: rare apex predator that creates danger and chaos. Patrols a long
 // loop, roars, chases players it sees for a limited time (a sprinting
 // player can escape; the hut is always safe), bites hard, then rests.
-// Meat bait can lure it away.
 
 import { CONFIG } from '../../shared/config.js';
 import { DS } from '../../shared/protocol.js';
@@ -63,19 +62,6 @@ export const trexBrain = {
     switch (d.mode) {
       case 'patrol': {
         d.fl &= ~1;
-        // bait lures it
-        const bait = sys.nearestBait(d, CONFIG.weapons.bait.attractRadius);
-        if (bait) {
-          if (sys.distTo(d, bait.x, bait.z) > 3) { sys.steer(d, bait.x, bait.z, C.walkSpeed * 1.6, dt); d.st = DS.WALK; }
-          else {
-            sys.halt(d, dt);
-            d.st = DS.EAT;
-            bait.eatenBy = d.id;
-            d.eatT = (d.eatT || 0) + dt;
-            if (d.eatT > CONFIG.weapons.bait.eatTime) { sys.eatBait(bait); d.eatT = 0; }
-          }
-          return;
-        }
         if (d.rest <= 0) {
           const p = sys.nearestPlayer(d, C.sightRadius, (q) => !sys.inSafeZone(q));
           if (p) {

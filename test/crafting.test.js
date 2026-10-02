@@ -58,7 +58,7 @@ test('crafting is refused without material, when full, far away or for unknown r
   assert.equal(world.store.teeth, 5);
 });
 
-test('traps and bait are limited by the carry caps', () => {
+test('traps are limited by the carry cap', () => {
   const { world, player, craft, stock } = setup();
   stock({ hide: 5, claws: 5, meat: 5 });
   player.inv.traps = world.caps().traps;
@@ -68,10 +68,6 @@ test('traps and bait are limited by the carry caps', () => {
   craft('trap');
   assert.equal(player.inv.traps, 1);
   assert.equal(world.store.claws, 4);
-  player.inv.baits = 0;
-  craft('bait');
-  assert.equal(player.inv.baits, 2);
-  assert.equal(world.store.meat, 4);
 });
 
 test('a lost spear can be crafted again, but not while you hold one', () => {
@@ -125,10 +121,13 @@ test('tier 2 upgrades unlock on island 2 and need their tier 1 upgrade', () => {
   const p = [...world.players.values()][0];
   const landing = world.layout.hut.arrowRack;
   p.x = landing.x; p.z = landing.z;
-  craft('bow2');
-  assert.ok(!world.upgrades.has('bow2'), 'no workbench before a camp is built');
   const plot = world.layout.basePlots[0];
-  if (!plot) return;   // rare island-2 layout without a base plot: the game falls back to the hut (shared/base.js)
+  craft('bow2');
+  if (!plot) {
+    assert.ok(world.upgrades.has('bow2'), 'a layout without base plots falls back to the hut workbench');
+    return;
+  }
+  assert.ok(!world.upgrades.has('bow2'), 'no workbench before a camp is built');
   p.x = plot.x; p.z = plot.z;
   stock({ hide: 9, teeth: 9, claws: 9, plates: 9, bones: 9 });
   world.receive(p.id, { t: MSG.ACT, a: ACT.BASE, op: 'build', plot: 0 });
@@ -149,12 +148,11 @@ test('tier 2 upgrades unlock on island 2 and need their tier 1 upgrade', () => {
   assert.ok(Math.abs(m.bowDamage - 0.35) < 1e-9);
 });
 
-test('the free refill only restores basic arrows, not traps or bait', () => {
+test('the free refill only restores basic arrows, not traps', () => {
   const { world, player, messages } = setup();
-  player.inv.arrows = 0; player.inv.traps = 0; player.inv.baits = 0;
+  player.inv.arrows = 0; player.inv.traps = 0;
   world.receive(player.id, { t: MSG.ACT, a: ACT.REFILL });
   assert.equal(player.inv.arrows, W.bow.startArrows);
   assert.equal(player.inv.traps, 0);
-  assert.equal(player.inv.baits, 0);
   assert.ok(messages.length > 0);
 });

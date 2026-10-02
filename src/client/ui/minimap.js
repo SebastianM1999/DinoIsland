@@ -4,6 +4,8 @@
 //
 // World coordinates: x = east, z = south (-z is north). The map is north-up.
 
+import { Terrain } from '../../shared/terrain.js';
+
 const TAU = Math.PI * 2;
 
 const C = {
@@ -20,7 +22,6 @@ const C = {
   path: [214, 178, 110],
   lava: [255, 120, 30],
   ash: [120, 112, 116],
-  basalt: [58, 48, 54],
 };
 
 const mix = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
@@ -31,6 +32,11 @@ const clamp01 = (v) => (v < 0 ? 0 : v > 1 ? 1 : v);
  * @param {import('../../shared/terrain.js').Terrain} terrain
  */
 export function buildMapBase(terrain, layout, res = 640) {
+  // Keep the secret arena and its causeway out of the map's terrain as well
+  // as its markers. Only this map copy changes; gameplay uses the real terrain.
+  if (layout?.bossArena && terrain.plan) {
+    terrain = new Terrain({ ...terrain.plan, bossArena: null, pools: terrain.plan.pools.filter(p => !p.annex) });
+  }
   const size = terrain.size;
   const half = size / 2;
   const cv = document.createElement('canvas');
@@ -41,7 +47,6 @@ export function buildMapBase(terrain, layout, res = 640) {
   const mpp = size / res;
   const jungle = layout && typeof layout.jungleDensity === 'function' ? layout.jungleDensity : null;
   const volcanic = layout?.biome?.id === 'volcano';
-  const arena = layout?.bossArena;
   // light from the north-west for a soft hillshade
   const lx = -0.7, lz = -0.7;
 
@@ -69,10 +74,6 @@ export function buildMapBase(terrain, layout, res = 640) {
             const j = clamp01((jungle(x, z) - 0.55) * 1.6);
             if (j > 0) col = mix(col, C.jungle, j * 0.85);
           }
-        }
-        if (arena) {
-          const k = 1 - clamp01((Math.hypot(x - arena.center.x, z - arena.center.z) - arena.outerR + 4) / 12);
-          if (k > 0) col = mix(col, C.basalt, k);
         }
         if (slope > 0.75) col = mix(col, slope > 1.4 ? C.cliff : C.rock, clamp01((slope - 0.75) / 0.6));
         const g = terrain.gradientAt(x, z, 1.2);
@@ -108,26 +109,10 @@ export function buildMapBase(terrain, layout, res = 640) {
       ctx.fill();
     }
   }
-  // the giant's pen (boss arena plateau): a dark red, dashed ring – visible, but clearly off-limits
-  if (layout?.grove) {
-    const g = layout.grove;
-    const cx = (g.x + half) / mpp, cz = (g.z + half) / mpp, r = g.r / mpp;
-    ctx.fillStyle = 'rgba(70, 30, 34, 0.55)';
-    ctx.beginPath();
-    ctx.arc(cx, cz, r, 0, TAU);
-    ctx.fill();
-    ctx.strokeStyle = 'rgba(255, 110, 80, 0.95)';
-    ctx.lineWidth = Math.max(1, 1.8 / mpp);
-    ctx.setLineDash([Math.max(2, 4 / mpp), Math.max(2, 3 / mpp)]);
-    ctx.stroke();
-    ctx.setLineDash([]);
-  }
-  // the boss arena: a red skull on the boss's spawn point
-  if (arena) skullGlyph(ctx, (arena.spawn.x + half) / mpp, (arena.spawn.z + half) / mpp, Math.max(5, 3.2 / mpp));
-  // island extent, so the big map can zoom to it (the arena islet included)
+  // Frame the main island without revealing the secret arena's location.
   const island = layout?.plan ? {
-    A: Math.max(layout.plan.A, arena ? Math.abs(arena.center.x) + arena.outerR : 0),
-    B: Math.max(layout.plan.B, arena ? Math.abs(arena.center.z) + arena.outerR : 0),
+    A: layout.plan.A,
+    B: layout.plan.B,
   } : null;
   return { canvas: cv, size, half, res, mpp, island };
 }
@@ -158,29 +143,6 @@ function arrow(ctx, x, y, yaw, s, fill) {
   ctx.fillStyle = 'rgba(0,0,0,0.14)';
   ctx.fill();
   ctx.restore();
-}
-
-/** Boss marker: a red disc with a white skull. */
-function skullGlyph(ctx, x, y, s) {
-  ctx.beginPath();
-  ctx.arc(x, y, s, 0, TAU);
-  ctx.fillStyle = '#b3221a';
-  ctx.fill();
-  ctx.lineWidth = s * 0.16;
-  ctx.strokeStyle = '#1f1418';
-  ctx.stroke();
-  ctx.fillStyle = '#fff';
-  ctx.beginPath();
-  ctx.arc(x, y - s * 0.12, s * 0.5, 0, TAU);
-  ctx.fill();
-  ctx.fillRect(x - s * 0.3, y + s * 0.15, s * 0.6, s * 0.38);
-  ctx.fillStyle = '#b3221a';
-  for (const dx of [-0.2, 0.2]) {
-    ctx.beginPath();
-    ctx.arc(x + dx * s, y - s * 0.12, s * 0.14, 0, TAU);
-    ctx.fill();
-  }
-  ctx.fillRect(x - s * 0.04, y + s * 0.3, s * 0.08, s * 0.23);
 }
 
 function hutGlyph(ctx, x, y, s) {

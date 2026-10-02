@@ -27,7 +27,7 @@ hud.setMission({
 const inv = {
   arrows: 8, maxArrows: 12, fruit: ['berry', 'mango', 'dragon'], maxFruit: 5,
   loot: { meat: 2, hide: 1, teeth: 0, plates: 0, claws: 0 }, carryWeight: 8, speedFactor: 0.86,
-  store: { meat: 1, hide: 0, teeth: 2, plates: 0, claws: 0 }, traps: 2, baits: 2,
+  store: { meat: 1, hide: 0, teeth: 2, plates: 0, claws: 0 }, traps: 2,
 };
 hud.setInventory(inv);
 let selected = 0;
@@ -35,7 +35,6 @@ const slots = () => [
   { id: 'spear', label: 'Spear', count: null, enabled: true },
   { id: 'bow', label: 'Bow', count: inv.arrows, enabled: inv.arrows > 0 },
   { id: 'trap', label: 'Trap', count: inv.traps, enabled: inv.traps > 0 },
-  { id: 'bait', label: 'Bait', count: inv.baits, enabled: true },
   { id: 'fruit', label: 'Fruit', count: inv.fruit.length, enabled: inv.fruit.length > 0, sub: inv.fruit[0] },
 ];
 hud.setHotbar(slots(), selected);

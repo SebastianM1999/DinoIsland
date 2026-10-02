@@ -7,7 +7,7 @@ import { CONFIG } from '../../shared/config.js';
 import { MSG, EV, DS, ACT } from '../../shared/protocol.js';
 import { angleDiff } from '../../shared/rng.js';
 import { raySphere } from '../../shared/collision.js';
-import { lineBlocked } from '../../shared/visibility.js';
+import { DINO_SIGHTING, lineBlocked } from '../../shared/visibility.js';
 import { groveEntry } from '../../shared/grove.js';
 import { InterpBuffer } from '../net/interp.js';
 import { DinoAnimator } from '../models/dino/rig.js';
@@ -226,6 +226,7 @@ export class DinoViews {
     this.map = new Map();
     this.spotted = new Set();
     this.spotAttempts = new Map();
+    this.spotFocus = new Map();
     this.spotTimer = 0;
     // Debug view of hit spheres (F3, alongside the static colliders).
     this.hitDebug = new THREE.Group();
@@ -288,6 +289,7 @@ export class DinoViews {
     this.map.delete(id);
     this.spotted.delete(id);
     this.spotAttempts.delete(id);
+    this.spotFocus.delete(id);
   }
 
   onSnapshot(m) {
@@ -371,21 +373,34 @@ export class DinoViews {
   }
 
   spotVisibleDinosaurs() {
-    if (!this.game.me.alive || !this.game.input.locked || this.game.hud.isPanelOpen()) return;
+    if (!this.game.me.alive || !this.game.input.locked || this.game.hud.isPanelOpen()) {
+      this.spotFocus.clear();
+      return;
+    }
     const camera = this.game.gfx.camera;
     const eye = camera.position;
+    const player = this.game.player;
+    const focused = new Set();
     for (const v of this.map.values()) {
-      if (!v.alive || this.spotted.has(v.id) || this.game.time - (this.spotAttempts.get(v.id) ?? -10) < 1.5) continue;
+      if (!v.alive || this.spotted.has(v.id)) continue;
       const target = v.pos.clone();
       target.y += v.type === 'brachio' ? 5 : v.type === 'trex' ? 2.5 : 1;
       const distance = eye.distanceTo(target);
-      if (distance > 110 || distance < 0.1) continue;
+      if (distance > DINO_SIGHTING.range || distance < 0.1) continue;
+      const dx = target.x - eye.x, dz = target.z - eye.z;
+      const horizontal = Math.hypot(dx, dz);
+      const forward = (-dx * Math.sin(player.yaw) - dz * Math.cos(player.yaw)) / Math.max(horizontal, 0.001);
+      if (forward < DINO_SIGHTING.forward || Math.abs(Math.atan2(target.y - eye.y, horizontal) - player.pitch) > DINO_SIGHTING.pitch) continue;
       const ndc = target.clone().project(camera);
       if (ndc.z < -1 || ndc.z > 1 || Math.abs(ndc.x) > 0.8 || Math.abs(ndc.y) > 0.8) continue;
       if (lineBlocked(eye, target, this.ctx.terrain, this.game.layout)) continue;
+      focused.add(v.id);
+      if (!this.spotFocus.has(v.id)) this.spotFocus.set(v.id, this.game.time);
+      if (this.game.time - this.spotFocus.get(v.id) < DINO_SIGHTING.hold || this.game.time - (this.spotAttempts.get(v.id) ?? -10) < 1.5) continue;
       this.spotAttempts.set(v.id, this.game.time);
       this.game.net.act(ACT.SPOT, { dino: v.id });
     }
+    for (const id of this.spotFocus.keys()) if (!focused.has(id)) this.spotFocus.delete(id);
   }
 
   /**

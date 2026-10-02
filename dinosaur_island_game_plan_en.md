@@ -275,7 +275,7 @@ Loot:
 - aggressive
 - small groups
 - chases players
-- can be influenced by bait and traps
+- can be influenced by traps
 
 Loot:
 
@@ -313,12 +313,11 @@ The T-Rex is not a regular hunting target in the first demo.
 
 ## 9. Hunting
 
-The demo needs four tools:
+The demo needs three tools:
 
 - **Spear** – melee, high damage, can also be thrown and picked up again
 - **Bow and arrow** – ranged, lower damage per hit, ideal against the Pteranodon and for luring/provoking dinosaurs from a safe distance
 - **Trap**
-- **Meat bait**
 
 ### Bow and Arrow
 
@@ -334,7 +333,7 @@ Gameplay:
 1. Find dinosaur tracks.
 2. Follow the dinosaur.
 3. Observe its position and behavior.
-4. Prepare a trap or bait.
+4. Prepare a trap.
 5. Attack as a team – up close with the spear, from a distance with the bow.
 6. Defeat the dinosaur.
 7. Pick up the loot.
@@ -372,7 +371,6 @@ Players can naturally take on different roles:
 
 - Tracker
 - Trapper
-- Bait
 - Hunter (melee with spear)
 - Archer (ranged with bow)
 - Scout
@@ -523,7 +521,6 @@ Directly as part of the game:
 - hits
 - damage and weak spots
 - trap
-- bait
 - dinosaur death
 - loot
 - pickup

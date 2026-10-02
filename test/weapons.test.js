@@ -16,6 +16,28 @@ function settle(vm, tool) {
 }
 function near(a, b) { assert.ok(a.distanceTo(b) < 1e-6, `contact gap: ${a.distanceTo(b)}`); }
 
+test('butchering makes one sustained stroke tied to action progress, with no looping', () => {
+  const vm = make();
+  vm.setKnife(true, 0);
+  for (let i = 0; i < 30; i++) vm.update(1 / 60, idle);
+  let lastX = vm.rHand.position.x;
+  for (let i = 1; i <= 20; i++) {
+    vm.setKnife(true, i / 20);
+    vm.update(1 / 60, idle);
+    assert.ok(vm.rHand.position.x < lastX, 'carving progresses across the carcass without restarting');
+    lastX = vm.rHand.position.x;
+  }
+  const end = vm.rHand.position.clone();
+  for (let i = 0; i < 120; i++) vm.update(1 / 60, idle);
+  near(vm.rHand.position, end);
+  vm.setKnife(false);
+  for (let i = 0; i < 30; i++) vm.update(1 / 60, idle);
+  assert.equal(vm.knife.visible, false);
+  vm.setKnife(true, 0);
+  for (let i = 0; i < 30; i++) vm.update(1 / 60, idle);
+  assert.ok(vm.rHand.position.x > end.x + 0.19, 'a new carcass starts a fresh stroke');
+});
+
 test('bow string, arrow nock, and pulling hand share a contact through draw and sway', () => {
   const vm = make(); settle(vm, 'bow');
   for (const draw of [0, 0.25, 0.6, 1]) {
@@ -52,7 +74,7 @@ test('optimistic inventory removal preserves spear until its throw release', () 
 
 test('remote bow and trap grips follow both arms and spear points forward', () => {
   const model = new PlayerModel(0);
-  for (const eq of ['bow', 'trap', 'spear', 'bait', 'bow']) {
+  for (const eq of ['bow', 'trap', 'spear', 'fruit', 'bow']) {
     model.animate(1 / 60, { eq, spd: 5, pitch: 0.3, drawing: eq === 'bow', eating: false, attacking: false, carry: 0, alive: true, grounded: true });
     model.root.updateMatrixWorld(true);
     if (eq === 'bow' || eq === 'trap') {

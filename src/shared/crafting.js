@@ -10,7 +10,6 @@ export const RECIPES = [
   // ---- supplies
   { id: 'arrows',  kind: 'supply', icon: 'arrow', name: 'Arrows ×6', text: 'Six fresh arrows for the quiver.', cost: { teeth: 1 }, give: { arrows: 6 } },
   { id: 'trap',    kind: 'supply', icon: 'trap',  name: 'Spike trap', text: 'One more trap to set.', cost: { hide: 1, claws: 1 }, give: { traps: 1 } },
-  { id: 'bait',    kind: 'supply', icon: 'meat',  name: 'Meat bait ×2', text: 'Two baits to lure dinosaurs.', cost: { meat: 1 }, give: { baits: 2 } },
   { id: 'spear',   kind: 'supply', icon: 'spear', name: 'Spare spear', text: 'A new spear if you lost yours.', cost: { teeth: 1, hide: 1 }, give: { spear: 1 } },
 
   // ---- upgrades, tier 1 (island 1)

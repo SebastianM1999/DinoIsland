@@ -1,5 +1,5 @@
 import { retainResource } from '../core/resources.js';
-// Weapons and tools: spear, bow, arrow, trap, meat bait.
+// Weapons and tools: spear, bow, arrow, trap.
 // Built once, geometry cached. Orientation: tools point along +Y from the grip.
 
 import * as THREE from 'three';
@@ -160,7 +160,7 @@ export function trapGeometry(sprung = false) {
   });
 }
 
-/** Meat chunk (loot + bait): a chunky red steak with a cream bone. ~0.35 m. */
+/** Meat loot: a chunky red steak with a cream bone. ~0.35 m. */
 export function meatGeometry() {
   return cached('meat', () => {
     let m = new THREE.IcosahedronGeometry(0.17, 1);

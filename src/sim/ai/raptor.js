@@ -1,12 +1,30 @@
 // Velociraptor: fast, alert, aggressive pack hunter. Wanders its home
 // territory, spots players quickly, chases and flanks them, bites and
-// darts back (hit-and-run). Meat bait distracts it; traps stop it.
+// darts back (hit-and-run). Hits scare it off briefly; traps stop it.
 
 import { CONFIG } from '../../shared/config.js';
 import { DS } from '../../shared/protocol.js';
 
 const C = CONFIG.dinos.raptor;
 const RETREAT_TIME = 0.9;
+
+/** Shared with raiders so a wounded raptor breaks off either kind of attack. */
+export function updateRaptorFear(d, sys, dt) {
+  if (!(d.frightened > 0)) return false;
+  d.frightened = Math.max(0, d.frightened - dt);
+  if (!d.frightened) return false;
+  const from = sys.world.players.get(d.fearFrom) || d.fearOrigin;
+  // Make a short escape, then hesitate instead of fleeing half the jungle.
+  if (sys.distTo(d, from.x, from.z) >= 6) {
+    sys.halt(d, dt);
+    d.st = DS.ALERT;
+    return true;
+  }
+  const away = Math.atan2(d.x - from.x, d.z - from.z);
+  sys.steer(d, d.x + Math.sin(away) * 6, d.z + Math.cos(away) * 6, C.runSpeed * 0.7, dt);
+  d.st = DS.RUN;
+  return true;
+}
 
 function spawnPack(sys, cx, cz, n, home) {
   const id = `raptor-${sys.world.id()}`;
@@ -35,7 +53,7 @@ export const raptorBrain = {
   init(d) {
     d.cool = 0;
     d.retreat = 0;
-    d.eatT = 0;
+    d.frightened = 0;
     d.flank = (d.slot % 3 - 1) * 0.9;   // approach angle offset for pack flanking
   },
 
@@ -47,8 +65,19 @@ export const raptorBrain = {
 
   onHurt(d, sys, byId) {
     const pack = sys.groups.get(d.group);
-    if (pack && sys.world.players.get(byId)) pack.target = byId;
-    d.eatT = 0;
+    const attacker = sys.world.players.get(byId);
+    const attacking = pack?.target != null || d.st === DS.ATTACK || d.raid?.foe != null;
+    if (pack && attacker) pack.target = byId;
+    if (attacking && attacker) {
+      d.frightened = 1 + Math.random();
+      d.fearFrom = byId;
+      d.fearOrigin = { x: attacker.x, z: attacker.z };
+      d.retreat = 0;
+      // The pause itself is the recovery time, with no extra bite cooldown.
+      d.cool = 0;
+      if (d.raid) d.raid.cool = 0;
+      d.st = DS.RUN;
+    }
   },
 
   update(d, sys, dt) {
@@ -56,6 +85,7 @@ export const raptorBrain = {
     if (!pack) return;
     d.cool = Math.max(0, d.cool - dt);
     d.retreat = Math.max(0, d.retreat - dt);
+    if (updateRaptorFear(d, sys, dt)) return;
 
     // validate / acquire the pack's target
     let target = pack.target ? sys.world.players.get(pack.target) : null;
@@ -65,9 +95,7 @@ export const raptorBrain = {
     }
     if (!target) {
       const seen = sys.nearestPlayer(d, C.sightRadius, (p) => !sys.inSafeZone(p));
-      // bait distracts unless a player is right on top of them
-      const bait = sys.nearestBait(d, CONFIG.weapons.bait.attractRadius);
-      if (seen && !(bait && sys.distTo(d, seen.x, seen.z) > 8)) {
+      if (seen) {
         pack.target = seen.id;
         target = seen;
         sys.roar(d);
@@ -77,7 +105,6 @@ export const raptorBrain = {
     // --- chase
     if (target) {
       d.fl |= 1;
-      d.eatT = 0;
       const dist = sys.distTo(d, target.x, target.z);
       if (d.retreat > 0) {
         // dart back after a bite
@@ -103,26 +130,6 @@ export const raptorBrain = {
       return;
     }
     d.fl &= ~1;
-
-    // --- bait
-    const bait = sys.nearestBait(d, CONFIG.weapons.bait.attractRadius);
-    if (bait) {
-      const dist = sys.distTo(d, bait.x, bait.z);
-      if (dist > 1.4) {
-        sys.steer(d, bait.x, bait.z, C.runSpeed * 0.8, dt);
-        d.st = DS.RUN;
-      } else {
-        sys.halt(d, dt);
-        bait.eatenBy = d.id;
-        d.eatT += dt;
-        d.st = DS.EAT;
-        if (d.eatT > CONFIG.weapons.bait.eatTime) {
-          sys.eatBait(bait);
-          d.eatT = 0;
-        }
-      }
-      return;
-    }
 
     // --- wander around home as a loose pack
     pack.wanderT -= dt;

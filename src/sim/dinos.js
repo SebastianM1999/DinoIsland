@@ -168,21 +168,6 @@ export class DinoSystem {
 
   distTo(d, x, z) { return Math.hypot(x - d.x, z - d.z); }
 
-  nearestBait(d, radius) {
-    let best = null, bd = radius * radius;
-    for (const b of this.world.baits.values()) {
-      if (b.eatenBy && b.eatenBy !== d.id) continue;
-      const q = (b.x - d.x) ** 2 + (b.z - d.z) ** 2;
-      if (q < bd) { bd = q; best = b; }
-    }
-    return best;
-  }
-
-  eatBait(b) {
-    this.world.baits.delete(b.id);
-    this.world.event(EV.BAIT_REMOVE, { id: b.id });
-  }
-
   /**
    * Is this spot fine for a land animal? Keeps dinosaurs out of water, cliffs and the hut clearing.
    * `downhill`: the animal is heading down to this spot. Then steep ground is fine (it runs down a

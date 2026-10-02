@@ -1,13 +1,13 @@
 // First-person hands + tool (see inspiration/ingame-FPS-pov.png): a chunky
 // arm in the player's color holding the spear diagonally from the bottom
-// right; bow held by the left hand with a drawable string; trap, bait and
+// right; bow held by the left hand with a drawable string; trap and
 // fruit held in the hands. Drawn in a separate pass (never clips).
 
 import * as THREE from 'three';
 import { CONFIG } from '../../shared/config.js';
 import { TOPS } from '../../shared/outfits.js';
 import { MAT, merge, mesh, tube } from '../models/kit.js';
-import { spearGeometry, bowGeometry, arrowGeometry, trapGeometry, meatGeometry, knifeGeometry, makeBowString, BOW_REST, ARROW_TIP_Y } from '../models/weapons.js';
+import { spearGeometry, bowGeometry, arrowGeometry, trapGeometry, knifeGeometry, makeBowString, BOW_REST, ARROW_TIP_Y } from '../models/weapons.js';
 import { handGeometry } from '../models/hands.js';
 import { SPEAR_THROW, spearReleaseRotation, cameraPlaneScale } from './spearThrow.js';
 import { makeFirearm } from '../models/firearms/index.js';
@@ -84,14 +84,11 @@ export class Viewmodel {
     this.bow.scale.setScalar(0.7);
     this.lHand.add(this.bow);
 
-    // trap (both hands, low), bait meat (right hand), fruit (right hand)
+    // trap (both hands, low), fruit (right hand)
     this.trap = mesh(trapGeometry(false), MAT.standard, { cast: false });
     this.trap.scale.setScalar(0.3);
     this.trap.position.set(0, -0.28, -0.65);
     this.root.add(this.trap);
-    this.meat = mesh(meatGeometry(), MAT.glossy, { cast: false });
-    this.meat.position.set(-0.05, 0.08, -0.06);
-    this.rHand.add(this.meat);
     // skinning knife (V): replaces the held tool while butchering a carcass
     this.knife = mesh(knifeGeometry(), MAT.standard, { cast: false });
     this.knife.rotation.set(-1.25, 0, 0.35);   // blade forward and down, toward the carcass
@@ -99,6 +96,7 @@ export class Viewmodel {
     this.rHand.add(this.knife);
     this.knifeOn = 0;      // 0..1 blend in/out
     this.knifeWanted = false;
+    this.knifeProgress = 0;
     this.fruitHolder = new THREE.Group();
     this.fruitHolder.position.set(-0.03, 0.08, -0.07);
     this.rHand.add(this.fruitHolder);
@@ -180,7 +178,10 @@ export class Viewmodel {
   }
 
   /** Butchering with the knife (V): the held tool is put away meanwhile. */
-  setKnife(on) { this.knifeWanted = !!on; }
+  setKnife(on, progress = 0) {
+    this.knifeWanted = !!on;
+    if (on) this.knifeProgress = THREE.MathUtils.clamp(progress, 0, 1);
+  }
 
   applyVisibility() {
     // the knife hides every tool; the tool comes back once it is put away
@@ -190,7 +191,6 @@ export class Viewmodel {
     this.bow.visible = t === 'bow';
     this.nocked.visible = t === 'bow' && this.hasArrow;
     this.trap.visible = t === 'trap';
-    this.meat.visible = t === 'bait';
     for (const k in this.fruitMeshes) this.fruitMeshes[k].visible = false;
     const showFruit = (t === 'fruit' && this.fruitType) || (this.eatT > 0 && this.fruitType);
     if (showFruit) {
@@ -370,12 +370,13 @@ export class Viewmodel {
     }
     for (const [kind, other] of Object.entries(this.guns)) if (kind !== this.tool) other.userData.flash.visible = false;
     if (this.knifeOn > 0) {
-      // butchering: right hand low and forward, sawing back and forth
+      // One sustained carving stroke spans the entire server-confirmed action.
       const k = this.knifeOn;
-      const saw = Math.sin(this.time * 11);
-      r.lerp(V(0.12 + saw * 0.06 + this.sway.x, -0.3 + Math.abs(saw) * 0.02 + this.sway.y, -0.5 - saw * 0.05), k);
+      const u = this.knifeProgress * this.knifeProgress * (3 - 2 * this.knifeProgress);
+      const press = Math.sin(u * Math.PI);
+      r.lerp(V(0.22 - u * 0.2 + this.sway.x, -0.3 - press * 0.035 + this.sway.y, -0.46 - press * 0.08), k);
       this.rHand.quaternion.identity();
-      this.rHand.rotation.set(-0.35 * k, 0.25 * k, 0);
+      this.rHand.rotation.set((-0.3 - press * 0.1) * k, (0.35 - u * 0.2) * k, (-0.12 + u * 0.24) * k);
       this.rPalm.quaternion.identity();
       this.rPalm.rotation.set(0, 0, 0);
       this.rPalm.visible = true;

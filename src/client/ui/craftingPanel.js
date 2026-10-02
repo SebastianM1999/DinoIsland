@@ -1,5 +1,5 @@
 // Crafting box dialog: opens with E at the hut workbench. Two tabs – supplies
-// (arrows, traps, bait, spear; crafted again and again) and team upgrades
+// (arrows, traps, spear; crafted again and again) and team upgrades
 // (built once, a new tier unlocks on every island). Everything is paid from
 // the shared hut store; the server validates each craft.
 

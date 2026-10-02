@@ -1,5 +1,8 @@
 // Shared terrain and obstacle occlusion for client sighting and server checks.
 
+// Discovery requires a close, deliberate look instead of a passing glance.
+export const DINO_SIGHTING = Object.freeze({ range: 35, forward: 0.97, pitch: 0.2, hold: 1.5 });
+
 export function lineBlocked(eye, target, terrain, layout) {
   const dx = target.x - eye.x, dz = target.z - eye.z, dy = target.y - eye.y;
   for (let i = 1; i < 16; i++) {

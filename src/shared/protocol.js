@@ -1,7 +1,7 @@
 // Network message formats (JSON). Every message is an object with a `t` type field.
 //
 // Authority model:
-//   * The server owns the world: dinosaurs, loot/items, fruit, traps, bait,
+//   * The server owns the world: dinosaurs, loot/items, fruit, traps,
 //     player health, inventories, the mission and the hut store.
 //   * Clients own only their own movement (position/look is sent ~20x/s)
 //     and report attacks/projectile results, which the server validates
@@ -54,8 +54,8 @@ export const ACT = {
   EAT: 'eat',           // { fruit? }                          start eating (type optional)
   GIVE: 'give',         // { to }                              give a fruit to a teammate
   TRAP: 'trap',         // { x, z, yaw }
-  BAIT: 'bait',         // { x, z }
   DEPOSIT: 'deposit',   // {}                                  drop loot at the hut
+  DROP: 'drop',         // { kind }                            drop a carried stack into the world
   REFILL: 'refill',     // {}                                  free basic resupply (12 arrows, spear, guns) at the hut
   CRAFT: 'craft',       // { recipe }                          craft a supply or team upgrade at the workbench
   RESPAWN: 'respawn',   // {}                                  request respawn when dead
@@ -90,8 +90,6 @@ export const EV = {
   TRAP_ADD: 'trap+',        // { trap }
   TRAP_REMOVE: 'trap-',     // { id }
   TRAP_SNAP: 'trapsnap',    // { id, dino }
-  BAIT_ADD: 'bait+',        // { bait }
-  BAIT_REMOVE: 'bait-',     // { id }
   TRACK: 'track',           // { x, z, yaw, side, type }
   ROAR: 'roar',             // { id }
   DEATH: 'death',           // { id, by }
@@ -137,7 +135,7 @@ export const PF = {
 };
 
 /** Equipment slot ids (`eq`). */
-export const EQUIP = ['spear', 'bow', 'trap', 'bait', 'fruit', 'pistol', 'rifle'];
+export const EQUIP = ['spear', 'bow', 'trap', 'fruit', 'pistol', 'rifle'];
 
 /** Dinosaur animation/AI states (`st`). */
 export const DS = {

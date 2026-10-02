@@ -33,8 +33,8 @@ export const CONTRACTS = [
   },
   {
     id: 'trapper', title: 'Trapper', icon: 'trap', goal: 2, event: 'trap',
-    text: 'Catch 2 dinosaurs in traps. Tip: put meat bait right next to a trap.',
-    reward: { cap: 'baits', amount: 1, text: 'Carry +1 bait' },
+    text: 'Catch 2 dinosaurs in traps. Place a trap along their path, then draw them toward it.',
+    reward: { cap: 'traps', amount: 1, text: 'Carry +1 trap' },
   },
   {
     id: 'sky', title: 'Sky Hunter', icon: 'claws', goal: 1, event: 'kill:ptera',
@@ -43,7 +43,7 @@ export const CONTRACTS = [
   },
   {
     id: 'apex', title: 'King of the Island', icon: 'skull', goal: 1, event: 'kill:trex',
-    text: 'The ultimate challenge: bring down the T-Rex together. Traps, bait and a lot of arrows help.',
+    text: 'The ultimate challenge: bring down the T-Rex together. Traps and a lot of arrows help.',
     reward: { cap: 'carry', amount: 6, text: 'Trophy + bigger backpack (+6 load)' },
   },
 ];

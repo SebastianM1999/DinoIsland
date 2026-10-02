@@ -115,12 +115,6 @@ export const CONFIG = {
       damage: 30,
       maxActive: 6,
     },
-    bait: {
-      startCount: 2,
-      attractRadius: 45,
-      eatTime: 10,
-      lifetime: 90,
-    },
     // Knife (hold V, not on the hotbar): butchers a carcass for extra drops
     // (CONFIG.dinos.<type>.butcher). Moving away or getting hit cancels.
     knife: {

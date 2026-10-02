@@ -232,6 +232,37 @@ export class Hud {
     this.$invPanel = el('section', 'hud-panel hud-inv brush');
     this.$invPanel.setAttribute('aria-label', 'Inventory');
     this.$invPanel.hidden = true;
+    this.$invPanel.addEventListener('wheel', (e) => {
+      if (!e.deltaY || e.target.closest('.hud-inv-body')?.scrollHeight > e.target.closest('.hud-inv-body')?.clientHeight) return;
+      e.preventDefault();
+      this.onInventoryWheel?.(Math.sign(e.deltaY));
+    }, { passive: false });
+    this.$invPanel.addEventListener('dragstart', (e) => {
+      const cell = e.target.closest('[data-drop-kind]');
+      if (!cell) return;
+      this._dragKind = cell.dataset.dropKind;
+      e.dataTransfer.setData('text/plain', this._dragKind);
+      e.dataTransfer.effectAllowed = 'move';
+      this.$tip.hidden = true;
+    });
+    this.$invPanel.addEventListener('dragend', () => { this._dragKind = null; });
+    this._onDragOver = (e) => {
+      if (!this._dragKind || !this._invOpen) return;
+      const store = e.target.closest?.('.hud-inv-store');
+      if (store && !CONFIG.loot[this._dragKind]) return;
+      if (store || e.target.closest?.('[data-world-drop]') || !this.$invPanel.contains(e.target)) e.preventDefault();
+    };
+    this._onDrop = (e) => {
+      if (!this._dragKind || !this._invOpen) return;
+      const store = !!e.target.closest?.('.hud-inv-store');
+      if (store && !CONFIG.loot[this._dragKind]) return;
+      if (!store && !e.target.closest?.('[data-world-drop]') && this.$invPanel.contains(e.target)) return;
+      e.preventDefault();
+      this.onInventoryDrop?.(this._dragKind, store);
+      this._dragKind = null;
+    };
+    document.addEventListener('dragover', this._onDragOver);
+    document.addEventListener('drop', this._onDrop);
     this.$mapPanel = el('section', 'hud-panel hud-map brush');
     this.$mapPanel.setAttribute('aria-label', 'Island map');
     this.$mapPanel.hidden = true;
@@ -273,7 +304,7 @@ export class Hud {
       if (!info) { this.$tip.hidden = true; return; }
       if (this.$tip.dataset.key !== target.dataset.tip) {
         this.$tip.dataset.key = target.dataset.tip;
-        this.$tip.innerHTML = `<span class="hud-tip-head"><span class="hud-tip-ic">${icon(target.dataset.tip === 'bait' ? 'meat' : target.dataset.tip)}</span><b>${esc(info.name)}</b><em>${esc(info.kind)}</em></span>
+        this.$tip.innerHTML = `<span class="hud-tip-head"><span class="hud-tip-ic">${icon(target.dataset.tip)}</span><b>${esc(info.name)}</b><em>${esc(info.kind)}</em></span>
           <span class="hud-tip-text">${esc(info.text)}</span>${info.use ? `<span class="hud-tip-use">${esc(info.use)}</span>` : ''}`;
       }
       this.$tip.hidden = false;
@@ -326,6 +357,8 @@ export class Hud {
   show(visible) { this.root.hidden = !visible; }
 
   dispose() {
+    document.removeEventListener('dragover', this._onDragOver);
+    document.removeEventListener('drop', this._onDrop);
     this._ro?.disconnect();
     clearTimeout(this._threatTimer);
     for (const timer of this._timers) clearTimeout(timer);
@@ -482,7 +515,7 @@ export class Hud {
       li.classList.toggle('is-off', !!s && s.enabled === false);
       li.classList.toggle('is-empty', !s);
       if (!s) { slot.ic.innerHTML = ''; slot.count.textContent = ''; li.removeAttribute('aria-label'); continue; }
-      const icId = s.id === 'bait' ? 'meat' : s.id === 'fruit' ? (FRUIT_KEYS.includes(s.sub) ? s.sub : 'fruit') : s.id;
+      const icId = s.id === 'fruit' ? (FRUIT_KEYS.includes(s.sub) ? s.sub : 'fruit') : s.id;
       const icKey = `${icId}`;
       if (slot.icKey !== icKey || prevId !== s.id) { slot.icKey = icKey; slot.ic.innerHTML = icon(icId); }
       slot.count.textContent = s.count == null ? '' : String(s.count);
@@ -539,22 +572,21 @@ export class Hud {
     // Only rebuild when the contents change – rebuilding every frame would
     // break hover tooltips.
     const maxCarry = inv.maxCarry ?? CONFIG.player.maxCarryWeight;
-    const sig = JSON.stringify([inv.guns, inv.reloading, inv.spear, inv.spearHealth, inv.arrowUses, inv.arrows, inv.maxArrows, inv.maxFruit, maxCarry, inv.traps, inv.baits, inv.fruit, inv.loot, inv.store, Math.round((inv.carryWeight || 0) * 10), Math.round((inv.speedFactor ?? 1) * 100)]);
+    const sig = JSON.stringify([inv.guns, inv.reloading, inv.spear, inv.spearHealth, inv.arrowUses, inv.arrows, inv.maxArrows, inv.maxFruit, maxCarry, inv.traps, inv.fruit, inv.loot, inv.store, Math.round((inv.carryWeight || 0) * 10), Math.round((inv.speedFactor ?? 1) * 100)]);
     if (this._c.invSig === sig) return;
     this._c.invSig = sig;
-    const cell = (ic, n, name, tip = ic) => `<li class="hud-cell${n ? '' : ' is-zero'}" data-tip="${tip}" tabindex="-1"><span class="hud-cell-ic">${icon(ic)}</span><span class="hud-cell-n">${n ?? ''}</span><span class="sr">${esc(name)}</span></li>`;
+    const cell = (ic, n, name, tip = ic, drop = null) => `<li class="hud-cell${n ? '' : ' is-zero'}" data-tip="${tip}" ${drop ? `draggable="true" data-drop-kind="${drop}"` : ''} tabindex="-1"><span class="hud-cell-ic">${icon(ic)}</span><span class="hud-cell-n">${n ?? ''}</span><span class="sr">${esc(name)}</span></li>`;
     const fruitCounts = {};
     for (const f of inv.fruit || []) fruitCounts[f] = (fruitCounts[f] || 0) + 1;
     const loot = inv.loot || {}, store = inv.store || {};
     const gear = [
-      cell('spear', inv.spear ? `${inv.spearHealth ?? 100}%` : 0, 'Spear health'),
-      ...['pistol', 'rifle'].map(k => cell(k, `${inv.guns?.[k]?.loaded ?? 0}/${inv.guns?.[k]?.reserve ?? 0}`, k === 'pistol' ? 'Pistol' : 'Assault rifle')),
-      cell('arrow', `${inv.arrows ?? 0}/${inv.maxArrows ?? CONFIG.weapons.bow.maxArrows}`, 'Arrows'),
-      cell('trap', inv.traps ?? 0, 'Traps'),
-      cell('meat', inv.baits ?? 0, 'Bait', 'bait'),
-      ...FRUIT_KEYS.map((k) => cell(k, fruitCounts[k] || 0, fruitName(k))),
+      cell('spear', inv.spear ? `${inv.spearHealth ?? 100}%` : 0, 'Spear health', 'spear', inv.spear ? 'spear' : null),
+      ...['pistol', 'rifle'].map(k => cell(k, inv.guns?.[k]?.owned === false ? 0 : `${inv.guns?.[k]?.loaded ?? 0}/${inv.guns?.[k]?.reserve ?? 0}`, k === 'pistol' ? 'Pistol' : 'Assault rifle', k, inv.guns?.[k] && inv.guns[k].owned !== false ? k : null)),
+      cell('arrow', `${inv.arrows ?? 0}/${inv.maxArrows ?? CONFIG.weapons.bow.maxArrows}`, 'Arrows', 'arrow', inv.arrows > 0 ? 'arrow' : null),
+      cell('trap', inv.traps ?? 0, 'Traps', 'trap', inv.traps > 0 ? 'trap' : null),
+      ...FRUIT_KEYS.map((k) => cell(k, fruitCounts[k] || 0, fruitName(k), k, fruitCounts[k] > 0 ? k : null)),
     ].join('');
-    const carried = LOOT_KEYS.map((k) => cell(k, loot[k] || 0, lootName(k))).join('');
+    const carried = LOOT_KEYS.map((k) => cell(k, loot[k] || 0, lootName(k), k, loot[k] > 0 ? k : null)).join('');
     const stored = LOOT_KEYS.map((k) => cell(k, store[k] || 0, lootName(k))).join('');
     const sf = inv.speedFactor ?? 1;
     const need = CONFIG.mission || {};
@@ -565,11 +597,12 @@ export class Hud {
           <h3>Gear &amp; fruit</h3><ul class="hud-grid">${gear}</ul>
           <h3>Carried loot</h3><ul class="hud-grid">${carried}</ul>
           <p class="hud-inv-stat">${icon('weight')} Load <b class="${(inv.carryWeight || 0) >= maxCarry ? 'is-slow' : ''}">${Math.round((inv.carryWeight || 0) * 10) / 10} / ${maxCarry}</b> · Speed <b class="${sf < 0.95 ? 'is-slow' : ''}">${Math.round(sf * 100)}%</b></p>
-          <p class="hud-inv-note">Hover an item to see what it is for.</p>
+          <p class="hud-inv-note">Drag a stack outside the inventory to drop it. Scroll to switch equipment.</p>
+          <div class="hud-inv-drop" data-world-drop>Drop here to place items on the ground</div>
         </div>
         <div class="hud-inv-store">
           <h3>${icon('home')} Hut store</h3><ul class="hud-grid">${stored}</ul>
-          <p class="hud-inv-note">Mission needs ${need.requiredMeat ?? 3} meat and ${need.requiredHide ?? 1} hide in the store.</p>
+          <p class="hud-inv-note">Drag carried loot here to deposit it near a hut drop-off. Mission needs ${need.requiredMeat ?? 3} meat and ${need.requiredHide ?? 1} hide in the store.</p>
         </div>
       </div>`;
   }

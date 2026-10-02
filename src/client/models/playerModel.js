@@ -424,7 +424,6 @@ const HELD = {
     return g;
   },
   trap: () => { const m = mesh(trapGeometry(false)); m.scale.setScalar(0.35); return m; },
-  bait: () => mesh(meatGeometry(), MAT.glossy),
   fruit: null,
 };
 
@@ -528,7 +527,6 @@ export class PlayerModel {
     if (!this.held[name]) {
       const m = HELD[name]();
       if (name === 'spear') m.rotation.set(-Math.PI / 2, 0, 0);
-      if (name === 'bait') m.position.set(0, -0.05, 0);
       if (name === 'bow' || name === 'trap' || name === 'pistol' || name === 'rifle') this.toolRig.add(m);
       else this.hand.add(m);
       this.held[name] = m;

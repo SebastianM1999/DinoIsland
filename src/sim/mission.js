@@ -52,7 +52,7 @@ export class Mission {
 
   /** Extra inventory capacity earned from completed contracts. */
   bonus() {
-    const b = { arrows: 0, fruit: 0, carry: 0, traps: 0, baits: 0 };
+    const b = { arrows: 0, fruit: 0, carry: 0, traps: 0 };
     CONTRACTS.forEach((def, i) => { if (this.contracts[i].done) b[def.reward.cap] += def.reward.amount; });
     return b;
   }

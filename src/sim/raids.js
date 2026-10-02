@@ -14,6 +14,7 @@ import { EV, DS } from '../shared/protocol.js';
 import { BASE_LOCAL, PALISADE_R, TOWER_SLOTS, plotPoint } from '../shared/base.js';
 import { angleDiff } from '../shared/rng.js';
 import { findPath } from './pathfind.js';
+import { updateRaptorFear } from './ai/raptor.js';
 
 export const RAID = {
   first: 240,              // seconds after the camp stands until the first raid
@@ -237,6 +238,7 @@ export function raiderStep(sys, d, dt) {
     return true;
   }
   // somebody hit it: fight back while they stay close
+  if (d.type === 'raptor' && updateRaptorFear(d, sys, dt)) return true;
   let foe = r.foe != null ? w.players.get(r.foe) : null;
   if (foe && (!foe.alive || foe.creative || sys.distTo(d, foe.x, foe.z) > 22)) { r.foe = null; foe = null; }
   if (foe) {
