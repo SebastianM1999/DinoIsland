@@ -68,6 +68,8 @@ export function buildGLBDino(type) {
   model.rotation.y = spec.yaw;
   model.position.y = -template.box.min.y * model.scale.y;
   root.add(tilt); tilt.add(body); body.add(model);
+  // Flyers pitch and bank about the torso instead of the toes.
+  if (spec.pivot) { body.position.y = spec.pivot; model.position.y -= spec.pivot; }
   const byName = new Map();
   model.traverse(o => byName.set(o.name.replace(/[.\s]/g, ''), o));
   const find = name => byName.get(name.replace(/[.\s]/g, ''));
@@ -139,6 +141,7 @@ export class GLBDinoAnimator {
       return [state, action];
     }));
     this.state = null; this.phase = Math.random(); this.dead = 0; this.trapped = 0;
+    this.lastY = null; this.vy = 0; this.bank = 0;
     this.c = {}; this.time = 0; this.tailAngle = 0; this.tailVelocity = 0;
     this.layerBones = [...new Set([...rig.neck, rig.head, rig.jaw, ...rig.tail].filter(Boolean))];
     this.bases = new Map();
@@ -157,7 +160,7 @@ export class GLBDinoAnimator {
   update(dt, input = {}) {
     dt = clamp(dt, 0, .1);
     const { speed = 0, dist = speed * dt, yawRate = 0, dead = false, trapped = false,
-      pose = {}, groundAt, groundPitch = 0, lookTarget, hurt = 0 } = input;
+      pose = {}, groundAt, groundPitch = 0, lookTarget, hurt = 0, airborne = false } = input;
     const r = this.rig, spec = r.spec;
     // Remove last frame's overlays before the mixer writes its base pose.
     for (const [bone, base] of this.bases) { bone.quaternion.copy(base.q); bone.position.copy(base.p); }
@@ -168,6 +171,7 @@ export class GLBDinoAnimator {
       this.c[k] = damp(this.c[k] || 0, pose[k] || 0, dt);
     let next = dead ? 'death' : pose.attack || pose.tailSwing ? 'attack'
       : trapped || speed < .08 ? 'idle' : speed > spec.runThreshold || pose.charge ? 'run' : 'walk';
+    if (spec.flyer) next = this.flightState(dt, { dead, trapped, pose, airborne, next });
     // Additional provider clips need only catalog entries; Quaternius uses overlays.
     if (!dead && !trapped && next !== 'attack') {
       if (hurt > .5 && this.actions.hurt) next = 'hurt';
@@ -185,7 +189,7 @@ export class GLBDinoAnimator {
       if (previous) { previous.fadeOut(.18); action.fadeIn(.18); }
       this.state = next;
     }
-    if (next === 'walk' || next === 'run') {
+    if (!spec.flyer && (next === 'walk' || next === 'run')) {
       const stride = next === 'walk' ? spec.walkStride : spec.runStride;
       const action = this.actions[next];
       const cadence = Math.min(Math.max(0, speed) / stride, spec.maxCadence);
@@ -199,9 +203,19 @@ export class GLBDinoAnimator {
       base.q.copy(bone.quaternion); base.p.copy(bone.position);
     }
     const live = 1 - this.dead;
-    r.body.rotation.x = damp(r.body.rotation.x, clamp(groundPitch, -.35, .35) * live, dt);
-    r.body.rotation.z = Math.sin(this.time * 22) * .035 * hurt * live;
-    r.tilt.rotation.z = Math.sin(this.time * 8) * .06 * this.trapped;
+    if (spec.flyer) {
+      // Nose follows the flight path (climb up, dive down); bank into turns. Level once dead.
+      const flying = airborne && !dead;
+      const pathPitch = clamp(Math.atan2(this.vy, Math.max(speed, 2)) * .8, -.9, .45);
+      r.body.rotation.x = damp(r.body.rotation.x, flying ? pathPitch : 0, dt, 5);
+      this.bank = damp(this.bank, flying ? clamp(yawRate * .35, -.6, .6) : 0, dt, 4);
+      r.body.rotation.z = Math.sin(this.time * 22) * .035 * hurt * live;
+      r.tilt.rotation.z = this.bank;
+    } else {
+      r.body.rotation.x = damp(r.body.rotation.x, clamp(groundPitch, -.35, .35) * live, dt);
+      r.body.rotation.z = Math.sin(this.time * 22) * .035 * hurt * live;
+      r.tilt.rotation.z = Math.sin(this.time * 8) * .06 * this.trapped;
+    }
     // Graze/alert/roar are overlays because this pack has no dedicated clips.
     r.root.updateMatrixWorld(true);
     r.root.getWorldQuaternion(this.rootQuaternion);
@@ -233,6 +247,25 @@ export class GLBDinoAnimator {
     // foot targets are not knee children; solving that chain again twists legs.
     // Ground pitch follows the terrain through the body above, retaining the
     // baked foot poses rather than applying an incompatible second IK solver.
+  }
+  /**
+   * Clip for a flyer. Alive in the air: dive when diving, otherwise flap while climbing, glide while
+   * sinking and alternate both when level. Dead: the Fall tumble loops while it is still dropping
+   * (the server simulates the fall) and the Death impact plays once it is down. On the ground alive
+   * (preview, never in play) it hovers ('idle').
+   */
+  flightState(dt, { dead, trapped, pose, airborne, next }) {
+    const y = this.rig.root.position.y;
+    if (this.lastY !== null && dt > 0) this.vy = damp(this.vy, (y - this.lastY) / dt, dt, 6);
+    this.lastY = y;
+    // Latch the landing: a carcass skimming a ridge between server ticks must not replay the impact.
+    this.landed = dead && (this.landed || !airborne);
+    if (dead) return this.landed ? 'death' : 'fall';
+    if (next === 'attack' || trapped || !airborne) return next === 'attack' ? 'attack' : 'idle';
+    if (pose.dive) return 'dive';
+    if (this.vy > .4) return 'fly';
+    if (this.vy < -.9) return 'glide';
+    return (this.time + this.phase * 5.2) % 5.2 < 2.6 ? 'fly' : 'glide';
   }
   dispose() { this.mixer.stopAllAction(); this.mixer.uncacheRoot(this.rig.model); }
 }

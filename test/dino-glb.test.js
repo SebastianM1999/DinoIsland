@@ -16,7 +16,7 @@ test('missing GLBs fall back and failed downloads are retried', async () => {
   try {
     assert.ok((await preloadDinoModels()).every(r => !r.loaded));
     assert.ok((await preloadDinoModels()).every(r => !r.loaded));
-    assert.equal(calls, 8);
+    assert.equal(calls, 10);
     assert.ok(!SPECIES.raptor.build().isGLB);
   } finally { globalThis.fetch = originalFetch; console.warn = originalWarn; }
 });
@@ -36,12 +36,12 @@ test('GLBs keep combat, independent skins, semantic clips and terrain animation 
     const animator = new DinoAnimator(a, SPECIES[type].anim), other = SPECIES[type].createAnimator(b);
     assert.notEqual(animator.mixer, other.mixer);
     // Blender-authored species have opening jaws and eyes built into their meshes.
-    const authored = ['raptor', 'brachio', 'trex', 'stego'].includes(type);
+    const authored = ['raptor', 'brachio', 'trex', 'stego', 'ptera'].includes(type);
     assert.equal(!!a.jaw, authored, `${type}: preserve the existing head anatomy`);
     if (!authored) assert.ok(a.model.getObjectByName('FaceEyes'), `${type}: missing visible eyes`);
     assert.equal(a.model.getObjectByName('DetailedFace'), undefined, 'no replacement facial geometry');
     if (type !== 'brachio') {
-      const sourceTriangles = { raptor: 53128, trex: 47633, stego: 51228 };
+      const sourceTriangles = { raptor: 53128, trex: 47633, stego: 51228, ptera: 44878 };
       let skinTriangles = 0;
       a.model.traverse(o => { if (o.isSkinnedMesh) skinTriangles += o.geometry.index.count / 3; });
       assert.equal(skinTriangles, sourceTriangles[type], 'integrated head/body surface remains complete');
@@ -65,7 +65,7 @@ test('GLBs keep combat, independent skins, semantic clips and terrain animation 
     assert.ok(Math.abs(box.y - spec.height) < .01);
     assert.ok(Math.abs(box.z - spec.length) < .01);
     const zones = new Set(a.hitZones.map(hz => hz.zone));
-    for (const zone of ['head', 'neck', 'body', 'leg', 'tail']) assert.ok(zones.has(zone));
+    for (const zone of ['head', 'neck', 'body', spec.flyer ? 'wing' : 'leg', 'tail']) assert.ok(zones.has(zone), `${type}: ${zone} zone`);
     const states = [{}, { speed: 1 }, { speed: 8 }, { pose: { attack: 1 } },
       { pose: { roar: 1 } }, { pose: { headDown: 1 } }, { pose: { alert: 1, neckRaise: 1 } },
       { speed: 8, pose: { charge: 1 } }, { pose: { tailSwing: 1 } }, { trapped: true }, { dead: true }, {}];
@@ -85,20 +85,35 @@ test('GLBs keep combat, independent skins, semantic clips and terrain animation 
       }
     }
     assert.equal(animator.state, 'idle', 'death can be reset in preview');
-    animator.update(.1, { speed: 1 });
-    assert.equal(animator.state, 'walk');
-    assert.ok(Math.abs(animator.actions.walk.timeScale - animator.actions.walk.getClip().duration / spec.walkStride) < 1e-6);
-    // An independent mixer must give the same leg rotations. Terrain overlays
-    // must not run a second solver on the pack's already-baked IK joints.
-    const reference = new THREE.AnimationMixer(b.model);
-    const action = reference.clipAction(b.clips.walk).play();
-    for (let i = 0; i < 60; i++) animator.update(1 / 60, { speed: 1, groundAt: () => 2 });
-    action.time = animator.actions.walk.time; reference.update(0);
-    for (let i = 0; i < a.legChains.length; i++) {
-      for (const joint of ['upper', 'lower', 'foot']) assert.ok(a.legChains[i][joint].quaternion.angleTo(b.legChains[i][joint].quaternion) < .001,
-        `${type}: ${joint} diverged from baked pose`);
+    if (spec.flyer) {
+      // Flight clips by state: flap/glide in the air, dive, Fall while dropping dead, Death on impact.
+      for (let i = 0; i < 30; i++) animator.update(1 / 60, { speed: 11, airborne: true });
+      assert.ok(['fly', 'glide'].includes(animator.state), `${type}: flies (${animator.state})`);
+      for (let i = 0; i < 30; i++) animator.update(1 / 60, { speed: 20, airborne: true, pose: { dive: 1 } });
+      assert.equal(animator.state, 'dive');
+      for (let i = 0; i < 30; i++) animator.update(1 / 60, { dead: true, airborne: true });
+      assert.equal(animator.state, 'fall', 'killed in the air: tumble while falling');
+      animator.update(1 / 60, { dead: true });
+      assert.equal(animator.state, 'death', 'impact once down');
+      assert.ok(Math.abs(animator.actions.death.time - 1 / 60) < 1e-6, 'impact starts from its first frame');
+      animator.update(1 / 60, { dead: true, airborne: true });
+      assert.equal(animator.state, 'death', 'a landed carcass never goes back to falling');
+    } else {
+      animator.update(.1, { speed: 1 });
+      assert.equal(animator.state, 'walk');
+      assert.ok(Math.abs(animator.actions.walk.timeScale - animator.actions.walk.getClip().duration / spec.walkStride) < 1e-6);
+      // An independent mixer must give the same leg rotations. Terrain overlays
+      // must not run a second solver on the pack's already-baked IK joints.
+      const reference = new THREE.AnimationMixer(b.model);
+      const action = reference.clipAction(b.clips.walk).play();
+      for (let i = 0; i < 60; i++) animator.update(1 / 60, { speed: 1, groundAt: () => 2 });
+      action.time = animator.actions.walk.time; reference.update(0);
+      for (let i = 0; i < a.legChains.length; i++) {
+        for (const joint of ['upper', 'lower', 'foot']) assert.ok(a.legChains[i][joint].quaternion.angleTo(b.legChains[i][joint].quaternion) < .001,
+          `${type}: ${joint} diverged from baked pose`);
+      }
+      reference.stopAllAction();
     }
-    reference.stopAllAction();
     for (let i = 0; i < 120; i++) animator.update(1 / 60, {});
     if (a.jaw) {
     const closed = a.jaw.quaternion.clone();
@@ -114,7 +129,7 @@ test('GLBs keep combat, independent skins, semantic clips and terrain animation 
         `${type}: knee snaps during run`);
       previous = a.legChains.map(leg => leg.lower.quaternion.clone());
     }
-    assert.ok(animator.actions.run.timeScale / a.clips.run.duration <= spec.maxCadence + 1e-6);
+    if (!spec.flyer) assert.ok(animator.actions.run.timeScale / a.clips.run.duration <= spec.maxCadence + 1e-6);
     // Dead pose clamps instead of looping back to standing.
     for (let i = 0; i < 180; i++) animator.update(1 / 60, { dead: true });
     const deathTime = animator.actions.death.time;
@@ -122,7 +137,6 @@ test('GLBs keep combat, independent skins, semantic clips and terrain animation 
     assert.equal(animator.actions.death.time, deathTime);
     animator.dispose(); other.dispose();
   }
-  assert.equal(SPECIES.ptera.build().isGLB, undefined);
 });
 
 test('preload reuses successfully registered models', async () => {

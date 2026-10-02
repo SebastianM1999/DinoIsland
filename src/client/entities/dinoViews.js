@@ -23,7 +23,7 @@ export const SPECIES = {
   brachio: { build: buildBrachio, anim: BRACHIO_ANIM, extraUpdate: brachioExtraUpdate, barHeight: 13.8, heavy: true },
   stego: { build: buildStego, anim: STEGO_ANIM, extraUpdate: stegoExtraUpdate, barHeight: 4.2, heavy: true },
   raptor: { build: buildRaptor, anim: RAPTOR_ANIM, extraUpdate: raptorExtraUpdate, barHeight: 1.8 },
-  ptera: { build: buildPtera, anim: PTERA_ANIM, extraUpdate: pteraExtraUpdate, barHeight: 1.8 },
+  ptera: { build: buildPtera, anim: PTERA_ANIM, extraUpdate: pteraExtraUpdate, barHeight: 2.3 },
   trex: { build: buildTrex, anim: TREX_ANIM, extraUpdate: trexExtraUpdate, barHeight: 6.4, heavy: true },
 };
 
@@ -127,6 +127,7 @@ class DinoView {
       groundPitch: -groundPitch,
       pose,
       hurt: this.flinch,
+      airborne: this.type === 'ptera' && !this.grounded(),   // flyers: flight clips, Fall until impact
       lookTarget: this.st === DS.ALERT || this.attackT > 0 || this.st === DS.CHARGE
         ? this.ctx.camera.position : null,
     });
@@ -155,6 +156,7 @@ class DinoView {
       case DS.ROAR: p.roar = 1; p.jaw = 1; break;
       case DS.RUN: p.charge = 0.3; break;
       case DS.TRAPPED: p.jaw = 0.6; break;
+      case DS.DIVE: p.dive = 1; break;
     }
     if (this.attackT > 0) { p.attack = 1; p.jaw = 1; }
     if (this.roarT > 0) { p.roar = 1; p.jaw = 1; }

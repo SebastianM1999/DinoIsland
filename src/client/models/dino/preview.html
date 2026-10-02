@@ -88,7 +88,7 @@
     let R = cameraRadius();
     const _fp = new THREE.Vector3();
 
-    const STATES = ['idle', 'walk', 'run', 'attack', 'roar', 'graze', 'alert', 'charge', 'tail', 'trapped', 'dead', 'fly', 'dive', 'landed'];
+    const STATES = ['idle', 'walk', 'run', 'attack', 'roar', 'graze', 'alert', 'charge', 'tail', 'trapped', 'dead', 'fall', 'fly', 'dive', 'landed'];
     let state = qs.get('state') || 'walk';
     let view = qs.get('view') || 'side';
     let orbit = qs.get('orbit') === '1';
@@ -170,7 +170,7 @@
       for (const [name, button] of Object.entries(speciesButtons)) button.setAttribute('aria-pressed', name === type);
       updateInfo(); syncURL();
     }
-    const DSMAP = { idle: 0, walk: 1, run: 2, alert: 4, attack: 5, charge: 6, tail: 7, trapped: 9, dead: 10, fly: 11, dive: 12, landed: 13, roar: 14, graze: 15 };
+    const DSMAP = { idle: 0, walk: 1, run: 2, alert: 4, attack: 5, charge: 6, tail: 7, trapped: 9, dead: 10, fall: 10, fly: 11, dive: 12, landed: 13, roar: 14, graze: 15 };
     function loop() {
       requestAnimationFrame(loop);
       const rawDelta = clock.getDelta();
@@ -186,13 +186,18 @@
       if (state === 'charge') pose.charge = 1;
       if (state === 'tail') pose.tailSwing = (t % 1.6) < 0.6 ? 1 : 0;
       if (state === 'trapped') pose.jaw = 0.6;
-      anim.update(dt, { speed, dist: speed * dt, yawRate: 0, dead: state === 'dead', trapped: state === 'trapped', groundAt: () => 0, groundPitch: 0, pose });
+      // flyers: fly/dive are airborne; 'fall' = killed in the air, drops for 2 s, then the impact
+      if (state === 'dive') pose.dive = 1;
+      const airborne = state === 'fly' || state === 'dive' || (state === 'fall' && (t % 4) < 2);
+      if (state === 'fall') rig.root.position.y = airborne ? 3 * (1 - ((t % 4) / 2) ** 2) : 0;
+      else if (rig.root.position.y) rig.root.position.y = 0;
+      anim.update(dt, { speed, dist: speed * dt, yawRate: 0, dead: state === 'dead' || state === 'fall', trapped: state === 'trapped', groundAt: () => 0, groundPitch: 0, pose, airborne });
       fakeView.st = DSMAP[state] ?? 0;
       fakeView.spd = speed;
       fakeView.time = t;
       extra?.(fakeView, dt);
       for (const copy of copies) {
-        copy.anim.update(dt, { speed, dist: speed * dt, yawRate: 0, dead: state === 'dead', trapped: state === 'trapped', groundAt: () => 0, groundPitch: 0, pose });
+        copy.anim.update(dt, { speed, dist: speed * dt, yawRate: 0, dead: state === 'dead' || state === 'fall', trapped: state === 'trapped', groundAt: () => 0, groundPitch: 0, pose, airborne });
         copy.st = fakeView.st; copy.spd = speed;
         extra?.(copy, dt);
       }

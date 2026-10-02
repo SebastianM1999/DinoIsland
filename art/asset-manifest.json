@@ -15,6 +15,13 @@
       "triangles": 47633
     },
     {
+      "id": "dino-ptera",
+      "file": "assets/models/dinos/ptera.glb",
+      "source": "Project-authored Pteranodon; art/sources/ptera/ptera.blend (build scripts in its text blocks)",
+      "license": "Project source",
+      "triangles": 44878
+    },
+    {
       "id": "dino-stego",
       "file": "assets/models/dinos/stego.glb",
       "source": "Project-authored Stegosaurus; art/sources/stego/stego.blend (build scripts in its text blocks)",

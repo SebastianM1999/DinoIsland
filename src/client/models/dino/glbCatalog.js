@@ -23,6 +23,8 @@ export const GLB_DINOS = {
   trex: model('trex', 'TRex', 5.919, 11, 4.819, 8.095),
   stego: model('stego', 'Stegosaurus', 3.758, 7.9, 1.414, 3.414, true),
   brachio: model('brachio', 'Brachiosaurus', 13.007, 18.514, 2.714, 5.333, true),
+  // Flyer: strides are unused (GLBDinoAnimator picks flight clips by state, not by ground speed).
+  ptera: model('ptera', 'Pteranodon', 1.855, 2.56, 1, 1),
 };
 // Project brachio (art/sources/brachio/brachio.blend).
 GLB_DINOS.brachio.bones = { ...GLB_DINOS.brachio.bones,
@@ -84,6 +86,30 @@ GLB_DINOS.stego.extraHitZones = [
   ['tail', 'Tail3', 0.0, 1.82, -2.59, 0.42],
   ['tail', 'Tail4', 0.0, 1.71, -3.18, 0.31],
 ].map(([zone, bone, x, y, fwd, radius]) => ({ zone, bone, at: [x, y, fwd], radius }));
+// Project ptera (art/sources/ptera/ptera.blend): a flyer. Fly/Glide/Dive while alive in the air, Fall
+// while dead and still falling (the server simulates the drop), Death = the ground impact.
+GLB_DINOS.ptera.flyer = true;
+GLB_DINOS.ptera.pivot = 1.0;                 // pitch/bank about the torso, not the toes
+GLB_DINOS.ptera.clips = { ...GLB_DINOS.ptera.clips, walk: 'Pteranodon_Fly', run: 'Pteranodon_Glide',
+  fly: 'Pteranodon_Fly', glide: 'Pteranodon_Glide', dive: 'Pteranodon_Dive', fall: 'Pteranodon_Fall' };
+GLB_DINOS.ptera.bones = { ...GLB_DINOS.ptera.bones,
+  jaw: 'Jaw', neck: ['Neck1', 'Neck2'], spine: ['Body', 'Shoulders'], tail: ['Tail1', 'Tail2'],
+  legs: [], feet: [], knees: [] };
+// Membrane hit spheres (game metres: [bone, x, y, forward, radius]), mid-chord along each wing.
+GLB_DINOS.ptera.extraHitZones = [
+  ['WingLowL', -0.57, 1.1, -0.19, 0.33],
+  ['WingLowL', -1.05, 1.11, -0.13, 0.45],
+  ['WingHandL', -1.53, 1.12, -0.17, 0.42],
+  ['WingHandL', -2.0, 1.12, -0.25, 0.32],
+  ['WingFingerL', -2.47, 1.11, -0.35, 0.22],
+  ['WingFingerL', -2.94, 1.1, -0.45, 0.18],
+  ['WingLowR', 0.57, 1.1, -0.19, 0.33],
+  ['WingLowR', 1.05, 1.11, -0.13, 0.45],
+  ['WingHandR', 1.53, 1.12, -0.17, 0.42],
+  ['WingHandR', 2.0, 1.12, -0.25, 0.32],
+  ['WingFingerR', 2.47, 1.11, -0.35, 0.22],
+  ['WingFingerR', 2.94, 1.1, -0.45, 0.18],
+].map(([bone, x, y, fwd, radius]) => ({ zone: 'wing', bone, at: [x, y, fwd], radius }));
 // Cycles per second, bounded independently of unusually short source run strides.
 GLB_DINOS.raptor.maxCadence = 2.4;
 GLB_DINOS.trex.maxCadence = 1.25;
