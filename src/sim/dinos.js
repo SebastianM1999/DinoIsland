@@ -14,6 +14,7 @@ import { stegoBrain } from './ai/stego.js';
 import { raptorBrain } from './ai/raptor.js';
 import { pteraBrain } from './ai/ptera.js';
 import { trexBrain } from './ai/trex.js';
+import { raiderStep } from './raids.js';
 
 const BRAINS = { brachio: brachioBrain, stego: stegoBrain, raptor: raptorBrain, ptera: pteraBrain, trex: trexBrain };
 const r2 = (v) => Math.round(v * 100) / 100;
@@ -187,11 +188,12 @@ export class DinoSystem {
       return false;
     }
     if (t.waterDepthAt(x, z) > (d.type === 'brachio' ? 1.2 : 0.35)) return false;
-    if (t.slopeAt(x, z) > (d.type === 'raptor' ? 0.95 : 0.8)) return false;
+    // raiders (sim/raids.js) scramble up steeper ground to reach a base on high ground
+    if (t.slopeAt(x, z) > (d.raid ? 1.25 : d.type === 'raptor' ? 0.95 : 0.8)) return false;
     if (t.lavaLevelAt(x, z) !== null) return false;
     // the hut / the team's base (shared/base.js safeZone): dinosaurs keep out
     const zone = this.world.safeZone();
-    if (zone && (x - zone.x) ** 2 + (z - zone.z) ** 2 < (zone.r + 10) ** 2) return false;
+    if (zone && !d.raid && (x - zone.x) ** 2 + (z - zone.z) ** 2 < (zone.r + 10) ** 2) return false;
     return Math.abs(x) < CONFIG.world.size / 2 - 20 && Math.abs(z) < CONFIG.world.size / 2 - 20;
   }
 
@@ -432,7 +434,9 @@ export class DinoSystem {
   }
 
   /** True if the player stands in the hut's safe zone (dinosaurs leave them alone). */
-  inSafeZone(p) {
+  /** Is player p in the base's safe zone (for dinosaur d – raiders ignore it)? */
+  inSafeZone(p, d = null) {
+    if (d?.raid) return false;
     const zone = this.world.safeZone();
     return !!zone && (p.x - zone.x) ** 2 + (p.z - zone.z) ** 2 < (zone.r + 6) ** 2;
   }
@@ -469,6 +473,8 @@ export class DinoSystem {
 
   damage(d, amount, zone, byId, weapon) {
     if (!d.alive) return;
+    // a raider (sim/raids.js) turns on whoever attacks it
+    if (d.raid && this.world.players.has(byId)) d.raid.foe = byId;
     // The grove's titan can only be hurt by someone standing inside the grove:
     // shots, throws and stabs from outside stop at the barrier.
     if (d.leash) {
@@ -502,7 +508,7 @@ export class DinoSystem {
     this.world.event(EV.DINO_DIE, { id: d.id, by: byId });
     this.world.toast(`${killer ? killer.name : 'The team'} brought down a ${c.name}!`, 'dino');
     this.world.mission.onDinoKilled(d);
-    this.respawnQueue.push({ type: d.type, at: this.world.now + c.respawn, group: d.group });
+    if (!d.raid) this.respawnQueue.push({ type: d.type, at: this.world.now + c.respawn, group: d.group });
   }
 
   dropCarcassLoot(d) {
@@ -556,7 +562,8 @@ export class DinoSystem {
           }
         }
       } else {
-        BRAINS[d.type].update(d, this, dt);
+        // raiders (sim/raids.js) go for the base; pterosaur raiders keep their brain
+        if (!(d.raid && raiderStep(this, d, dt))) BRAINS[d.type].update(d, this, dt);
         // turning on the spot can swing the body into a trunk: push it back out
         if (d.type !== 'ptera' && this.resolveBody(d, d.x, d.z, d.yaw)) { d.x = push.x; d.z = push.z; }
         if (d.type !== 'ptera') this.#unstick(d);

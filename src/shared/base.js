@@ -90,6 +90,20 @@ export function towerCost(kind, level, levelIndex) {
   return Object.fromEntries(Object.entries(cost).map(([key, n]) => [key, Math.ceil(n * k)]));
 }
 
+/** Repair after a raid: per damaged part (the base itself, each tower), scaled per island. */
+export const REPAIR_COST = { base: { hide: 2, bones: 3 }, tower: { hide: 1, bones: 2 } };
+
+/** Total repair cost for everything damaged right now (null: nothing to repair). */
+export function repairCost(base, levelIndex) {
+  const k = 1 + 0.25 * Math.max(0, levelIndex - 1);
+  const parts = [...(base.damaged ? [REPAIR_COST.base] : []), ...base.towers.filter((t) => t.damaged).map(() => REPAIR_COST.tower)];
+  if (!parts.length) return null;
+  const out = {};
+  for (const p of parts) for (const [key, n] of Object.entries(p)) out[key] = (out[key] || 0) + n;
+  for (const key in out) out[key] = Math.ceil(out[key] * k);
+  return out;
+}
+
 /** Fresh (unbuilt) base state, replicated to clients as-is. */
 export function freshBase() {
   return { plot: null, stage: 0, building: null, hp: 0, maxHp: 0, damaged: false, towers: [] };

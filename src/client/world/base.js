@@ -272,7 +272,7 @@ export function buildBaseView(terrain, layout) {
     for (const geo of o.glow) glow.push(place(geo, pos, [0, rotY, 0]));
   };
 
-  function buildStage(plot, stage, building, towers) {
+  function buildStage(plot, stage, building, towers, damaged) {
     const g = plotGroup(plot);
     plotG = g;
     const std = [], glossy = [], glow = [];
@@ -306,13 +306,19 @@ export function buildBaseView(terrain, layout) {
       // look out of the base until the first shot
       const yaw = Math.atan2(-tx, -tz);
       head.rotation.y = yaw;
+      if (t.damaged) head.rotation.x = -0.7;   // knocked out: the launcher hangs down
       g.add(head);
-      heads.set(t.slot, { head, want: yaw });
+      if (!t.damaged) heads.set(t.slot, { head, want: yaw });
     }
     if (stage === 0 && building) std.push(...borderPegs(style, plot.r - 1));
     addMeshes(g, std, glossy, glow);
 
-    if (stage >= 1) {
+    if (stage >= 1 && damaged) {
+      // wrecked by a raid: the fire is out, dark smoke rises from the camp
+      const smoke = createSmoke([{ x: BASE_LOCAL.tent[0], y: 1.5, z: BASE_LOCAL.tent[1] - 2, count: 14, size: 0.9, rise: 1.3, life: 5, dark: 0.9 }]);
+      g.add(smoke.mesh);
+      fx.push((dt) => smoke.update(Math.min(dt, 0.1)));
+    } else if (stage >= 1) {
       const fire = createFire();
       fire.group.position.set(...at('fire'));
       g.add(fire.group);
@@ -344,13 +350,13 @@ export function buildBaseView(terrain, layout) {
     /** Show the base state (shared/base.js freshBase shape); rebuilds only when something visible changed. */
     setBase(base) {
       const towers = base?.towers || [];
-      const k = `${base?.plot}|${base?.stage}|${base?.building?.stage ?? ''}|${towers.map((t) => `${t.slot}${t.kind}${t.level}`).join(',')}`;
+      const k = `${base?.plot}|${base?.stage}|${base?.building?.stage ?? ''}|${towers.map((t) => `${t.slot}${t.kind}${t.level}${t.damaged ? 'x' : ''}`).join(',')}|${base?.damaged ? 1 : 0}`;
       if (k === key) return;
       key = k;
       clear();
       if (!plots.length) return;
       if (base?.plot == null) buildStakes();
-      else buildStage(plots[base.plot], base.stage, base.building, towers);
+      else buildStage(plots[base.plot], base.stage, base.building, towers, !!base.damaged);
     },
     /** A tower fired (EV.TOWER_SHOT): turn its head and send an arrow / spear flying. */
     shoot(m) {

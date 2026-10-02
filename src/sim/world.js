@@ -25,8 +25,9 @@ import { planIsland } from '../shared/island.js';
 import { levelDef, LEVEL_COUNT } from '../shared/levels.js';
 import { findUnstuckSpot, goodSpot } from './unstuck.js';
 import { nearDino, plausibleZone } from './hitCheck.js';
-import { freshBase, campStations, safeZone as baseSafeZone, hasBasePlots, PLOT_REACH, MAX_STAGE, stageCost, BUILD_TIME, BASE_STAGES, applyBaseColliders, baseSpawnPoints, TOWERS, TOWER_SLOTS, towerCost } from '../shared/base.js';
+import { freshBase, campStations, safeZone as baseSafeZone, hasBasePlots, PLOT_REACH, MAX_STAGE, stageCost, BUILD_TIME, BASE_STAGES, applyBaseColliders, baseSpawnPoints, TOWERS, TOWER_SLOTS, towerCost, repairCost } from '../shared/base.js';
 import { updateTowers } from './towers.js';
+import { Raids } from './raids.js';
 import { insideGrove, mayEnterGrove } from '../shared/grove.js';
 import { RECIPE_BY_ID, upgradeMods, unlockIsland, canAfford } from '../shared/crafting.js';
 
@@ -83,6 +84,7 @@ export class ServerWorld {
     this.relics = this.layout.relics.map((r) => ({ ...r, found: false, byName: null }));
     this.base = freshBase();          // the team's own base (islands 2+, see shared/base.js)
     this._safe = undefined;
+    this.raids = new Raids(this);     // raids on the base (sim/raids.js)
     this.dinos = new DinoSystem(this);
     this.log(`island ${level + 1} "${levelDef(level).name}" variant ${variant}`);
   }
@@ -348,6 +350,7 @@ export class ServerWorld {
     const deny = (text) => this.toast(text, 'crate', p.id);
     if (!p.alive || !hasBasePlots(this.layout)) return;
     if (m.op === 'tower' || m.op === 'towerUp') return this.towerAction(p, m);
+    if (m.op === 'repair') return this.repairBase(p);
     if (b.building) return deny('The team is already building – wait for it to finish');
     let plot, stage;
     if (m.op === 'build') {
@@ -409,6 +412,23 @@ export class ServerWorld {
     this.event(EV.STORE, { store: this.store });
     this.event(EV.BASE, { base: this.publicBase() });
     this.toast(`${p.name} built: ${level >= 2 ? T.upgrade.name : T.name}`, T.icon);
+  }
+
+  /** Repair the base and every knocked-out tower after a raid (one payment for all). */
+  repairBase(p) {
+    const b = this.base;
+    const plot = b.plot != null ? this.layout.basePlots[b.plot] : null;
+    if (!plot || !this.near(p, plot.x, plot.z, plot.r + PLOT_REACH)) return;
+    const cost = repairCost(b, this.levelIndex);
+    if (!cost) return this.toast('Nothing to repair', 'crate', p.id);
+    if (!canAfford({ cost }, this.store)) return this.toast('Not enough loot in the hut store', 'crate', p.id);
+    for (const [k, n] of Object.entries(cost)) this.store[k] -= n;
+    if (b.damaged) { b.damaged = false; b.hp = b.maxHp; }
+    for (const t of b.towers) if (t.damaged) { t.damaged = false; t.hp = t.maxHp; }
+    this._safe = undefined;
+    this.event(EV.STORE, { store: this.store });
+    this.event(EV.BASE, { base: this.publicBase() });
+    this.toast(`${p.name} repaired the base`, 'home');
   }
 
   /** A stage under construction is finished: it stands, collides and works. */
@@ -1086,6 +1106,7 @@ export class ServerWorld {
 
     this.dinos.update(dt);
     updateTowers(this, dt);
+    this.raids.update(dt);
     this.dinos.recordHistory(this.now);
     for (const p of this.players.values()) this.resolvePlayerDinos(p);
     this.mission.update(dt);
@@ -1147,6 +1168,7 @@ export class ServerWorld {
       relics: this.relics.map((r) => ({ id: r.id, kind: r.kind, x: r.x, y: r.y, z: r.z, found: r.found })),
       boat: { repaired: this.mission.phase !== 'search' },
       base: this.publicBase(),
+      raid: this.raids.public(),
     };
   }
 }

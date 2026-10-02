@@ -64,7 +64,7 @@ export const ACT = {
   UNSTUCK: 'unstuck',   // { manual? }                         move me to the nearest free spot (auto: client stuck detector,
                         //                                     manual: U key); server-validated and rate-limited
   BUTCHER: 'butcher',   // { dino, stop? }                     start (hold V) / stop butchering a carcass with the knife
-  BASE: 'base',         // { op: 'build', plot } | { op: 'upgrade' } | { op: 'tower', slot, kind } | { op: 'towerUp', slot }
+  BASE: 'base',         // { op: 'build', plot } | { op: 'upgrade' } | { op: 'tower', slot, kind } | { op: 'towerUp', slot } | { op: 'repair' }
                         //                                     build / grow the team's base and its towers (islands 2+)
 };
 
@@ -106,6 +106,7 @@ export const EV = {
   BUTCHERED: 'butchered',   // { id }                            carcass id was butchered (sinks away)
   BASE: 'base',             // { base }                          the team's base changed (see shared/base.js freshBase)
   TOWER_SHOT: 'tshot',      // { slot, kind, o, end, dino }      a base tower fired
+  RAID: 'raid',             // { raid: { phase, dir, left } }    raid announced (warn) / started / over (idle)
 };
 
 /** Player snapshot tuple layout. */

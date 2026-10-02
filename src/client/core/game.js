@@ -206,6 +206,7 @@ export class Game {
       onUpgrade: () => this.net.act(ACT.BASE, { op: 'upgrade' }),
       onTower: (slot, kind) => this.net.act(ACT.BASE, { op: 'tower', slot, kind }),
       onTowerUp: (slot) => this.net.act(ACT.BASE, { op: 'towerUp', slot }),
+      onRepair: () => this.net.act(ACT.BASE, { op: 'repair' }),
       onClose: () => this.input.onPanelToggle('close'),
     });
     this.hud.addPanel('base', { el: this.basePanel.el, onOpen: () => { this.#syncBase(); this.basePanel.onOpen(); } });
@@ -280,6 +281,7 @@ export class Game {
       }
     }
     this.setBase(world.base || freshBase());
+    this.raid = world.raid || { phase: 'idle' };
     this.fruitCounts = world.fruit.slice();
     world.fruit.forEach((count, id) => this.fruitPlants.setCount(id, count));
     this.hud.setPlayer({ name: this.me.name, slot: this.me.slot });
@@ -352,6 +354,13 @@ export class Game {
 
   /** Camp functions available right now (hut on island 1, landing camp + base later). */
   stations() { return campStations(this.layout, this.base, this.layout.level.index); }
+
+  /** A point `dist` m out from the base in the direction a raid comes from. */
+  #raidPoint(dist) {
+    const home = this.stations().home;
+    const a = this.raid?.dir ?? 0;
+    return { x: home.x - Math.sin(a) * dist, y: home.y ?? 0, z: home.z - Math.cos(a) * dist };
+  }
 
   /** E at a building plot's stake (plot index) or at the base flag (-1). */
   openBase(plot = -1) {
@@ -444,6 +453,10 @@ export class Game {
     });
     net.on(`ev:${EV.STORE}`, (m) => { this.store = m.store; this.#syncCrafting(); this.#syncBase(); });
     net.on(`ev:${EV.BASE}`, (m) => this.setBase(m.base));
+    net.on(`ev:${EV.RAID}`, (m) => {
+      this.raid = m.raid;
+      if (m.raid.phase === 'warn') this.audio.play('roar_raptor', { pos: this.#raidPoint(60) });
+    });
     net.on(`ev:${EV.TOWER_SHOT}`, (m) => {
       this.baseView.shoot(m);
       this.audio.play(m.kind === 'arrow' ? 'bow' : 'throw', { pos: { x: m.o[0], y: m.o[1], z: m.o[2] } });
@@ -808,6 +821,11 @@ export class Game {
       { bearing: bearing(this.stations().home.x, this.stations().home.z), kind: 'hut' },
       { bearing: bearing(this.layout.boat.x, this.layout.boat.z), kind: 'boat' },
     ];
+    // an announced / running raid: where it comes from
+    if (this.raid && this.raid.phase !== 'idle') {
+      const r = this.#raidPoint(120);
+      list.push({ bearing: bearing(r.x, r.z), kind: 'dino' });
+    }
     for (const rp of this.remotes.map.values()) {
       list.push({ bearing: bearing(rp.pos.x, rp.pos.z), kind: 'player', color: CONFIG.playerColors[rp.slot % 4] });
     }

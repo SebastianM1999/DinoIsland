@@ -4,7 +4,7 @@
 
 import { CONFIG } from '../../shared/config.js';
 import { canAfford } from '../../shared/crafting.js';
-import { BASE_STAGES, MAX_STAGE, PLOT_KINDS, TOWERS, TOWER_SLOTS, stageCost, towerCost } from '../../shared/base.js';
+import { BASE_STAGES, MAX_STAGE, PLOT_KINDS, TOWERS, TOWER_SLOTS, stageCost, towerCost, repairCost } from '../../shared/base.js';
 import { icon } from './icons.js';
 
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -14,9 +14,10 @@ export class BasePanel {
    * @param {{ onBuild: (plot: number) => void, onUpgrade: () => void, onTower: (slot: number, kind: string) => void,
    *   onTowerUp: (slot: number) => void, onClose: () => void }} opts
    */
-  constructor({ onBuild, onUpgrade, onTower, onTowerUp, onClose }) {
+  constructor({ onBuild, onUpgrade, onTower, onTowerUp, onRepair, onClose }) {
     this.onBuild = onBuild;
     this.onUpgrade = onUpgrade;
+    this.onRepair = onRepair;
     this.onTower = onTower;
     this.onTowerUp = onTowerUp;
     this.onClose = onClose;
@@ -32,6 +33,7 @@ export class BasePanel {
       else if (act === 'upgrade') this.onUpgrade?.();
       else if (act === 'tower') this.onTower?.(Number(b.dataset.slot), b.dataset.kind);
       else if (act === 'towerUp') this.onTowerUp?.(Number(b.dataset.slot));
+      else if (act === 'repair') this.onRepair?.();
       else if (act === 'close') this.onClose?.();
     });
     this.timer = null;
@@ -72,6 +74,20 @@ export class BasePanel {
       <span class="craft-costs">${done ? '' : this.costHtml(cost)}</span>
       <button type="button" class="wd-btn${next ? ' wd-primary' : ''}" data-act="${stage === 1 ? 'build' : 'upgrade'}"${canStart ? '' : ' disabled'}>${done ? icon('check') : ''}${label}</button>
     </li>`;
+  }
+
+  /** Health of the base, and a repair button once a raid has knocked something out. */
+  healthRow() {
+    const base = this.state.base;
+    if (!base || base.stage < 1) return '';
+    const cost = repairCost(base, this.state.island - 1);
+    const pct = base.maxHp ? Math.round((base.hp / base.maxHp) * 100) : 0;
+    const broken = [base.damaged ? 'the base' : null, ...base.towers.filter((t) => t.damaged).map((t) => `tower ${t.slot + 1}`)].filter(Boolean);
+    const sub = broken.length ? `Damaged: ${broken.join(', ')}. No healing or safe zone until it is repaired.` : 'Raids wear it down; between raids it patches itself up.';
+    return `<li class="craft-row${broken.length ? ' is-hurt' : ''}"><span class="craft-ic">${icon('heart')}</span>
+      <span class="craft-txt"><b>Base health <em>${pct}%</em></b><span class="base-hp"><i style="width:${pct}%"></i></span><small>${esc(sub)}</small></span>
+      <span class="craft-costs">${cost ? this.costHtml(cost) : ''}</span>
+      <button type="button" class="wd-btn${cost ? ' wd-primary' : ''}" data-act="repair"${cost && canAfford({ cost }, this.state.store) ? '' : ' disabled'}>Repair</button></li>`;
   }
 
   /** One row per tower spot: locked, free (choose a tower) or built (upgrade). */
@@ -128,7 +144,7 @@ export class BasePanel {
       </header>
       <p class="base-intro">${intro}</p>
       <div class="craft-stockbar"><span class="craft-stock-label">${icon('home')} Hut store</span>${stock}</div>
-      <ul class="craft-list">${rows}</ul>
+      <ul class="craft-list">${this.healthRow()}${rows}</ul>
       ${this.towerRows()}
       <footer class="wd-foot"><button type="button" class="wd-btn" data-act="close">Close</button></footer>`;
   }

@@ -738,28 +738,43 @@ export function planIsland(levelIndex = 0, variant = 1) {
         if (plan.ramps.some((rp) => rp.pts.some((p) => Math.hypot(p.x - x, p.z - z) < R * 1.6 + 6))) continue;
         const slope = slopeOf(fnN, x, z, R * 0.5);
         if (slope > 0.5) continue;
-        cands.push({ x, z, h, slope, hut: Math.hypot(x - plan.hut.x, z - plan.hut.z), river });
+        // the ground around the plot must meet the flattened pad gently – no
+        // mesa with cliffs on a narrow hilltop that nobody can climb
+        let rim = 0;
+        for (let k = 0; k < 8; k++) {
+          const a = (k / 8) * Math.PI * 2;
+          for (const rr of [R + 4, R + 10]) rim = Math.max(rim, Math.abs(fnN(x + Math.cos(a) * rr, z + Math.sin(a) * rr) - h) / (rr - R + 2));
+        }
+        if (rim > 0.65) continue;
+        cands.push({ x, z, h, slope, rim, hut: Math.hypot(x - plan.hut.x, z - plan.hut.z), river });
       }
     }
     const kinds = [
       // near the landing beach, low ground
       { kind: 'coast', score: (c) => Math.abs(c.hut - 90) + (c.hut < 45 ? 200 : 0) + c.h * 2 + c.slope * 120 },
-      // high, open ground
-      { kind: 'highland', score: (c) => -c.h * 3 + c.slope * 120 + (c.h < 8 ? 200 : 0) },
+      // the highest open ground with gentle sides (named "inland" by the layout when it is low)
+      { kind: 'highland', score: (c) => -c.h * 3 + c.slope * 120 },
       // by the water (keeping a little more distance from a lava flow)
       { kind: 'river', score: (c) => c.river * 2 + c.slope * 120 + (c.river > R + 30 ? 200 : 0) },
     ];
-    for (const k of kinds) {
-      let best = null, bs = Infinity;
-      for (const c of cands) {
-        if (plan.basePlots.some((p) => Math.hypot(p.x - c.x, p.z - c.z) < 70)) continue;
-        const s = k.score(c);
-        if (s < bs) { bs = s; best = c; }
+    // first pass: gentle rims and well apart; if that leaves fewer than two
+    // plots, a second pass accepts steeper rims and closer neighbours
+    for (const pass of [{ rim: 0.45, gap: 70 }, { rim: 0.65, gap: 45 }]) {
+      if (pass.rim > 0.45 && plan.basePlots.length >= 2) break;
+      for (const k of kinds) {
+        if (plan.basePlots.some((p) => p.kind === k.kind)) continue;
+        let best = null, bs = Infinity;
+        for (const c of cands) {
+          if (c.rim > pass.rim || plan.basePlots.some((p) => Math.hypot(p.x - c.x, p.z - c.z) < pass.gap)) continue;
+          const sc = k.score(c);
+          if (sc < bs) { bs = sc; best = c; }
+        }
+        // no fitting place of this kind (the second pass takes any open ground except for the riverbank)
+        if (!best || (bs >= 200 && (pass.rim <= 0.45 || k.kind === 'river'))) continue;
+        plan.basePlots.push({ kind: k.kind, x: best.x, z: best.z, r: R, h: best.h });
+        taken.push({ x: best.x, z: best.z, r: R + 8 });
+        addPad(best, R + 2.5);
       }
-      if (!best || bs >= 200) continue;   // no fitting place of this kind on this island
-      plan.basePlots.push({ kind: k.kind, x: best.x, z: best.z, r: R, h: best.h });
-      taken.push({ x: best.x, z: best.z, r: R + 8 });
-      addPad(best, R + 2.5);
     }
   }
 

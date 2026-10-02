@@ -1050,7 +1050,12 @@
 .base-intro { margin: 0 0 0.8em; color: var(--ink-dim); font-weight: 700; line-height: 1.35; }
 .base-sub { display: flex; align-items: center; gap: 0.4em; margin: 0.9em 0 0.5em; font-size: 1em; }
 .base-sub svg { width: 1.3em; height: 1.3em; }
-.base-tower-choice { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 0.4em; }
+.base-hp { display: block; height: 0.45em; margin: 0.25em 0; border-radius: 0.3em; background: rgba(10, 15, 28, 0.6); overflow: hidden; }
+.base-hp i { display: block; height: 100%; background: var(--green); border-radius: 0.3em; }
+.craft-row.is-hurt { border-color: #ff7b7b; }
+.craft-row.is-hurt .base-hp i { background: #ff7b7b; }
+.base-tower-choice { display: flex; flex-wrap: wrap; justify-content: flex-start; gap: 0.4em; flex-basis: 100%; padding-left: 3.2em; }
+.craft-row:has(.base-tower-choice) { flex-wrap: wrap; }
 .base-tower-choice .craft-cost svg { width: 1.1em; height: 1.1em; }
 .hud-craft .craft-list + .base-sub + .craft-list { max-height: 30vh; }
 

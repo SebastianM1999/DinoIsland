@@ -18,6 +18,7 @@ migrateStorage();
 const DEBUG_QUERY = new URLSearchParams(location.search);
 const DEBUG_ISLAND = Math.max(0, (Number(DEBUG_QUERY.get('island')) || 1) - 1);
 const DEBUG_BASE = Math.max(0, Math.min(3, Number(DEBUG_QUERY.get('base')) || 0));
+const DEBUG_RAID = Math.max(0, Number(DEBUG_QUERY.get('raid')) || 0);   // ?raid=10: first raid in 10 s (with ?base)
 document.title = BRAND.name;
 
 // SVG filter that gives HUD and menu panels their brush-stroke edges.
@@ -86,7 +87,7 @@ async function start(mode, options = {}) {
     const outfit = savedOutfit();
     if (mode === 'internet') options.url = await internetTest.start();
     net = mode === 'steam' ? await Net.steam(window.dinoSteam, options, name, outfit) :
-      mode === 'online' || mode === 'internet' ? await Net.connect(websocketAddress(options.url ?? serverInput.value), name, outfit) : await Net.local(name, outfit, { level: DEBUG_ISLAND, baseStage: DEBUG_BASE });
+      mode === 'online' || mode === 'internet' ? await Net.connect(websocketAddress(options.url ?? serverInput.value), name, outfit) : await Net.local(name, outfit, { level: DEBUG_ISLAND, baseStage: DEBUG_BASE, raidIn: DEBUG_RAID });
   } catch (err) {
     if (mode === 'internet') internetTest.stop();
     busy = false;

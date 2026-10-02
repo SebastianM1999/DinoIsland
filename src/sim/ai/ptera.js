@@ -58,7 +58,7 @@ function pickTarget(sys, d) {
   const area = d.area;
   let best = null, bestScore = 0;
   for (const p of sys.world.players.values()) {
-    if (!p.alive || sys.inSafeZone(p)) continue;
+    if (!p.alive || sys.inSafeZone(p, d)) continue;
     const dist = Math.hypot(p.x - area.x, p.z - area.z);
     const near = Math.hypot(p.x - d.x, p.z - d.z);
     if (dist > C.targetRadius && near > C.targetRadius) continue;
@@ -134,7 +134,7 @@ export const pteraBrain = {
       case 'dive': {
         d.st = DS.DIVE;
         const p = sys.world.players.get(d.targetId);
-        if (!p || !p.alive || sys.inSafeZone(p) || d.modeT > 7) { climb(d, 4); break; }
+        if (!p || !p.alive || sys.inSafeZone(p, d) || d.modeT > 7) { climb(d, 4); break; }
         // lead the target a little
         const dist = flyTo(sys, d, p.x, p.y + 1.0, p.z, C.diveSpeed, dt, 3.2);
         if (dist < 2.3) {
