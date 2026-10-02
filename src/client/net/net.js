@@ -82,9 +82,9 @@ export class Net {
   /**
    * Start an authoritative world for solo play. It runs in a Web Worker
    * (src/sim/worker.js), so its ticks never stall a rendered frame.
-   * Resolves after the welcome.
+   * Resolves after the welcome. `level` (0-based) starts on a later island (testing).
    */
-  static local(name, outfit) {
+  static local(name, outfit, { level = 0, baseStage = 0 } = {}) {
     return new Promise((resolve, reject) => {
       const worker = new Worker(new URL('../../sim/worker.js', import.meta.url), { type: 'module' });
       const transport = {
@@ -105,7 +105,7 @@ export class Net {
         if (!net.welcome) reject(new Error('The island could not be started'));
         else transport.onClose?.('The island simulation stopped');
       };
-      worker.postMessage({ type: 'start', name, outfit });
+      worker.postMessage({ type: 'start', name, outfit, level, baseStage });
     });
   }
 

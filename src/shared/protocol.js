@@ -64,6 +64,7 @@ export const ACT = {
   UNSTUCK: 'unstuck',   // { manual? }                         move me to the nearest free spot (auto: client stuck detector,
                         //                                     manual: U key); server-validated and rate-limited
   BUTCHER: 'butcher',   // { dino, stop? }                     start (hold V) / stop butchering a carcass with the knife
+  BASE: 'base',         // { op: 'build', plot } | { op: 'upgrade' } build / grow the team's base (islands 2+)
 };
 
 /** Server events (msg.e). */
@@ -102,6 +103,7 @@ export const EV = {
   BOAT: 'boat',             // { repaired }                      the boat got repaired
   BUTCHER: 'butcher',       // { id, dino, t }                   player id started butchering (t = seconds; t 0 = stopped)
   BUTCHERED: 'butchered',   // { id }                            carcass id was butchered (sinks away)
+  BASE: 'base',             // { base }                          the team's base changed (see shared/base.js freshBase)
 };
 
 /** Player snapshot tuple layout. */

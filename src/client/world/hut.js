@@ -12,9 +12,11 @@ import { createFlag, createFire, createSmoke, createArrows } from './hut/fx.js';
 const ANIM_RANGE = 220; // skip animation when the camera is farther than this
 
 /**
+ * landing: the small landing camp of islands 2+ (shared/base.js) – crates,
+ * supply bench, flag and a cold fire pit; no cabin, wardrobe or mission board.
  * @returns {{ group: THREE.Group, update(dt:number, time:number, camPos?:THREE.Vector3):void, setArrowStock(n:number):void, arrowSlots:number }}
  */
-export function buildHut(terrain, layout) {
+export function buildHut(terrain, layout, { landing = false } = {}) {
   const hut = layout.hut;
   const group = new THREE.Group();
   group.name = 'hut';
@@ -23,7 +25,7 @@ export function buildHut(terrain, layout) {
   // Local offset of a layout point (ground height from the terrain).
   const local = (p) => [p.x - hut.x, terrain.heightAt(p.x, p.z) - hut.y, p.z - hut.z];
 
-  const cabin = buildCabin();
+  const cabin = landing ? { std: [], glossy: [], glow: [] } : buildCabin();
   const propsStd = [];
   const glossy = [...cabin.glossy];
   const glow = [...cabin.glow];
@@ -43,20 +45,22 @@ export function buildHut(terrain, layout) {
   add(buildWorkbench(), benchPos);
   // Mission board faces the campfire (its front is local -z).
   const bdx = firePos[0] - boardPos[0], bdz = firePos[2] - boardPos[2];
-  add(buildMissionBoard(), boardPos, Math.atan2(-bdx, -bdz));
-  add(buildWardrobe(), local(hut.wardrobe));
+  if (!landing) {
+    add(buildMissionBoard(), boardPos, Math.atan2(-bdx, -bdz));
+    add(buildWardrobe(), local(hut.wardrobe));
+  }
   add(buildFlagpole(), flagPos);
   add(buildCampfire(), firePos);
 
-  const cabinMesh = mesh(merge(cabin.std));
-  cabinMesh.name = 'hut-cabin';
+  const cabinMesh = landing ? null : mesh(merge(cabin.std));
+  if (cabinMesh) cabinMesh.name = 'hut-cabin';
   const propsMesh = mesh(merge(propsStd));
   propsMesh.name = 'hut-props';
   const glossyMesh = mesh(merge(glossy), MAT.glossy);
   glossyMesh.name = 'hut-glossy';
   const glowMesh = mesh(merge(glow), MAT.glow, { cast: false, receive: false });
   glowMesh.name = 'hut-glow';
-  group.add(cabinMesh, propsMesh, glossyMesh, glowMesh);
+  group.add(...[cabinMesh, propsMesh, glossyMesh, glowMesh].filter(Boolean));
 
   // Flag: +x of the cloth points downwind (matches the vegetation wind).
   const flag = createFlag();
@@ -64,16 +68,19 @@ export function buildHut(terrain, layout) {
   flag.mesh.rotation.y = -Math.atan2(0.6, 0.8);
   group.add(flag.mesh);
 
-  const fire = createFire();
-  fire.group.position.set(firePos[0], firePos[1], firePos[2]);
-  group.add(fire.group);
+  // the landing camp's fire pit is cold: it does not heal (see shared/base.js)
+  const fire = landing ? null : createFire();
+  if (fire) {
+    fire.group.position.set(firePos[0], firePos[1], firePos[2]);
+    group.add(fire.group);
+  }
 
   const ch = CABIN.chimney;
-  const smoke = createSmoke([
+  const smoke = landing ? null : createSmoke([
     { x: firePos[0], y: firePos[1] + 0.95, z: firePos[2], count: 10, size: 0.34, rise: 0.95, life: 3.2, dark: 0.5 },
     { x: ch.x, y: ch.top + 0.25, z: CABIN.CZ - ch.d, count: 9, size: 0.46, rise: 1.1, life: 4.2, dark: 0.42 },
   ]);
-  group.add(smoke.mesh);
+  if (smoke) group.add(smoke.mesh);
 
   const arrows = createArrows({ x: benchPos[0] + ARROW_BARREL.x, y: benchPos[1] + ARROW_BARREL.y, z: benchPos[2] + ARROW_BARREL.z, r: ARROW_BARREL.r });
   group.add(arrows.mesh);
@@ -86,8 +93,8 @@ export function buildHut(terrain, layout) {
     update(dt, time, camPos) {
       if (camPos && camPos.distanceToSquared(center) > ANIM_RANGE * ANIM_RANGE) return;
       flag.update(time);
-      fire.update(time);
-      smoke.update(Math.min(dt, 0.1));
+      fire?.update(time);
+      smoke?.update(Math.min(dt, 0.1));
     },
     /** Show n arrows in the barrel (clamped to arrowSlots). */
     setArrowStock(n) {

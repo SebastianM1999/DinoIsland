@@ -39,7 +39,6 @@ export class DinoSystem {
     this.groups = new Map();
     this.respawnQueue = [];
     this.colliders = world.layout.colliders;
-    this.hut = world.layout.hut.campfire;
     // harder islands: tougher and harder-hitting dinosaurs
     const diff = world.layout.level.difficulty;
     this.hpMul = Math.pow(diff, 0.85);
@@ -190,8 +189,9 @@ export class DinoSystem {
     if (t.waterDepthAt(x, z) > (d.type === 'brachio' ? 1.2 : 0.35)) return false;
     if (t.slopeAt(x, z) > (d.type === 'raptor' ? 0.95 : 0.8)) return false;
     if (t.lavaLevelAt(x, z) !== null) return false;
-    const safe = CONFIG.player.hutHealRadius + 10;
-    if ((x - this.hut.x) ** 2 + (z - this.hut.z) ** 2 < safe * safe) return false;
+    // the hut / the team's base (shared/base.js safeZone): dinosaurs keep out
+    const zone = this.world.safeZone();
+    if (zone && (x - zone.x) ** 2 + (z - zone.z) ** 2 < (zone.r + 10) ** 2) return false;
     return Math.abs(x) < CONFIG.world.size / 2 - 20 && Math.abs(z) < CONFIG.world.size / 2 - 20;
   }
 
@@ -433,8 +433,8 @@ export class DinoSystem {
 
   /** True if the player stands in the hut's safe zone (dinosaurs leave them alone). */
   inSafeZone(p) {
-    const r = CONFIG.player.hutHealRadius + 6;
-    return (p.x - this.hut.x) ** 2 + (p.z - this.hut.z) ** 2 < r * r;
+    const zone = this.world.safeZone();
+    return !!zone && (p.x - zone.x) ** 2 + (p.z - zone.z) ** 2 < (zone.r + 6) ** 2;
   }
 
   /** Call/roar with a per-animal cooldown so re-targeting never spams sound. */

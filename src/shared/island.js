@@ -13,6 +13,7 @@ import { CONFIG } from './config.js';
 import { makeRng, fbm, valueNoise, clamp, smoothstep, lerp } from './rng.js';
 import { levelDef } from './levels.js';
 import { planBossArena, bossArenaHeight } from './bossArena.js';
+import { BASE_PLOT_RADIUS } from './base.js';
 
 const TAU = Math.PI * 2;
 
@@ -715,6 +716,51 @@ export function planIsland(levelIndex = 0, variant = 1) {
     const mr = 22 * Math.max(0.55, K);
     const s = findSpot(mr, { maxSlope: 0.32, trailGap: 4, riverGap: 6, maxH: 18 });
     if (s) plan.meadows.push({ x: s.x, z: s.z, r: mr * 1.2 });
+  }
+
+  // --- base building plots (every island after the first, see shared/base.js).
+  // Planned after all other sites so those stay exactly as they were.
+  // A deterministic grid search scored per kind of place: it draws no random
+  // numbers, so every other part of the island stays as it was.
+  plan.basePlots = [];
+  if (level.index > 0) {
+    const R = BASE_PLOT_RADIUS;
+    const riverGap = volcanic ? 10 : 3;
+    const cands = [];
+    for (let x = -A * 0.85; x <= A * 0.85; x += 7) {
+      for (let z = -B * 0.8; z <= B * 0.8; z += 7) {
+        if (!insideEllipse(plan, x, z, 0.84)) continue;
+        if (taken.some((t) => Math.hypot(t.x - x, t.z - z) < t.r + R)) continue;
+        const h = fnN(x, z);
+        if (h < 1.8 || h > 32) continue;
+        const trail = distToPolyline(plan.trail, x, z), river = distToPolyline(plan.river.pts, x, z);
+        if (trail < R + 1 || river < R + riverGap) continue;
+        if (plan.ramps.some((rp) => rp.pts.some((p) => Math.hypot(p.x - x, p.z - z) < R * 1.6 + 6))) continue;
+        const slope = slopeOf(fnN, x, z, R * 0.5);
+        if (slope > 0.5) continue;
+        cands.push({ x, z, h, slope, hut: Math.hypot(x - plan.hut.x, z - plan.hut.z), river });
+      }
+    }
+    const kinds = [
+      // near the landing beach, low ground
+      { kind: 'coast', score: (c) => Math.abs(c.hut - 90) + (c.hut < 45 ? 200 : 0) + c.h * 2 + c.slope * 120 },
+      // high, open ground
+      { kind: 'highland', score: (c) => -c.h * 3 + c.slope * 120 + (c.h < 8 ? 200 : 0) },
+      // by the water (keeping a little more distance from a lava flow)
+      { kind: 'river', score: (c) => c.river * 2 + c.slope * 120 + (c.river > R + 30 ? 200 : 0) },
+    ];
+    for (const k of kinds) {
+      let best = null, bs = Infinity;
+      for (const c of cands) {
+        if (plan.basePlots.some((p) => Math.hypot(p.x - c.x, p.z - c.z) < 70)) continue;
+        const s = k.score(c);
+        if (s < bs) { bs = s; best = c; }
+      }
+      if (!best || bs >= 200) continue;   // no fitting place of this kind on this island
+      plan.basePlots.push({ kind: k.kind, x: best.x, z: best.z, r: R, h: best.h });
+      taken.push({ x: best.x, z: best.z, r: R + 8 });
+      addPad(best, R + 2.5);
+    }
   }
 
   // flatten the hut clearing and the boat beach

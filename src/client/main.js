@@ -13,6 +13,11 @@ import { initInternetTest } from './ui/internetTest.js';
 import { BRAND, storageKey, migrateStorage } from '../shared/brand.js';
 
 migrateStorage();
+// Testing aids (solo only): ?island=2 starts on island 2 (1-based), ?base=1..3
+// with the team's base already standing on the first building plot.
+const DEBUG_QUERY = new URLSearchParams(location.search);
+const DEBUG_ISLAND = Math.max(0, (Number(DEBUG_QUERY.get('island')) || 1) - 1);
+const DEBUG_BASE = Math.max(0, Math.min(3, Number(DEBUG_QUERY.get('base')) || 0));
 document.title = BRAND.name;
 
 // SVG filter that gives HUD and menu panels their brush-stroke edges.
@@ -81,7 +86,7 @@ async function start(mode, options = {}) {
     const outfit = savedOutfit();
     if (mode === 'internet') options.url = await internetTest.start();
     net = mode === 'steam' ? await Net.steam(window.dinoSteam, options, name, outfit) :
-      mode === 'online' || mode === 'internet' ? await Net.connect(websocketAddress(options.url ?? serverInput.value), name, outfit) : await Net.local(name, outfit);
+      mode === 'online' || mode === 'internet' ? await Net.connect(websocketAddress(options.url ?? serverInput.value), name, outfit) : await Net.local(name, outfit, { level: DEBUG_ISLAND, baseStage: DEBUG_BASE });
   } catch (err) {
     if (mode === 'internet') internetTest.stop();
     busy = false;
@@ -114,6 +119,7 @@ async function launch(net, reuse = null) {
     if (net.closed) throw new Error(disconnectReason);
     loadingText.textContent = 'Building the island…';
     game = new Game(canvas, net, reuse ?? (menuAudio ? { audio: menuAudio } : null));
+    if (DEBUG_QUERY.has('debug')) window.dinoGame = game;   // testing aid: inspect the running game
   } catch (err) {
     console.error(err);
     net.close();

@@ -16,7 +16,7 @@ import { buildLayout } from '../shared/layout.js';
 import { MSG, ACT, EV, EQUIP } from '../shared/protocol.js';
 import { DinoSystem } from './dinos.js';
 import { Mission } from './mission.js';
-import { resolveCircle } from '../shared/collision.js';
+import { resolveCircle, penetration } from '../shared/collision.js';
 import { resolveDinoContact, DINO_CONTACT, dinoBodyCircles } from '../shared/dinoContact.js';
 import { makeRng } from '../shared/rng.js';
 import { lineBlocked } from '../shared/visibility.js';
@@ -25,6 +25,7 @@ import { planIsland } from '../shared/island.js';
 import { levelDef, LEVEL_COUNT } from '../shared/levels.js';
 import { findUnstuckSpot, goodSpot } from './unstuck.js';
 import { nearDino, plausibleZone } from './hitCheck.js';
+import { freshBase, campStations, safeZone as baseSafeZone, hasBasePlots, PLOT_REACH, MAX_STAGE, stageCost, BUILD_TIME, BASE_STAGES, applyBaseColliders, baseSpawnPoints } from '../shared/base.js';
 import { insideGrove, mayEnterGrove } from '../shared/grove.js';
 import { RECIPE_BY_ID, upgradeMods, unlockIsland, canAfford } from '../shared/crafting.js';
 
@@ -79,6 +80,8 @@ export class ServerWorld {
     this.fruit = this.layout.fruitSpots.map((s) => ({ spot: s.id, count: this.rollFruitCount(), regrowAt: 0 }));
     this.spottedDinos = new Set();
     this.relics = this.layout.relics.map((r) => ({ ...r, found: false, byName: null }));
+    this.base = freshBase();          // the team's own base (islands 2+, see shared/base.js)
+    this._safe = undefined;
     this.dinos = new DinoSystem(this);
     this.log(`island ${level + 1} "${levelDef(level).name}" variant ${variant}`);
   }
@@ -128,7 +131,7 @@ export class ServerWorld {
     let slot = 0;
     while (used.has(slot)) slot++;
     const clean = String(name || '').replace(/[^\p{L}\p{N} _\-.]/gu, '').trim().slice(0, 14) || `Player ${slot + 1}`;
-    const sp = this.layout.spawnPoints[slot];
+    const sp = this.spawnPoint(slot);
     const p = {
       id: this.id(),
       slot,
@@ -311,8 +314,86 @@ export class ServerWorld {
     this.toast(`${p.name} was defeated${lostMeat ? ' – the carried loot is lost' : ''}!`, 'skull');
   }
 
+  // ------------------------------------------------------------------ base
+
+  /** The camp functions available right now (hut on island 1, landing camp + base later). */
+  stations() { return campStations(this.layout, this.base, this.levelIndex); }
+
+  /** The zone dinosaurs keep out of: { x, z, r } or null (no base yet / base damaged). */
+  safeZone() {
+    // asked for every dinosaur step: computed once per tick (reset in step())
+    if (this._safe === undefined) this._safe = baseSafeZone(this.layout, this.base, this.levelIndex);
+    return this._safe;
+  }
+
+  /** Is `p` within `range` of any of the points? */
+  nearAny(p, points, range) { return points.some((s) => s && this.near(p, s.x, s.z, range)); }
+
+  /** Where players (re)spawn: around the base campfire once one stands, else the landing beach. */
+  spawnPoint(slot) {
+    const plot = this.base.stage > 0 ? this.layout.basePlots[this.base.plot] : null;
+    const pts = plot ? baseSpawnPoints(plot) : this.layout.spawnPoints;
+    return pts[slot % pts.length];
+  }
+
+  publicBase() {
+    const b = this.base;
+    return { ...b, building: b.building && { stage: b.building.stage, left: r2(Math.max(0, b.building.until - this.now)) }, towers: b.towers.map((t) => ({ ...t })) };
+  }
+
+  /** Build (op 'build' on a plot) or grow (op 'upgrade') the team's base from the hut store. */
+  baseAction(p, m) {
+    const b = this.base;
+    const deny = (text) => this.toast(text, 'crate', p.id);
+    if (!p.alive || !hasBasePlots(this.layout)) return;
+    if (b.building) return deny('The team is already building – wait for it to finish');
+    let plot, stage;
+    if (m.op === 'build') {
+      if (b.plot != null) return deny('Your base already stands on this island');
+      plot = this.layout.basePlots[m.plot];
+      if (!plot || !this.near(p, plot.x, plot.z, plot.r + PLOT_REACH)) return;
+      stage = 1;
+    } else if (m.op === 'upgrade') {
+      plot = b.plot != null ? this.layout.basePlots[b.plot] : null;
+      if (!plot || !this.near(p, plot.x, plot.z, plot.r + PLOT_REACH)) return;
+      if (b.stage >= MAX_STAGE) return deny('Your base is fully built');
+      stage = b.stage + 1;
+    } else return;
+    const cost = stageCost(stage, this.levelIndex);
+    if (!canAfford({ cost }, this.store)) return deny('Not enough loot in the hut store');
+    for (const [k, n] of Object.entries(cost)) this.store[k] -= n;
+    if (m.op === 'build') b.plot = m.plot;
+    b.building = { stage, until: this.now + BUILD_TIME, by: p.id };
+    this.event(EV.STORE, { store: this.store });
+    this.event(EV.BASE, { base: this.publicBase() });
+    this.toast(`${p.name} started building the ${BASE_STAGES[stage].name.toLowerCase()} – ${BUILD_TIME} s`, BASE_STAGES[stage].icon);
+  }
+
+  /** A stage under construction is finished: it stands, collides and works. */
+  finishBuilding() {
+    const b = this.base;
+    const S = BASE_STAGES[b.building.stage];
+    b.stage = b.building.stage;
+    b.building = null;
+    b.maxHp = S.hp;
+    b.hp = S.hp;
+    b.damaged = false;
+    applyBaseColliders(this.layout, b);
+    // nobody may end up inside the new walls
+    for (const p of this.players.values()) {
+      if (!p.alive || penetration(p.x, p.z, P.radius, this.layout.playerColliders, p.y + 0.05, p.y + P.height, P.stepHeight) <= 0.01) continue;
+      const spot = findUnstuckSpot(this.terrain, this.layout, p.x, p.z);
+      if (!spot) continue;
+      p.x = spot.x; p.y = spot.y; p.z = spot.z;
+      p.lastMoveAt = this.now;
+      this.correct(p, { unstuck: 1 });
+    }
+    this.event(EV.BASE, { base: this.publicBase() });
+    this.toast(`The ${S.name.toLowerCase()} is built! ${S.stage === 1 ? 'The campfire heals and dinosaurs keep away.' : ''}`, 'quest');
+  }
+
   respawnPlayer(p) {
-    const sp = this.layout.spawnPoints[p.slot];
+    const sp = this.spawnPoint(p.slot);
     p.alive = true;
     p.hp = P.maxHealth;
     p.x = sp.x; p.z = sp.z; p.y = this.terrain.heightAt(sp.x, sp.z);
@@ -425,7 +506,7 @@ export class ServerWorld {
     if (fine && !manual) return;
     let spot = findUnstuckSpot(this.terrain, this.layout, p.x, p.z, { minDist: fine ? 1.5 : 0 });
     if (!spot) {
-      const sp = this.layout.spawnPoints[p.slot] || this.layout.spawnPoints[0];
+      const sp = this.spawnPoint(p.slot);
       spot = { x: sp.x, y: this.layout.groundAt(sp.x, sp.z), z: sp.z };
     }
     p.nextUnstuckAt = this.now + UNSTUCK_COOLDOWN;
@@ -685,8 +766,7 @@ export class ServerWorld {
         return;
       }
       case ACT.DEPOSIT: {
-        const h = this.layout.hut.dropOff;
-        if (!p.alive || !this.near(p, h.x, h.z, 6)) return;
+        if (!p.alive || !this.nearAny(p, this.stations().dropOff, 6)) return;
         let total = 0;
         const parts = [];
         for (const k of LOOT_KEYS) {
@@ -706,8 +786,8 @@ export class ServerWorld {
         return;
       }
       case ACT.OUTFIT: {
-        const wd = this.layout.hut.wardrobe;
-        if (!this.near(p, wd.x, wd.z, 6)) return;
+        const wd = this.stations().wardrobe;
+        if (!wd || !this.near(p, wd.x, wd.z, 6)) return;
         const outfit = sanitizeOutfit(m.outfit, p.slot);
         if (sameOutfit(outfit, p.outfit)) return;
         p.outfit = outfit;
@@ -724,8 +804,7 @@ export class ServerWorld {
       case ACT.UNSTUCK: return this.unstuck(p, !!m.manual);
       case ACT.BUTCHER: return m.stop ? this.stopButcher(p) : this.startButcher(p, m.dino);
       case ACT.REFILL: {
-        const h = this.layout.hut.arrowRack;
-        if (!p.alive || !this.near(p, h.x, h.z, 6)) return;
+        if (!p.alive || !this.nearAny(p, this.stations().refill, 6)) return;
         // free basic resupply only; everything else is crafted (ACT.CRAFT)
         inv.arrows = Math.max(inv.arrows, Math.min(W.bow.startArrows, this.caps().arrows));
         this.normalizeArrows(inv);
@@ -737,16 +816,18 @@ export class ServerWorld {
         return;
       }
       case ACT.CRAFT: return this.craft(p, m.recipe);
+      case ACT.BASE: return this.baseAction(p, m);
     }
   }
 
   /** Craft a supply or a team upgrade from the hut store at the workbench. */
   craft(p, id) {
-    const h = this.layout.hut.arrowRack;
+    const h = this.stations().workbench;
     const r = RECIPE_BY_ID[id];
+    const deny = (text) => this.toast(text, 'crate', p.id);
+    if (!h) return deny('Build a camp first – its workbench crafts');
     if (!r || !p.alive || !this.near(p, h.x, h.z, 6)) return;
     const inv = p.inv;
-    const deny = (text) => this.toast(text, 'crate', p.id);
     if (unlockIsland(r) > this.levelIndex + 1) return deny(`${r.name} unlocks on island ${unlockIsland(r)}`);
     if (r.kind === 'upgrade') {
       if (this.upgrades.has(r.id)) return deny(`${r.name} is already built`);
@@ -884,6 +965,8 @@ export class ServerWorld {
 
   step(dt) {
     this.now += dt;
+    this._safe = undefined;
+    if (this.base.building && this.now >= this.base.building.until) this.finishBuilding();
     const F = CONFIG.fruit;
 
     for (const p of this.players.values()) {
@@ -927,10 +1010,10 @@ export class ServerWorld {
         this.event(EV.RELIC, { id: r.id, kind: r.kind, by: p.id });
         this.mission.onRelicFound(r, p);
       }
-      // the hut is a safe, healing place
-      const c = this.layout.hut.campfire;
-      if (p.hp < P.maxHealth && this.near(p, c.x, c.z, P.hutHealRadius)) {
-        p.hp = Math.min(P.maxHealth, p.hp + P.hutHealPerSecond * dt);
+      // the hut / the base campfire is a safe, healing place
+      const st = this.stations();
+      if (st.fire && p.hp < P.maxHealth && this.near(p, st.fire.x, st.fire.z, st.healR)) {
+        p.hp = Math.min(P.maxHealth, p.hp + P.hutHealPerSecond * st.healRate * dt);
       }
     }
 
@@ -1020,6 +1103,7 @@ export class ServerWorld {
       level: { index: this.levelIndex, variant: this.variant },
       relics: this.relics.map((r) => ({ id: r.id, kind: r.kind, x: r.x, y: r.y, z: r.z, found: r.found })),
       boat: { repaired: this.mission.phase !== 'search' },
+      base: this.publicBase(),
     };
   }
 }

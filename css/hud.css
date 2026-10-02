@@ -1047,6 +1047,7 @@
 .hud-craft .wd-btn:disabled { opacity: 0.5; cursor: default; }
 .hud-craft button { cursor: url('../assets/cursor-hand.svg') 12 3, pointer; }
 @media (max-width: 38em) { .craft-row { flex-wrap: wrap; } .craft-costs { order: 3; } }
+.base-intro { margin: 0 0 0.8em; color: var(--ink-dim); font-weight: 700; line-height: 1.35; }
 
 /* ---------------------------------------------------------------- primeval grove prompt */
 .hud-grove { width: min(30em, 92vw); }

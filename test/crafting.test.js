@@ -121,9 +121,20 @@ test('tier 2 upgrades unlock on island 2 and need their tier 1 upgrade', () => {
   assert.equal(world.levelIndex, 1);
   assert.ok(world.upgrades.has('bow1'), 'team upgrades survive the voyage');
 
-  const rack = world.layout.hut.arrowRack;
+  // from island 2 on, crafting needs the workbench of the team's own camp
   const p = [...world.players.values()][0];
-  p.x = rack.x; p.z = rack.z;
+  const landing = world.layout.hut.arrowRack;
+  p.x = landing.x; p.z = landing.z;
+  craft('bow2');
+  assert.ok(!world.upgrades.has('bow2'), 'no workbench before a camp is built');
+  const plot = world.layout.basePlots[0];
+  p.x = plot.x; p.z = plot.z;
+  stock({ hide: 9, teeth: 9, claws: 9, plates: 9, bones: 9 });
+  world.receive(p.id, { t: MSG.ACT, a: ACT.BASE, op: 'build', plot: 0 });
+  for (let t = 0; t < 16; t += 0.5) world.step(0.5);
+  assert.equal(world.base.stage, 1);
+  const bench = world.stations().workbench;
+  p.x = bench.x; p.z = bench.z;
   craft('spear2');
   assert.ok(!world.upgrades.has('spear2'), 'needs the stone spearhead first');
   craft('bow2');

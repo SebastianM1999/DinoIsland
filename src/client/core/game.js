@@ -21,6 +21,9 @@ import { buildVegetation } from '../world/vegetation.js';
 import { buildRocks } from '../world/rocks.js';
 import { buildFruitPlants } from '../world/fruitPlants.js';
 import { buildHut } from '../world/hut.js';
+import { buildBaseView } from '../world/base.js';
+import { BasePanel } from '../ui/basePanel.js';
+import { campStations, safeZone, applyBaseColliders, hasBasePlots, freshBase } from '../../shared/base.js';
 import { WIND } from '../models/kit.js';
 import { RemotePlayers } from '../entities/remotePlayers.js';
 import { Hud } from '../ui/hud.js';
@@ -118,7 +121,7 @@ export class Game {
     };
     this.input.onPanelToggle = (action) => {
       if (action === 'interact') {
-        if (!(this.hud._boardOpen || this.hud.isExtraOpen('wardrobe') || this.hud.isExtraOpen('boat') || this.hud.isExtraOpen('crafting'))) return false;
+        if (!(this.hud._boardOpen || this.hud.isExtraOpen('wardrobe') || this.hud.isExtraOpen('boat') || this.hud.isExtraOpen('crafting') || this.hud.isExtraOpen('base'))) return false;
         action = 'close';
       }
       if (action === 'close' && !this.hud.isPanelOpen()) return false;
@@ -129,6 +132,7 @@ export class Game {
       else if (action === 'wardrobe') open = this.hud.togglePanel('wardrobe');
       else if (action === 'boat') open = this.hud.togglePanel('boat');
       else if (action === 'crafting') open = this.hud.togglePanel('crafting');
+      else if (action === 'base') open = this.hud.togglePanel('base');
       else if (action === 'grove') open = this.hud.togglePanel('grove');
       else {
         this.hud.toggleInventory(false);
@@ -137,6 +141,7 @@ export class Game {
         this.hud.togglePanel('wardrobe', false);
         this.hud.togglePanel('boat', false);
         this.hud.togglePanel('crafting', false);
+        this.hud.togglePanel('base', false);
         if (this.hud.isExtraOpen('grove')) this.hud.togglePanel('grove', false);
         open = false;
       }
@@ -196,6 +201,12 @@ export class Game {
     });
     this.hud.addPanel('crafting', { el: this.craftingPanel.el, onOpen: () => { this.#syncCrafting(); this.craftingPanel.onOpen(); } });
     this.#syncCrafting();
+    this.basePanel = new BasePanel({
+      onBuild: (plot) => this.net.act(ACT.BASE, { op: 'build', plot }),
+      onUpgrade: () => this.net.act(ACT.BASE, { op: 'upgrade' }),
+      onClose: () => this.input.onPanelToggle('close'),
+    });
+    this.hud.addPanel('base', { el: this.basePanel.el, onOpen: () => { this.#syncBase(); this.basePanel.onOpen(); } });
     this.grovePrompt = new GrovePrompt({
       onClose: () => this.input.onPanelToggle('close'),
       speaker: () => this.me.name,
@@ -219,13 +230,15 @@ export class Game {
     this.vegetation = buildVegetation(this.terrain, this.layout);
     this.rocks = buildRocks(this.terrain, this.layout);
     this.fruitPlants = buildFruitPlants(this.terrain, this.layout);
-    this.hut = buildHut(this.terrain, this.layout);
+    // islands with building plots start at a small landing camp; the team builds its own base
+    this.hut = buildHut(this.terrain, this.layout, { landing: hasBasePlots(this.layout) });
+    this.baseView = buildBaseView(this.terrain, this.layout);
     this.sites = buildSites(this.terrain, this.layout);
     this.grove = buildGrove(this.terrain, this.layout);
     this.logs = buildLogs(this.terrain, this.layout);
     this.bossArena = buildBossArena(this.terrain, this.layout);
-    scene.add(this.sky.group, this.water.group, this.vegetation.group, this.rocks.group, this.fruitPlants.group, this.hut.group, this.sites.group, this.grove.group, this.logs.group, this.bossArena.group);
-    this.worldUpdaters = [this.sky, this.water, this.vegetation, this.fruitPlants, this.hut, this.sites, this.grove, this.bossArena];
+    scene.add(this.sky.group, this.water.group, this.vegetation.group, this.rocks.group, this.fruitPlants.group, this.hut.group, this.baseView.group, this.sites.group, this.grove.group, this.logs.group, this.bossArena.group);
+    this.worldUpdaters = [this.sky, this.water, this.vegetation, this.fruitPlants, this.hut, this.baseView, this.sites, this.grove, this.bossArena];
     this.moodK = 0;
 
     // Debug view of colliders (F3).
@@ -264,6 +277,7 @@ export class Game {
         this.remotes.add(p);
       }
     }
+    this.setBase(world.base || freshBase());
     this.fruitCounts = world.fruit.slice();
     world.fruit.forEach((count, id) => this.fruitPlants.setCount(id, count));
     this.hud.setPlayer({ name: this.me.name, slot: this.me.slot });
@@ -323,6 +337,32 @@ export class Game {
       store: this.store,
       upgrades: this.me.inv?.upgrades || [],
       island: this.mission?.level?.number ?? 1,
+    });
+  }
+
+  /** The team's base changed (shared/base.js): colliders, model and panel follow. */
+  setBase(base) {
+    this.base = base;
+    applyBaseColliders(this.layout, base);
+    this.baseView.setBase(base);
+    this.#syncBase();
+  }
+
+  /** Camp functions available right now (hut on island 1, landing camp + base later). */
+  stations() { return campStations(this.layout, this.base, this.layout.level.index); }
+
+  /** E at a building plot's stake (plot index) or at the base flag (-1). */
+  openBase(plot = -1) {
+    this.basePlot = plot;
+    if (!this.hud.isPanelOpen()) this.input.onPanelToggle('base');
+  }
+
+  #syncBase() {
+    if (!this.basePanel) return;
+    const plot = this.basePlot ?? -1;
+    this.basePanel.setState({
+      store: this.store, base: this.base, island: this.layout.level.number,
+      plot, plotKind: (this.layout.basePlots[plot] || this.layout.basePlots[this.base?.plot ?? -1])?.kind ?? null,
     });
   }
 
@@ -400,7 +440,8 @@ export class Game {
       this.boatPanel.setMission(m.mission);
       this.hud.missionComplete(m.mission.complete, { completedIn: m.mission.completedIn, won: m.mission.won, next: m.mission.level?.number + 1 });
     });
-    net.on(`ev:${EV.STORE}`, (m) => { this.store = m.store; this.#syncCrafting(); });
+    net.on(`ev:${EV.STORE}`, (m) => { this.store = m.store; this.#syncCrafting(); this.#syncBase(); });
+    net.on(`ev:${EV.BASE}`, (m) => this.setBase(m.base));
     net.on(`ev:${EV.HURT}`, (m) => {
       if (m.id === this.me.id) {
         this.me.hp = m.hp;
@@ -711,8 +752,8 @@ export class Game {
    */
   #inDanger() {
     const p = this.player.pos;
-    const h = this.layout.hut.campfire;
-    if (Math.hypot(p.x - h.x, p.z - h.z) < CONFIG.player.hutHealRadius + 6) return false;
+    const zone = safeZone(this.layout, this.base, this.layout.level.index);
+    if (zone && Math.hypot(p.x - zone.x, p.z - zone.z) < zone.r + 6) return false;
     if (this.time - (this.lastHurtAt ?? -99) < 3) return true;
     for (const v of this.dinos.map.values()) {
       if (!v.alive || v.type === 'brachio') continue;
@@ -744,7 +785,7 @@ export class Game {
     hud.setMinimap({
       x: p.pos.x, z: p.pos.z, yaw: p.yaw,
       players: [...this.remotes.map.values()].map((rp) => ({ x: rp.pos.x, z: rp.pos.z, yaw: rp.yaw, color: CONFIG.playerColors[rp.slot % 4] })),
-      hut: { x: this.layout.hut.x, z: this.layout.hut.z },
+      hut: this.stations().home,
       markers: this.#collect('minimapMarkers'),
     });
     if (!this.me.alive) {
@@ -758,7 +799,7 @@ export class Game {
     const p = this.player.pos;
     const bearing = (x, z) => Math.atan2(-(x - p.x), -(z - p.z));
     const list = [
-      { bearing: bearing(this.layout.hut.x, this.layout.hut.z), kind: 'hut' },
+      { bearing: bearing(this.stations().home.x, this.stations().home.z), kind: 'hut' },
       { bearing: bearing(this.layout.boat.x, this.layout.boat.z), kind: 'boat' },
     ];
     for (const rp of this.remotes.map.values()) {

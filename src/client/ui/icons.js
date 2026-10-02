@@ -17,10 +17,14 @@ export const ICONS = {
     <path d="M23.5 6.2a3 3 0 0 0-5 1.6l-2.3 2.3 3.2 3.2 2.3-2.3a3 3 0 1 0 1.8-4.8z" fill="#e1d3b2" stroke="${OUT}" stroke-width="1" stroke-linejoin="round"/>
     <path d="M12 14.5l-3.4 3.4a3 3 0 1 0-1.8 4.8 3 3 0 0 0 5 1.6l3.4-3.4z" fill="#e1d3b2" stroke="${OUT}" stroke-width="1" stroke-linejoin="round"/>`),
 
-  skull: svg(`<path d="M16 3.5c-7 0-11.5 4.6-11.5 11 0 3.6 1.6 6 3.8 7.4V26c0 1.4 1 2.5 2.4 2.5h10.6c1.4 0 2.4-1.1 2.4-2.5v-4.1c2.2-1.4 3.8-3.8 3.8-7.4 0-6.4-4.5-11-11.5-11z" fill="#f2e8d0" stroke="${OUT}" stroke-width="1.1"/>
-    <ellipse cx="11.2" cy="15.5" rx="3" ry="3.4" fill="${OUT}"/><ellipse cx="20.8" cy="15.5" rx="3" ry="3.4" fill="${OUT}"/>
-    <path d="M16 19.5l-1.6 3h3.2z" fill="${OUT}"/>
-    <path d="M12.5 25.5v3M16 25.5v3M19.5 25.5v3" stroke="#c9b993" stroke-width="1.2"/>`),
+  tent: svg(`<path d="M16 4 3 27h26z" fill="#c98a4f" stroke="#1a2238" stroke-width="1.1" stroke-linejoin="round"/>
+    <path d="M16 4v23M16 13l-5 14h10z" fill="#5a3a22" stroke="#1a2238" stroke-width="0.9" stroke-linejoin="round"/>
+    <path d="M16 4l-2-2.5M16 4l2-2.5" stroke="#8a5a33" stroke-width="1.4" stroke-linecap="round"/>`),
+
+  tower: svg(`<path d="M9 29 11 12h10l2 17z" fill="#a86b3c" stroke="#1a2238" stroke-width="1" stroke-linejoin="round"/>
+    <path d="M7 12h18l-2-4H9z" fill="#8a5a33" stroke="#1a2238" stroke-width="1" stroke-linejoin="round"/>
+    <path d="M8 8 16 2l8 6z" fill="#3c5078" stroke="#1a2238" stroke-width="1" stroke-linejoin="round"/>
+    <path d="M12 17h8M11.5 22h9" stroke="#6b3f1e" stroke-width="1.2"/>`),
 
   knife: svg(`<path d="M6 26.5 9.5 23" stroke="#6b4228" stroke-width="4" stroke-linecap="round"/>
     <path d="M6 26.5 9.5 23" stroke="#c7995a" stroke-width="1.3" stroke-dasharray="1.6 1.4" stroke-linecap="round"/>

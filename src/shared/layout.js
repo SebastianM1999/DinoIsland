@@ -87,12 +87,24 @@ export function buildLayout(terrain) {
     wardrobe: { x: hf.x - 3.7, z: hf.z + 3.5, y: g },      // clothes rack + mirror, faces north
   };
   layout.hut = hut;
-  boxes.push({ x: hut.x, z: hut.z + 1, hw: 5.4, hd: 4.2, rot: 0, top: g + 7 });           // cabin
+  // Base building plots (islands after the first, see shared/base.js). The
+  // front of a base faces the landing beach, where the team arrives.
+  layout.basePlots = (plan.basePlots || []).map((p) => {
+    const y = terrain.heightAt(p.x, p.z);
+    return {
+      kind: p.kind === 'highland' && y < 8 ? 'inland' : p.kind,   // the best "high" ground may still be low
+      x: p.x, z: p.z, r: p.r, y,
+      rot: Math.atan2(-(hf.x - p.x), -(hf.z - p.z)),
+    };
+  });
+  // islands with base plots start at a small landing camp: no cabin, wardrobe or mission board
+  const landing = layout.basePlots.length > 0;
+  if (!landing) boxes.push({ x: hut.x, z: hut.z + 1, hw: 5.4, hd: 4.2, rot: 0, top: g + 7 });           // cabin
   boxes.push({ x: hut.dropOff.x, z: hut.dropOff.z, hw: 1.1, hd: 0.8, rot: 0, top: g + 1.1 });
   boxes.push({ x: hut.arrowRack.x, z: hut.arrowRack.z, hw: 1.4, hd: 0.6, rot: 0, top: g + 1.0 });
-  circles.push({ x: hut.missionBoard.x, z: hut.missionBoard.z, r: 0.5 });
+  if (!landing) circles.push({ x: hut.missionBoard.x, z: hut.missionBoard.z, r: 0.5 });
   circles.push({ x: hut.flag.x, z: hut.flag.z, r: 0.3 });
-  boxes.push({ x: hut.wardrobe.x, z: hut.wardrobe.z - 0.15, hw: 1.05, hd: 0.55, rot: 0, top: g + 2.2 });
+  if (!landing) boxes.push({ x: hut.wardrobe.x, z: hut.wardrobe.z - 0.15, hw: 1.05, hd: 0.55, rot: 0, top: g + 2.2 });
   for (let i = 0; i < 4; i++) {
     const a = -Math.PI / 2 + (i - 1.5) * 0.45;
     // face east, toward the island and the boat
@@ -152,7 +164,9 @@ export function buildLayout(terrain) {
     return true;
   };
   const reserve = (x, z, r) => occupied.push({ x, z, r });
-  const nearHut = (x, z, pad = 0) => Math.hypot(x - hf.x, z - (hf.z + 2)) < hf.radius + pad;
+  // the hut clearing – and the base plots, which stay just as clear of trees, rocks and dinosaur homes
+  const nearHut = (x, z, pad = 0) => Math.hypot(x - hf.x, z - (hf.z + 2)) < hf.radius + pad
+    || layout.basePlots.some((p) => Math.hypot(x - p.x, z - p.z) < p.r + 2 + Math.min(pad, 12));
   const nearBoat = (x, z, pad = 0) => Math.hypot(x - plan.boat.x, z - plan.boat.z) < 10 + pad;
   const dry = (x, z, min = 0.4) => terrain.waterLevelAt(x, z) === null && terrain.lavaLevelAt(x, z) === null && terrain.heightAt(x, z) > min;
   const inside = (x, z, k) => (x / plan.A) ** 2 + (z / plan.B) ** 2 < k * k;

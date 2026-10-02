@@ -11,6 +11,7 @@ function fixture() {
     terrain: { heightAt: () => 3 },
     layout: { colliders: [], hut: { campfire: { x: -200, z: -200 } }, level: { difficulty: 1 } },
     event() {}, toast() {}, dropLoot: (...args) => drops.push(args),
+    safeZone: () => ({ x: -200, z: -200, r: 14 }),
     mission: { onDinoKilled() {} },
   };
   return { system: new DinoSystem(world), world, drops };

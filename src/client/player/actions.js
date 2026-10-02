@@ -10,6 +10,8 @@ import { shotEnd } from '../../shared/gunshots.js';
 import { insideGrove } from '../../shared/grove.js';
 import { segmentColliders } from '../../shared/collision.js';
 import { dinoBodyCircles } from '../../shared/dinoContact.js';
+import { PLOT_KINDS, MAX_STAGE, plotPoint } from '../../shared/base.js';
+import { stakePoint } from '../world/base.js';
 import { upgradeMods } from '../../shared/crafting.js';
 import { GunEffects } from '../entities/gunEffects.js';
 import { spearLaunch } from './spearThrow.js';
@@ -440,11 +442,24 @@ export class PlayerActions {
     if (this.butcher) return { text: 'Butchering…', key: 'V', run: null };
     const carcass = this.findCarcass();
     if (carcass) return { text: `Hold to butcher the ${CONFIG.dinos[carcass.type].name}`, key: 'V', run: null };
-    // 3. hut
-    const h = g.layout.hut;
-    if (near(h.dropOff, 4)) {
+    // 3. hut / landing camp / the team's base (shared/base.js campStations)
+    const st = g.stations();
+    if (st.dropOff.some((d) => near(d, 4))) {
       const carrying = LOOT_KEYS.some((k) => inv.loot[k] > 0);
       return { text: carrying ? 'Drop off loot' : 'Loot drop-off (nothing to drop off)', run: carrying ? () => net.act(ACT.DEPOSIT) : null };
+    }
+    const plots = g.layout.basePlots;
+    if (plots.length) {
+      const base = g.base;
+      if (base?.plot == null) {
+        const i = plots.findIndex((plot) => near(stakePoint(plot), 3.5));
+        if (i >= 0) return { text: `Build a base here – ${PLOT_KINDS[plots[i].kind]?.name ?? 'building plot'}`, run: () => g.openBase(i) };
+      } else {
+        const flag = plotPoint(plots[base.plot], 'flag');
+        if (near(flag, 3.5) || (base.stage === 0 && near(plotPoint(plots[base.plot], 'fire'), 6))) {
+          return { text: base.stage >= MAX_STAGE ? 'Your base' : 'Manage the base', run: () => g.openBase(-1) };
+        }
+      }
     }
     const boat = g.layout.boat;
     if (boat && Math.hypot(boat.interact.x - pos.x, boat.interact.z - pos.z) < 5.5) {
@@ -453,13 +468,16 @@ export class PlayerActions {
       const text = m?.boat?.repaired ? 'Check the boat' : `Inspect the wreck (${found}/${m?.relics?.length ?? 3} parts)`;
       return { text, run: () => g.openBoat() };
     }
-    if (near(h.wardrobe, 3)) {
+    if (st.wardrobe && near(st.wardrobe, 3)) {
       return { text: 'Change clothes', run: () => g.openWardrobe() };
     }
-    if (near(h.arrowRack, 4)) {
+    if (st.workbench && near(st.workbench, 4)) {
       return { text: 'Open the crafting box', run: () => g.openCrafting() };
     }
-    if (near(h.missionBoard, 3.5)) {
+    // the landing camp's supply bench: free basic resupply only (crafting needs a camp)
+    const bench = st.refill.find((r) => near(r, 4));
+    if (bench) return { text: 'Free basic resupply (build a camp to craft)', run: () => net.act(ACT.REFILL) };
+    if (st.board && near(st.board, 3.5)) {
       return { text: 'Open the mission board', run: () => g.openBoard() };
     }
     // 4. give fruit
