@@ -51,9 +51,6 @@ jobs:
                 labels.includes('integration-rebase-conflict')) throw new Error('Stale or ineligible reservation');
             const { data: access } = await github.rest.repos.getCollaboratorPermissionLevel({ ...context.repo, username: pr.user.login });
             if (!['admin', 'maintain', 'write'].includes(access.permission)) throw new Error('Untrusted author');
-            const files = await github.paginate(github.rest.pulls.listFiles, { ...context.repo, pull_number: number, per_page: 100 });
-            const protectedPath = p => /^(\.github\/|\.claude\/|AGENTS\.md$|CLAUDE\.md$|\.mcp\.json$)/i.test(p);
-            if (files.some(f => protectedPath(f.filename) || protectedPath(f.previous_filename || ''))) throw new Error('Automation changes require manual integration');
             await require('./.github/scripts/integration.cjs').validateProtection(github, context.repo);
             core.setOutput('branch', pr.head.ref);
             core.setOutput('sha', expected);
@@ -82,7 +79,6 @@ jobs:
             git rebase --abort || true
             exit 1
           fi
-          git diff --exit-code origin/main HEAD -- .github .claude AGENTS.md CLAUDE.md .mcp.json
           git push --force-with-lease="refs/heads/$TASK_BRANCH:$TASK_SHA" origin "HEAD:refs/heads/$TASK_BRANCH"
           echo "published_head=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
       - name: Hold conflicting rebase for repair

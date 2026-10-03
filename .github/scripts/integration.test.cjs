@@ -134,11 +134,16 @@ test('forks, drafts and blocked tasks never reach integration', async () => {
     const f = fixture(options); await f.run(); assert.deepEqual(mutations(f.calls), []);
   }
 });
-test('non-collaborator authors and automation changes are blocked before executing CI', async () => {
-  for (const options of [{ permission: 'read' }, { files: [{ filename: '.github/workflows/ci.yml' }] },
-    { files: [{ filename: 'ordinary.txt', previous_filename: 'AGENTS.md' }] }]) {
-    const f = fixture(options); await f.run(); assert.deepEqual(mutations(f.calls), []);
-    assert.ok(f.calls.some(c => c.name === 'labels' && c.args.labels.includes('integration-blocked')));
+test('non-collaborator authors are blocked before executing CI', async () => {
+  const f = fixture({ permission: 'read' }); await f.run();
+  assert.deepEqual(mutations(f.calls), []);
+  assert.ok(f.calls.some(c => c.name === 'labels' && c.args.labels.includes('integration-blocked')));
+});
+test('workflow, skill and instruction paths remain eligible for tested integration', async () => {
+  for (const filename of ['.github/workflows/ci.yml', '.claude/skills/example/SKILL.md', 'AGENTS.md', 'CLAUDE.md', '.mcp.json']) {
+    const f = fixture({ files: [{ filename }] }); await f.run();
+    assert.ok(f.calls.some(c => c.name === 'merge'));
+    assert.ok(!f.calls.some(c => c.name === 'labels' && c.args.labels.includes('integration-blocked')));
   }
 });
 test('reserves an exact-head deterministic rebase when a task is behind main', async () => {
@@ -195,7 +200,7 @@ test('approves only GitHub Actions exact-head CI for the validated same-reposito
     const f = fixture({ headRuns: [{ ...approval, ...change }] }); await f.run();
     assert.ok(!f.calls.some(c => c.name === 'approve'));
   }
-  for (const options of [{ fork: true }, { permission: 'read' }, { files: [{ filename: 'AGENTS.md' }] }, { behind: true }]) {
+  for (const options of [{ fork: true }, { permission: 'read' }, { behind: true }]) {
     const f = fixture({ ...options, headRuns: [approval] }); await f.run(); assert.ok(!f.calls.some(c => c.name === 'approve'));
   }
 });

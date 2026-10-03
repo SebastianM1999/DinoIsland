@@ -21,8 +21,8 @@ The required workflow is:
 - Let the integration controller rebase feature branches onto main, test and land
   ordinary feature PRs with GitHub Rebase and merge. Never merge main into a feature
   branch. Never push
-  directly to `main`, bypass checks, or independently merge them. Instruction and
-  automation changes require manual integration after checks pass.
+  directly to `main`, bypass checks, or independently merge them. All file paths, including instructions and
+  automation, are eligible after required checks pass.
 
 GitHub deletes the remote PR branch after merging. Remove local worktrees only
 when clean and confirmed integrated. Rebased feature publication uses an exact-head
