@@ -35,7 +35,9 @@ git fetch origin
 git worktree add -b claude/task-name ../dino-claude-task-name origin/main
 ```
 
-Run Claude or Codex in that worktree. Read AGENTS.md and directory specs, implement
+Run `npm ci` in the new worktree: its `prepare` hook (`scripts/link-agent-skills.mjs`) links the
+git-ignored `.agents/skills` to the tracked `.claude/skills`, so Codex finds the project skills
+like Claude and Copilot do. Then run Claude or Codex in that worktree. Read AGENTS.md and directory specs, implement
 the task, run `npm test`, and make focused commits. After the user authorizes pushing:
 
 ```powershell

@@ -9,6 +9,7 @@
     "start": "node server/index.js",
     "dev": "node --watch server/index.js",
     "test": "node --test",
+    "prepare": "node scripts/link-agent-skills.mjs",
     "desktop": "electron .",
     "build:win": "electron-builder --win dir",
     "verify:steam": "node scripts/verify-steam.cjs",
