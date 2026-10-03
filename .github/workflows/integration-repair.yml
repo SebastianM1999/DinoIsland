@@ -123,13 +123,11 @@ jobs:
           test "$(git rev-parse FETCH_HEAD)" = "$TASK_SHA"
           git diff --exit-code origin/main HEAD -- .github .claude AGENTS.md CLAUDE.md .mcp.json
           git push origin "HEAD:refs/heads/$TASK_BRANCH"
-      - name: Request independent CI
+      - name: Request independent candidate validation
         uses: actions/github-script@v8
-        env:
-          TASK_BRANCH: ${{ steps.validate.outputs.branch }}
         with:
           script: |
-            await github.rest.actions.createWorkflowDispatch({ ...context.repo, workflow_id: 'ci.yml', ref: process.env.TASK_BRANCH });
+            await github.rest.actions.createWorkflowDispatch({ ...context.repo, workflow_id: 'integration.yml', ref: 'main' });
       - name: Release reservation
         if: always()
         uses: actions/github-script@v8
