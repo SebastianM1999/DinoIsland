@@ -1,0 +1,117 @@
+name: Integration rebase
+
+on:
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: Same-repository task to rebase
+        required: true
+      expected_head_sha:
+        description: Exact task revision reserved by the controller
+        required: true
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+  actions: write
+
+concurrency:
+  group: integration-rebase
+  cancel-in-progress: false
+
+jobs:
+  rebase:
+    if: vars.AUTOMERGE_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      INTEGRATION_RULESET_UPDATED_AT: ${{ vars.INTEGRATION_RULESET_UPDATED_AT }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: main
+          fetch-depth: 0
+      - name: Validate rebase reservation
+        id: validate
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const number = Number(context.payload.inputs.pr_number);
+            const expected = context.payload.inputs.expected_head_sha;
+            if (!Number.isSafeInteger(number) || number < 1 || !/^[a-f0-9]{40}$/i.test(expected || '')) throw new Error('Invalid reservation');
+            const { data: pr } = await github.rest.pulls.get({ ...context.repo, pull_number: number });
+            const labels = pr.labels.map(l => l.name);
+            if (pr.state !== 'open' || pr.draft || pr.changed_files > 3000 || pr.base.ref !== 'main' ||
+                pr.head.repo?.full_name !== `${context.repo.owner}/${context.repo.repo}` || pr.head.sha !== expected ||
+                !labels.includes('ready-to-merge') || !labels.includes('integration-rebasing') ||
+                labels.includes('integration-blocked') || labels.includes('integration-repairing') ||
+                labels.includes('integration-rebase-conflict')) throw new Error('Stale or ineligible reservation');
+            const { data: access } = await github.rest.repos.getCollaboratorPermissionLevel({ ...context.repo, username: pr.user.login });
+            if (!['admin', 'maintain', 'write'].includes(access.permission)) throw new Error('Untrusted author');
+            const files = await github.paginate(github.rest.pulls.listFiles, { ...context.repo, pull_number: number, per_page: 100 });
+            const protectedPath = p => /^(\.github\/|\.claude\/|AGENTS\.md$|CLAUDE\.md$|\.mcp\.json$)/i.test(p);
+            if (files.some(f => protectedPath(f.filename) || protectedPath(f.previous_filename || ''))) throw new Error('Automation changes require manual integration');
+            await require('./.github/scripts/integration.cjs').validateProtection(github, context.repo);
+            core.setOutput('branch', pr.head.ref);
+            core.setOutput('sha', expected);
+      - name: Rebase the reserved revision
+        id: rebase
+        env:
+          TASK_BRANCH: ${{ steps.validate.outputs.branch }}
+          TASK_SHA: ${{ steps.validate.outputs.sha }}
+        shell: bash
+        run: |
+          git config user.name 'Dino integration bot'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git config core.hooksPath /dev/null
+          git config rebase.updateRefs false
+          git check-ref-format "refs/heads/$TASK_BRANCH"
+          git fetch origin "refs/heads/$TASK_BRANCH"
+          test "$(git rev-parse FETCH_HEAD)" = "$TASK_SHA"
+          git checkout --detach "$TASK_SHA"
+          git fetch origin refs/heads/main:refs/remotes/origin/main
+          if ! git rebase origin/main; then
+            if test -n "$(git diff --name-only --diff-filter=U)"; then
+              git rebase --abort
+              echo 'conflict=true' >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            git rebase --abort || true
+            exit 1
+          fi
+          git diff --exit-code origin/main HEAD -- .github .claude AGENTS.md CLAUDE.md .mcp.json
+          git push --force-with-lease="refs/heads/$TASK_BRANCH:$TASK_SHA" origin "HEAD:refs/heads/$TASK_BRANCH"
+      - name: Hold conflicting rebase for repair
+        if: steps.rebase.outputs.conflict == 'true'
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const number = Number(context.payload.inputs.pr_number);
+            await github.rest.issues.addLabels({ ...context.repo, issue_number: number, labels: ['integration-rebase-conflict'] });
+            await github.rest.issues.createComment({ ...context.repo, issue_number: number,
+              body: 'Automatic rebase stopped at a conflict. The task branch was left unchanged. Optional Claude repair will resolve it when enabled; otherwise resolve and rebase locally, then remove integration-rebase-conflict.' });
+      - name: Hold failed publication instead of retrying indefinitely
+        if: failure() && steps.validate.outcome == 'success'
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const number = Number(context.payload.inputs.pr_number);
+            await github.rest.issues.addLabels({ ...context.repo, issue_number: number, labels: ['integration-blocked'] });
+            await github.rest.issues.createComment({ ...context.repo, issue_number: number,
+              body: 'Automatic rebase or guarded publication failed. No unconditional push was attempted. Inspect the Integration rebase logs and current branch, then remove integration-blocked when resolved.' });
+      - name: Release reservation
+        if: always()
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const number = Number(context.payload.inputs.pr_number);
+            if (!Number.isSafeInteger(number) || number < 1) return;
+            try { await github.rest.issues.removeLabel({ ...context.repo, issue_number: number, name: 'integration-rebasing' }); }
+            catch (error) { if (error.status !== 404) throw error; }
+      - name: Wake integration after publishing or holding the task
+        if: always() && steps.validate.outcome == 'success'
+        uses: actions/github-script@v8
+        with:
+          script: |
+            await github.rest.actions.createWorkflowDispatch({ ...context.repo, workflow_id: 'integration.yml', ref: 'main' });

@@ -28,6 +28,7 @@ jobs:
     timeout-minutes: 25
     env:
       ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+      GIT_EDITOR: 'true'
       INTEGRATION_RULESET_UPDATED_AT: ${{ vars.INTEGRATION_RULESET_UPDATED_AT }}
     steps:
       - uses: actions/checkout@v6
@@ -68,13 +69,15 @@ jobs:
           TASK_SHA: ${{ steps.validate.outputs.sha }}
         shell: bash
         run: |
+          git config core.hooksPath /dev/null
           git config user.name 'Dino integration bot'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git fetch origin "$TASK_BRANCH"
+          git check-ref-format "refs/heads/$TASK_BRANCH"
+          git fetch origin "refs/heads/$TASK_BRANCH"
           test "$(git rev-parse FETCH_HEAD)" = "$TASK_SHA"
-          git checkout -B "$TASK_BRANCH" "$TASK_SHA"
+          git checkout --detach "$TASK_SHA"
           git fetch origin main
-          if ! git merge --no-ff --no-commit origin/main; then
+          if ! git rebase origin/main; then
             test -n "$(git diff --name-only --diff-filter=U)"
           fi
       - name: Repair with Claude subscription
@@ -87,31 +90,37 @@ jobs:
           allowed_bots: 'github-actions[bot]'
           additional_permissions: |
             actions: read
-          claude_args: '--max-turns 25 --allowedTools "Bash(npm ci),Bash(npm test),Bash(git diff:*),Bash(git status:*)"'
+          claude_args: '--max-turns 25 --allowedTools "Bash(npm ci),Bash(npm test),Bash(git diff:*),Bash(git status:*),Bash(git add:*),Bash(git rebase --continue)"'
           prompt: |
             Repair PR #${{ inputs.pr_number }} on the already checked-out task branch.
             Read AGENTS.md and applicable package-info.md files. Read the PR description
             and both sides of the diff to understand the intended behavior. Resolve the
-            pending merge with origin/main and/or the CI failure while preserving both
+            pending rebase onto origin/main and/or the CI failure while preserving both
             tasks. Run npm ci and npm test. Never weaken or skip checks to make CI pass.
             Do not edit .github/, .claude/, AGENTS.md, CLAUDE.md or .mcp.json.
-            Do not commit, push, merge a PR, change labels or repository settings.
-            Leave file edits for the deterministic publishing step. If intent is
+            For each rebase conflict, edit the resolution, git add the resolved files, and
+            run git rebase --continue (GIT_EDITOR=true). Repeat until the rebase is
+            complete. Never git rebase --skip or discard another feature. Rebase
+            continuation may recreate existing commits; do not create other commits,
+            push, merge a PR, change labels or repository settings.
+            Leave additional CI-fix edits uncommitted for the publishing step. If intent is
             ambiguous, leave the conflict unresolved and explain the blocker.
       - name: Validate and commit repaired candidate
         shell: bash
         run: |
+          test ! -d "$(git rev-parse --git-path rebase-merge)"
+          test ! -d "$(git rev-parse --git-path rebase-apply)"
           git add -A
           test -z "$(git diff --name-only --diff-filter=U)"
           git diff --check
           git diff --cached --check
           npm ci
           npm test
-          node --test .github/scripts/integration.test.cjs
+          node --test .github/scripts/integration.test.cjs .github/scripts/rebase.test.cjs
           git add -A
           git diff --cached --check
-          if ! git diff --cached --quiet || test -f .git/MERGE_HEAD; then
-            git commit -m 'Integrate current main and repair failing checks'
+          if ! git diff --cached --quiet; then
+            git commit -m 'Repair failing checks after rebasing onto main'
           fi
       - name: Publish only the reserved task branch
         env:
@@ -119,14 +128,18 @@ jobs:
           TASK_SHA: ${{ steps.validate.outputs.sha }}
         shell: bash
         run: |
-          git fetch origin "$TASK_BRANCH"
+          git check-ref-format "refs/heads/$TASK_BRANCH"
+          git fetch origin "refs/heads/$TASK_BRANCH"
           test "$(git rev-parse FETCH_HEAD)" = "$TASK_SHA"
           git diff --exit-code origin/main HEAD -- .github .claude AGENTS.md CLAUDE.md .mcp.json
-          git push origin "HEAD:refs/heads/$TASK_BRANCH"
+          git push --force-with-lease="refs/heads/$TASK_BRANCH:$TASK_SHA" origin "HEAD:refs/heads/$TASK_BRANCH"
       - name: Request independent candidate validation
         uses: actions/github-script@v8
         with:
           script: |
+            try {
+              await github.rest.issues.removeLabel({ ...context.repo, issue_number: Number(context.payload.inputs.pr_number), name: 'integration-rebase-conflict' });
+            } catch (error) { if (error.status !== 404) throw error; }
             await github.rest.actions.createWorkflowDispatch({ ...context.repo, workflow_id: 'integration.yml', ref: 'main' });
       - name: Release reservation
         if: always()

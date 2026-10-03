@@ -33,7 +33,8 @@ function fixture(options = {}) {
       createWorkflowDispatch: wrap('dispatch', {}),
       approveWorkflowRun: wrap('approve', {}),
       listWorkflowRunArtifacts: wrap('artifacts', options.artifacts || []),
-      listWorkflowRuns: wrap('runs', args => args.workflow_id === 'integration-repair.yml' ? (options.repairRuns || []) :
+      listWorkflowRuns: wrap('runs', args => args.workflow_id === 'integration-rebase.yml' ? (options.rebaseRuns || []) :
+        args.workflow_id === 'integration-repair.yml' ? (options.repairRuns || []) :
         (args.head_sha === 'feature-sha' ? (options.headRuns || []) :
           (options.runs || [{ id: 10, head_sha: candidateSha, head_repository: { full_name: 'owner/game' }, status: 'completed', conclusion: 'success' }])))
     },
@@ -97,11 +98,11 @@ test('a bot PR approval request cannot override independently dispatched CI, but
   assert.equal(failed.calls.find(c => c.name === 'dispatch').args.workflow_id, 'integration-repair.yml');
 });
 
-test('merges a current passing collaborator task using an exact-head squash guard', async () => {
+test('merges a current passing collaborator task using an exact-head rebase guard', async () => {
   const f = fixture(); await f.run();
   assert.deepEqual(mutations(f.calls).map(c => c.name), ['merge']);
   assert.equal(f.calls.find(c => c.name === 'merge').args.sha, 'feature-sha');
-  assert.equal(f.calls.find(c => c.name === 'merge').args.merge_method, 'squash');
+  assert.equal(f.calls.find(c => c.name === 'merge').args.merge_method, 'rebase');
 });
 test('fails closed if required CI protection is missing or allows bypass', async () => {
   for (const protection of [ { enabled: false },
@@ -140,11 +141,41 @@ test('non-collaborator authors and automation changes are blocked before executi
     assert.ok(f.calls.some(c => c.name === 'labels' && c.args.labels.includes('integration-blocked')));
   }
 });
-test('updates a behind branch and waits for a recalculated merge candidate', async () => {
+test('reserves an exact-head deterministic rebase when a task is behind main', async () => {
   const f = fixture({ behind: true }); await f.run();
-  assert.deepEqual(mutations(f.calls).map(c => c.name), ['update']);
-  assert.equal(f.calls.find(c => c.name === 'update').args.expected_head_sha, 'feature-sha');
-  assert.equal(f.calls.some(c => c.name === 'dispatch'), false);
+  assert.deepEqual(mutations(f.calls).map(c => c.name), ['dispatch']);
+  const dispatch = f.calls.find(c => c.name === 'dispatch');
+  assert.equal(dispatch.args.workflow_id, 'integration-rebase.yml');
+  assert.equal(dispatch.args.ref, 'main');
+  assert.deepEqual(dispatch.args.inputs, { pr_number: '7', expected_head_sha: 'feature-sha' });
+  const reservation = f.calls.find(c => c.name === 'labels');
+  assert.deepEqual(reservation.args.labels, ['integration-rebasing']);
+  assert.ok(f.calls.indexOf(reservation) < f.calls.indexOf(dispatch));
+  assert.ok(!f.calls.some(c => c.name === 'update'));
+});
+test('active rebase reservations suppress duplicates and abandoned reservations recover', async () => {
+  const current = fixture({ behind: true, labels: ['integration-rebasing'] }); await current.run();
+  assert.deepEqual(mutations(current.calls), []);
+  const events = [{ event: 'labeled', label: { name: 'integration-rebasing' }, created_at: new Date(Date.now() - 31 * 60 * 1000).toISOString() }];
+  const active = fixture({ behind: true, labels: ['integration-rebasing'], events, rebaseRuns: [{ status: 'in_progress' }] });
+  await active.run(); assert.deepEqual(mutations(active.calls), []);
+  const abandoned = fixture({ behind: true, labels: ['integration-rebasing'], events }); await abandoned.run();
+  assert.equal(abandoned.calls.find(c => c.name === 'removeLabel').args.name, 'integration-rebasing');
+  assert.equal(abandoned.calls.find(c => c.name === 'dispatch').args.workflow_id, 'integration-rebase.yml');
+});
+test('rebase conflicts hold without retries or invoke optional bounded repair', async () => {
+  const held = fixture({ behind: true, repairEnabled: false, labels: ['integration-rebase-conflict'] });
+  await held.run(); assert.deepEqual(mutations(held.calls), []);
+  const repair = fixture({ behind: true, labels: ['integration-rebase-conflict'] }); await repair.run();
+  assert.equal(repair.calls.find(c => c.name === 'dispatch').args.workflow_id, 'integration-repair.yml');
+  const exhausted = fixture({ labels: ['integration-rebase-conflict', 'integration-attempt-2'] }); await exhausted.run();
+  assert.deepEqual(mutations(exhausted.calls), []);
+  assert.ok(exhausted.calls.some(c => c.name === 'labels' && c.args.labels.includes('integration-blocked')));
+});
+test('rebase dispatch failure releases the reservation', async () => {
+  const f = fixture({ behind: true, errors: { dispatch: new Error('unavailable') } });
+  await assert.rejects(f.run(), /unavailable/);
+  assert.equal(f.calls.find(c => c.name === 'removeLabel').args.name, 'integration-rebasing');
 });
 test('task-head success never substitutes for synthetic-candidate CI', async () => {
   const f = fixture({ runs: [{ id: 99, head_sha: 'feature-sha', head_repository: { full_name: 'owner/game' }, status: 'completed', conclusion: 'success' }] });
