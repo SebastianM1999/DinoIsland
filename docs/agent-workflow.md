@@ -4,6 +4,26 @@ Each developer uses their own clone. Each task uses a separate branch and worktr
 The repository's default branch is `main`; agents submit complete tasks as PRs.
 No human approval is required for ordinary task PRs. Automated checks are required.
 
+## Instructions at session start
+
+The repository-root `AGENTS.md` is the shared source for Codex, Claude and Copilot.
+Codex discovers it directly. Root `CLAUDE.md` imports it with `@AGENTS.md`.
+Copilot discovers `.github/copilot-instructions.md`, which directs it to AGENTS.md
+and includes the essential workflow itself. Keep Copilot custom instructions
+enabled in the client. All these files are tracked and travel with clones/worktrees;
+personal instruction files on one developer's computer are not required.
+
+Start sessions inside the project or its feature worktree. If starting on `main`
+or in the shared checkout, the agent must create an isolated feature worktree before
+editing. If resuming a feature, reuse its existing worktree, branch and PR rather
+than creating another PR. After pulling these instructions, restart existing
+sessions or explicitly ask them to reread AGENTS.md.
+
+Opening the finished feature's PR requires explicit push authorization under the
+shared Git rule. Once authorized, the agent must submit the PR and mark it
+`ready-to-merge`; a local commit alone is not a submitted feature. A platform that
+already creates a task PR should reuse it. Follow-up fixes remain in that one PR.
+
 ## Start and submit a task
 
 From a clean clone, use a unique developer/task name:
