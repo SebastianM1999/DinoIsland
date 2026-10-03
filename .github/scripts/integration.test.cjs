@@ -2,13 +2,14 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const integrate = require('./integration.cjs');
+const candidateSha = 'cccccccccccccccccccccccccccccccccccccccc';
 
 function fixture(options = {}) {
   const calls = [];
   const pr = { number: 7, state: 'open', draft: false, created_at: '2026-01-01', user: { login: 'developer' },
     labels: ['ready-to-merge', ...(options.labels || [])].map(name => ({ name })),
     head: { sha: 'feature-sha', ref: 'codex/task', repo: { full_name: options.fork ? 'other/game' : 'owner/game' } },
-    base: { ref: 'main', repo: { full_name: 'owner/game' } }, mergeable: true, mergeable_state: 'clean', ...options.pr };
+    base: { ref: 'main', repo: { full_name: 'owner/game' } }, mergeable: true, mergeable_state: 'clean', merge_commit_sha: candidateSha, ...options.pr };
   const wrap = (name, result) => async args => {
     calls.push({ name, args });
     if (options.errors?.[name]) throw options.errors[name];
@@ -31,8 +32,9 @@ function fixture(options = {}) {
     actions: {
       createWorkflowDispatch: wrap('dispatch', {}),
       listWorkflowRuns: wrap('runs', args => args.workflow_id === 'integration-repair.yml' ? (options.repairRuns || []) :
-        (options.runs || [{ id: 10, head_sha: 'feature-sha', head_repository: { full_name: 'owner/game' }, status: 'completed', conclusion: 'success' }]))
-    }
+        (options.runs || [{ id: 10, head_sha: candidateSha, head_repository: { full_name: 'owner/game' }, status: 'completed', conclusion: 'success' }]))
+    },
+    git: { createRef: wrap('createRef', {}), getRef: wrap('getRef', { object: { sha: options.existingCandidate || candidateSha } }), deleteRef: wrap('deleteRef', {}) }
   }, paginate: async (method, args) => typeof method === 'string' ? (options.rules || [{ type: 'required_status_checks',
     parameters: { strict_required_status_checks_policy: true, required_status_checks: [{ context: 'Node 22 tests', integration_id: 15368 }] },
     ruleset_source_type: 'Repository', ruleset_id: 24 }]) : (await method(args)).data,
@@ -52,8 +54,8 @@ function fixture(options = {}) {
 const mutations = calls => calls.filter(call => ['merge', 'update', 'dispatch'].includes(call.name));
 
 test('a bot PR approval request cannot override independently dispatched CI, but still requires a passing run', async () => {
-  const approval = { id: 12, event: 'pull_request', head_sha: 'feature-sha', head_repository: { full_name: 'owner/game' }, status: 'completed', conclusion: 'action_required' };
-  const passed = { id: 11, event: 'workflow_dispatch', head_sha: 'feature-sha', head_repository: { full_name: 'owner/game' }, status: 'completed', conclusion: 'success' };
+  const approval = { id: 12, event: 'pull_request', head_sha: candidateSha, head_repository: { full_name: 'owner/game' }, status: 'completed', conclusion: 'action_required' };
+  const passed = { id: 11, event: 'workflow_dispatch', head_sha: candidateSha, head_repository: { full_name: 'owner/game' }, status: 'completed', conclusion: 'success' };
   const good = fixture({ runs: [approval, passed] }); await good.run();
   assert.deepEqual(mutations(good.calls).map(c => c.name), ['merge']);
   const missing = fixture({ runs: [approval] }); await missing.run();
@@ -106,22 +108,47 @@ test('non-collaborator authors and automation changes are blocked before executi
     assert.ok(f.calls.some(c => c.name === 'labels' && c.args.labels.includes('integration-blocked')));
   }
 });
-test('updates a behind branch and explicitly dispatches CI instead of merging its stale success', async () => {
+test('updates a behind branch and waits for a recalculated merge candidate', async () => {
   const f = fixture({ behind: true }); await f.run();
-  assert.deepEqual(mutations(f.calls).map(c => c.name), ['update', 'dispatch']);
+  assert.deepEqual(mutations(f.calls).map(c => c.name), ['update']);
   assert.equal(f.calls.find(c => c.name === 'update').args.expected_head_sha, 'feature-sha');
-  assert.equal(f.calls.find(c => c.name === 'dispatch').args.workflow_id, 'ci.yml');
+  assert.equal(f.calls.some(c => c.name === 'dispatch'), false);
+});
+test('task-head success never substitutes for synthetic-candidate CI', async () => {
+  const f = fixture({ runs: [{ id: 99, head_sha: 'feature-sha', head_repository: { full_name: 'owner/game' }, status: 'completed', conclusion: 'success' }] });
+  await f.run(); assert.deepEqual(mutations(f.calls).map(c => c.name), ['dispatch']);
+  assert.equal(f.calls.find(c => c.name === 'runs').args.head_sha, candidateSha);
+  assert.equal(f.calls.find(c => c.name === 'createRef').args.sha, candidateSha);
+  assert.equal(f.calls.find(c => c.name === 'dispatch').args.ref, 'integration/ci-pr-7-cccccccccccccccc');
+});
+test('missing or invalid merge candidate waits without accepting head checks', async () => {
+  for (const merge_commit_sha of [null, 'invalid']) {
+    const f = fixture({ pr: { merge_commit_sha } }); await f.run(); assert.deepEqual(mutations(f.calls), []);
+  }
+});
+test('existing candidate branch is reused only if it points to the exact candidate', async () => {
+  const exists = Object.assign(new Error('already exists'), { status: 422 });
+  const f = fixture({ runs: [], errors: { createRef: exists } }); await f.run();
+  assert.equal(f.calls.find(c => c.name === 'dispatch').args.ref, 'integration/ci-pr-7-cccccccccccccccc');
+  const mismatch = fixture({ runs: [], errors: { createRef: exists }, existingCandidate: 'wrong-commit' });
+  await assert.rejects(mismatch.run(), /unexpected commit/); assert.ok(!mismatch.calls.some(c => c.name === 'dispatch'));
+});
+test('successful merge cleans up only its exact candidate ref', async () => {
+  const f = fixture(); await f.run();
+  assert.equal(f.calls.find(c => c.name === 'deleteRef').args.ref, 'heads/integration/ci-pr-7-cccccccccccccccc');
+  const changed = fixture({ existingCandidate: 'wrong-commit' }); await changed.run();
+  assert.ok(!changed.calls.some(c => c.name === 'deleteRef'));
 });
 test('pending or wrong-head CI never allows a merge', async () => {
-  const pending = fixture({ runs: [{ id: 11, head_sha: 'feature-sha', head_repository: { full_name: 'owner/game' }, status: 'in_progress' }] });
+  const pending = fixture({ runs: [{ id: 11, head_sha: candidateSha, head_repository: { full_name: 'owner/game' }, status: 'in_progress' }] });
   await pending.run(); assert.deepEqual(mutations(pending.calls), []);
   const wrong = fixture({ runs: [{ id: 11, head_sha: 'old-sha', head_repository: { full_name: 'owner/game' }, status: 'completed', conclusion: 'success' }] });
   await wrong.run(); assert.deepEqual(mutations(wrong.calls).map(c => c.name), ['dispatch']);
 });
 test('latest failed run wins over older success and reserves a bounded repair', async () => {
   const f = fixture({ runs: [
-    { id: 10, head_sha: 'feature-sha', head_repository: { full_name: 'owner/game' }, status: 'completed', conclusion: 'success' },
-    { id: 11, head_sha: 'feature-sha', head_repository: { full_name: 'owner/game' }, status: 'completed', conclusion: 'failure' }
+    { id: 10, head_sha: candidateSha, head_repository: { full_name: 'owner/game' }, status: 'completed', conclusion: 'success' },
+    { id: 11, head_sha: candidateSha, head_repository: { full_name: 'owner/game' }, status: 'completed', conclusion: 'failure' }
   ] }); await f.run();
   const reserve = f.calls.find(c => c.name === 'labels');
   assert.deepEqual(reserve.args.labels, ['integration-attempt-1', 'integration-repairing']);
@@ -143,7 +170,7 @@ test('unknown mergeability waits without spending a repair attempt', async () =>
   const f = fixture({ pr: { mergeable: null, mergeable_state: 'unknown' } }); await f.run(); assert.deepEqual(mutations(f.calls), []);
 });
 test('recent bot CI dispatch suppresses duplicates, while user comments cannot suppress CI', async () => {
-  const comment = { body: '<!-- integration-ci:feature-sha -->', created_at: new Date().toISOString(), user: { login: 'github-actions[bot]' } };
+  const comment = { body: '<!-- integration-ci:' + candidateSha + ' -->', created_at: new Date().toISOString(), user: { login: 'github-actions[bot]' } };
   const f = fixture({ runs: [], comments: [comment] }); await f.run(); assert.deepEqual(mutations(f.calls), []);
   const forged = fixture({ runs: [], comments: [{ ...comment, user: { login: 'developer' } }] });
   await forged.run(); assert.equal(mutations(forged.calls)[0].name, 'dispatch');
@@ -171,7 +198,7 @@ test('an orphan repair reservation expires only after 30 minutes with no active 
 });
 test('disabled repair on an older task does not starve a later passing task', async () => {
   const second = { number: 8, state: 'open', draft: false, user: { login: 'developer' }, labels: [{ name: 'ready-to-merge' }],
-    head: { sha: 'feature-sha', ref: 'codex/second', repo: { full_name: 'owner/game' } }, base: { ref: 'main', repo: { full_name: 'owner/game' } }, mergeable: true, mergeable_state: 'clean' };
+    head: { sha: 'feature-sha', ref: 'codex/second', repo: { full_name: 'owner/game' } }, base: { ref: 'main', repo: { full_name: 'owner/game' } }, mergeable: true, mergeable_state: 'clean', merge_commit_sha: candidateSha };
   const f = fixture({ repairEnabled: false, pr: { mergeable: false, mergeable_state: 'dirty' }, otherPrs: [second] });
   await f.run(); assert.equal(f.calls.find(c => c.name === 'merge').args.pull_number, 8);
 });
