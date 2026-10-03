@@ -127,6 +127,17 @@ module.exports = async function integrate({ github, context, core }) {
       // Wait for GitHub to recalculate mergeability and its synthetic commit after updating.
       return;
     }
+    // GitHub may require approval for bot-created PR runs even after author and source checks.
+    // Approve only this trusted same-repository PR's exact task-head CI from GitHub Actions.
+    const headRuns = await github.paginate(api.actions.listWorkflowRuns, { ...repo, workflow_id: 'ci.yml', head_sha: pr.head.sha, per_page: 100 });
+    const awaitingApproval = headRuns.filter(run => run.head_sha === pr.head.sha && run.event === 'pull_request'
+      && run.conclusion === 'action_required' && run.actor?.login === 'github-actions[bot]'
+      && run.head_repository?.full_name === pr.base.repo.full_name
+      && run.pull_requests?.some(pull => pull.number === pr.number)).sort((a, b) => b.id - a.id)[0];
+    if (awaitingApproval) {
+      await api.actions.approveWorkflowRun({ ...repo, run_id: awaitingApproval.id });
+      return;
+    }
     const candidate = pr.merge_commit_sha;
     if (!/^[a-f0-9]{40}$/i.test(candidate || '')) continue;
     const runs = await github.paginate(api.actions.listWorkflowRuns, { ...repo, workflow_id: 'ci.yml', head_sha: candidate, per_page: 100 });
