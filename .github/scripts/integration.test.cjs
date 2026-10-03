@@ -31,8 +31,10 @@ function fixture(options = {}) {
     },
     actions: {
       createWorkflowDispatch: wrap('dispatch', {}),
+      approveWorkflowRun: wrap('approve', {}),
       listWorkflowRuns: wrap('runs', args => args.workflow_id === 'integration-repair.yml' ? (options.repairRuns || []) :
-        (options.runs || [{ id: 10, head_sha: candidateSha, head_repository: { full_name: 'owner/game' }, status: 'completed', conclusion: 'success' }]))
+        (args.head_sha === 'feature-sha' ? (options.headRuns || []) :
+          (options.runs || [{ id: 10, head_sha: candidateSha, head_repository: { full_name: 'owner/game' }, status: 'completed', conclusion: 'success' }])))
     },
     git: { createRef: wrap('createRef', {}), getRef: wrap('getRef', { object: { sha: options.existingCandidate || candidateSha } }), deleteRef: wrap('deleteRef', {}) }
   }, paginate: async (method, args) => typeof method === 'string' ? (options.rules || [{ type: 'required_status_checks',
@@ -51,7 +53,7 @@ function fixture(options = {}) {
     }
   } };
 }
-const mutations = calls => calls.filter(call => ['merge', 'update', 'dispatch'].includes(call.name));
+const mutations = calls => calls.filter(call => ['merge', 'update', 'dispatch', 'approve'].includes(call.name));
 
 test('a bot PR approval request cannot override independently dispatched CI, but still requires a passing run', async () => {
   const approval = { id: 12, event: 'pull_request', head_sha: candidateSha, head_repository: { full_name: 'owner/game' }, status: 'completed', conclusion: 'action_required' };
@@ -117,9 +119,24 @@ test('updates a behind branch and waits for a recalculated merge candidate', asy
 test('task-head success never substitutes for synthetic-candidate CI', async () => {
   const f = fixture({ runs: [{ id: 99, head_sha: 'feature-sha', head_repository: { full_name: 'owner/game' }, status: 'completed', conclusion: 'success' }] });
   await f.run(); assert.deepEqual(mutations(f.calls).map(c => c.name), ['dispatch']);
-  assert.equal(f.calls.find(c => c.name === 'runs').args.head_sha, candidateSha);
+  assert.ok(f.calls.some(c => c.name === 'runs' && c.args.head_sha === candidateSha));
   assert.equal(f.calls.find(c => c.name === 'createRef').args.sha, candidateSha);
   assert.equal(f.calls.find(c => c.name === 'dispatch').args.ref, 'integration/ci-pr-7-cccccccccccccccc');
+});
+test('approves only GitHub Actions exact-head CI for the validated same-repository PR', async () => {
+  const approval = { id: 71, event: 'pull_request', head_sha: 'feature-sha', conclusion: 'action_required', actor: { login: 'github-actions[bot]' },
+    head_repository: { full_name: 'owner/game' }, pull_requests: [{ number: 7 }] };
+  const good = fixture({ headRuns: [approval] }); await good.run();
+  assert.deepEqual(mutations(good.calls).map(c => c.name), ['approve']);
+  assert.equal(good.calls.find(c => c.name === 'approve').args.run_id, 71);
+  for (const change of [{ head_sha: 'old-sha' }, { event: 'workflow_dispatch' }, { actor: { login: 'outsider' } },
+    { head_repository: { full_name: 'other/game' } }, { pull_requests: [{ number: 8 }] }, { pull_requests: [] }]) {
+    const f = fixture({ headRuns: [{ ...approval, ...change }] }); await f.run();
+    assert.ok(!f.calls.some(c => c.name === 'approve'));
+  }
+  for (const options of [{ fork: true }, { permission: 'read' }, { files: [{ filename: 'AGENTS.md' }] }, { behind: true }]) {
+    const f = fixture({ ...options, headRuns: [approval] }); await f.run(); assert.ok(!f.calls.some(c => c.name === 'approve'));
+  }
 });
 test('missing or invalid merge candidate waits without accepting head checks', async () => {
   for (const merge_commit_sha of [null, 'invalid']) {
