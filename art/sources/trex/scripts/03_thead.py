@@ -1,5 +1,5 @@
 
-for n in ('TrexHead', 'TrexJaw', 'TrexEyes', 'TrexPupils', 'TrexLids', 'TrexTeethUp', 'TrexTeethLow', 'TrexKnobs'): remove(n)
+for n in ('TrexHead', 'TrexJaw', 'TrexEyes', 'TrexPupils', 'TrexLids', 'TrexGlints', 'TrexTongue', 'TrexTeethUp', 'TrexTeethLow', 'TrexKnobs'): remove(n)
 def map_sec(y, half, xs=1.0, zs=1.0):
     zm = (half[0][1] + half[-1][1]) / 2
     q = [MAPP(x * xs, y, zm + (z - zm) * zs) for x, z in half]; return (q[0].y, [(p.x, p.z) for p in q])
@@ -25,24 +25,22 @@ for v in head.data.vertices:
         p += V((0, 0, .014)) * math.exp(-((p.y - MAPP(0, yy, 0).y)/.04)**2) * smooth(MAPP(0,0,1.39).z, MAPP(0,0,1.35).z, p.z)
     v.co = p
 head.data.update()
-T_ = [(0,0.9),(0.5,0.93),(0.82,1.0),(0.97,0.9),(1.0,0.62),(0.92,0.3),(0.72,0.1),(0.4,0.015),(0,0.0)]
+# lower jaw (mouth.py): flat sides to a jawline keel, thin inward-rolled lip (the lower teeth are rooted
+# on it by lip_at below), mouth trough + tongue
+exec(bpy.data.texts['mouth'].as_string(), globals())
 JT = MAPP(0, 0, 1.348).z
-JS = []
+JS_ = []
 for y, w, bot in JAW_SECS:
-    yy = MAPP(0, y, 0).y; ww = w * 1.32 * 0.86 * (1.22 if y < -1.0 else 1); bb = JT - (1.348 - bot) * 1.75
-    JS.append((yy, [(tx*ww, bb + tz*(JT-bb)) for tx, tz in T_]))
+    JS_.append((MAPP(0, y, 0).y, w * 1.32 * 0.86 * (1.22 if y < -1.0 else 1), JT - (1.348 - bot) * 1.75))
+JS = [(yy, jaw_prof(ww, bb, JT, 0.035 * trough_fade(yy, JS_[-1][0], JS_[0][0]))) for yy, ww, bb in JS_]
 jaw = loft2('TrexJaw', JS)
+_ym = (JS_[0][0] + JS_[-1][0]) / 2
+add_tongue('TrexTongue', (0, _ym - .03, JT - .026), (.07, .22, .014), seg=(16, 10))
 EYE = MAPP(.15, -0.805, 1.505)
-bm = bmesh.new()
-for sx in (1, -1): blob_bm(bm, V((sx*EYE.x, EYE.y, EYE.z)), (.036, .04, .037), (0, 0, -sx*0.35), 24, 16)
-mk('TrexEyes', bm)
-bm = bmesh.new()
-for sx in (1, -1):
-    d = V((sx*math.cos(.35), -math.sin(.35), 0)); blob_bm(bm, V((sx*EYE.x, EYE.y, EYE.z)) + d*.032, (.005, .008, .028), (0, 0, -sx*0.35), 16, 10)
-mk('TrexPupils', bm)
-bm = bmesh.new()
-for sx in (1, -1): blob_bm(bm, V((sx*EYE.x, EYE.y, EYE.z + .02)), (.042, .049, .025), (0.45, -sx*0.1, -sx*0.35), 24, 14)
-mk('TrexLids', bm)
+# living eyes (eyes.py): apex predator -> slim opening slanting down toward the snout, slit pupil
+exec(bpy.data.texts['eyes'].as_string(), globals())
+T_E = dict(c=tuple(EYE), R=.04, yaw=.35, W=.9, Ht=.38, Hb=.5, tilt=.34, rim=(.26, .07), pupil=(.09, .34), iris=.78)
+build_eyes('Trex', T_E)
 bm = bmesh.new()   # brow hornlets + cheek bosses (reference: bony knobs over the eyes)
 for sx in (1, -1):
     for k, (dy, dz, r) in enumerate(((.03, .07, .03), (.075, .065, .026), (.115, .05, .02))):

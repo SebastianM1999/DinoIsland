@@ -13,8 +13,9 @@ wider, much deeper T-Rex skull (`MAPP`). The model is authored at raptor scale
 
 | Script | Builds |
 | --- | --- |
+| `eyes`, `mouth` | skill helpers: living eyes (slim slanted lid opening, slit pupil, catchlights) and lower jaw (jawline keel, inward lip the lower teeth root in, mouth trough, tongue) |
 | `tbody` | skin-modifier skeleton: horizontal trunk, thick neck, massive thighs, 3-toed feet, tiny 2-finger arms |
-| `thead` | blunt boxy skull with brow ridge, jaw muscles, nasal bumps, brow hornlets, amber eyes, two rows of teeth |
+| `thead` | blunt boxy skull with brow ridge, jaw muscles, nasal bumps, brow hornlets, living amber eyes (`eyes`), keel-profile lower jaw with mouth trough + tongue (`mouth`), two rows of teeth |
 | `tmerge` | fuses skull, lower jaw and body into one mesh (exact boolean union, smoothed fillet at the neck). Ahead of the mouth corner the jaw top is pressed just under the skull so the lips never weld; the corner skin stretches when the jaw opens. Region weights drive Head/Jaw skinning and paint |
 | `tparts` | foot and hand claws, low bony scutes along neck/back/tail |
 | `tpaint` | grey hide (`rex_skin` in `tlib`): dark back, grey flanks, dark mottling, cream throat/belly, dark eye mask, pink mouth; teeth rooted in the measured gum line |
