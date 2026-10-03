@@ -70,12 +70,32 @@
 - Teeth: `horn_bm` cones, curved slightly back, sizes alternating, 1-2 bigger fangs. **Root every
   tooth in the measured lip line** (`lip_at()` on the evaluated head/jaw), base 3 cm inside the
   gum, and stop the row before the snout tip (teeth past the tip clump and stick forward).
-- Eyes: glossy blob + pupil blob placed on the eye surface along the eye's outward axis; angry lid
-  blob rotated so its lower edge slants down toward the snout. Eye sits in the socket, not on top.
+- Eyes: use `eyes.py` (`build_eyes` + `paint_eyes`), never a ball + button pupil + cap lid (the owner
+  called those lifeless). See §4b.
 - Claws/spikes: `horn_bm` with the 'ht' layer for base→tip gradients (`paint_t`). Dorsal spikes:
   ray-cast the body top (`scene.ray_cast`) for their bases; flatten sideways (`flat=0.4-0.55`).
 - All of these are separate rigid islands (one bone each) — that's fine because they are small and
   embedded. The skull, jaw and neck are NOT (see §5).
+
+## 4b. Living eyes (`eyes.py`)
+
+Why the old eyes looked dead: flat single-colour ball, black bump pupil, a lid that sat on top like a
+hat, no highlight. `build_eyes(prefix, E)` / `paint_eyes(prefix, E, P, gloss, skin)` fix all four:
+
+- **Catchlights:** two white glints (big front-top, small opposite) on the gloss material. The single
+  biggest gain; they read even at preview distance. Keep them inside the lid opening (move them down
+  when the opening gets slimmer, or the upper lid hides them).
+- **Lids wrap the ball:** an almond opening (`W`, `Ht`, `Hb` in units of R); the ball outside it is
+  painted as lid skin and uses the skin material; a rolled rim (`rim` = upper, lower thickness), heavy
+  upper lid, thin lower lid.
+- **Mood = `tilt`:** `+` lifts the back corner / drops the snout-side corner = angry (owner wants
+  "a bit angry": Triceratops `Ht .42, Hb .5, tilt .24`); `-` = droopy/sad. The sign was wrong once and
+  produced a sad face - check a close-up from the side.
+- **Iris:** limbal ring, radial streaks, glow ring round the pupil, shadow under the upper lid.
+- **Pupil:** a curved disc lying on the ball (crisp at any ball density). Round for herbivores
+  (`pupil=(.27, .3)`), slit for predators (e.g. `(.09, .34)`).
+- Eye radius ~0.14 at 8 m body length; sink the centre ~0.045 below the measured head surface.
+- Rigid on Head like before (Eyes, Lids, Pupils, Glints). Cost ~2.5k triangles for both eyes.
 
 ## 5. One fluid mesh (head, jaw, neck)
 
@@ -91,6 +111,32 @@ palate, cheek skin stretching smoothly.
 Dead ends: voxel remesh (dropped the Skin-modifier trunk), boolean slit cutter (boxy planes and a
 stray sheet), soft head/jaw split (upper lip followed the jaw and tore the snout).
 
+## 5b. Lower jaw and mouth (owner: "not happy with the bottom jaw")
+
+Researched against creature-topology guides (lips roll inward, an inner mouth so an open mouth never shows
+empty space, a jawline from chin to ear) and ceratopsid jaw anatomy (deep dentary, deepest at the back,
+separate pointed predentary beak). Rejected version: a round "sausage" loft with a flat top that hung
+like a pouch under the snout.
+
+- **Cross-section** (front to back, half profile from the top centre): mouth trough centre
+  (`MOUTH - 0.08`) -> inner lip edge -> thin cutting lip at the mouth line (0.8 w) -> outer lip ->
+  widest flat side (1.0 w at a third of the depth) -> narrowing side -> jawline keel (0.5 w, 0.18 w)
+  -> bottom centre. The trough fades out at the beak tip and at the hinge.
+  See `art/sources/triceratops/scripts/12_thead.py` `tr_jaw_prof`.
+- **Side profile:** shallow (~0.3 m at 8 m length), straight bottom edge rising toward the front,
+  deepest under the cheek. Lower jaw narrower than the upper lip at every section (overbite).
+- **Beak/snout tip:** the lower tip ends BEHIND the upper beak's hook, otherwise the boolean welds them
+  and a strand of skin stretches between the beak tips when the mouth opens.
+- **Tongue:** a flat blob in the trough, top just under the lip line (hidden when closed), rigid on Jaw.
+- **Lip gap scales with size:** `fuse_head(lip_gap=...)` 0.006 at raptor scale, ~0.02 at 8 m.
+- **Cheeks (herbivores):** put the mouth corner well forward (Triceratops `corner_y` -3.45 of a
+  beak at -4.1) and blend Head -> Jaw weights over a band round the lip line behind it (`tr_cheeks` in
+  `art/sources/triceratops/scripts/17_tskin.py`), so the mouth does not split open to the hinge.
+- **Paint:** mouth colour in the trough and on the palate, beak colour on the cutting lip.
+- **Verify:** close-ups at jaw 0 and 0.52 rad (the game's roar overlay) from side, 3/4, front and
+  below; `check_glb.mjs` prints `jaw skin N verts` (must be hundreds); `ground_report` again - a jaw
+  that really opens can push the lower beak below the ground in grazing/run poses.
+
 ## 6. Skinning
 
 - Bone heat (`ARMATURE_AUTO`) is fine on clean meshes but **fails on fused/boolean meshes**
@@ -98,6 +144,8 @@ stray sheet), soft head/jaw split (upper lip followed the jaw and tore the snout
   `distance_weights()`.
 - Then `crisp_chain()` for every limb below the thigh/shoulder (σ ≈ 0.015-0.025 at raptor scale),
   then `head_jaw_regions()`. Remove stray `Jaw`/`root` influence from the body before that.
+- `set_weights` must keep the fuse region groups (`rg_*`): `distance_weights` runs before
+  `head_jaw_regions`, and wiping them left stego and ptera with NO jaw skin (mouth never opened).
 - `check_weights()` must return 0. A single unweighted vertex shows up as a long spike in poses.
 - Rigid parts: `rigid_islands()`; claws on the same bone as the skin around them.
 
