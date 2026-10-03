@@ -107,6 +107,8 @@ head's CI and explicitly wakes integration on completion. This avoids relying on
 chained workflow completion events, which GitHub may suppress. It uses no AI and
 does not execute feature code. The wait stops after 17 minutes and holds the PR
 with an explanatory comment if CI never finishes; it does not poll while idle.
+A new rebase/repair reservation stops the previous CI wait so the queued replacement
+can start when main advances during integration.
 
 Conflicts or failing CI may trigger at most two Claude repair attempts, each capped
 at 25 turns/25 minutes. Claude resolves each pending rebase conflict and continues

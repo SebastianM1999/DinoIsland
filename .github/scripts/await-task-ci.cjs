@@ -26,6 +26,9 @@ module.exports = async function awaitTaskCi({ github, context, core, prNumber, e
     if (pr.draft || pr.base.ref !== 'main' || pr.head.repo?.full_name !== fullName
       || pr.base.repo?.full_name !== fullName || !labels.has('ready-to-merge')
       || labels.has('integration-blocked')) return 'PR no longer eligible; stopped.';
+    if (labels.has('integration-rebasing') || labels.has('integration-repairing')) {
+      return 'New integration reservation supersedes this CI wait; stopped.';
+    }
     const permission = (await api.repos.getCollaboratorPermissionLevel({ ...repo, username: pr.user.login })).data.permission;
     if (!['write', 'maintain', 'admin'].includes(permission)) return 'Author lacks write permission; stopped.';
     if (pr.head.sha !== expectedHead) {
