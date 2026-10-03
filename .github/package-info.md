@@ -24,6 +24,7 @@
 - Superseded CI runs are cancelled per PR or ref to limit runner usage.
 - Successful rebase/repair publication starts a separate metadata-only wait job (17-minute wait, 20-minute job limit) with trusted-main checkout. It wakes integration after current-revision CI completes, stops on closed/ineligible tasks, and holds timed-out tasks with a comment. There is no idle schedule and CI itself remains read-only. Rebase/repair completion events are replaced by explicit handoffs to avoid missed recursive workflow_run events.
 - Update feature branches by rebase, never by merging main into them. Land passing feature PRs with GitHub Rebase and merge. GitHub automatically deletes merged remote PR branches; local worktrees are cleaned only when safe.
+- After a successful API merge, the controller also removes the feature ref if its observed SHA still matches the integrated head, preserving advanced branches and main. This covers API merges where the repository auto-delete setting leaves the ref behind.
 - Only reserved feature branches may be rewritten, using force-with-lease pinned to the validated head SHA. Never rewrite main or overwrite concurrent changes. The rebase-conflict label holds a PR for optional repair, and rebasing reservations prevent duplicate dispatches.
 - Workflows must not execute untrusted pull-request code with write tokens or secrets.
 - AI repairs may execute same-repository code authored by collaborators with write access. Those collaborators are trusted; outside authors and forks never enter privileged repairs or merging.

@@ -203,6 +203,19 @@ module.exports = async function integrate({ github, context, core }) {
       if (!result.data.merged) core.info(`PR ${pr.number}: GitHub declined the merge.`);
       else {
         core.info(`PR ${pr.number}: merged successfully with Rebase and merge.`);
+        // API merges may leave the feature ref behind despite the repository auto-delete setting.
+        // Preserve an advanced branch and never delete main.
+        if (pr.head.ref !== 'main') {
+          try {
+            const taskRef = (await api.git.getRef({ ...repo, ref: `heads/${pr.head.ref}` })).data;
+            if (taskRef.object.sha === pr.head.sha) {
+              await api.git.deleteRef({ ...repo, ref: `heads/${pr.head.ref}` });
+              core.info(`PR ${pr.number}: deleted the merged feature branch.`);
+            } else core.info(`PR ${pr.number}: preserved a feature branch that advanced after validation.`);
+          } catch (error) {
+            if (error.status !== 404) core.warning(`PR ${pr.number}: feature branch cleanup deferred (${error.status || 'request error'}).`);
+          }
+        }
         const candidateBranch = `integration/ci-pr-${pr.number}-${candidate.slice(0, 16)}`;
         try {
           const existing = (await api.git.getRef({ ...repo, ref: `heads/${candidateBranch}` })).data;
