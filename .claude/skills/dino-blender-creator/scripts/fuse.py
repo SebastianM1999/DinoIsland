@@ -40,6 +40,7 @@ def fuse_head(body_name, head_name, jaw_name, corner_y, mouth_z, lip_gap=0.006, 
     for me in (head_me, jaw_me):
         tmp = bpy.data.objects.new('fuse_tmp', me); bpy.context.scene.collection.objects.link(tmp)
         bo = ob.modifiers.new('Union', 'BOOLEAN'); bo.operation = 'UNION'; bo.solver = 'EXACT'; bo.object = tmp
+        bo.use_self = True   # without it the jaw union of a long-snouted skull (spino) left a 21-vertex scrap
         bpy.ops.object.modifier_apply(modifier='Union')
         bpy.data.objects.remove(tmp, do_unlink=True); bpy.data.meshes.remove(me)
     bm = bmesh.new(); bm.from_mesh(ob.data)
@@ -87,7 +88,7 @@ def union_fillet(base_name, other_name, width=0.16, iters=40, head_back_y=None):
     Bb, Bo = _bvh(_bake(base)), _bvh(_bake(other))
     for o in bpy.context.selected_objects: o.select_set(False)
     bpy.context.view_layer.objects.active = base; base.select_set(True)
-    bo = base.modifiers.new('Union', 'BOOLEAN'); bo.operation = 'UNION'; bo.solver = 'EXACT'; bo.object = other
+    bo = base.modifiers.new('Union', 'BOOLEAN'); bo.operation = 'UNION'; bo.solver = 'EXACT'; bo.object = other; bo.use_self = True
     bpy.ops.object.modifier_apply(modifier='Union'); remove(other_name)
     bm = bmesh.new(); bm.from_mesh(base.data)
     bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=1e-5); bmesh.ops.dissolve_degenerate(bm, edges=bm.edges, dist=1e-5)
