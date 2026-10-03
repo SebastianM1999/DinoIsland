@@ -32,6 +32,13 @@ confirming their work is merged and no local changes need preserving.
 1. Enable GitHub Actions. Protect `main`: require `Node 22 tests` from GitHub Actions
    (app ID 15368), require up-to-date branches, enforce the rule for administrators,
    require PRs with zero approving reviews, and disable force pushes/deletions.
+   Also keep the active repository ruleset **Tested agent integration** on `main`,
+   with the same strict required check and no bypass actors. The controller reads
+   effective rules through GitHub's metadata API; it needs no administrator token.
+   After verifying no bypass actors as an administrator, store the ruleset's
+   `updated_at` value in Actions variable `INTEGRATION_RULESET_UPDATED_AT`. Any
+   ruleset edit pauses integration until an administrator verifies and repins it.
+   This approved snapshot covers bypass metadata GitHub hides from workflow tokens.
 2. Create labels `ready-to-merge`, `integration-blocked`, `integration-repairing`,
    `integration-attempt-1`, and `integration-attempt-2`.
 3. Set repository Actions variable `AUTOMERGE_ENABLED=true` to enable the controller.

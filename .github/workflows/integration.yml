@@ -29,6 +29,7 @@ jobs:
     timeout-minutes: 5
     env:
       CLAUDE_REPAIR_ENABLED: ${{ vars.CLAUDE_REPAIR_ENABLED }}
+      INTEGRATION_RULESET_UPDATED_AT: ${{ vars.INTEGRATION_RULESET_UPDATED_AT }}
     steps:
       # Never check out or execute the PR here: this job has write permissions.
       - uses: actions/checkout@v6
