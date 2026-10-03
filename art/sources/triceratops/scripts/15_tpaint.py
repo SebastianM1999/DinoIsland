@@ -1,6 +1,6 @@
 # Vertex colours: dusty orange-brown hide with dark mottling on the back, cream belly and throat,
 # darker scaly lower legs, a dark grey hooked beak, rust-red frill (darker centre, warm orange rim
-# band, freckles), bone-cream horns and knobs with brown bases, grey hoof-nails, amber eyes.
+# band, freckles), bone-cream horns and knobs with brown bases, grey hoof-nails, amber eyes with iris rings and catchlights ('eyes').
 exec(bpy.data.texts['fuse'].as_string(), globals())
 skinm = vc_mat('TriSkin', 0.62, 0.35); gloss = vc_mat('TriGloss', 0.25, 0.55)
 
@@ -44,17 +44,12 @@ def tr_frill_fn(p, n):
     return shade(mix(c, TP['back'], back * 0.45), 1.0 + 0.06 * fbm(p, 6.0))
 paint(bpy.data.objects['TriFrill'], tr_frill_fn)
 
-def tr_eye_fn(p, n):
-    sx = 1 if p.x >= 0 else -1
-    front = V((sx * TR_EYE.x, TR_EYE.y, TR_EYE.z)) + V((sx * math.cos(TR_EYE_YAW), -math.sin(TR_EYE_YAW), 0)) * TR_EYE_R * .8
-    return mix(TP['eye'], TP['eye2'], smooth(.05, .13, (p - front).length))
-paint(bpy.data.objects['TriEyes'], tr_eye_fn)
-paint(bpy.data.objects['TriPupils'], lambda p, n: TP['pupil'])
-paint(bpy.data.objects['TriLids'], lambda p, n: mix(TP['lid'], TP['back2'], smooth(0.2, -0.4, n.z) * 0.6))
+exec(bpy.data.texts['eyes'].as_string(), globals())
+paint_eyes('Tri', TR_E, dict(iris=lin('#f0b030'), iris2=lin('#a85a14'), glow=lin('#ffe07a'), limbal=lin('#2e1a0a'),
+                             pupil=TP['pupil'], sclera=lin('#d6c4a0'), lid=TP['lid'], lid2=TP['back2']), gloss, skinm)
 paint(bpy.data.objects['TriNails'], lambda p, n: mix(TP['nail2'], TP['nail'], smooth(0.02, 0.12, p.z)))
 paint_t(bpy.data.objects['TriHorns'], lambda p, t: mix(TP['hornb'], TP['horn'], smooth(0.05, 0.55, t)))
 paint_t(bpy.data.objects['TriKnobs'], lambda p, t: mix(TP['frillrim'], TP['horn'], smooth(0.1, 0.7, t)))
-for o in bpy.data.objects:
-    if o.type == 'MESH' and o.name.startswith('Tri'):
-        o.data.materials.clear()
-        o.data.materials.append(gloss if o.name in ('TriEyes', 'TriPupils') else skinm)
+for o in bpy.data.objects:                                   # eyes, lids, glints got theirs in paint_eyes
+    if o.type == 'MESH' and o.name.startswith('Tri') and o.name not in ('TriEyes', 'TriLids', 'TriGlints', 'TriPupils'):
+        o.data.materials.clear(); o.data.materials.append(skinm)

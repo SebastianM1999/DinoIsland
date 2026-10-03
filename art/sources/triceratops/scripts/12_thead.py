@@ -1,6 +1,6 @@
 # Big wedge head: wide cheeks at the back, tapering snout ending in a hooked parrot beak.
 # Skull + lower jaw are lofts; 'tfuse' welds them with the neck into ONE mesh.
-for n in ('TriHead', 'TriJaw', 'TriEyes', 'TriPupils', 'TriLids'): remove(n)
+for n in ('TriHead', 'TriJaw', 'TriEyes', 'TriGlints', 'TriPupils', 'TriLids'): remove(n)
 TR_MOUTH = 1.25; TR_CORNER = -3.2
 
 def tr_prof(w, top, bot, brow=0.0):
@@ -37,21 +37,13 @@ TR_JS = [(-2.5, .3, 1.02), (-2.68, .38, .86), (-2.96, .36, .86), (-3.2, .3, .9),
          (-3.82, .12, 1.03), (-3.93, .055, 1.08)]
 jaw = loft2('TriJaw', [(y, [(tx * w, bot + tz * (TR_MOUTH - bot)) for tx, tz in TR_JT]) for y, w, bot in TR_JS])
 
-# eyes sit IN the measured head surface (ray cast from outside), slightly sunk
+# eyes sit IN the measured head surface (ray cast from outside), slightly sunk; 'eyes' builds the ball,
+# the almond lid rim and the catchlights (calm herbivore: round pupil, outer corner drooping a little)
+exec(bpy.data.texts['eyes'].as_string(), globals())
 dg = bpy.context.evaluated_depsgraph_get(); eh = head.evaluated_get(dg)
 hit = eh.ray_cast(V((2.0, TR_EYE0.y, TR_EYE0.z)), V((-1, 0, 0)))
-TR_EYE = V((hit[1].x - .035, TR_EYE0.y, TR_EYE0.z)) if hit[0] else TR_EYE0
-TR_EYE_R = .125; TR_EYE_YAW = 0.25
-bm = bmesh.new()
-for sx in (1, -1): blob_bm(bm, V((sx * TR_EYE.x, TR_EYE.y, TR_EYE.z)), (TR_EYE_R * .8, TR_EYE_R, TR_EYE_R), (0, 0, -sx * TR_EYE_YAW), 24, 16)
-mk('TriEyes', bm)
-bm = bmesh.new()
-for sx in (1, -1):
-    d = V((sx * math.cos(TR_EYE_YAW), -math.sin(TR_EYE_YAW), 0))
-    blob_bm(bm, V((sx * TR_EYE.x, TR_EYE.y, TR_EYE.z - .006)) + d * TR_EYE_R * .7, (.022, .045, .048), (0, 0, -sx * TR_EYE_YAW), 16, 10)
-mk('TriPupils', bm)
-bm = bmesh.new()   # soft upper lid covering ~35 %, level edge (calm, not angry)
-for sx in (1, -1):
-    blob_bm(bm, V((sx * (TR_EYE.x + .004), TR_EYE.y, TR_EYE.z + TR_EYE_R * .66)), (TR_EYE_R * .9, TR_EYE_R * 1.14, TR_EYE_R * .5),
-            (0, 0, -sx * TR_EYE_YAW), 24, 14)
-mk('TriLids', bm)
+TR_EYE_R = .14; TR_EYE_YAW = 0.25
+TR_EYE = V((hit[1].x - .045, TR_EYE0.y, TR_EYE0.z)) if hit[0] else TR_EYE0
+TR_E = dict(c=tuple(TR_EYE), R=TR_EYE_R, yaw=TR_EYE_YAW, W=.86, Ht=.58, Hb=.66, tilt=.12, rim=(.2, .06),
+            pupil=(.27, .3), iris=.74)
+build_eyes('Tri', TR_E)
