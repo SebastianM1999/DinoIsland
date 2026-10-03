@@ -1,6 +1,6 @@
 # Big wedge head: wide cheeks at the back, tapering snout ending in a hooked parrot beak.
 # Skull + lower jaw are lofts; 'tfuse' welds them with the neck into ONE mesh.
-for n in ('TriHead', 'TriJaw', 'TriEyes', 'TriGlints', 'TriPupils', 'TriLids'): remove(n)
+for n in ('TriHead', 'TriJaw', 'TriEyes', 'TriGlints', 'TriPupils', 'TriLids', 'TriTongue'): remove(n)
 TR_MOUTH = 1.25; TR_CORNER = -3.45   # cheeks close the mouth behind the corner (beaked herbivore)
 
 def tr_prof(w, top, bot, brow=0.0):
@@ -31,11 +31,24 @@ def tr_head_sculpt(p, n):
     return p
 sculpt(head, tr_head_sculpt)
 
-TR_JT = [(0, 0.92), (0.5, 0.96), (0.8, 0.92), (0.97, 0.7), (1.0, 0.45), (0.9, 0.2), (0.66, 0.05), (0.34, 0.0), (0, 0.0)]
-#            y      w     bot      (narrower than the upper lip -> overbite; deep at the back; beak tip)
-TR_JS = [(-2.5, .3, 1.02), (-2.68, .38, .86), (-2.96, .36, .86), (-3.2, .3, .9), (-3.45, .24, .95), (-3.66, .18, .99),
-         (-3.79, .12, 1.04), (-3.87, .06, 1.08)]                    # tip stays behind the upper beak's hook
-jaw = loft2('TriJaw', [(y, [(tx * w, bot + tz * (TR_MOUTH - bot)) for tx, tz in TR_JT]) for y, w, bot in TR_JS])
+# Lower jaw (after creature-topology guides + ceratopsid anatomy): flat cheek sides that taper to a
+# defined jawline keel (no round "sausage lip"), a thin cutting lip tucked inside the upper beak that
+# rolls inward into a mouth trough (the cavity you see when it opens), deepest under the cheek, rising
+# to a pointed, upturned lower beak (predentary) that stops behind the upper beak's hook.
+def tr_jaw_prof(w, bot, trough=0.08):
+    D = TR_MOUTH - bot
+    return [(0, TR_MOUTH - trough), (0.42 * w, TR_MOUTH - trough * 0.85), (0.7 * w, TR_MOUTH - 0.012), (0.8 * w, TR_MOUTH),
+            (0.92 * w, TR_MOUTH - 0.07 * D), (1.0 * w, TR_MOUTH - 0.32 * D), (0.86 * w, TR_MOUTH - 0.66 * D),
+            (0.5 * w, bot + 0.06 * D), (0.18 * w, bot + 0.004), (0, bot)]
+#            y      w     bot      (narrower than the upper lip; deepest under the cheek; pointed beak tip)
+TR_JS = [(-2.5, .28, 1.05), (-2.68, .36, .93), (-2.96, .35, .93), (-3.2, .3, .96), (-3.42, .25, 1.0), (-3.6, .19, 1.04),
+         (-3.73, .13, 1.08), (-3.82, .08, 1.11), (-3.87, .03, 1.15)]
+jaw = loft2('TriJaw', [(y, tr_jaw_prof(w, bot, 0.08 * smooth(-3.86, -3.6, y) * smooth(-2.5, -2.7, y)))
+                        for y, w, bot in TR_JS])
+
+bm = bmesh.new()   # tongue lying in the mouth trough (top stays under the lip line -> hidden when closed)
+blob_bm(bm, (0, -3.3, TR_MOUTH - .075), (.12, .3, .045), (0, 0, 0), 20, 12)
+mk('TriTongue', bm)
 
 # eyes sit IN the measured head surface (ray cast from outside), slightly sunk; 'eyes' builds the ball,
 # the almond lid rim and the catchlights (slim, slanted opening: the corner toward the snout dips, so it looks grumpy/angry; round pupil)

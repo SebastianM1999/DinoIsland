@@ -32,5 +32,6 @@ for n in ('TriEyes', 'TriGlints', 'TriPupils', 'TriLids', 'TriFrill', 'TriKnobs'
     rigid_islands(bpy.data.objects[n], rig, lambda c: 'Head')
 FEET = segs(rig, [p + 'Foot' + s for p in ('Front', 'Back') for s in 'LR'])
 rigid_islands(bpy.data.objects['TriNails'], rig, lambda c: nearest(c, FEET))
+rigid_islands(bpy.data.objects['TriTongue'], rig, lambda c: 'Jaw')
 limit_influences(body)
 print('unweighted after limit', check_weights(body))
