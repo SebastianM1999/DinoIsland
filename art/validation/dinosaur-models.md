@@ -32,9 +32,9 @@ Branch: `codex/animated-dinosaur-models`. Local commits only; no push.
 | --- | --- | ---: | --- |
 | Raptor | Project Velociraptor from `art/sources/raptor/raptor.blend` (opening jaw, IK-baked clips) | 53,128 | 1.675 × 3.037 m |
 | T-Rex | Project T-Rex from `art/sources/trex/trex.blend` (opening jaw, roar clip, IK-baked clips) | 47,633 | 5.9 × 11 m |
-| Stego | Project Stegosaurus from `art/sources/stego/stego.blend` (fused head+jaw+neck, IK-baked clips, tail-swing attack) | 51,228 | 3.76 × 7.9 m |
+| Stego | Project Stegosaurus from `art/sources/stego/stego.blend` (fused head+jaw+neck, IK-baked clips, tail-swing attack, living eyes, jaw with mouth trough + tongue) | 54,588 | 3.76 × 7.9 m |
 | Brachio | Project Brachiosaurus from `art/sources/brachio/brachio.blend` (opening jaw, IK-baked clips, rear-up stomp) | 57,660 | 13.0 × 18.5 m |
-| Ptera | Project Pteranodon from `art/sources/ptera/ptera.blend` (fused head+beak+neck, membrane wings, Fly/Glide/Dive/Attack, Fall + impact Death) | 44,878 | 1.86 × 2.56 m, 6.5 m span |
+| Ptera | Project Pteranodon from `art/sources/ptera/ptera.blend` (fused head+beak+neck, membrane wings, Fly/Glide/Dive/Attack, Fall + impact Death, living eyes, lower beak with mouth trough + tongue) | 49,351 | 1.86 × 2.56 m, 6.5 m span |
 
 Original Quaternius assets remain CC0. Project additions retain the project's
 license. Source Blend files are retained; Apatosaurus is now unused. Regeneration

@@ -11,9 +11,10 @@ Authored at real scale (about 9.3 m in Blender, facing -Y); the game fits it to 
 | Script | Builds |
 | --- | --- |
 | `lib`, `anim`, `fuse`, `weights`, `sheet`, `export` | shared dino-blender-creator helpers (same as the other species) |
+| `eyes`, `mouth` | skill helpers: living eyes (lid opening, rim, iris, pupil disc, catchlights) and lower jaw (jawline keel, inward lip, mouth trough, tongue, cheeks) |
 | `slib` | stego palette `SP` (teal-sage hide, round spots, mustard belly, brick-red plates), `sskin()`, `s_limb()` leg tube that never twists at the knee |
 | `sbody` | trunk (long weapon tail -> arched back -> low neck) as one spline tube, four pillar legs (long hind, short front), toenails |
-| `shead` | small low head: blunt snout, soft overbite jaw, heavy-lidded amber eyes under a brow ridge |
+| `shead` | small low head: blunt snout, soft overbite jaw, living amber eyes (round pupil, slight grumpy slant) under a brow ridge |
 | `sfuse` | skull + jaw + neck fused into ONE mesh (`fuse_head`), legs boolean-unioned in with a smoothed fillet |
 | `sparts` | 14 plates in two alternating rows (biggest over the hips, fanning out), 4 tail spikes |
 | `spaint` | vertex colours for every part, two materials (skin, gloss) |

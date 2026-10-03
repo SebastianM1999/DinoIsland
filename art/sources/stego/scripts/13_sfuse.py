@@ -1,6 +1,6 @@
 # Skull + lower jaw + trunk -> ONE fluid mesh (no head/neck seam), region groups for paint/skin.
 exec(bpy.data.texts['fuse'].as_string(), globals())
-fuse_head('StegoBody', 'StegoHead', 'StegoJaw', S_CORNER, S_MOUTH, lip_gap=0.008, region=0.04,
+fuse_head('StegoBody', 'StegoHead', 'StegoJaw', S_CORNER, S_MOUTH, lip_gap=0.015, region=0.04,
           seam_width=0.12, fillet_iters=45)
 
 # Legs: boolean union into the trunk + a smoothed fillet ring, so thighs and shoulders grow out of
