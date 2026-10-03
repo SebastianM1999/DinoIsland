@@ -7,7 +7,7 @@
 - `workflows/integration.yml` — trusted-main controller, awakened by the ready-to-merge label, completed CI, explicit rebase/repair handoffs, and manual runs; no idle schedule. Does not execute PR source.
 - `workflows/integration-repair.yml` — reserved same-repository task repair using Claude subscription credentials; validates eligibility, rebases onto main and continues resolved conflicts, repairs files, tests, publishes only the task branch, and wakes the controller for independent candidate CI.
 - `workflows/integration-rebase.yml` — deterministic same-repository feature rebase onto current main, with exact-head reservation, trusted eligibility checks, disabled Git hooks and lease-guarded publication; holds conflicts for repair without running feature code.
-- `scripts/integration.cjs` — durable ready-label queue controller; checks protection, collaborator eligibility, protected paths, revision-specific CI, repair budgets, and guarded rebase-and-merge integration.
+- `scripts/integration.cjs` — durable ready-label queue controller; checks protection, collaborator eligibility, revision-specific CI, repair budgets, and guarded rebase-and-merge integration.
 - `scripts/rebase.test.cjs` — real temporary-Git tests for clean rebasing, exact-head lease rejection and conflict preservation.
 - `scripts/integration.test.cjs` — mocked integration safety tests, explicitly run by CI because default Node discovery skips hidden directories.
 - `scripts/await-task-ci.cjs` — bounded metadata-only wait after a rebased/repaired head is published; explicitly dispatches integration on CI completion instead of relying on recursive workflow completion events.
@@ -32,7 +32,7 @@
 - The required check context is `Node 22 tests`, bound to the GitHub Actions App (15368). Main protection is strict and includes administrators. Human PR approvals are not required.
 - The active repository ruleset `Tested agent integration` applies the same strict check to `main` with no bypass actors. The controller validates effective rules using metadata APIs available to the normal workflow token, avoiding administrator credentials.
 - `INTEGRATION_RULESET_UPDATED_AT` pins the administrator-verified ruleset snapshot. Missing or changed snapshots fail closed; an administrator must verify bypass actors and repin after editing the ruleset, since GitHub hides bypass metadata from ordinary workflow tokens.
-- Automation/configuration changes require manual integration. Repairs never modify them; independent read-only CI must pass before merging.
+- No file paths are excluded from automatic integration or task repair. Workflow, configuration, skill and instruction changes still require passing independent CI.
 - A bot-triggered PR run marked `action_required` has no CI jobs and cannot supersede the independently dispatched CI for the same revision. Test failures and pending runs still prevent merging.
 - Candidate CI runs on a temporary `integration/ci-pr-*` branch pointing at GitHub's combined PR merge commit. A task-head result alone is insufficient: strict rules require checks on the combined commit. Candidate refs are validated before reuse and cleaned up after successful integration.
 - Each repair has a 25-minute timeout and 25-turn limit; at most two attempts per task. Ready/blocked/attempt labels persist state across Actions runs; concurrency is only mutual exclusion.
@@ -42,6 +42,6 @@
 ## Not here
 - Game behavior and tests: `src/`, `server/`, `desktop/`, and `test/`.
 - Browser rendering, Windows packaging, and real Steam validation are not covered by this baseline CI.
-- The controller approves pending bot PR CI only after same-repository, collaborator, protected-path and current-main checks, matching the exact task SHA and PR number. Other actors and forks remain subject to GitHub approval policy.
+- The controller approves pending bot PR CI only after same-repository, collaborator and current-main checks, matching the exact task SHA and PR number. Other actors and forks remain subject to GitHub approval policy.
 
 - Successful normal PR CI records a tested-SHA artifact. The controller accepts it only for the exact current synthetic merge commit, avoiding duplicate candidate tests. Old CI without this record retains independent candidate CI as a compatibility fallback.

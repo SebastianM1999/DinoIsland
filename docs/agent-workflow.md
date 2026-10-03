@@ -111,7 +111,7 @@ with an explanatory comment if CI never finishes; it does not poll while idle.
 Conflicts or failing CI may trigger at most two Claude repair attempts, each capped
 at 25 turns/25 minutes. Claude resolves each pending rebase conflict and continues
 the rebase without skipping commits; deterministic steps rerun
-tests, check protected paths, commit, and publish only that task branch. Independent
+tests, commit, and publish only that task branch. Independent
 read-only CI must then pass before the controller merges. There is no automatic
 approval based solely on Claude's own report.
 
@@ -144,5 +144,6 @@ Binary assets require coordinated single-writer ownership.
 
 Treat write-access collaborators as trusted: their task code can run in an AI repair
 job that has credentials. Forks and outside authors are excluded from privileged
-automation. Workflow/configuration changes require manual integration. No policy
+automation. All file paths, including workflow/configuration and agent instructions,
+are eligible for automatic integration after required checks. No policy
 here guarantees isolation from a malicious collaborator with repository write access.

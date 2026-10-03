@@ -93,12 +93,6 @@ module.exports = async function integrate({ github, context, core }) {
     const permission = (await api.repos.getCollaboratorPermissionLevel({ ...repo, username: pr.user.login })).data.permission;
     if (!['write', 'maintain', 'admin'].includes(permission)) { await block(pr, 'The author must have write permission.'); continue; }
     if (pr.changed_files > 3000) { await block(pr, 'The task exceeds GitHub\'s file-list limit and requires manual integration.'); continue; }
-    const files = await github.paginate(api.pulls.listFiles, { ...repo, pull_number: pr.number, per_page: 100 });
-    const protectedPath = name => /^(?:\.github\/|\.claude\/|AGENTS\.md$|CLAUDE\.md$|\.mcp\.json$)/i.test(name);
-    if (files.some(file => protectedPath(file.filename) || (file.previous_filename && protectedPath(file.previous_filename)))) {
-      await block(pr, 'Automation and agent-instruction changes require manual integration.');
-      continue;
-    }
     if (labels(pr).has('integration-repairing')) {
       const events = await github.paginate(api.issues.listEvents, { ...repo, issue_number: pr.number, per_page: 100 });
       const reservation = events.filter(event => event.event === 'labeled' && event.label?.name === 'integration-repairing')
