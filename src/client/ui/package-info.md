@@ -38,6 +38,7 @@
 - HUD per-frame setters only touch `transform` / canvas pixels, skip unchanged values and never read layout during a frame (header rule in `hud.js`).
 - The minimap base image is painted once per island (`initMinimap`); frames only blit and draw markers. Map is north-up, -z is north.
 - Dynamic text is HTML-escaped (`esc`) before going into `innerHTML`.
+- Settings can scroll vertically by wheel/keyboard, but never display native scrollbar tracks or thumbs (including nested audio credits).
 - `skillModel.js` stays DOM-free so it can be tested headlessly.
 - `new Hud(root)` clears the root element, so each island builds a fresh HUD in the same `#hud` element.
 

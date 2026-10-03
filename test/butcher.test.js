@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import { ServerWorld } from '../src/sim/world.js';
 import { CONFIG } from '../src/shared/config.js';
 import { MSG, ACT, EV } from '../src/shared/protocol.js';
+import { PlayerActions } from '../src/client/player/actions.js';
+import { Hud } from '../src/client/ui/hud.js';
 
 /** A world with one player standing next to a freshly killed raptor (no other dinosaurs). */
 function setup() {
@@ -22,6 +24,54 @@ function setup() {
 }
 
 const kinds = (world) => [...world.items.values()].map((it) => it.kind);
+
+test('butcher stroke and ring track real channel time at low FPS, including the faster knife skill', () => {
+  for (const fps of [5, 15, 60]) for (const multiplier of [1, 0.5]) {
+    const { world, p, d, act } = setup();
+    p.mods.knifeTimeMul = multiplier;
+    const actions = Object.create(PlayerActions.prototype);
+    actions.butcher = null; actions.butcherFinish = null; actions.butcherRetry = 0;
+    const view = { id: d.id, type: d.type, get butchered() { return d.butchered; } };
+    actions.game = { me: { id: p.id }, mods: p.mods, player: { pos: { x: p.x, z: p.z } },
+      dinos: { map: new Map([[d.id, view]]) }, net: { act: (a, m) => act({ a, ...m }) } };
+    actions.findCarcass = () => d.butchered ? null : view;
+    world.host.send = (_, m) => { if (m.e === EV.BUTCHER) actions.onButcher(m); };
+    actions.updateKnife(0.05, true, true, 100);
+    const duration = CONFIG.dinos.raptor.butcher.time * multiplier;
+    assert.equal(actions.butcher.time, duration);
+    let nextFrame = 1 / fps, halfway = false;
+    while (!d.butchered) {
+      world.step(0.01);
+      if (world.now + 1e-6 < nextFrame) continue;
+      nextFrame += 1 / fps;
+      actions.updateKnife(Math.min(1 / fps, 0.05), true, true, 100 + world.now);
+      if (actions.butcher && world.now >= duration * 0.5) {
+        assert.ok(Math.abs(actions.knifeProgress(100 + world.now) - world.now / duration) < 1e-6, `${fps} FPS channel must use elapsed time`);
+        halfway = true;
+      }
+    }
+    assert.ok(halfway);
+    // Delay rendering after completion: the first rendered frame must still be full.
+    const now = 100 + world.now + 2;
+    const hud = { _c: {}, $eat: { hidden: true }, $eatFg: { style: {} } };
+    Hud.prototype.eatProgress.call(hud, actions.knifeProgress(now));
+    assert.equal(hud.$eat.hidden, false);
+    assert.equal(hud.$eatFg.style.strokeDashoffset, '0');
+    assert.equal(actions.knifeProgress(now + 0.1), 1);
+    assert.equal(actions.knifeProgress(now + 0.3), null);
+  }
+});
+
+test('cancelling a butcher channel never shows a completed stroke or ring', () => {
+  const { world, p, d, act } = setup();
+  const actions = Object.create(PlayerActions.prototype);
+  actions.game = { me: { id: p.id } };
+  actions.butcher = { dino: d.id, t: 0.2, time: 5 };
+  world.host.send = (_, m) => { if (m.e === EV.BUTCHER) actions.onButcher(m); };
+  act({ a: ACT.BUTCHER, dino: d.id });
+  act({ a: ACT.BUTCHER, stop: 1 });
+  assert.equal(actions.knifeProgress(10), null);
+});
 
 test('holding V at a carcass butchers it once for the configured extra drops', () => {
   const { world, d, act, run, events } = setup();

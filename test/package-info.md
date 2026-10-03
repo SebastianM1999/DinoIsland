@@ -27,7 +27,7 @@ Grouped by the module area they mainly cover. Many simulation tests also check t
 - `firearms.test.js` — pistol/rifle actions, reload, fire rate under host ticks, gun grips (`src/sim/firearms.js` + client viewmodel/player model).
 - `weapons.test.js` — client spear throw, bow/arrow/trap hand contacts and release sync (viewmodel, projectiles, player model).
 - `projectile-recovery.test.js` — arrow/spear wear, refill, lodged spears and recovery (server + client `Items`).
-- `butcher.test.js` — butchering carcasses, bones and skulls as loot.
+- `butcher.test.js` — butchering carcasses, bones/skulls as loot, low-FPS client stroke/ring timing and completion versus cancellation.
 
 ### Simulation: progression, base and economy
 - `skills.test.js` — skill tree data, XP/level math, buying, `sanitizeProfile`, `skillMods` (pure shared/skills.js).
@@ -49,7 +49,7 @@ Grouped by the module area they mainly cover. Many simulation tests also check t
 - `dino-skin.test.js` — procedural skin loft faces outward.
 - `audio.test.js` — audio catalog/samples, music transitions and boss-area music, footstep surfaces and cadence; HTTP serving of audio files.
 - `graphics-tier.test.js` — automatic graphics tier choice and auto-tune.
-- `input-panels.test.js` — Escape/E panel handling and pointer-lock retry (`src/client/input/input.js`).
+- `input-panels.test.js` — Escape/E panel handling, raw pointer-lock fallback/retry, focus/lock resets and cursor-warp rejection (`src/client/input/input.js`).
 - `ordering.test.js` — packet ordering and action/state dependencies under unreliable transport (client `Net` + `ServerWorld`).
 
 ### Hosting and networking (server/, desktop/)

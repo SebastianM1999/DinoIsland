@@ -20,8 +20,10 @@
 ## Rules
 - Gameplay code asks only `isHeld` / `wasPressed` / `wasReleased` with an action name; new keys are added to `KEY_BINDINGS`, not as separate listeners in gameplay code.
 - No input is recorded while `enabled` is false (outside a running game).
-- Mouse movement and wheel are only accumulated while the pointer is locked; the first click without lock only captures the mouse and does not fire `primary`.
-- Losing focus or pointer lock releases all held actions (reported as released).
+- Mouse movement and wheel are only accumulated during enabled, focused gameplay with the actual pointer-lock target; the first click without lock only captures the mouse and does not fire `primary`.
+- Pointer lock requests native unadjusted movement, falling back to ordinary lock on `NotSupportedError`. Other failures retain the cooldown retry.
+- Focus, enabled-state and pointer-lock transitions clear accumulated mouse/wheel input and re-prime relative movement. The first movement packet after a transition, nonfinite deltas and changes to locked cursor coordinates are discarded; legitimate relative deltas are never magnitude-capped.
+- Losing focus or pointer lock, or disabling gameplay, releases all held actions (reported as released).
 - `inventory`, `map`, `skills` never become held actions; they go straight to `onPanelToggle`. E and Escape are consumed when `onPanelToggle` returns true.
 - `pressed` / `released` are only valid until `endFrame()`.
 

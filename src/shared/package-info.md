@@ -56,6 +56,8 @@
 - Protocol changes must stay in sync with `src/sim/world.js` (handler), `src/client/net/net.js` (sender) and the 8 KiB inbound cap in `server/gameHost.js` / 8192-byte cap in `desktop/steam-session.js`. Steam's unreliable routing depends on the `snap`/`state` type strings.
 - Renaming `BRAND.slug` or `storagePrefix` has player-visible effects (Steam lobby visibility, saved settings); see the notes in `brand.js`.
 
+- The butcher protocol distinguishes successful completion (`EV.BUTCHER.done`) from cancellation; timings in `CONFIG.dinos` are reduced by `skillMods.knifeTimeMul` on the server.
+
 ## Not here
 - Authoritative game logic (AI, damage, inventory, raids, missions progress): `src/sim/`.
 - Meshes, materials, UI, input, audio, client networking: `src/client/`.

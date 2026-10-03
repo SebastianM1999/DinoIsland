@@ -21,6 +21,7 @@
 - Hit tests run on the client against the animated dino hit spheres; melee and gun hits send the hit point, zone and `rt: game.renderTime` so the server can check them against the rewound pose (lag compensation).
 - Movement limits (radius, step height, slopes, swim, creative) come from `CONFIG.player` and the shared collision functions, the same ones the server uses to validate (`ServerWorld.onState`); keep both sides in sync when changing them.
 - Mouse sensitivity comes from `src/client/core/settings.js` (`settings.sens`, read in `PlayerController.look`).
+- Butcher stroke/ring timing uses monotonic elapsed seconds, never the movement frame delta capped at 50 ms. Server-confirmed duration includes the knife skill; only a successful `EV.BUTCHER` (`done: true`) briefly holds the final stroke and full ring before recovery.
 - The spear release timing/origin lives only in `spearThrow.js`; the viewmodel and gameplay must read it from there.
 - The stuck detector only asks; the server decides the spot (`src/sim/unstuck.js`).
 

@@ -17,7 +17,7 @@
 ### Areas inside `world.js` (~1500 lines, find by the `// ----- <area>` banners)
 - constructor / `#loadLevel` / `nextLevel`: builds terrain + layout from `shared/` (`planIsland`, `buildLayout`), resets per-island state; `worldEpoch` bumps per island.
 - players: `join`, `leave`, `freshInventory`, `caps`, `carryWeight`, `hurtPlayer`.
-- knife: butchering carcasses (`startButcher`/`updateButcher`).
+- knife: butchering carcasses (`startButcher`/`updateButcher`); successful completion emits `EV.BUTCHER` with `done: true`, cancellation omits it.
 - downed/revive/death: `killPlayer`, `downPlayer`, `defeatPlayer`, `startRevive`/`updateRevive`, `updateDowned`, `respawnPlayer`.
 - skills / XP: `awardXp`, `skillAction`, `refreshMods`, `grantDash`, `damageMul`, `sendProf`.
 - base: `stations`, `safeZone`, `baseAction`, `towerAction`, `repairBase`, `finishBuilding`, `pay`, `creativeSupply`.

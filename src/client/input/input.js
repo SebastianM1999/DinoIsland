@@ -35,24 +35,27 @@ export class Input {
     this.mouseDY = 0;
     this.wheel = 0;
     this.locked = false;
+    this.focused = true;
+    this.mousePrimed = false;
+    this.mousePosition = null;
     this.enabled = false;       // gameplay input only while playing
     this.onLockChange = null;
     this.onPanelToggle = null;
 
     addEventListener('keydown', (e) => this.#onKey(e, true));
     addEventListener('keyup', (e) => this.#onKey(e, false));
-    addEventListener('blur', () => this.#releaseAll());
+    addEventListener('blur', () => { this.focused = false; this.#releaseAll(); });
+    addEventListener('focus', () => { this.focused = true; this.#resetMouse(); });
     target.addEventListener('mousedown', (e) => this.#onMouse(e, true));
     addEventListener('mouseup', (e) => this.#onMouse(e, false));
     target.addEventListener('contextmenu', (e) => e.preventDefault());
-    addEventListener('mousemove', (e) => {
-      if (!this.locked) return;
-      this.mouseDX += e.movementX;
-      this.mouseDY += e.movementY;
-    });
-    addEventListener('wheel', (e) => { if (this.locked) this.wheel += Math.sign(e.deltaY); }, { passive: true });
+    addEventListener('mousemove', (e) => this.#onMove(e));
+    addEventListener('wheel', (e) => {
+      if (this.#mouseActive() && Number.isFinite(e.deltaY)) this.wheel += Math.sign(e.deltaY);
+    }, { passive: true });
     document.addEventListener('pointerlockchange', () => {
       this.locked = document.pointerLockElement === target;
+      this.#resetMouse();
       if (!this.locked) this.#releaseAll();
       this.onLockChange?.(this.locked);
     });
@@ -65,8 +68,14 @@ export class Input {
     const attempt = async (retries = 0) => {
       if (generation !== (this.lockGeneration ?? 0)) return;
       try {
-        // Raw movement is optional; ordinary pointer lock works on more systems.
-        await this.target.requestPointerLock();
+        // Use native relative movement instead of OS acceleration/cursor warps.
+        // Unsupported platforms retain ordinary pointer lock and its cooldown retry.
+        try {
+          await this.target.requestPointerLock({ unadjustedMovement: true });
+        } catch (error) {
+          if (error.name !== 'NotSupportedError' || generation !== (this.lockGeneration ?? 0)) throw error;
+          await this.target.requestPointerLock();
+        }
         this.lockPending = false;
       } catch {
         if (retries < 2 && this.enabled && generation === (this.lockGeneration ?? 0)) {
@@ -84,6 +93,7 @@ export class Input {
     this.lockGeneration = (this.lockGeneration ?? 0) + 1;
     clearTimeout(this.lockRetry);
     this.lockPending = false;
+    this.#resetMouse();
     if (document.pointerLockElement) document.exitPointerLock();
   }
 
@@ -129,6 +139,39 @@ export class Input {
   #releaseAll() {
     for (const a of this.held) this.released.add(a);
     this.held.clear();
+    this.#resetMouse();
+  }
+
+  get enabled() { return this._enabled; }
+  set enabled(on) {
+    this._enabled = on;
+    if (!on) this.#releaseAll();
+    else this.#resetMouse();
+  }
+
+  #resetMouse() {
+    this.mouseDX = this.mouseDY = this.wheel = 0;
+    this.mousePrimed = false;
+    this.mousePosition = null;
+  }
+
+  #onMove(e) {
+    if (!this.#mouseActive()) return;
+    if (!Number.isFinite(e.movementX) || !Number.isFinite(e.movementY)) return;
+    // Locked coordinates must stay fixed (Pointer Lock spec). A changing cursor
+    // position is a warp/rebase, not relative motion; establish a new baseline.
+    const position = [e.screenX, e.screenY, e.clientX, e.clientY];
+    const hasPosition = position.every(Number.isFinite);
+    const rebased = hasPosition && this.mousePosition && position.some((v, i) => v !== this.mousePosition[i]);
+    if (hasPosition) this.mousePosition = position;
+    // The first packet can contain the distance from the old unlocked cursor.
+    if (!this.mousePrimed || rebased) { this.mousePrimed = true; return; }
+    this.mouseDX += e.movementX;
+    this.mouseDY += e.movementY;
+  }
+
+  #mouseActive() {
+    return this.enabled && this.focused && this.locked && document.pointerLockElement === this.target;
   }
 
   isHeld(a) { return this.held.has(a); }

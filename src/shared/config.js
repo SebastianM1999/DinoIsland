@@ -229,7 +229,7 @@ export const CONFIG = {
       radius: 0.7,
       body: [[0, 0.25], [0.6, 0.18]],
       loot: { meat: 1, teeth: 2 },
-      butcher: { time: 2.5, loot: { bones: 2, skull: 1 } },
+      butcher: { time: 5, loot: { bones: 2, skull: 1 } },
       respawn: 90,
     },
     ptera: {
@@ -247,7 +247,7 @@ export const CONFIG = {
       attackCooldown: 9,
       radius: 1.2,
       loot: { meat: 1, claws: 2 },
-      butcher: { time: 2, loot: { bones: 1, hide: 1 } },
+      butcher: { time: 4, loot: { bones: 1, hide: 1 } },
       respawn: 90,
     },
     trex: {

@@ -330,7 +330,7 @@ export class ServerWorld {
     d.deadT = Math.min(d.deadT, W.knife.sinkTime);
     const { loot } = CONFIG.dinos[d.type].butcher;
     this.dropLoot(d.x, d.z, loot);
-    this.event(EV.BUTCHER, { id: p.id, dino: null, t: 0 });
+    this.event(EV.BUTCHER, { id: p.id, dino: null, t: 0, done: true });
     this.event(EV.BUTCHERED, { id: d.id });
     const parts = Object.entries(loot).map(([k, n]) => `${n} ${CONFIG.loot[k].name.toLowerCase()}`).join(', ');
     this.toast(`${p.name} butchered the ${CONFIG.dinos[d.type].name}: ${parts}`, 'bones');

@@ -105,7 +105,7 @@ export const EV = {
   OUTFIT: 'outfit',         // { id, outfit }                    a player changed clothes
   RELIC: 'relic',           // { id, kind, by }                  a boat part was found
   BOAT: 'boat',             // { repaired }                      the boat got repaired
-  BUTCHER: 'butcher',       // { id, dino, t }                   player id started butchering (t = seconds; t 0 = stopped)
+  BUTCHER: 'butcher',       // { id, dino, t, done? }            start (t seconds), stop (t 0), done true on completion
   BUTCHERED: 'butchered',   // { id }                            carcass id was butchered (sinks away)
   BASE: 'base',             // { base }                          the team's base changed (see shared/base.js freshBase)
   TOWER_SHOT: 'tshot',      // { slot, kind, o, end, dino }      a base tower fired

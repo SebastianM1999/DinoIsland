@@ -40,7 +40,8 @@ export class PlayerActions {
     this.drawT = 0;
     this.drawing = false;
     this.eatingT = 0;
-    this.butcher = null;     // { dino, t, time, x, z, confirmed } while holding V at a carcass
+    this.butcher = null;     // { dino, t, time, startedAt, x, z, confirmed } while holding V
+    this.butcherFinish = null;
     this.butcherRetry = 0;
     this.reviving = null;    // { id, t, start } while holding E on a downed teammate (t = channel seconds once the server confirms)
     this.reviveRetry = 0;
@@ -66,11 +67,7 @@ export class PlayerActions {
       this.vm.eat(m.fruit, CONFIG.fruit.eatTime);
       game.audio?.play('eat');
     });
-    net.on(`ev:${EV.BUTCHER}`, (m) => {
-      if (m.id !== game.me.id) return;
-      if (!m.dino) this.butcher = null;                       // finished or cancelled by the server
-      else if (this.butcher?.dino === m.dino) { this.butcher.confirmed = true; this.butcher.time = m.t; }
-    });
+    net.on(`ev:${EV.BUTCHER}`, (m) => this.onButcher(m));
     net.on(`ev:${EV.REVIVE}`, (m) => {
       if (m.by !== game.me.id || !this.reviving || this.reviving.id !== m.id) return;
       if (m.t > 0) { this.reviving.t = m.t; this.reviving.start = game.time; }
@@ -243,8 +240,9 @@ export class PlayerActions {
     // --- viewmodel
     const fruitType = this.bestFruit();
     this.vm.setTool(tool, { hasSpear: this.inv.spear, fruitType, hasArrow: this.inv.arrows > 0 });
-    this.vm.setKnife(!!this.butcher, this.butcher ? Math.min(1, this.butcher.t / this.butcher.time) : 0);
-    this.vm.root.visible = alive && (!!this.butcher || eating || this.inv.guns?.[tool]?.owned !== false);
+    const knifeProgress = this.knifeProgress();
+    this.vm.setKnife(knifeProgress != null, knifeProgress ?? 0);
+    this.vm.root.visible = alive && (knifeProgress != null || eating || this.inv.guns?.[tool]?.owned !== false);
     this.vm.update(dt, { speed: g.player.moveSpeed, sprint: g.player.sprinting, grounded: g.player.onGround, lookX: g.lastMouse?.x || 0, lookY: g.lastMouse?.y || 0 });
 
     this.updateHud(dt, fruitType, w);
@@ -400,13 +398,38 @@ export class PlayerActions {
     return best;
   }
 
-  updateKnife(dt, enabled, held) {
+  onButcher(m) {
+    if (m.id !== this.game.me.id) return;
+    if (!m.dino) {
+      // Completion is distinct from cancellation: render the final stroke and
+      // full ring for at least one frame, even if the event arrives during a stall.
+      this.butcherFinish = m.done && this.butcher ? { until: null } : null;
+      this.butcher = null;
+    } else if (this.butcher?.dino === m.dino) {
+      this.butcher.confirmed = true;
+      this.butcher.time = m.t;
+    }
+  }
+
+  knifeProgress(now = performance.now() / 1000) {
+    if (this.butcher) return Math.min(1, this.butcher.t / this.butcher.time);
+    if (this.butcherFinish) {
+      this.butcherFinish.until ??= now + 0.25;
+      if (now < this.butcherFinish.until) return 1;
+      this.butcherFinish = null;
+    }
+    return null;
+  }
+
+  updateKnife(dt, enabled, held, now = performance.now() / 1000) {
     const g = this.game;
     const pos = g.player.pos;
     this.butcherRetry = Math.max(0, this.butcherRetry - dt);
     const b = this.butcher;
     if (b) {
-      b.t += dt;
+      // Movement dt is capped at 50 ms. The server's channel is real elapsed
+      // time, so using movement dt makes the stroke/ring lag badly at low FPS.
+      b.t = Math.max(b.t, now - b.startedAt);
       const v = g.dinos.map.get(b.dino);
       const moved = Math.hypot(pos.x - b.x, pos.z - b.z) > W.knife.moveCancel;
       // the server did not take it (too far, someone else is faster): don't hammer it
@@ -418,10 +441,10 @@ export class PlayerActions {
       }
       return;
     }
-    if (!enabled || !held || this.butcherRetry > 0) return;
+    if (this.knifeProgress(now) != null || !enabled || !held || this.butcherRetry > 0) return;
     const v = this.findCarcass();
     if (!v) return;
-    this.butcher = { dino: v.id, t: 0, time: CONFIG.dinos[v.type].butcher.time, x: pos.x, z: pos.z, confirmed: false };
+    this.butcher = { dino: v.id, t: 0, time: CONFIG.dinos[v.type].butcher.time * g.mods.knifeTimeMul, startedAt: now, x: pos.x, z: pos.z, confirmed: false };
     g.net.act(ACT.BUTCHER, { dino: v.id });
     g.audio?.play('swing');
   }
@@ -654,8 +677,8 @@ export class PlayerActions {
       draw: this.drawing ? this.drawT / W.bow.maxDrawTime : 0,
       mode: !g.me.alive ? 'none' : tool === 'trap' ? 'place' : 'default',
     });
-    hud.eatProgress(this.butcher ? Math.min(1, this.butcher.t / this.butcher.time)
-      : this.eatingT > 0 ? 1 - this.eatingT / CONFIG.fruit.eatTime : null);
+    hud.eatProgress(this.knifeProgress()
+      ?? (this.eatingT > 0 ? 1 - this.eatingT / CONFIG.fruit.eatTime : null));
     this.updateHint();
   }
 
