@@ -38,12 +38,12 @@ TR_JS = [(-2.5, .3, 1.02), (-2.68, .38, .86), (-2.96, .36, .86), (-3.2, .3, .9),
 jaw = loft2('TriJaw', [(y, [(tx * w, bot + tz * (TR_MOUTH - bot)) for tx, tz in TR_JT]) for y, w, bot in TR_JS])
 
 # eyes sit IN the measured head surface (ray cast from outside), slightly sunk; 'eyes' builds the ball,
-# the almond lid rim and the catchlights (calm herbivore: round pupil, outer corner drooping a little)
+# the almond lid rim and the catchlights (slim, slanted opening: the corner toward the snout dips, so it looks grumpy/angry; round pupil)
 exec(bpy.data.texts['eyes'].as_string(), globals())
 dg = bpy.context.evaluated_depsgraph_get(); eh = head.evaluated_get(dg)
 hit = eh.ray_cast(V((2.0, TR_EYE0.y, TR_EYE0.z)), V((-1, 0, 0)))
 TR_EYE_R = .14; TR_EYE_YAW = 0.25
 TR_EYE = V((hit[1].x - .045, TR_EYE0.y, TR_EYE0.z)) if hit[0] else TR_EYE0
-TR_E = dict(c=tuple(TR_EYE), R=TR_EYE_R, yaw=TR_EYE_YAW, W=.86, Ht=.58, Hb=.66, tilt=.12, rim=(.2, .06),
+TR_E = dict(c=tuple(TR_EYE), R=TR_EYE_R, yaw=TR_EYE_YAW, W=.88, Ht=.42, Hb=.5, tilt=.24, rim=(.22, .06),
             pupil=(.27, .3), iris=.74)
 build_eyes('Tri', TR_E)
