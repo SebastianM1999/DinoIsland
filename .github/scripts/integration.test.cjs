@@ -32,6 +32,7 @@ function fixture(options = {}) {
     actions: {
       createWorkflowDispatch: wrap('dispatch', {}),
       approveWorkflowRun: wrap('approve', {}),
+      listWorkflowRunArtifacts: wrap('artifacts', options.artifacts || []),
       listWorkflowRuns: wrap('runs', args => args.workflow_id === 'integration-repair.yml' ? (options.repairRuns || []) :
         (args.head_sha === 'feature-sha' ? (options.headRuns || []) :
           (options.runs || [{ id: 10, head_sha: candidateSha, head_repository: { full_name: 'owner/game' }, status: 'completed', conclusion: 'success' }])))
@@ -54,6 +55,35 @@ function fixture(options = {}) {
   } };
 }
 const mutations = calls => calls.filter(call => ['merge', 'update', 'dispatch', 'approve'].includes(call.name));
+
+test('normal successful PR CI proves its exact merge candidate with an artifact and avoids duplicate CI', async () => {
+  const normal = { id: 81, event: 'pull_request', head_sha: 'feature-sha', status: 'completed', conclusion: 'success',
+    head_repository: { full_name: 'owner/game' }, pull_requests: [{ number: 7 }] };
+  const f = fixture({ headRuns: [normal], runs: [], artifacts: [{ name: `tested-${candidateSha}`, expired: false }] });
+  await f.run(); assert.deepEqual(mutations(f.calls).map(c => c.name), ['merge']);
+  assert.equal(f.calls.find(c => c.name === 'artifacts').args.run_id, 81);
+  assert.ok(!f.calls.some(c => c.name === 'runs' && c.args.head_sha === candidateSha));
+  assert.ok(!f.calls.some(c => c.name === 'createRef'));
+});
+test('mismatched or expired PR CI artifacts cannot prove candidate safety', async () => {
+  const normal = { id: 81, event: 'pull_request', head_sha: 'feature-sha', status: 'completed', conclusion: 'success',
+    head_repository: { full_name: 'owner/game' }, pull_requests: [{ number: 7 }] };
+  for (const artifacts of [[], [{ name: 'tested-old-commit', expired: false }], [{ name: `tested-${candidateSha}`, expired: true }]]) {
+    const f = fixture({ headRuns: [normal], runs: [], artifacts }); await f.run();
+    assert.deepEqual(mutations(f.calls).map(c => c.name), ['dispatch']);
+    assert.ok(f.calls.some(c => c.name === 'createRef'));
+  }
+});
+test('pending normal PR CI waits and failed normal PR CI requests repair', async () => {
+  const normal = { id: 81, event: 'pull_request', head_sha: 'feature-sha', status: 'in_progress', conclusion: null,
+    head_repository: { full_name: 'owner/game' }, pull_requests: [{ number: 7 }] };
+  const olderPassed = { ...normal, id: 80, status: 'completed', conclusion: 'success' };
+  const artifacts = [{ name: `tested-${candidateSha}`, expired: false }];
+  const pending = fixture({ headRuns: [olderPassed, normal], artifacts }); await pending.run(); assert.deepEqual(mutations(pending.calls), []);
+  const failed = fixture({ headRuns: [olderPassed, { ...normal, status: 'completed', conclusion: 'failure' }], artifacts }); await failed.run();
+  assert.equal(failed.calls.find(c => c.name === 'dispatch').args.workflow_id, 'integration-repair.yml');
+  assert.ok(!failed.calls.some(c => c.name === 'merge'));
+});
 
 test('a bot PR approval request cannot override independently dispatched CI, but still requires a passing run', async () => {
   const approval = { id: 12, event: 'pull_request', head_sha: candidateSha, head_repository: { full_name: 'owner/game' }, status: 'completed', conclusion: 'action_required' };

@@ -33,3 +33,5 @@
 - Game behavior and tests: `src/`, `server/`, `desktop/`, and `test/`.
 - Browser rendering, Windows packaging, and real Steam validation are not covered by this baseline CI.
 - The controller approves pending bot PR CI only after same-repository, collaborator, protected-path and current-main checks, matching the exact task SHA and PR number. Other actors and forks remain subject to GitHub approval policy.
+
+- Successful normal PR CI records a tested-SHA artifact. The controller accepts it only for the exact current synthetic merge commit, avoiding duplicate candidate tests. Old CI without this record retains independent candidate CI as a compatibility fallback.

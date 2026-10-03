@@ -66,10 +66,10 @@ It brings the task branch up to date, explicitly requests CI (workflow-token pus
 may leave PR workflows awaiting approval). It automatically approves only eligible
 same-repository PR runs from `github-actions[bot]` for the exact task revision,
 then merges only a passing current
-combined merge commit. CI runs on a temporary `integration/ci-pr-*` branch pointing
-at GitHub's PR merge commit so the required check attaches to the exact candidate
-GitHub will merge. Testing only the task head is insufficient. Candidate branches
-are removed after their task merges; task branches are preserved.
+combined merge commit. Normal PR CI records the tested merge SHA after all tests pass;
+the controller requires that exact current candidate before merging. This avoids a
+second test run for the same feature revision. Older runs without this record use a
+temporary candidate branch as a compatibility fallback. Task branches are preserved.
 The merge API guards the expected task SHA; strict branch protection guards against
 main advancing between validation and merge.
 

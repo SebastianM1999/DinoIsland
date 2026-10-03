@@ -140,22 +140,42 @@ module.exports = async function integrate({ github, context, core }) {
     }
     const candidate = pr.merge_commit_sha;
     if (!/^[a-f0-9]{40}$/i.test(candidate || '')) continue;
-    const runs = await github.paginate(api.actions.listWorkflowRuns, { ...repo, workflow_id: 'ci.yml', head_sha: candidate, per_page: 100 });
-    // Strict checks must pass on the synthetic merge candidate. Task-head success never substitutes.
-    // A bot-triggered PR run can require approval without creating any CI jobs. It must not
-    // supersede the independent workflow_dispatch CI we explicitly requested for this revision.
-    // Actual test failures, cancellations and pending runs remain authoritative.
-    const matching = runs.filter(run => run.head_sha === candidate && run.head_repository?.full_name === pr.base.repo.full_name
-      && !(run.event === 'pull_request' && run.conclusion === 'action_required'))
+    const normalRuns = headRuns.filter(run => run.head_sha === pr.head.sha && run.event === 'pull_request'
+      && run.head_repository?.full_name === pr.base.repo.full_name
+      && run.pull_requests?.some(pull => pull.number === pr.number))
       .sort((a, b) => b.id - a.id || (b.run_attempt || 1) - (a.run_attempt || 1));
-    if (!matching.length) { if (await dispatchCi(pr)) return; continue; }
-    const latest = matching[0];
-    if (latest.status !== 'completed') continue;
-    if (latest.conclusion !== 'success') {
-      if (['failure', 'timed_out'].includes(latest.conclusion)) {
+    let candidateTested = false;
+    if (normalRuns.length) {
+      const latestNormal = normalRuns[0];
+      if (latestNormal.status !== 'completed') continue;
+      if (['failure', 'timed_out'].includes(latestNormal.conclusion)) {
         if (await repair(pr, 'CI failed.')) return;
-      } else if (await dispatchCi(pr)) return;
-      continue;
+        continue;
+      }
+      if (latestNormal.conclusion === 'success') {
+        const artifacts = await github.paginate(api.actions.listWorkflowRunArtifacts, { ...repo, run_id: latestNormal.id, per_page: 100 });
+        candidateTested = artifacts.some(artifact => artifact.name === `tested-${candidate}` && artifact.expired === false);
+      }
+    }
+    if (!candidateTested) {
+      const runs = await github.paginate(api.actions.listWorkflowRuns, { ...repo, workflow_id: 'ci.yml', head_sha: candidate, per_page: 100 });
+      // A successful normal PR run proves its synthetic checkout through a CI-generated artifact.
+      // Older runs without that artifact use candidate-branch CI; task-head success alone never substitutes.
+      // A bot-triggered PR run can require approval without creating any CI jobs. It must not
+      // supersede the independent workflow_dispatch CI we explicitly requested for this revision.
+      // Actual test failures, cancellations and pending runs remain authoritative.
+      const matching = runs.filter(run => run.head_sha === candidate && run.head_repository?.full_name === pr.base.repo.full_name
+        && !(run.event === 'pull_request' && run.conclusion === 'action_required'))
+        .sort((a, b) => b.id - a.id || (b.run_attempt || 1) - (a.run_attempt || 1));
+      if (!matching.length) { if (await dispatchCi(pr)) return; continue; }
+      const latest = matching[0];
+      if (latest.status !== 'completed') continue;
+      if (latest.conclusion !== 'success') {
+        if (['failure', 'timed_out'].includes(latest.conclusion)) {
+          if (await repair(pr, 'CI failed.')) return;
+        } else if (await dispatchCi(pr)) return;
+        continue;
+      }
     }
     try {
       const result = await api.pulls.merge({ ...repo, pull_number: pr.number, sha: pr.head.sha, merge_method: 'squash' });
