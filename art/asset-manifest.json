@@ -12,7 +12,7 @@
       "file": "assets/models/dinos/trex.glb",
       "source": "Project-authored T-Rex; art/sources/trex/trex.blend (build scripts in its text blocks)",
       "license": "Project source",
-      "triangles": 47633
+      "triangles": 50731
     },
     {
       "id": "dino-ptera",

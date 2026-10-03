@@ -27,8 +27,8 @@ def rigid(ob, choose):
         c = sum((mw @ me.vertices[i].co for i in isl), V()) / len(isl)
         bn = choose(c); g = ob.vertex_groups.get(bn) or ob.vertex_groups.new(name=bn); g.add(isl, 1.0, 'REPLACE')
     m = ob.modifiers.new('Armature', 'ARMATURE'); m.object = rig; ob.parent = rig
-for n in ('TrexEyes', 'TrexPupils', 'TrexLids', 'TrexTeethUp', 'TrexKnobs'): rigid(bpy.data.objects[n], lambda c: 'Head')
-rigid(bpy.data.objects['TrexTeethLow'], lambda c: 'Jaw')
+for n in ('TrexEyes', 'TrexPupils', 'TrexLids', 'TrexGlints', 'TrexTeethUp', 'TrexKnobs'): rigid(bpy.data.objects[n], lambda c: 'Head')
+for n in ('TrexTeethLow', 'TrexTongue'): rigid(bpy.data.objects[n], lambda c: 'Jaw')
 SPINE = segs(['Torso', 'Body', 'Neck1', 'Neck2'] + ['Tail%d' % i for i in range(1, 6)])
 rigid(bpy.data.objects['TrexScutes'], lambda c: 'Head' if c.y < -0.72 and c.z > 1.42 else nearest(c, SPINE))
 rigid(bpy.data.objects['TrexClaws'], lambda c: nearest(c, segs(['BackToesL', 'BackToesR', 'HandL', 'HandR'])))

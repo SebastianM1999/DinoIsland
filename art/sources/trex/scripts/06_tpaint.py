@@ -20,7 +20,7 @@ def jaw_fn(p, n):
     c = rex_skin(p, n)
     c = mix(c, P['belly'], smooth(-0.1, -0.6, n.z))
     c = mix(c, P['lip'], smooth(MOUTH - .05, MOUTH - .01, p.z) * 0.7)
-    return mix(c, mix(P['tongue'], P['gum'], 0.5 + fbm(p, 6)), smooth(0.4, 0.8, n.z) * smooth(MOUTH - .025, MOUTH - .005, p.z))
+    return mix(c, mix(P['tongue'], P['gum'], 0.5 + fbm(p, 6)), smooth(0.2, 0.6, n.z) * smooth(MOUTH - .045, MOUTH - .035, p.z) * smooth(MOUTH + .002, MOUTH - .006, p.z))  # trough
 ob = bpy.data.objects['TrexBody']; me = ob.data
 gi = {g.name: g.index for g in ob.vertex_groups}
 col = me.color_attributes.get('Col') or me.color_attributes.new('Col', 'FLOAT_COLOR', 'POINT')
@@ -32,17 +32,16 @@ for v in me.vertices:
     if wj > 0.001: c = mix(c, jaw_fn(p_, n_), min(1, wj * 1.4))
     col.data[v.index].color = (*c, 1.0)
 me.color_attributes.active_color = col
-def eye_fn(p, n):
-    q = p - V((math.copysign(EYE.x, p.x), EYE.y, EYE.z)); return mix(P['eye'], P['eye2'], smooth(.014, .034, q.length))
-paint(bpy.data.objects['TrexEyes'], eye_fn)
-paint(bpy.data.objects['TrexPupils'], lambda p, n: P['pupil'])
-paint(bpy.data.objects['TrexLids'], lambda p, n: mix(P['mask'], P['back2'], 0.4))
+exec(bpy.data.texts['eyes'].as_string(), globals())
+paint_eyes('Trex', T_E, dict(iris=P['eye'], iris2=P['eye2'], glow=lin('#ffe07a'), limbal=lin('#2a1206'), pupil=P['pupil'],
+                             sclera=lin('#d8b892'), lid=mix(P['mask'], P['back2'], 0.4), lid2=P['mask']), gloss, skinm)
+paint(bpy.data.objects['TrexTongue'], lambda p, n: mix(P['tongue'], P['gum'], smooth(0.6, -0.2, n.z)))
 paint(bpy.data.objects['TrexKnobs'], lambda p, n: mix(mix(P['back'], P['mask'], .5), P['lip'], smooth(0.4, 1.0, n.z) * .35))
 paint_t(bpy.data.objects['TrexTeethUp'], lambda p, t: mix(P['toothb'], P['tooth'], smooth(0.0, 0.5, t)))
 paint_t(bpy.data.objects['TrexTeethLow'], lambda p, t: mix(P['toothb'], P['tooth'], smooth(0.0, 0.5, t)))
 paint_t(bpy.data.objects['TrexClaws'], lambda p, t: mix(P['claw'], P['clawtip'], smooth(0.5, 1.0, t)))
 paint_t(bpy.data.objects['TrexScutes'], lambda p, t: mix(P['back2'], P['stripe'], 0.3 + 0.5 * smooth(0.2, 1.0, t)))
 for o in bpy.data.objects:
-    if o.type == 'MESH':
-        o.data.materials.clear()
-        o.data.materials.append(gloss if o.name in ('TrexEyes', 'TrexPupils', 'TrexTeethUp', 'TrexTeethLow', 'TrexClaws') else skinm)
+    if o.type == 'MESH' and o.name not in ('TrexEyes', 'TrexLids', 'TrexPupils', 'TrexGlints'):
+        o.data.materials.clear()                         # eyes, lids, pupils, glints got theirs in paint_eyes
+        o.data.materials.append(gloss if o.name in ('TrexTeethUp', 'TrexTeethLow', 'TrexClaws') else skinm)
