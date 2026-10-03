@@ -65,3 +65,49 @@ for s, tip in DL_TOETIPS:
     t = V(tip)
     horn_bm(bm, t + V((0, .03, .015)), t + V((0, -.12, -.03)), .035, bend=(0, -.01, .025), seg=8, rings=6)
 mk('DlClaws', bm)
+
+# Neck frill (Jurassic-Park style display ruff): a ribbed fan on each side of the neck, rooted behind the jaw
+# corner. Modelled OPEN (rest pose); one bone per rib (Frill<L|R><k>, 'dlrig') folds it back flat along the neck
+# in every clip and spreads it in Attack, Roar and Hurt ('dlanim'). Attributes: 'ht' radial 0 root -> 1 rim,
+# 'fk' rib coordinate (k + t between rib k and k+1) for skinning and paint.
+remove('DlFrill')
+DL_FR_PHI = [8, 39, 71, 102, 133, 165]                          # rib angle from straight up, outward, degrees
+DL_FR_LEN = [.62, .84, .8, .72, .6, .48]                         # longest at the upper outer corner (pointed tip)
+DL_FR_ROOT = {s: V((sx * .15, -1.98, 2.34)) for s, sx in (('L', 1), ('R', -1))}
+def dl_fr_dir(sx, phi):
+    a = math.radians(phi); return V((sx * math.sin(a), .25, math.cos(a))).normalized()
+DL_FR_RIBS = {s: [(DL_FR_ROOT[s], DL_FR_ROOT[s] + dl_fr_dir(sx, p) * L) for p, L in zip(DL_FR_PHI, DL_FR_LEN)]
+              for s, sx in (('L', 1), ('R', -1))}
+bm = bmesh.new(); lht = bm.verts.layers.float.get('ht') or bm.verts.layers.float.new('ht'); lfk = bm.verts.layers.float.new('fk')
+SUB, RR = 6, 8
+for s, sx in (('L', 1), ('R', -1)):
+    C = SUB * (len(DL_FR_PHI) - 1)
+    nrm = dl_fr_dir(sx, 90).cross(dl_fr_dir(sx, 0)).normalized()
+    if nrm.y > 0: nrm = -nrm
+    grid = {}
+    for c in range(C + 1):
+        k, t = divmod(c, SUB); t /= SUB
+        if k == len(DL_FR_PHI) - 1: k, t = k - 1, 1.0
+        phi = DL_FR_PHI[k] + (DL_FR_PHI[k + 1] - DL_FR_PHI[k]) * t
+        L = DL_FR_LEN[k] + (DL_FR_LEN[k + 1] - DL_FR_LEN[k]) * t
+        L *= 1 - .1 * math.sin(math.pi * t)                       # scalloped rim between the rib tips
+        d = dl_fr_dir(sx, phi); rib = math.exp(-(min(t, 1 - t) / .1) ** 2)
+        for r in range(RR + 1):
+            u = .06 + .94 * r / RR
+            th = (.012 + .014 * rib) * (1 - .6 * u)
+            for side, sg in ((0, 1), (1, -1)):
+                v = bm.verts.new(DL_FR_ROOT[s] + d * (L * u) + nrm * (sg * th)); v[lht] = u; v[lfk] = k + t
+                grid[(c, r, side)] = v
+    for c in range(C):
+        for r in range(RR):
+            bm.faces.new((grid[(c, r, 0)], grid[(c + 1, r, 0)], grid[(c + 1, r + 1, 0)], grid[(c, r + 1, 0)]))
+            bm.faces.new((grid[(c, r + 1, 1)], grid[(c + 1, r + 1, 1)], grid[(c + 1, r, 1)], grid[(c, r, 1)]))
+        for r in (0, RR):                                            # inner and outer rims
+            f = (grid[(c, r, 0)], grid[(c, r, 1)], grid[(c + 1, r, 1)], grid[(c + 1, r, 0)])
+            bm.faces.new(f if r == 0 else tuple(reversed(f)))
+    for c in (0, C):                                                 # the two end ribs
+        for r in range(RR):
+            f = (grid[(c, r, 0)], grid[(c, r + 1, 0)], grid[(c, r + 1, 1)], grid[(c, r, 1)])
+            bm.faces.new(f if c == 0 else tuple(reversed(f)))
+bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+mk('DlFrill', bm)

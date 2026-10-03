@@ -28,6 +28,8 @@ for s in 'LR':
     bone(eb, 'ArmUp' + s, sh, el, 'Torso')
     bone(eb, 'ArmLow' + s, el, wr, 'ArmUp' + s, True)
     bone(eb, 'Hand' + s, wr, hd, 'ArmLow' + s, True)
+for s in 'LR':                                               # one bone per frill rib, root behind the jaw corner
+    for k, (h, t) in enumerate(DL_FR_RIBS[s]): bone(eb, 'Frill%s%d' % (s, k), h, t, 'Neck3')
 bpy.ops.object.mode_set(mode='POSE'); init('DlRig')
 for s in 'LR': theropod_constraints(s)
 finish_rig()
