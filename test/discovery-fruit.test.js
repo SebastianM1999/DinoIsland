@@ -7,7 +7,8 @@ import * as THREE from 'three';
 
 function setup() {
   const sent = [];
-  const world = new ServerWorld({ send: (to, msg) => sent.push({ to, msg }) });
+  // Harvest behavior needs a known island with fruit; random layouts may have none.
+  const world = new ServerWorld({ send: (to, msg) => sent.push({ to, msg }) }, { level: 0, variant: 1 });
   return { world, sent };
 }
 
@@ -16,6 +17,7 @@ test('fruit plants hold 1–4 harvests and replenish only after depletion', () =
   const { id } = world.join('Forager');
   const player = world.players.get(id);
   const spot = world.layout.fruitSpots[0];
+  assert.ok(spot, 'The seeded harvest fixture must contain a fruit plant');
   const fruit = world.fruit[spot.id];
   const initial = fruit.count;
   assert.ok(initial >= 1 && initial <= 4);
