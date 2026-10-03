@@ -20,6 +20,8 @@
 - AI repairs may execute same-repository code authored by collaborators with write access. Those collaborators are trusted; outside authors and forks never enter privileged repairs or merging.
 - Set `AUTOMERGE_ENABLED=true` only after main protection is active. `CLAUDE_REPAIR_ENABLED=true` separately enables subscription repair and requires `CLAUDE_CODE_OAUTH_TOKEN` in Actions secrets.
 - The required check context is `Node 22 tests`, bound to the GitHub Actions App (15368). Main protection is strict and includes administrators. Human PR approvals are not required.
+- The active repository ruleset `Tested agent integration` applies the same strict check to `main` with no bypass actors. The controller validates effective rules using metadata APIs available to the normal workflow token, avoiding administrator credentials.
+- `INTEGRATION_RULESET_UPDATED_AT` pins the administrator-verified ruleset snapshot. Missing or changed snapshots fail closed; an administrator must verify bypass actors and repin after editing the ruleset, since GitHub hides bypass metadata from ordinary workflow tokens.
 - Automation/configuration changes require manual integration. Repairs never modify them; independent read-only CI must pass before merging.
 - Each repair has a 25-minute timeout and 25-turn limit; at most two attempts per task. Ready/blocked/attempt labels persist state across Actions runs; concurrency is only mutual exclusion.
 - See `docs/agent-workflow.md` for setup, operation, pausing and coverage limitations.

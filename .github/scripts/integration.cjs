@@ -3,15 +3,33 @@
 // Runs only from trusted main. Pull-request source is never loaded by this controller.
 async function validateProtection(github, repo) {
   const branch = (await github.rest.repos.getBranch({ ...repo, branch: 'main' })).data;
-  const metadata = await github.graphql(`query($owner:String!,$repo:String!){repository(owner:$owner,name:$repo){ref(qualifiedName:"refs/heads/main"){branchProtectionRule{requiresStrictStatusChecks requiresStatusChecks isAdminEnforced requiredStatusCheckContexts}}}}`, repo);
-  const rule = metadata.repository?.ref?.branchProtectionRule;
   const checks = branch.protection?.required_status_checks;
   if (!branch.protected || !branch.protection?.enabled || checks?.enforcement_level !== 'everyone'
-    || !checks.checks?.some(check => check.context === 'Node 22 tests' && check.app_id === 15368)
-    || !rule?.requiresStatusChecks || !rule.requiresStrictStatusChecks || !rule.isAdminEnforced
-    || !rule.requiredStatusCheckContexts?.includes('Node 22 tests')) {
+    || !checks.checks?.some(check => check.context === 'Node 22 tests' && check.app_id === 15368)) {
     throw new Error('Integration requires strict Node 22 tests from GitHub Actions and protection enforced for admins.');
   }
+  // The default Actions token cannot inspect classic branch-protection administration or GraphQL
+  // rules. Effective branch rules and repository rulesets expose the necessary policy via REST.
+  const rules = await github.paginate('GET /repos/{owner}/{repo}/rules/branches/{branch}', { ...repo, branch: 'main', per_page: 100 });
+  const candidates = rules.filter(rule => rule.type === 'required_status_checks'
+    && rule.parameters?.strict_required_status_checks_policy === true
+    && rule.parameters.required_status_checks?.some(check => check.context === 'Node 22 tests' && check.integration_id === 15368)
+    && rule.ruleset_source_type === 'Repository' && Number.isInteger(rule.ruleset_id));
+  let enforced = false;
+  const approvedTimestamp = process.env.INTEGRATION_RULESET_UPDATED_AT;
+  for (const rule of candidates) {
+    const ruleset = (await github.request('GET /repos/{owner}/{repo}/rulesets/{ruleset_id}', { ...repo, ruleset_id: rule.ruleset_id })).data;
+    // An administrator verifies an empty bypass list and pins this exact updated_at in a repository
+    // variable. The default workflow token can read the timestamp but may not see bypass_actors.
+    // Any policy edit invalidates that approval; a visible nonempty bypass list always fails closed.
+    const bypassAcceptable = ruleset.bypass_actors === undefined
+      || (Array.isArray(ruleset.bypass_actors) && ruleset.bypass_actors.length === 0);
+    if (approvedTimestamp && ruleset.updated_at === approvedTimestamp && ruleset.enforcement === 'active' && bypassAcceptable) {
+      enforced = true;
+      break;
+    }
+  }
+  if (!enforced) throw new Error('Integration requires strict Node 22 tests from GitHub Actions and an approved unchanged active ruleset with no bypass actors.');
   return branch;
 }
 

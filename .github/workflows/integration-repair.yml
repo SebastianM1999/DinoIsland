@@ -28,6 +28,7 @@ jobs:
     timeout-minutes: 25
     env:
       ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+      INTEGRATION_RULESET_UPDATED_AT: ${{ vars.INTEGRATION_RULESET_UPDATED_AT }}
     steps:
       - uses: actions/checkout@v6
         with:
