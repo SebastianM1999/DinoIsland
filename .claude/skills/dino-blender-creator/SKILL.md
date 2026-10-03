@@ -82,7 +82,12 @@ scripts as text blocks and a `scripts/` mirror.
 11. **Integrate** (catalog, tests, manifest, docs, barHeight), `npm test`, commit only your files
     on the branch the user wants, never push. Save a master build script so the whole dino
     rebuilds from an empty scene, and mirror the scripts + README.
-12. Show the user, ask for feedback, iterate.
+12. Show the user, ask for feedback, iterate. **Always end the final report with the review URL**: the
+    running game preview link the owner can click, e.g.
+    `http://localhost:<port>/src/client/models/dino/preview.html?type=<type>&state=walk&view=three-quarter`
+    (keep that server running; in a worktree the preview tool only starts the main checkout's server, so
+    start the worktree's server on its own port). Also give the PR URL if one was created. The owner wants
+    this link every time the agent finishes coding, without asking.
 
 ## Design rules (short version — details in references)
 
@@ -135,5 +140,6 @@ scripts as text blocks and a `scripts/` mirror.
 - [ ] `check_glb.mjs` clean; catalog numbers pasted from it
 - [ ] `hit_coverage.mjs` ≥ 95 %; species zones (plates/flank/wing) restored if the old model had them
 - [ ] Viewed in the game dino preview in every state
+- [ ] Final report ends with the clickable review URL (game preview link, + PR URL if one exists)
 - [ ] `npm test` passes (except the known random fruit test); only own files committed; not pushed
 - [ ] Master build script rebuilds from an empty scene; scripts mirrored; README written
