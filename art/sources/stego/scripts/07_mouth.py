@@ -17,8 +17,8 @@ def trough_fade(y, tip_y, hinge_y):
     L = abs(hinge_y - tip_y)
     return smooth(tip_y, tip_y + 0.3 * L, y) * smooth(hinge_y, hinge_y - 0.15 * L, y)
 
-def add_tongue(name, centre, size):
-    remove(name); bm = bmesh.new(); blob_bm(bm, centre, size, (0, 0, 0), 20, 12); return mk(name, bm)
+def add_tongue(name, centre, size, seg=(20, 12)):
+    remove(name); bm = bmesh.new(); blob_bm(bm, centre, size, (0, 0, 0), *seg); return mk(name, bm)
 
 def cheeks(body, corner_y, mouth_z, band=0.26, ramp=0.5):
     gh, gj = body.vertex_groups['Head'], body.vertex_groups['Jaw']

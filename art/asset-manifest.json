@@ -33,7 +33,7 @@
       "file": "assets/models/dinos/brachio.glb",
       "source": "Project-authored Brachiosaurus; art/sources/brachio/brachio.blend (build scripts in its text blocks)",
       "license": "Project source",
-      "triangles": 57660
+      "triangles": 58628
     }
   ]
 }

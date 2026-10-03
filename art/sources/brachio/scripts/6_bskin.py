@@ -29,8 +29,8 @@ def rigid(ob, choose):
         c = sum((mw @ me.vertices[i].co for i in isl), V()) / len(isl)
         bn = choose(c); g = ob.vertex_groups.get(bn) or ob.vertex_groups.new(name=bn); g.add(isl, 1.0, 'REPLACE')
     m = ob.modifiers.new('Armature', 'ARMATURE'); m.object = rig; ob.parent = rig
-for n in ('BrachioHead', 'BrachioEyes', 'BrachioPupils', 'BrachioLids', 'BrachioTeeth'): rigid(bpy.data.objects[n], lambda c: 'Head')
-rigid(bpy.data.objects['BrachioJaw'], lambda c: 'Jaw')
+for n in ('BrachioHead', 'BrachioEyes', 'BrachioPupils', 'BrachioLids', 'BrachioGlints', 'BrachioTeeth'): rigid(bpy.data.objects[n], lambda c: 'Head')
+for n in ('BrachioJaw', 'BrachioTongue'): rigid(bpy.data.objects[n], lambda c: 'Jaw')
 FEETB = segs([p + 'Foot' + s for p in ('Front', 'Back') for s in 'LR'])
 rigid(bpy.data.objects['BrachioFeet'], lambda c: nearest(c, FEETB))
 body, legs = bpy.data.objects['BrachioBody'], bpy.data.objects['BrachioLegs']

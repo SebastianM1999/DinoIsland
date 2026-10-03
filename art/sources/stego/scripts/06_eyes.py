@@ -7,7 +7,8 @@
 #   - two white catchlights (big + small, front-top) on the gloss material: the eye "looks back"
 # Every eye is described by a dict E: c (left eye centre, x > 0), R, yaw (forward turn), W/Ht/Hb (opening
 # half-width / upper / lower height as fractions of R), tilt (rad, + = back corner up / snout-side corner down = angry, - = droopy/sad), rim (upper,
-# lower tube radius as fractions of R), pupil (rx, ry as fractions of R; ry > rx = slit), iris (fraction of R).
+# lower tube radius as fractions of R), pupil (rx, ry as fractions of R; ry > rx = slit), iris (fraction of R),
+# optional ball=(seg, ring) and rimseg=(around, tube) to save triangles on a dino near the 60k budget.
 import bpy, bmesh, math
 from mathutils import Vector as V, Matrix
 
@@ -37,9 +38,9 @@ def build_eyes(prefix, E):
     R = E['R']; bm = bmesh.new()
     for sx in (1, -1):
         c, d, h, v = eye_frame(E, sx)
-        blob_bm(bm, c, (R, R, R), (0, 0, 0), 32, 22)
+        blob_bm(bm, c, (R, R, R), (0, 0, 0), *E.get('ball', (32, 22)))
     mk(prefix + 'Eyes', bm)
-    bm = bmesh.new(); N, M = 56, 8
+    bm = bmesh.new(); N, M = E.get('rimseg', (56, 8))
     for sx in (1, -1):
         c, d, h, v = eye_frame(E, sx); rings = []
         tl = E['tilt']
