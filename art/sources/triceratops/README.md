@@ -18,7 +18,7 @@ scale (about 8.2 m long, 3.47 m tall in Blender, facing -Y), 30 fps clips.
 | `eyes` | reusable "living eye" builder (candidate for the skill): ball in an almond lid opening (ball outside the opening = lid skin on the skin material), rolled lid rim (heavy upper, thin lower, per-species tilt), painted iris (limbal ring, streaks, glow ring, lid shadow), curved pupil disc (round or slit), two white catchlights |
 | `tlib` | palette `TP` (dusty orange-brown hide, dark brown mottling, cream belly, rust-red frill, bone horns, grey beak), `thide()` |
 | `tbody` | trunk (short tail -> barrel body peaking over the hips -> short thick neck) as one spline tube, four short pillar legs, grey hoof-nails (4 hind, 5 front) |
-| `thead` | big wedge head: wide cheeks, deep snout, hooked parrot beak overhanging the lower beak, horn bosses, amber 'living' eyes (`eyes`) |
+| `thead` | big wedge head: wide cheeks, deep snout, hooked parrot beak overhanging a pointed lower beak (predentary); slim lower jaw with flat sides, a jawline keel and a thin cutting lip that rolls inward into a mouth trough (+ tongue), cheeks behind the mouth corner (`tskin` `tr_cheeks`), horn bosses, amber 'living' eyes (`eyes`) |
 | `tfuse` | skull + jaw + neck fused into ONE mesh (`fuse_head`), legs union-filleted into the trunk (`union_fillet`) |
 | `tparts` | cupped neck frill leaning back with forward-swept side lobes (reads from the side), 15 rim knobs, two long brow horns, nose horn, cheek horns |
 | `tpaint` | vertex colours for every part, two materials (skin, gloss) |

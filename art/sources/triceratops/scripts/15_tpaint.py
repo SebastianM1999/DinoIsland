@@ -29,7 +29,8 @@ def tr_jaw_fn(p, n):
     c = thide(p, n)
     c = mix(c, mix(TP['belly'], TP['belly2'], 0.5 + fbm(p, 2)), smooth(-0.1, -0.6, n.z))
     c = mix(c, mix(TP['beak'], TP['beak2'], 0.3 + 0.4 * fbm(p, 4.0)), tr_beak(p, -3.6))
-    return mix(c, TP['mouth'], smooth(0.3, 0.7, n.z) * smooth(TR_MOUTH - .04, TR_MOUTH - .01, p.z))
+    c = mix(c, TP['beak2'], smooth(-0.1, 0.4, n.z) * smooth(TR_MOUTH - .03, TR_MOUTH - .002, p.z) * 0.6)  # cutting lip
+    return mix(c, TP['mouth'], smooth(0.3, 0.7, n.z) * smooth(TR_MOUTH - .15, TR_MOUTH - .1, p.z) * smooth(TR_MOUTH + .002, TR_MOUTH - .006, p.z))  # mouth trough
 
 paint_regions(bpy.data.objects['TriBody'], tr_body_fn, tr_head_fn, tr_jaw_fn)
 
@@ -47,6 +48,7 @@ paint(bpy.data.objects['TriFrill'], tr_frill_fn)
 exec(bpy.data.texts['eyes'].as_string(), globals())
 paint_eyes('Tri', TR_E, dict(iris=lin('#f0b030'), iris2=lin('#a85a14'), glow=lin('#ffe07a'), limbal=lin('#2e1a0a'),
                              pupil=TP['pupil'], sclera=lin('#d6c4a0'), lid=TP['lid'], lid2=TP['back2']), gloss, skinm)
+paint(bpy.data.objects['TriTongue'], lambda p, n: mix(lin('#8e3a3a'), lin('#b85a55'), smooth(-0.2, 0.6, n.z)))
 paint(bpy.data.objects['TriNails'], lambda p, n: mix(TP['nail2'], TP['nail'], smooth(0.02, 0.12, p.z)))
 paint_t(bpy.data.objects['TriHorns'], lambda p, t: mix(TP['hornb'], TP['horn'], smooth(0.05, 0.55, t)))
 paint_t(bpy.data.objects['TriKnobs'], lambda p, t: mix(TP['frillrim'], TP['horn'], smooth(0.1, 0.7, t)))
