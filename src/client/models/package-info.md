@@ -2,7 +2,7 @@
 > Code-built 3D models shared by the rest of the client: the model kit (shared materials and shape helpers), the player character, weapons, hands, fruit and the site props; dinosaurs and firearms live in subfolders.
 
 ## Files
-- `kit.js` — the model kit: shared materials `MAT` (standard, glossy, glow), `WIND` uniforms + `windMaterial`, and shape helpers (`deform`, `paint`, `place`, `part`, `merge`, `mesh`, `tube`, `blob`, `spike`, `limb`, `eye`, `wrap`, `rockGeometry`, `smoothNormals`, `prep`, `jitter`).
+- `kit.js` — the model kit: shared materials `MAT` (standard, glossy, glow), `WIND` uniforms + `windMaterial` (keeps a shader patch already on its base material, e.g. surface detail), and shape helpers (`deform`, `paint`, `place`, `part`, `merge`, `mesh`, `tube`, `blob`, `spike`, `limb`, `eye`, `wrap`, `rockGeometry`, `smoothNormals`, `prep`, `jitter`).
 - `playerModel.js` — `PlayerModel`: rigged, procedurally animated co-op explorer with outfit slots (hats, tops, pants from `shared/outfits.js`) and held weapons/tools/firearms.
 - `weapons.js` — cached spear, bow (+ string), arrow, trap (open/sprung), meat and knife geometry; `BOW_REST`, `ARROW_TIP_Y`; `make*` mesh helpers.
 - `hands.js` — `handGeometry`: grip-centred first-person hands.

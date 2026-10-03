@@ -8,6 +8,8 @@ import { MAT, merge, mesh, place } from '../models/kit.js';
 import { buildCabin, CABIN } from './hut/cabin.js';
 import { buildDropOff, buildWorkbench, buildMissionBoard, buildWardrobe, buildFlagpole, buildCampfire, ARROW_BARREL, FLAG_ATTACH } from './hut/props.js';
 import { createFlag, createFire, createSmoke, createArrows } from './hut/fx.js';
+import { hutFloor } from './baseGround.js';
+import { detailMaterial } from './surfaceDetail.js';
 
 const ANIM_RANGE = 220; // skip animation when the camera is farther than this
 
@@ -52,6 +54,17 @@ export function buildHut(terrain, layout, { landing = false } = {}) {
   add(buildFlagpole(), flagPos);
   add(buildCampfire(), firePos);
 
+  // camp ground: flagstones round the fire, stepping stones, stones and firewood
+  const xz = (p) => [p[0], p[2]];
+  const floor = hutFloor({
+    fire: xz(firePos), bench: xz(benchPos), drop: xz(dropPos), flag: xz(flagPos),
+    door: landing ? null : [0.7, CABIN.CZ - CABIN.HZ - 0.9],
+    board: landing ? null : xz(boardPos),
+    wardrobe: landing ? null : xz(local(hut.wardrobe)),
+  }, layout.biome?.id, (lx, lz) => terrain.heightAt(hut.x + lx, hut.z + lz) - hut.y);
+  const floorStone = [];
+  for (const g of floor) (g.userData.stone ? floorStone : propsStd).push(g);
+
   const cabinMesh = landing ? null : mesh(merge(cabin.std));
   if (cabinMesh) cabinMesh.name = 'hut-cabin';
   const propsMesh = mesh(merge(propsStd));
@@ -60,7 +73,9 @@ export function buildHut(terrain, layout, { landing = false } = {}) {
   glossyMesh.name = 'hut-glossy';
   const glowMesh = mesh(merge(glow), MAT.glow, { cast: false, receive: false });
   glowMesh.name = 'hut-glow';
-  group.add(...[cabinMesh, propsMesh, glossyMesh, glowMesh].filter(Boolean));
+  const floorMesh = floorStone.length ? mesh(merge(floorStone), detailMaterial(MAT.standard, 'rock')) : null;
+  if (floorMesh) floorMesh.name = 'hut-floor';
+  group.add(...[cabinMesh, propsMesh, glossyMesh, glowMesh, floorMesh].filter(Boolean));
 
   // Flag: +x of the cloth points downwind (matches the vegetation wind).
   const flag = createFlag();

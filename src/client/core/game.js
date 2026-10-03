@@ -23,6 +23,7 @@ import { buildSky } from '../world/sky.js';
 import { buildWater } from '../world/water.js';
 import { buildVegetation } from '../world/vegetation.js';
 import { buildRocks } from '../world/rocks.js';
+import { setSurfaceQuality } from '../world/surfaceDetail.js';
 import { buildFruitPlants } from '../world/fruitPlants.js';
 import { buildHut } from '../world/hut.js';
 import { buildBaseView } from '../world/base.js';
@@ -178,6 +179,7 @@ export class Game {
     this.unsubGraphics = this.gfx.onGraphics((g) => {
       this.vegetation.setQuality(g);
       this.rocks.setQuality(g);
+      setSurfaceQuality(g);
       this.vegetation.setDensity(g.grass);
     });
     this.remotes = new RemotePlayers(this.gfx.scene, this.gfx.camera, this.overlay);

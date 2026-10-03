@@ -7,14 +7,16 @@
 // when it changes.
 
 import * as THREE from 'three';
-import { MAT, merge, mesh, place, part, paint, deform, jitter, rockGeometry, spike } from '../models/kit.js';
+import { MAT, merge, mesh, place, part, paint, deform, jitter, spike } from '../models/kit.js';
 import { makeRng } from '../../shared/rng.js';
-import { BASE_LOCAL, TOWER_SLOTS, TOWER_HEIGHT, palisadeSegments, plotPoint } from '../../shared/base.js';
+import { BASE_LOCAL, TOWER_SLOTS, TOWER_HEIGHT, PALISADE_R, palisadeSegments, plotPoint } from '../../shared/base.js';
 import { bowGeometry, arrowGeometry, spearGeometry } from '../models/weapons.js';
 import { buildCabin, CABIN } from './hut/cabin.js';
 import { buildDropOff, buildWorkbench, buildMissionBoard, buildWardrobe, buildFlagpole, buildCampfire, FLAG_ATTACH } from './hut/props.js';
 import { createFlag, createFire, createSmoke } from './hut/fx.js';
 import { COL, box, plank, log, lashing } from './hut/pieces.js';
+import { stoneWall, baseFloor } from './baseGround.js';
+import { detailMaterial } from './surfaceDetail.js';
 
 const ANIM_RANGE = 220;
 const _v = new THREE.Vector3();
@@ -110,8 +112,18 @@ function watchtower(style) {
   return out;
 }
 
-/** Palisade: sharpened logs (jungle) or basalt pillars (volcano) around the base, the gate left open. */
+/** Palisade: sharpened logs (jungle) or a masonry wall (volcano, see baseGround.js) around the base, the gate left open. */
 function palisade(style) {
+  const gate = Math.PI;
+  if (style.palisade === 'stone') {
+    const out = stoneWall(style.stone);
+    // a skull on each gate tower
+    for (const s of [-1, 1]) {
+      const a = gate + s * 0.36;
+      out.push(...skull([Math.sin(a) * PALISADE_R, 4.12, Math.cos(a) * PALISADE_R], 0.9));
+    }
+    return out;
+  }
   const out = [];
   const rng = makeRng(0x9a11a);
   for (const sgm of palisadeSegments()) {
@@ -119,24 +131,16 @@ function palisade(style) {
     for (let k = -1; k <= 1; k++) {
       const x = sgm.lx + tx * k * 1.25, z = sgm.lz + tz * k * 1.25;
       const h = 2.8 + rng() * 0.6;
-      if (style.palisade === 'stone') {
-        const g = rockGeometry({ radius: 0.62, seed: rng.int(1, 999), squash: 1, colors: style.stone });
-        out.push(place(g, [x, h / 2 - 0.2, z], [0, rng() * 3, 0], [1, h / 1.3, 1]));
-      } else {
-        out.push(log(h, 0.24, [x, h / 2, z], 'y', { body: rng.pick(style.log), seed: rng.int(1, 99), ends: [false, false] }));
-        out.push(place(spike(0.24, 0.5, style.log[0], COL.logEnd, 7), [x, h, z]));
-      }
+      out.push(log(h, 0.24, [x, h / 2, z], 'y', { body: rng.pick(style.log), seed: rng.int(1, 99), ends: [false, false] }));
+      out.push(place(spike(0.24, 0.5, style.log[0], COL.logEnd, 7), [x, h, z]));
     }
     // two cross rails hold the wall together
-    if (style.palisade !== 'stone') {
-      for (const y of [0.9, 2.2]) out.push(log(3.9, 0.07, [sgm.lx - Math.sin(sgm.a) * 0.3, y, sgm.lz - Math.cos(sgm.a) * 0.3], 'x', { body: style.log[2], seed: 40, rot: [0, sgm.a, 0], ends: [false, false] }));
-    }
+    for (const y of [0.9, 2.2]) out.push(log(3.9, 0.07, [sgm.lx - Math.sin(sgm.a) * 0.3, y, sgm.lz - Math.cos(sgm.a) * 0.3], 'x', { body: style.log[2], seed: 40, rot: [0, sgm.a, 0], ends: [false, false] }));
   }
   // gate posts with a skull each
-  const gate = Math.PI;
   for (const s of [-1, 1]) {
     const a = gate + s * 0.36;
-    const x = Math.sin(a) * 15.5, z = Math.cos(a) * 15.5;
+    const x = Math.sin(a) * PALISADE_R, z = Math.cos(a) * PALISADE_R;
     out.push(log(4.2, 0.32, [x, 2.1, z], 'y', { body: style.log[0], seed: 50 + s }));
     out.push(...skull([x, 4.3, z], 0.9));
   }
@@ -246,7 +250,7 @@ export function buildBaseView(terrain, layout) {
     for (const o of [...group.children]) {
       if (o === flyGroup) continue;
       group.remove(o);
-      o.traverse((c) => { if (c.isMesh) { c.geometry.dispose(); if (c.material !== MAT.standard && c.material !== MAT.glossy && c.material !== MAT.glow) c.material.dispose?.(); } });
+      o.traverse((c) => { if (c.isMesh) { c.geometry.dispose(); if (c.material !== MAT.standard && c.material !== MAT.glossy && c.material !== MAT.glow && !c.material.userData.sharedResource) c.material.dispose?.(); } });
     }
     fx = [];
     heads = new Map();
@@ -276,6 +280,11 @@ export function buildBaseView(terrain, layout) {
     const g = plotGroup(plot);
     plotG = g;
     const std = [], glossy = [], glow = [];
+    // masonry (flagstones, the stone wall) gets the stone grain of surfaceDetail.js
+    const stone = [];
+    // laid flagstones, paths and the porch; follows the ground of the (flattened) plot
+    const ground = (lx, lz) => { const p = plotPoint(plot, [lx, lz]); return terrain.heightAt(p.x, p.z) - plot.y; };
+    for (const geo of baseFloor(layout.biome?.id, stage, ground)) (geo.userData.stone ? stone : std).push(geo);
     if (stage >= 1) {
       prop(buildDropOff(), at('dropOff'), 0, std, glossy, glow);
       prop(buildWorkbench(), at('workbench'), 0, std, glossy, glow);
@@ -294,10 +303,11 @@ export function buildBaseView(terrain, layout) {
     }
     if (stage >= 3) {
       std.push(...watchtower(style).map((geo) => place(geo, at('watchtower'))));
-      std.push(...palisade(style));
+      (style.palisade === 'stone' ? stone : std).push(...palisade(style));
       std.push(...trophies(style).map((geo) => place(geo, at('trophies'), [0, 0.5, 0])));
     }
     if (building) std.push(...scaffolding(style, building.stage));
+    if (stone.length) g.add(mesh(merge(stone), detailMaterial(MAT.standard, 'rock')));
     for (const t of towers) {
       const [tx, tz] = TOWER_SLOTS[t.slot];
       std.push(...towerBody(style, t.kind, t.level).map((geo) => place(geo, [tx, 0, tz])));

@@ -2,16 +2,18 @@
 > Turns the deterministic island layout from `shared/layout.js` (plus `shared/terrain.js`) into Three.js scenery: terrain, sky, water/lava, vegetation, rocks, logs, fruit plants, hut, team base, special sites, boss arena and grove barrier.
 
 ## Files
-- `terrainMesh.js` — `buildTerrainMesh`: smooth, biome-coloured island mesh from the shared Terrain grid (also tints the boss-arena ground).
+- `terrainMesh.js` — `buildTerrainMesh`: smooth, biome-coloured island mesh from the shared Terrain grid (also tints the boss-arena ground); writes `surface`/`surface2` weights (sand, rock, path, forest, wet, ash) for the detail shader.
+- `surfaceDetail.js` — procedural per-pixel surface detail (no textures): `withSurfaceDetail(mat, kind)` / cached `detailMaterial(base, kind)` for `terrain` (grass, leaf litter, trails, sand ripples/shells/tide line, cliffs, ash), `rock` (granite, sandstone, basalt, limestone picked from the instance tint) and `foliage` (leaf grain, per-tree tone, blossoms); `SURFACE` uniforms, `setSurfaceQuality(graphics)`, `setSurfaceBiome(biome)`.
 - `sky.js` — `buildSky`: gradient dome, sun, drifting clouds, distant islands; `mood()` for darker air.
 - `water.js` — `buildWater`: one shared shader for sea, pools and rivers (depth from a terrain height texture, foam, rapids, waterfall plunge) and lava; `ripple()` / `splash()`.
 - `rivers.js` — geometry helpers for water surfaces: `riverGeometry`, `discGeometry`, `withSheetAttrs` (common `aFlow`/`aRiver` attributes).
 - `vegetation.js` — `buildVegetation`: instanced trees, bushes, ferns, grass and flowers per biome with wind; `setQuality`/`setDensity`; `VEG_TUNING`.
-- `rocks.js` — `buildRocks` / `rockGeo`: boulders from `shared/rockShapes.js` tables and sea stacks (with palms on green islands).
+- `rocks.js` — `buildRocks` / `rockGeo`: boulders from `shared/rockShapes.js` tables (stone kind per rock from `biome.rocks.kinds`, clustered by region) and sea stacks (with palms on green islands).
 - `logs.js` — `buildLogs`: fallen trunks from `layout.logs`, merged into one mesh.
 - `fruitPlants.js` — `buildFruitPlants`: berry bushes, mangos in mango trees, dragon-fruit plants; `setCount(spotId, n)` with pop-in.
-- `hut.js` — `buildHut`: hunting hut (cabin, drop-off, workbench, mission board, wardrobe, flag, campfire) or the small landing camp on islands 2+.
+- `hut.js` — `buildHut`: hunting hut (cabin, drop-off, workbench, mission board, wardrobe, flag, campfire, camp ground from `hutFloor`) or the small landing camp on islands 2+.
 - `base.js` — `buildBaseView`: the team base on islands 2+ (plot stakes, scaffolding, camp/lodge/fort stages, towers, raid damage); `setBase`, `shoot`; `stakePoint`.
+- `baseGround.js` — `flagstones` (irregular laid slabs with joints, optional gaps for stepping stones) and `campClutter` (a few varied stones, sticks, firewood) used by `hutFloor` (hunting hut / landing camp) and `baseFloor` (base yard and paths that grow with the stage, plank porch before the cabin; decoration, no collider) and `stoneWall` (the volcanic fort wall: coursed blocks, pillars, merlons, gate towers inside the palisade colliders); stone pieces use the `rock` detail material.
 - `sites.js` — `buildSites`: places boat, caves, spring cave, ruins, nest and volcano FX from `models/props/`.
 - `bossArena.js` — `buildBossArena`: lava islet look (spires, rune gate, basalt, embers, ritual circle) from `layout.bossArena`.
 - `grove.js` — `buildGrove`: shimmering red barrier cylinder around the giant's pen; `strike(pt)` and `flash()`.
@@ -23,7 +25,7 @@
 - `hut/fx.js` — animated parts: waving flag, campfire flames and light, pooled smoke, arrow stock.
 
 ### veg/
-- `veg/trees.js` — procedural tree types (palm ... dead) as cached `{ trunk, foliage }`; `treeMatrix`, `TREE_WIND`, `TREE_VARIANTS`, `MANGO_FRUIT_LOCAL`.
+- `veg/trees.js` — procedural tree types (palm ... dead) as cached `{ trunk, foliage }`; crown variants (`CROWN_TYPES`, `CROWN_VARIANTS`) reshape and recolour only the foliage, the trunk stays; `treeMatrix`, `TREE_WIND`, `TREE_VARIANTS`, `MANGO_FRUIT_LOCAL`.
 - `veg/plants.js` — small plants (bush, fern, big leaf, shrub, grass, flower, berry bush, dragon plant); `BUSH_TYPES`.
 - `veg/shapes.js` — shared vegetation helpers (`clump`, `leafStrip`, `arcPath`, `LEAF_MAT`, `windPair`, `glowMaterial`, `instanced`, `foliageTint`, geometry-detail scope).
 - `veg/spatialInstances.js` — `SpatialInstances`: splits instances into 80 m chunks so each batch is culled separately; quality/density control.
@@ -39,6 +41,7 @@
 - Geometry must match the shared shapes that colliders use: trunks from `shared/treeShapes.js` (`treeMatrix` must match `treePoint`), rocks from `shared/rockShapes.js`, base from `shared/base.js`, terrain triangulation matches `Terrain.heightAt()`, cabin size matches its `layout.js` collider, log colliders come from the layout.
 - Builders return `{ group, update?, ... }`; per-frame work reuses preallocated objects and skips animation beyond a camera range (`ANIM_RANGE`).
 - Static pieces are merged into a few meshes with the shared `models/kit.js` materials (vertex colours, no textures); many copies use instancing.
+- Small-scale surface detail is procedural in the fragment shader (`surfaceDetail.js`), driven by vertex attributes, instance tints and world/object position, never image textures; it fades with distance and follows the graphics tier (Low = macro variation only, Medium = no bump).
 - Cached geometries/materials shared across islands are marked `sharedResource` (directly or via `retainResource`) so island disposal skips them.
 - Wind sway goes through `kit.windMaterial` driven by `WIND.uTime` (set in `core/game.js`).
 

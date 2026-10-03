@@ -187,16 +187,19 @@ export function finishInstanced(m) {
 
 /** Soft tint (multiplied onto vertex colors) from a 0..1 hue value. */
 export function foliageTint(hue, out = new THREE.Color()) {
-  // 0 -> blue-green/dark, 0.5 -> neutral, 1 -> warm yellow-green; a few trees get
-  // a stronger autumn-ish or teal accent so the canopy is never one flat green
+  // 0 -> blue-green/dark, 0.5 -> neutral, 1 -> warm yellow-green; plus an own
+  // brightness and a few stronger accents (sunlit, teal, olive) so neighbouring
+  // crowns never share one flat green
   const t = hue;
-  let r = 0.8 + 0.26 * t;
-  let g = 0.9 + 0.1 * Math.sin(t * Math.PI);
-  let b = 0.98 - 0.3 * t;
+  let r = 0.76 + 0.34 * t;
+  let g = 0.88 + 0.12 * Math.sin(t * Math.PI);
+  let b = 1.0 - 0.36 * t;
   const accent = (t * 7.31) % 1;
-  if (accent > 0.9) { r *= 1.12; g *= 0.97; b *= 0.8; }         // sunlit yellow-green
-  else if (accent < 0.08) { r *= 0.85; g *= 0.98; b *= 1.1; }  // cool teal
-  return out.setRGB(Math.min(1, r), Math.min(1, g), Math.max(0.55, Math.min(1, b)));
+  if (accent > 0.88) { r *= 1.14; g *= 0.98; b *= 0.74; }        // sunlit yellow-green
+  else if (accent < 0.1) { r *= 0.84; g *= 0.98; b *= 1.12; }   // cool teal
+  else if (accent < 0.17) { r *= 0.95; g *= 0.9; b *= 0.72; }   // olive
+  const lum = 0.86 + 0.24 * ((t * 13.7) % 1);
+  return out.setRGB(Math.min(1.15, r * lum), Math.min(1.15, g * lum), Math.max(0.5, Math.min(1.15, b * lum)));
 }
 
 export { THREE };

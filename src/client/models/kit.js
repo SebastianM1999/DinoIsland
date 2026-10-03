@@ -97,7 +97,11 @@ export const WIND = {
  */
 export function windMaterial(base, { strength = 0.08, pivotY = 0, frequency = 1.6, heightScale = 0.25 } = {}) {
   const mat = base.clone();
-  mat.onBeforeCompile = (shader) => {
+  // clone() drops per-instance hooks: keep the base's own shader patch (e.g. surface detail)
+  const own = (k) => (Object.prototype.hasOwnProperty.call(base, k) ? base[k] : null);
+  const prev = own('onBeforeCompile'), prevKey = own('customProgramCacheKey');
+  mat.onBeforeCompile = (shader, renderer) => {
+    prev?.call(mat, shader, renderer);
     shader.uniforms.uTime = WIND.uTime;
     shader.uniforms.uWindDir = WIND.uWindDir;
     shader.vertexShader = shader.vertexShader
@@ -118,7 +122,7 @@ export function windMaterial(base, { strength = 0.08, pivotY = 0, frequency = 1.
           transformed.xz += uWindDir * sway * h * h * ${strength.toFixed(4)} * 10.0;
         }`);
   };
-  mat.customProgramCacheKey = () => `wind-${strength}-${pivotY}-${frequency}-${heightScale}`;
+  mat.customProgramCacheKey = () => `wind-${strength}-${pivotY}-${frequency}-${heightScale}|${prevKey ? prevKey.call(base) : ''}`;
   return mat;
 }
 

@@ -5,7 +5,7 @@
 
 ### Island generation & terrain
 - `rng.js` — seeded PRNG (`makeRng`, Mulberry32), `hash2`, `valueNoise`, `fbm`, and math helpers (`clamp`, `lerp`, `smoothstep`, `angleDiff`).
-- `levels.js` — biome definitions (`BIOMES`: vegetation, sites, dinos, music) and the island list (`LEVELS`); `levelDef(index)` returns the full definition incl. difficulty, dino counts, grove/boss-arena flags.
+- `levels.js` — biome definitions (`BIOMES`: vegetation, rock palette + stone-kind tints, sites, dinos, music) and the island list (`LEVELS`); `levelDef(index)` returns the full definition incl. difficulty, dino counts, grove/boss-arena flags.
 - `island.js` — island generator: `planIsland(levelIndex, variant)` builds the plan (hut beach, boat beach, hills/volcano, rivers/lava, pools, sites, trail); `islandHeight`, `riverQuery`, `poolAt`, `islandSeed`; `CAVES_ENABLED` (currently `false`).
 - `terrain.js` — `Terrain`: samples the plan onto a grid once and answers `heightAt`, `slopeAt`, `gradientAt`, water/lava/sea level and depth queries, `isWalkable`.
 - `layout.js` — `buildLayout(terrain)`: deterministic placement of hut, boat, trees, rocks, bushes, fruit spots, sites, dino zones, nests, paths and all static colliders.
@@ -16,7 +16,7 @@
 - `siteFrame.js` — local-to-world frame for placed sites (`toWorld`, `boxRot`, `siteBox`).
 - `collision.js` — 2D collision against circle and oriented-box colliders (`resolveCircle`, `penetration`, `standTop`), segment/ray tests (`segmentColliders`, `raySphere`, `segmentSphere`).
 - `treeShapes.js` — trunk centerlines per tree type (`TRUNKS`) and `treeColliders` built from the same numbers as the meshes.
-- `rockShapes.js` — rock ring tables (`ROCK_VARIANTS`, `rockTable`), `placeRock`, walkable surface `rockSurfaceAt`/`rockHeightAt`; pebbles below `PEBBLE_SCALE` have no collision.
+- `rockShapes.js` — rock ring tables (`ROCK_VARIANTS`: boulder, block, slab, stepped, formation, crag, table rock; `rockTable`), `placeRock`, walkable surface `rockSurfaceAt`/`rockHeightAt`; pebbles below `PEBBLE_SCALE` have no collision.
 - `caveShape.js` — cave dome dimensions, colliders, interior/mouth points, rock piles.
 - `ruinsShape.js` — ruins plaza layout from a seed (`ruinsLayout`), colliders, altar top for the relic.
 - `boatShape.js` — wrecked boat dimensions, relic sockets, hull colliders and interact point.
