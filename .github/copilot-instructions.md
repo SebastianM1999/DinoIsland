@@ -17,9 +17,15 @@ The required workflow is:
   the feature branch, create or update exactly one PR targeting `main`, and add
   `ready-to-merge` when complete. Reuse a platform-created PR. Keep all follow-up
   fixes on that same branch/PR. Report the PR URL and integration status.
-- Let the integration controller test and merge ordinary feature PRs. Never push
+- Let the integration controller rebase feature branches onto main, test and land
+  ordinary feature PRs with GitHub Rebase and merge. Never merge main into a feature
+  branch. Never push
   directly to `main`, bypass checks, or independently merge them. Instruction and
   automation changes require manual integration after checks pass.
+
+GitHub deletes the remote PR branch after merging. Remove local worktrees only
+when clean and confirmed integrated. Rebased feature publication uses an exact-head
+force-with-lease; never rewrite main or overwrite newer work.
 
 See [the workflow guide](../docs/agent-workflow.md) for commands and limitations.
 Keep this startup summary consistent with AGENTS.md when workflow rules change.

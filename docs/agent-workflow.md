@@ -43,9 +43,11 @@ gh pr edit --add-label ready-to-merge
 ```
 
 Use an untracked temporary body file outside the checkout. Agents should attach
-created PRs to their Codex chat. The bot squash-merges one task into one main commit;
-checkpoint commits remain on the task branch. Remove finished worktrees only after
-confirming their work is merged and no local changes need preserving.
+created PRs to their Codex chat. The bot rebases the feature onto current main and
+uses GitHub Rebase and merge, preserving feature commits in linear main history.
+GitHub automatically deletes the remote PR branch after merging. Remove finished
+local worktrees/branches only after confirming integration and that no local changes
+need preserving; a rebase changes commit IDs, so ancestry checks alone are insufficient.
 
 ## Repository setup
 
@@ -60,7 +62,9 @@ confirming their work is merged and no local changes need preserving.
    ruleset edit pauses integration until an administrator verifies and repins it.
    This approved snapshot covers bypass metadata GitHub hides from workflow tokens.
 2. Create labels `ready-to-merge`, `integration-blocked`, `integration-repairing`,
-   `integration-attempt-1`, and `integration-attempt-2`.
+   `integration-rebasing`, `integration-rebase-conflict`, `integration-attempt-1`,
+   and `integration-attempt-2`. Allow Rebase and merge, disable merge-commit/squash
+   landing, and enable automatic deletion of merged PR branches.
 3. Set repository Actions variable `AUTOMERGE_ENABLED=true` to enable the controller.
 4. Optional AI repair: run `claude setup-token` locally and save the token only in
    repository Actions secret `CLAUDE_CODE_OAUTH_TOKEN`. Set Actions variable
@@ -75,29 +79,38 @@ AI subscription limits still apply. There are no paid API fallbacks in this setu
 
 ## How the controller works
 
-The ready-to-merge label, CI/repair completion, and manual dispatch wake a
+The ready-to-merge label, CI/rebase/repair completion, and manual dispatch wake a
 single controller. Ready labels persist the queue; Actions concurrency only prevents
 simultaneous controllers. Eligible same-repository PRs are considered in creation
 order; blocked tasks do not prevent later independent tasks from progressing.
 
 The controller requires a collaborator with write access as PR author. It refuses
 automation/configuration edits and validates branch protection before making changes.
-It brings the task branch up to date, explicitly requests CI (workflow-token pushes
+It rebases the task branch onto current main without running task code, then requests CI (workflow-token pushes
 may leave PR workflows awaiting approval). It automatically approves only eligible
 same-repository PR runs from `github-actions[bot]` for the exact task revision,
 then merges only a passing current
 combined merge commit. Normal PR CI records the tested merge SHA after all tests pass;
 the controller requires that exact current candidate before merging. This avoids a
 second test run for the same feature revision. Older runs without this record use a
-temporary candidate branch as a compatibility fallback. Task branches are preserved.
+temporary candidate branch as a compatibility fallback. Merged remote PR branches
+are deleted automatically; local worktrees are kept until safe cleanup.
 The merge API guards the expected task SHA; strict branch protection guards against
 main advancing between validation and merge.
 
 Conflicts or failing CI may trigger at most two Claude repair attempts, each capped
-at 25 turns/25 minutes. Claude edits the task candidate; deterministic steps rerun
+at 25 turns/25 minutes. Claude resolves each pending rebase conflict and continues
+the rebase without skipping commits; deterministic steps rerun
 tests, check protected paths, commit, and publish only that task branch. Independent
 read-only CI must then pass before the controller merges. There is no automatic
 approval based solely on Claude's own report.
+
+Rebasing rewrites feature commit IDs. Publishing uses an exact reserved-head
+`--force-with-lease`, so concurrent pushes are rejected instead of overwritten.
+The integration workflows never rewrite main. A conflict during deterministic
+rebase holds the same PR for optional AI repair or a local agent; clean rebases do
+not need AI credentials. After a local conflict fix, remove the rebase-conflict
+label and keep using the same PR.
 
 When blocked, inspect the PR and repair/CI logs, clarify intent or fix the branch,
 then remove `integration-blocked`. Reset attempt labels only when deliberately

@@ -109,6 +109,20 @@ module.exports = async function integrate({ github, context, core }) {
       await api.issues.removeLabel({ ...repo, issue_number: pr.number, name: 'integration-repairing' });
       pr.labels = pr.labels.filter(label => label.name !== 'integration-repairing');
     }
+    if (labels(pr).has('integration-rebasing')) {
+      const events = await github.paginate(api.issues.listEvents, { ...repo, issue_number: pr.number, per_page: 100 });
+      const reservation = events.filter(event => event.event === 'labeled' && event.label?.name === 'integration-rebasing')
+        .sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at))[0];
+      if (!reservation || Date.now() - Date.parse(reservation.created_at) < 30 * 60 * 1000) continue;
+      const rebaseRuns = await github.paginate(api.actions.listWorkflowRuns, { ...repo, workflow_id: 'integration-rebase.yml', branch: 'main', per_page: 100 });
+      if (rebaseRuns.some(run => run.status !== 'completed')) continue;
+      await api.issues.removeLabel({ ...repo, issue_number: pr.number, name: 'integration-rebasing' });
+      pr.labels = pr.labels.filter(label => label.name !== 'integration-rebasing');
+    }
+    if (labels(pr).has('integration-rebase-conflict')) {
+      if (await repair(pr, 'Rebasing this task onto main has conflicts.')) return;
+      continue;
+    }
     if (pr.mergeable === null || !pr.mergeable_state || pr.mergeable_state === 'unknown') continue;
     if (pr.mergeable === false || pr.mergeable_state === 'dirty') {
       if (await repair(pr, 'The branch has merge conflicts.')) return;
@@ -117,14 +131,15 @@ module.exports = async function integrate({ github, context, core }) {
     const main = (await api.repos.getBranch({ ...repo, branch: 'main' })).data.commit.sha;
     const comparison = (await api.repos.compareCommits({ ...repo, base: pr.head.sha, head: main })).data;
     if (comparison.ahead_by > 0) {
+      await api.issues.addLabels({ ...repo, issue_number: pr.number, labels: ['integration-rebasing'] });
       try {
-        await api.pulls.updateBranch({ ...repo, pull_number: pr.number, expected_head_sha: pr.head.sha });
+        await api.actions.createWorkflowDispatch({ ...repo, workflow_id: 'integration-rebase.yml', ref: 'main',
+          inputs: { pr_number: String(pr.number), expected_head_sha: pr.head.sha } });
       } catch (error) {
-        // A moving head or newly discovered conflict is retried from fresh state on the next run.
-        if ([409, 422].includes(error.status)) { core.info(`PR ${pr.number}: branch update deferred.`); return; }
+        await api.issues.removeLabel({ ...repo, issue_number: pr.number, name: 'integration-rebasing' });
         throw error;
       }
-      // Wait for GitHub to recalculate mergeability and its synthetic commit after updating.
+      // The deterministic worker rebases and publishes with an exact-head force-with-lease guard.
       return;
     }
     // GitHub may require approval for bot-created PR runs even after author and source checks.
@@ -178,7 +193,7 @@ module.exports = async function integrate({ github, context, core }) {
       }
     }
     try {
-      const result = await api.pulls.merge({ ...repo, pull_number: pr.number, sha: pr.head.sha, merge_method: 'squash' });
+      const result = await api.pulls.merge({ ...repo, pull_number: pr.number, sha: pr.head.sha, merge_method: 'rebase' });
       if (!result.data.merged) core.info(`PR ${pr.number}: GitHub declined the merge.`);
       else {
         const candidateBranch = `integration/ci-pr-${pr.number}-${candidate.slice(0, 16)}`;
