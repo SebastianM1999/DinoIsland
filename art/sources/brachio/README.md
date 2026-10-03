@@ -9,9 +9,10 @@ Headless: `blender -b brachio.blend --python-expr "import bpy; exec(bpy.data.tex
 | Script | Builds |
 | --- | --- |
 | `lib` | shared helpers (same as the raptor's): lofts, tubes along splines, blobs, horns, `paint()` |
+| `eyes`, `mouth` | skill helpers: living eyes (lid opening, rim, iris, pupil disc, catchlights; reduced resolution for the 60k budget) and lower jaw (jawline keel, inward lip, mouth trough, tongue) |
 | `blib` | brachio palette `BP` (slate back, grey flanks, cream throat/belly) and `bskin()` |
 | `bbody` | trunk (tail → body → near-vertical neck) and four pillar legs as spline tubes, foot pads + toenails |
-| `bhead` | small head with arched nasal crest, opening jaw, eyes, lids, peg teeth |
+| `bhead` | small head with arched nasal crest, opening jaw (keel profile, mouth trough, tongue), gentle living eyes (round pupil, almost level lids), peg teeth |
 | `bpaint` | vertex colours for every part, materials |
 | `brig` | armature: 6 neck, 8 tail bones, 4 IK legs (front poles behind, hind poles in front), jaw |
 | `bskin` | heat weights for body/legs, rigid head/jaw/feet |

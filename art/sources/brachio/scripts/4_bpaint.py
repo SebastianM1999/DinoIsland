@@ -29,16 +29,13 @@ paint(bpy.data.objects['BrachioHead'], head_fn)
 def jaw_fn(p, n):
     c = bskin(p, n, wr=False, fr=False)
     c = mix(c, BP['belly'], smooth(0.0, -0.6, n.z))
-    return mix(c, BP['mouth'], smooth(0.4, 0.8, n.z) * smooth(11.98, 12.02, p.z))
+    return mix(c, BP['mouth'], smooth(-0.1, 0.4, n.z) * smooth(JT - .09, JT - .06, p.z) * smooth(JT + .002, JT - .008, p.z))  # trough + its walls
 paint(bpy.data.objects['BrachioJaw'], jaw_fn)
-def eye_fn(p, n):
-    q = p - V((math.copysign(EYE.x, p.x), EYE.y, EYE.z))
-    return mix(BP['eye'], BP['eye2'], smooth(.04, .1, q.length))
-paint(bpy.data.objects['BrachioEyes'], eye_fn)
-paint(bpy.data.objects['BrachioPupils'], lambda p, n: BP['pupil'])
-paint(bpy.data.objects['BrachioLids'], lambda p, n: BP['lid'])
+paint_eyes('Brachio', B_E, dict(iris=lin('#e0a234'), iris2=BP['eye2'], glow=lin('#ffe07a'), limbal=lin('#2e1a0a'),
+                                pupil=BP['pupil'], sclera=lin('#cfc2a4'), lid=BP['lid'], lid2=BP['back2']), gloss, skinm)
+paint(bpy.data.objects['BrachioTongue'], lambda p, n: mix(lin('#8e3a3a'), lin('#b85a55'), smooth(-0.2, 0.6, n.z)))
 paint(bpy.data.objects['BrachioTeeth'], lambda p, n: BP['tooth'])
 for o in bpy.data.objects:
-    if o.type == 'MESH':
-        o.data.materials.clear()
-        o.data.materials.append(gloss if o.name in ('BrachioEyes', 'BrachioPupils', 'BrachioTeeth') else skinm)
+    if o.type == 'MESH' and o.name not in ('BrachioEyes', 'BrachioLids', 'BrachioPupils', 'BrachioGlints'):
+        o.data.materials.clear()                         # eyes, lids, pupils, glints got theirs in paint_eyes
+        o.data.materials.append(gloss if o.name == 'BrachioTeeth' else skinm)
