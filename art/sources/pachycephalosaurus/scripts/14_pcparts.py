@@ -22,15 +22,15 @@ def pc_surf(p0, d):
 bm = bmesh.new(); lay = bm.verts.layers.float.get('ht') or bm.verts.layers.float.new('ht')
 PC_KNOBS = []
 for sx in (1, -1):
-    for i, a in enumerate(range(62, 181, 13)):                     # lower ring round the dome
+    for i, a in enumerate(range(100, 181, 12)):                    # ring round the BACK of the dome only (no necklace across the face)
         if sx < 0 and a == 180: continue
-        r = (.036 + .01 * math.sin(i * 1.7) ** 2) * PC_HK
-        p, n = pc_dome_pt(sx, a, -22)
+        r = (.03 + .01 * math.sin(i * 1.7) ** 2) * PC_HK
+        p, n = pc_dome_pt(sx, a, -12)
         if p: blob_bm(bm, p + n * r * .1, (r, r, r * .9), (0, 0, 0), 12, 8); PC_KNOBS.append(p)
-    for a in (105, 135, 160):                                      # second, smaller row
-        p, n = pc_dome_pt(sx, a, -6)
+    for a in (125, 150, 172):                                      # second, smaller row
+        p, n = pc_dome_pt(sx, a, 2)
         if p: blob_bm(bm, p, V((.032, .032, .03)) * PC_HK, (0, 0, 0), 10, 6)
-    for x, y, z in ((.12, -1.62, 1.66), (.16, -1.55, 1.58)):                       # knobs behind the eye
+    for x, y, z in ((.16, -1.56, 1.62),):                                          # one knob behind the eye
         q = pch(x, y, z); p, n = pc_surf((sx * (q.x + .5), q.y, q.z), (-sx, 0, 0))
         if p: blob_bm(bm, p, V((.028, .028, .028)) * PC_HK, (0, 0, 0), 10, 6)
 mk('PcKnobs', bm)

@@ -4,6 +4,17 @@ exec(bpy.data.texts['fuse'].as_string(), globals())
 fuse_head('PcBody', 'PcHead', 'PcJaw', PC_CORNER, PC_MOUTH, lip_gap=0.007, region=0.016,
           seam_width=0.08, fillet_iters=55)
 
+# Cheek fill: behind the mouth corner the skull underside and the jaw top met in a long groove that read as a
+# gaping mouth; smooth it into one cheek surface so the visible mouth ends at the corner (herbivore cheeks).
+_b = bpy.data.objects['PcBody']; _g = _b.vertex_groups.new(name='cheekfill')
+for v in _b.data.vertices:
+    w = smooth(PC_CORNER - .005, PC_CORNER + .05, v.co.y) * smooth(-1.06, -1.12, v.co.y) * math.exp(-((v.co.z - PC_MOUTH) / .03) ** 2) * smooth(.03, .07, abs(v.co.x))
+    if w > .01: _g.add([v.index], w, 'REPLACE')
+for o in bpy.context.selected_objects: o.select_set(False)
+bpy.context.view_layer.objects.active = _b; _b.select_set(True)
+_sm = _b.modifiers.new('CheekFill', 'SMOOTH'); _sm.vertex_group = 'cheekfill'; _sm.factor = 1.0; _sm.iterations = 25
+bpy.ops.object.modifier_apply(modifier='CheekFill'); _b.vertex_groups.remove(_b.vertex_groups['cheekfill'])
+
 def pc_union_parts(base_name, names, width=0.1, iters=55, head_back_y=None):
     base = bpy.data.objects[base_name]; Bb = _bvh(_bake(base))
     Bo = [_bvh(_bake(bpy.data.objects[n])) for n in names]

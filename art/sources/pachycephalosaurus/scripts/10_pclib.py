@@ -20,7 +20,7 @@ def pchide(p, n):
 # Head scale: the whole head (skull, dome, jaw, eyes, ornaments, Head/Jaw bones) is designed in the original
 # reference measurements and shrunk about the neck joint - the owner found the first head "too big, funny".
 # The snout ahead of the eye is stretched by PC_SNOUT (owner: "the face should be a bit longer").
-PC_HK = 0.7; PC_HPIV = (-1.12, 1.6); PC_SNOUT = (-1.72, 1.35)
+PC_HK = 0.7; PC_HPIV = (-1.12, 1.6); PC_SNOUT = (-1.72, 1.2)
 def pch(x, y, z):
     if y < PC_SNOUT[0]: y = PC_SNOUT[0] + (y - PC_SNOUT[0]) * PC_SNOUT[1]
     return V((x * PC_HK, PC_HPIV[0] + (y - PC_HPIV[0]) * PC_HK, PC_HPIV[1] + (z - PC_HPIV[1]) * PC_HK))

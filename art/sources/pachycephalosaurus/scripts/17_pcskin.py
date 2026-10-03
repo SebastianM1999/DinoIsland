@@ -20,7 +20,7 @@ for s in 'LR':
                     lambda p: smooth(0.8, 1.05, trunk_e(p, PC_TRUNK)) * smooth(reach[0], reach[1], min(seg_d(p, a, b) for _, a, b in S_)),
                     sigma=sig)
 head_jaw_regions(body)
-cheeks(body, PC_CORNER, PC_MOUTH, band=0.045, ramp=0.1)
+cheeks(body, PC_CORNER, PC_MOUTH, band=0.05, ramp=0.12)
 print('unweighted', check_weights(body))
 
 def pc_copy_skin(ob, body, anchor):
