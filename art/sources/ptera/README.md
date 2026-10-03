@@ -12,6 +12,7 @@ T-pose (wings level, legs hanging), lowest point at z = 0.
 | Script | Builds |
 | --- | --- |
 | `lib`, `anim`, `fuse`, `weights`, `export` | shared dino-blender-creator helpers |
+| `eyes`, `mouth` | skill helpers: living eyes (lid opening, rim, iris, pupil disc, catchlights) and lower jaw (jawline keel, inward lip, mouth trough, tongue, cheeks) |
 | `plib` | palette `PP` (umber-grey hide, crimson skull + crest, horn beak, cream membranes), `p_tube()` (tube with a fixed frame axis, never twists), `pskin()` |
 | `pbody` | trunk (tail stub -> deep chest -> S-neck) as one tube, thin hanging legs with four toes + claws |
 | `phead` | short skull with a long toothless dagger beak, lower beak, swept-back crest blade, sunk slit-pupil eyes under angry lids |

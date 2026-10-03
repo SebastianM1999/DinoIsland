@@ -23,7 +23,7 @@ def p_jaw_fn(p, n):
     c = mix(PP['beak'], PP['beak2'], 0.5 + 0.6 * fbm(p * V((1, .3, 1)), 14.0))
     c = mix(c, mix(PP['crest'], PP['crest2'], 0.5), smooth(-0.95, -0.82, p.y) * 0.8)   # throat end blends into the head colour
     c = mix(c, PP['beaktip'], smooth(-1.58, -1.82, p.y))
-    return mix(c, PP['mouth'], smooth(0.3, 0.7, n.z) * smooth(P_MOUTH - .012, P_MOUTH - .003, p.z))
+    return mix(c, PP['mouth'], smooth(0.3, 0.7, n.z) * smooth(P_MOUTH - .022, P_MOUTH - .016, p.z) * smooth(P_MOUTH + .001, P_MOUTH - .002, p.z))  # trough
 
 paint_regions(bpy.data.objects['PteraBody'], p_body_fn, p_head_fn, p_jaw_fn)
 
@@ -46,15 +46,12 @@ p_paint_membrane(bpy.data.objects['PteraMembrane'])
 paint(bpy.data.objects['PteraLegs'], lambda p, n: mix(PP['leg'], PP['spot'], 0.3 + 0.4 * fbm(p, 16.0)))
 paint(bpy.data.objects['PteraCrest'], lambda p, n: mix(mix(PP['crest'], PP['crest2'], smooth(-0.8, -0.35, p.y)),
                                                       PP['mask'], smooth(0.55, 0.9, fbm(p * V((1, 3, 1)), 6.0)) * 0.35))
-def p_eye_fn(p, n):
-    sx = 1 if p.x >= 0 else -1
-    front = V((sx * P_EYE.x, P_EYE.y, P_EYE.z)) + V((sx * math.cos(P_EYE_YAW), -math.sin(P_EYE_YAW), 0)) * P_EYE_R * .8
-    return mix(PP['eye'], PP['eye2'], smooth(.012, .035, (p - front).length))
-paint(bpy.data.objects['PteraEyes'], p_eye_fn)
-paint(bpy.data.objects['PteraPupils'], lambda p, n: PP['pupil'])
-paint(bpy.data.objects['PteraLids'], lambda p, n: mix(PP['lid'], PP['mask'], 0.4))
+exec(bpy.data.texts['eyes'].as_string(), globals())
+paint_eyes('Ptera', P_E, dict(iris=PP['eye'], iris2=PP['eye2'], glow=lin('#ffe07a'), limbal=lin('#2a1206'),
+                              pupil=PP['pupil'], sclera=lin('#d8b892'), lid=PP['lid'], lid2=PP['mask']), gloss, skinm)
+paint(bpy.data.objects['PteraTongue'], lambda p, n: mix(lin('#8e3a3a'), lin('#b85a55'), smooth(-0.2, 0.6, n.z)))
 for n in ('PteraHandClaws', 'PteraToeClaws'): paint_t(bpy.data.objects[n], lambda p, t: mix(PP['claw'], PP['clawtip'], smooth(0.4, 1.0, t)))
 for o in bpy.data.objects:
-    if o.type == 'MESH' and o.name.startswith('Ptera'):
-        o.data.materials.clear()
-        o.data.materials.append(gloss if o.name in ('PteraEyes', 'PteraPupils', 'PteraHandClaws', 'PteraToeClaws') else skinm)
+    if o.type == 'MESH' and o.name.startswith('Ptera') and o.name not in ('PteraEyes', 'PteraLids', 'PteraPupils', 'PteraGlints'):
+        o.data.materials.clear()                         # eyes, lids, pupils, glints got theirs in paint_eyes
+        o.data.materials.append(gloss if o.name in ('PteraHandClaws', 'PteraToeClaws') else skinm)

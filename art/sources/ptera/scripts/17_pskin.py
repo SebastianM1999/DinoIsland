@@ -26,7 +26,8 @@ legs = bpy.data.objects['PteraLegs']
 distance_weights(legs, rig, ['Body'], P_LEG, side_x=0.0, sigma=0.02)
 print('membrane unweighted', check_weights(mem), 'legs unweighted', check_weights(legs))
 
-for n in ('PteraEyes', 'PteraPupils', 'PteraLids', 'PteraCrest'): rigid_islands(bpy.data.objects[n], rig, lambda c: 'Head')
+for n in ('PteraEyes', 'PteraPupils', 'PteraLids', 'PteraGlints', 'PteraCrest'): rigid_islands(bpy.data.objects[n], rig, lambda c: 'Head')
+rigid_islands(bpy.data.objects['PteraTongue'], rig, lambda c: 'Jaw')
 HAND = segs(rig, ['WingLowL', 'WingHandL', 'WingLowR', 'WingHandR'])
 rigid_islands(bpy.data.objects['PteraHandClaws'], rig, lambda c: nearest(c, HAND))
 FEET = segs(rig, ['BackFootL', 'BackFootR'])

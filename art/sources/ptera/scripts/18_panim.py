@@ -78,14 +78,14 @@ def p_fall_params(t):
          for s, ph in P_FALL_PH.items()}
     return dict(wing=w, roll=.55 * math.sin(f), pitch=.4 + .12 * math.sin(2 * f), drop=0.0,
                 n1=(.35 + .18 * math.sin(f - .5), .15 * math.sin(f - .3)), n2=(.25 + .15 * math.sin(f - 1.0), .12 * math.sin(f - .8)),
-                head=(.2 + .12 * math.sin(f - 1.5), .2 * math.sin(f - 1.2)), jaw=.3 + .1 * math.sin(f - 1.8),
+                head=(.2 + .12 * math.sin(f - 1.5), .2 * math.sin(f - 1.2)), jaw=.12 + .05 * math.sin(f - 1.8),
                 tail=-.15 + .1 * math.sin(f), legs=(.5 + .3 * math.sin(f - .4), -.4 + .2 * math.sin(f - 1), .3))
 
 # lying on the ground after the impact: belly down, rolled a little onto the left, wings sprawled
 # flat (the lower left wing angled up to stay above the ground), neck along the ground, head on its side
 P_LIE = dict(wing={'L': dict(up=-.02, sweep=.32, elbow=.42, finger=.3, hand_up=-.04, tip_up=-.05),
                    'R': dict(up=-.16, sweep=.32, elbow=.42, finger=.3, hand_up=-.04, tip_up=-.05)},
-             roll=.1, pitch=.03, drop=-.73, n1=(.22, .12), n2=(.14, .1), head=(-.12, .65), jaw=.18, tail=.05, legs=(1.62, -.15, .2))
+             roll=.1, pitch=.03, drop=-.73, n1=(.22, .12), n2=(.14, .1), head=(-.12, .65), jaw=.1, tail=.05, legs=(1.62, -.15, .2))
 
 def p_blend(a, b, u):
     if isinstance(a, dict): return {k: p_blend(a[k], b[k], u) for k in a}
@@ -114,7 +114,7 @@ def p_death(t):
     for k in ('legs', 'n2', 'head', 'pitch'): P[k] = p_blend(F0[k], P_LIE[k], fold)
     P['n1'] = p_blend(F0['n1'], P_LIE['n1'], fold)
     P['drop'] = P_LIE['drop'] * hit
-    P['jaw'] = track(t, [(0, P['jaw']), (.2, .45), (.5, .15), (1, .18)])
+    P['jaw'] = track(t, [(0, P['jaw']), (.2, .2), (.5, .08), (1, .1)])   # the jaw is really skinned now: keep the beak off the ground
     p_apply(P)
 
 def p_idle(t):

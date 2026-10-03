@@ -24,12 +24,15 @@ for s, sx in (('L', 1), ('R', -1)):
         crisp_chain(body, rig, ch, lambda p: p.x * sx > 0.05,
                     lambda p: smooth(0.72, 1.08, s_trunk_e(p)) * smooth(0.95, 0.7, min(seg_d(p, a, b) for _, a, b in CH)), sigma=sig)
 head_jaw_regions(body)
+exec(bpy.data.texts['mouth'].as_string(), globals())
+cheeks(body, S_CORNER, S_MOUTH, band=0.22, ramp=0.5)
 print('unweighted', check_weights(body))
 
 SPINE = segs(rig, ['Body', 'Shoulders', 'Neck1', 'Neck2'] + S_TAIL)
 def s_spine_bone(c):          # plates/spikes follow the spine bone under their base
     return nearest(V((0, c.y, c.z - 0.5)), SPINE)
-for n in ('StegoEyes', 'StegoPupils', 'StegoLids'): rigid_islands(bpy.data.objects[n], rig, lambda c: 'Head')
+for n in ('StegoEyes', 'StegoPupils', 'StegoLids', 'StegoGlints'): rigid_islands(bpy.data.objects[n], rig, lambda c: 'Head')
+rigid_islands(bpy.data.objects['StegoTongue'], rig, lambda c: 'Jaw')
 rigid_islands(bpy.data.objects['StegoSpikes'], rig, lambda c: nearest(c, segs(rig, S_TAIL)))
 FEET = segs(rig, [p + 'Foot' + s for p in ('Front', 'Back') for s in 'LR'])
 rigid_islands(bpy.data.objects['StegoNails'], rig, lambda c: nearest(c, FEET))

@@ -1,7 +1,7 @@
 # Small, low head: blunt beak, round cheeks, heavy sleepy brow (friendly but grumpy).
 # Skull + lower jaw are lofts; 'sfuse' welds them with the neck into ONE mesh.
-for n in ('StegoHead', 'StegoJaw', 'StegoEyes', 'StegoPupils', 'StegoLids'): remove(n)
-S_MOUTH = 0.9; S_CORNER = -3.15
+for n in ('StegoHead', 'StegoJaw', 'StegoEyes', 'StegoPupils', 'StegoLids', 'StegoGlints', 'StegoTongue'): remove(n)
+S_MOUTH = 0.9; S_CORNER = -3.4   # cheeks close the mouth behind the corner
 
 def s_prof(w, top, bot, brow=0.0):
     mid = (top + bot) / 2
@@ -28,35 +28,22 @@ def s_head_sculpt(p, n):
     return p
 sculpt(head, s_head_sculpt)
 
-S_T = [(0, 0.9), (0.5, 0.93), (0.82, 1.0), (0.97, 0.9), (1.0, 0.62), (0.92, 0.3), (0.72, 0.1), (0.4, 0.015), (0, 0.0)]
-#           y      w     bot      (narrower than the upper lip -> soft overbite; deep at the back)
-S_JS = [(-2.76, .19, .74), (-2.88, .26, .65), (-3.04, .29, .64), (-3.2, .275, .68), (-3.36, .26, .71), (-3.5, .245, .73),
-        (-3.62, .225, .75), (-3.71, .195, .77), (-3.77, .15, .79), (-3.8, .08, .81)]
-jaw = loft2('StegoJaw', [(y, [(tx * w, bot + tz * (S_MOUTH - bot)) for tx, tz in S_T]) for y, w, bot in S_JS])
+# lower jaw (mouth.py): flat sides to a jawline keel, thin inward-rolled lip, mouth trough + tongue;
+# narrower than the upper lip (soft overbite), deepest at the back, tip just behind the snout tip
+exec(bpy.data.texts['mouth'].as_string(), globals())
+#           y      w     bot
+S_JS = [(-2.76, .19, .76), (-2.88, .26, .69), (-3.04, .28, .68), (-3.2, .265, .71), (-3.36, .25, .74), (-3.5, .235, .76),
+        (-3.62, .21, .78), (-3.7, .17, .8), (-3.75, .12, .82), (-3.78, .06, .84)]
+jaw = loft2('StegoJaw', [(y, jaw_prof(w, bot, S_MOUTH, 0.05 * trough_fade(y, -3.78, -2.76))) for y, w, bot in S_JS])
+add_tongue('StegoTongue', (0, -3.3, S_MOUTH - .045), (.08, .2, .028))
 
 # eyes sit IN the measured head surface (ray cast from outside), slightly sunk
 dg = bpy.context.evaluated_depsgraph_get(); eh = head.evaluated_get(dg)
 hit = eh.ray_cast(V((1.0, S_EYE0.y, S_EYE0.z)), V((-1, 0, 0)))
-S_EYE = V((hit[1].x - .03, S_EYE0.y, S_EYE0.z)) if hit[0] else S_EYE0
-S_EYE_R = .11; S_EYE_YAW = 0.3                     # eyes look slightly forward
-bm = bmesh.new()
-for sx in (1, -1): blob_bm(bm, V((sx * S_EYE.x, S_EYE.y, S_EYE.z)), (S_EYE_R * .8, S_EYE_R, S_EYE_R), (0, 0, -sx * S_EYE_YAW), 24, 16)
-mk('StegoEyes', bm)
-bm = bmesh.new()
-for sx in (1, -1):
-    d = V((sx * math.cos(S_EYE_YAW), -math.sin(S_EYE_YAW), 0))
-    blob_bm(bm, V((sx * S_EYE.x, S_EYE.y, S_EYE.z - .012)) + d * S_EYE_R * .7, (.02, .042, .05), (0, 0, -sx * S_EYE_YAW), 16, 10)
-mk('StegoPupils', bm)
-bm = bmesh.new()   # heavy upper lid covering ~40 %, its edge sloping down toward the back of the head
-for sx in (1, -1):
-    blob_bm(bm, V((sx * (S_EYE.x + .004), S_EYE.y, S_EYE.z + S_EYE_R * .6)), (S_EYE_R * .9, S_EYE_R * 1.14, S_EYE_R * .52),
-            (0, 0, -sx * S_EYE_YAW), 24, 14)
-mk('StegoLids', bm)
-S_LID_TILT = 0.22                                    # rotate each lid about the eye's outward axis
-lids = bpy.data.objects['StegoLids']
-for v in lids.data.vertices:
-    sx = 1 if v.co.x > 0 else -1; c = V((sx * S_EYE.x, S_EYE.y, S_EYE.z))
-    ax = V((sx * math.cos(S_EYE_YAW), -math.sin(S_EYE_YAW), 0))
-    v.co = c + mathutils.Matrix.Rotation(-sx * S_LID_TILT, 3, ax) @ (v.co - c)
-lids.data.update()
-
+S_EYE = V((hit[1].x - .035, S_EYE0.y, S_EYE0.z)) if hit[0] else S_EYE0
+S_EYE_R = .11; S_EYE_YAW = 0.3
+# living eyes (eyes.py): grumpy-calm herbivore, round pupil, slight angry slant
+exec(bpy.data.texts['eyes'].as_string(), globals())
+S_E = dict(c=tuple(S_EYE), R=S_EYE_R, yaw=S_EYE_YAW, W=.88, Ht=.48, Hb=.56, tilt=.16, rim=(.22, .06),
+           pupil=(.27, .3), iris=.74)
+build_eyes('Stego', S_E)
