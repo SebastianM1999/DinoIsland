@@ -91,7 +91,8 @@ Actively hunts the player. Uses bites at close range and short bursts of speed t
 - Lean, athletic body
 - Large curved claw on each foot
 - Long stiff tail
-- Sandy beige and brown feathers with black markings and rusty-orange accents
+- Sandy beige and brown scaly skin with black markings and rusty-orange accents
+- Fully featherless: scales on the head, body, arms, legs, and tail; no feathers or plumage
 
 ### Attack Behavior
 Usually attacks in small groups. One Deinonychus distracts the player while others try to approach from the sides or behind.
@@ -118,7 +119,8 @@ Stalks the player before committing to a powerful charge. Uses devastating bites
 - Small, agile predator
 - Slim body with a narrow, alert head
 - Large curved claw on each foot
-- Long balancing tail and short feathers along its arms and back
+- Long balancing tail and scaly skin along its arms and back
+- Fully featherless: scales on the head, body, arms, legs, and tail; no feathers or plumage
 - Orange body with a darker back, dark brown stripes across the back and tail, a cream belly and throat, and golden-yellow eyes, matching the existing raptor palette in the code
 
 ### Attack Behavior
