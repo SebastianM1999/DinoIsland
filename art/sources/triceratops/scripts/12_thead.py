@@ -1,7 +1,7 @@
 # Big wedge head: wide cheeks at the back, tapering snout ending in a hooked parrot beak.
 # Skull + lower jaw are lofts; 'tfuse' welds them with the neck into ONE mesh.
 for n in ('TriHead', 'TriJaw', 'TriEyes', 'TriGlints', 'TriPupils', 'TriLids'): remove(n)
-TR_MOUTH = 1.25; TR_CORNER = -3.2
+TR_MOUTH = 1.25; TR_CORNER = -3.45   # cheeks close the mouth behind the corner (beaked herbivore)
 
 def tr_prof(w, top, bot, brow=0.0):
     mid = (top + bot) / 2
@@ -34,7 +34,7 @@ sculpt(head, tr_head_sculpt)
 TR_JT = [(0, 0.92), (0.5, 0.96), (0.8, 0.92), (0.97, 0.7), (1.0, 0.45), (0.9, 0.2), (0.66, 0.05), (0.34, 0.0), (0, 0.0)]
 #            y      w     bot      (narrower than the upper lip -> overbite; deep at the back; beak tip)
 TR_JS = [(-2.5, .3, 1.02), (-2.68, .38, .86), (-2.96, .36, .86), (-3.2, .3, .9), (-3.45, .24, .95), (-3.66, .18, .99),
-         (-3.82, .12, 1.03), (-3.93, .055, 1.08)]
+         (-3.79, .12, 1.04), (-3.87, .06, 1.08)]                    # tip stays behind the upper beak's hook
 jaw = loft2('TriJaw', [(y, [(tx * w, bot + tz * (TR_MOUTH - bot)) for tx, tz in TR_JT]) for y, w, bot in TR_JS])
 
 # eyes sit IN the measured head surface (ray cast from outside), slightly sunk; 'eyes' builds the ball,

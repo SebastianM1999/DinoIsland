@@ -13,6 +13,19 @@ for s in 'LR':
     for pre, sig in (('Back', 0.06), ('Front', 0.05)):
         limb_weights(body, rig, [pre + n + s for n in ('UpLeg', 'LowLeg', 'Foot')], s, TR_TRUNK, sigma=sig)
 head_jaw_regions(body)
+# Cheeks: behind the mouth corner the skin round the lip line blends Head -> Jaw over a band that widens
+# toward the hinge, so it stretches like a cheek instead of splitting open all the way back.
+def tr_cheeks(body, band=0.26, ramp=0.5):
+    gh, gj = body.vertex_groups['Head'], body.vertex_groups['Jaw']
+    for v in body.data.vertices:
+        p = body.matrix_world @ v.co
+        b = band * smooth(TR_CORNER, TR_CORNER + ramp, p.y)
+        if b < 0.01 or abs(p.z - TR_MOUTH) > b: continue
+        w = {g.group: g.weight for g in v.groups}; hj = w.get(gh.index, 0) + w.get(gj.index, 0)
+        if hj < 0.01: continue
+        up = smooth(TR_MOUTH - b, TR_MOUTH + b, p.z)
+        gh.add([v.index], hj * up, 'REPLACE'); gj.add([v.index], hj * (1 - up), 'REPLACE')
+tr_cheeks(body)
 print('unweighted', check_weights(body))
 
 for n in ('TriEyes', 'TriGlints', 'TriPupils', 'TriLids', 'TriFrill', 'TriKnobs', 'TriHorns'):
