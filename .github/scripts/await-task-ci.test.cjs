@@ -96,3 +96,14 @@ test('latest matching CI run supersedes an older successful run', async () => {
 test('invalid input rejects without querying GitHub', async () => {
   await assert.rejects(awaitCi({ prNumber: 1, expectedHead: 'short' }), /exact 40-character/);
 });
+
+test('a new rebase or repair reservation releases the old wait without blocking its queued workflow', async () => {
+  for (const reservation of ['integration-rebasing', 'integration-repairing']) {
+    const f = fixture({ frames: [{ runs: [{ status: 'completed', conclusion: 'action_required' }] },
+      { pr: { labels: [{ name: 'ready-to-merge' }, { name: reservation }] } }] });
+    assert.match(await f.start(), /supersedes/);
+    assert.equal(f.dispatches.length, 1);
+    assert.equal(f.holds.length, 0);
+    assert.equal(f.clock(), 10);
+  }
+});
