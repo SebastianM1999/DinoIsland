@@ -16,6 +16,7 @@
 - The normal `pull_request` checkout tests GitHub's combined merge candidate. Merge-group runs test the queue candidate when a native GitHub merge queue is available.
 
 ## Rules
+- Feature branches use `<agent>/<feature>` (for example `claude/new-dinos`), without requiring a developer name. The controller accepts eligible feature branches regardless of prefix.
 - CI has read-only repository permissions, no AI credentials, and no persisted checkout credentials.
 - Use `npm ci` with the committed lockfile and Node 22. Electron's binary download is disabled because headless tests do not launch Electron.
 - Superseded CI runs are cancelled per PR or ref to limit runner usage.

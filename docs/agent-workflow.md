@@ -26,18 +26,20 @@ already creates a task PR should reuse it. Follow-up fixes remain in that one PR
 
 ## Start and submit a task
 
-From a clean clone, use a unique developer/task name:
+Use `<agent>/<feature>`: `codex/new-dinos`, `claude/new-dinos` or
+`copilot/new-dinos`. No developer-name segment is required. Choose a unique feature
+slug when parallel agents use the same prefix. For example, a Claude task starts:
 
 ```powershell
 git fetch origin
-git worktree add -b codex/sebas/task-name ../dino-task-name origin/main
+git worktree add -b claude/task-name ../dino-claude-task-name origin/main
 ```
 
 Run Claude or Codex in that worktree. Read AGENTS.md and directory specs, implement
 the task, run `npm test`, and make focused commits. After the user authorizes pushing:
 
 ```powershell
-git push -u origin codex/sebas/task-name
+git push -u origin claude/task-name
 gh pr create --base main --title "Describe resulting behavior" --body-file pr-body.md
 gh pr edit --add-label ready-to-merge
 ```
