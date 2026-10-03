@@ -84,6 +84,11 @@ then remove `integration-blocked`. Reset attempt labels only when deliberately
 giving a fixed task another repair budget. Never enable an API-billing fallback
 without explicit authorization.
 
+Find controller decisions in GitHub's **Actions > Integration queue** logs, test
+results in **Actions > CI**, and repair details in **Actions > Integration repair**.
+To wake the queue immediately, use the Integration queue workflow's **Run workflow**
+button on `main`, or run `gh workflow run integration.yml --ref main`.
+
 ## Pause and limitations
 
 Set `AUTOMERGE_ENABLED=false` to pause new integrations/repairs. Cancel already
