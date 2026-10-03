@@ -21,9 +21,9 @@ Dilophosaurus pipeline.
 | `lib`, `anim`, `fuse`, `weights`, `views`, `export`, `eyes`, `mouth` | shared dino-blender-creator helpers (copies of the skill scripts) |
 | `pclib` | palette `PCP`, `pchide()` (countershade + soft dark saddles + speckles) |
 | `pcbody` | trunk (stiff tail -> barrel body -> short thick neck) as one spline tube; strong hind legs with three toes, small arms with three fingers, all separate tubes |
-| `pchead` | short deep face with a plain closed snout and a straight mouth line (a hooked beak read as a "napping turtle"); the compact dome is part of the skull loft (round-topped sections rising behind the snout - a separate ellipsoid read as a ball sitting on the head); the whole head is designed in reference measurements and shrunk to 70 % about the neck joint by `pch()` (`pclib`; the full-size head looked "too big, funny"), the snout ahead of the eye stretched by 35 % ("face a bit longer") - every head coordinate in `pchead`, `pcparts`, `pcpaint` and the Head/Jaw bones goes through `pch()`; lower jaw (`mouth.jaw_prof`), small deep-set eyes with a thin skin-coloured rim and a slight focused slant (`R .038, Ht .4, Hb .5, tilt .28`; the big round bulging eye read as "stupid") |
-| `pcfuse` | skull + jaw + neck fused into ONE mesh (`fuse_head`), limb parts unioned one by one (EXACT, no `use_self`) with one fillet pass |
-| `pcparts` | knob ring round the back/sides of the dome + a smaller second row, blunt spikes at its rear rim, knobs behind the eyes, small snout spikes (all snapped onto the measured surface; a knob that snaps > 12 cm away is dropped), back/tail scutes, nails |
+| `pchead` | short deep face with a plain closed snout and a straight mouth line (a hooked beak read as a "napping turtle"); the compact dome is part of the skull loft (round-topped sections rising behind the snout - a separate ellipsoid read as a ball sitting on the head); the whole head is designed in reference measurements and shrunk to 70 % about the neck joint by `pch()` (`pclib`; the full-size head looked "too big, funny"), the snout ahead of the eye stretched by 20 % ("face a bit longer") and kept deep and blunt (a low pointed snout read as a duck bill) - every head coordinate in `pchead`, `pcparts`, `pcpaint` and the Head/Jaw bones goes through `pch()`; lower jaw (`mouth.jaw_prof`), small deep-set eyes with a thin skin-coloured rim and a slight focused slant (`R .044, Ht .4, Hb .5, tilt .3`; the big round bulging eye read as "stupid") |
+| `pcfuse` | skull + jaw + neck fused into ONE mesh (`fuse_head`; behind the mouth corner the jaw top rises into the skull (`pc_jaw_top`) so they weld into one cheek - a groove along the lip line there read as a long gaping mouth), limb parts unioned one by one (EXACT, no `use_self`) with one fillet pass |
+| `pcparts` | knob ring round the BACK of the dome only (a ring across the cheeks read as a pearl necklace) + a smaller second row, blunt spikes at its rear rim, knobs behind the eyes, small snout spikes (all snapped onto the measured surface; a knob that snaps > 12 cm away is dropped), back/tail scutes, nails |
 | `pcpaint` | vertex colours (red-brown hide, cream only on the underside, thin dark mouth line, darker snout tip, bone dome with fine crazing, bone knobs/spikes), two materials |
 | `pcrig` | armature: Body, Torso, Neck1-2, Head, flipped Jaw, Tail1-6, theropod IK legs, FK arms |
 | `pcskin` | spine distance weights, crisp limb weights outside the trunk tube, Head/Jaw from the fuse regions + `cheeks`, scutes copy the back skin, knobs/spikes/eyes rigid on Head, nails on Hand/BackToes |
@@ -31,14 +31,14 @@ Dilophosaurus pipeline.
 | `pcexport` | samples clips, deform-only export rig, `Pachycephalosaurus_*` actions, GLB |
 | `pcbuild` | master: clears the scene, sets 30 fps and runs everything above |
 
-Measured (`check_glb.mjs ... --length 4.5`): height 1.988 m at 4.5 m length, walk stride 1.252 m, run stride
-2.61 m, max knee step 0.32 rad per 1/60 s at 3 Hz cadence (limit 0.4), 39,846 triangles, 1,811 vertices follow
+Measured (`check_glb.mjs ... --length 4.5`): height 1.996 m at 4.5 m length, walk stride 1.257 m, run stride
+2.62 m, max knee step 0.32 rad per 1/60 s at 3 Hz cadence (limit 0.4), 39,429 triangles, 1,680 vertices follow
 the Jaw. All clips keep every vertex above the ground (`ground_report` min z >= 0.004).
 
 ## Not integrated into the game yet
 
-The GLB is not registered: a species needs `GLB_DINOS` (`model('pachycephalosaurus', 'Pachycephalosaurus', 1.988,
-4.5, 1.252, 2.61, true)`, bones = raptor theropod bones with `neck: ['Neck1', 'Neck2']`, `tail: Tail1-6`,
+The GLB is not registered: a species needs `GLB_DINOS` (`model('pachycephalosaurus', 'Pachycephalosaurus', 1.996,
+4.5, 1.257, 2.62, true)`, bones = raptor theropod bones with `neck: ['Neck1', 'Neck2']`, `tail: Tail1-6`,
 `clips.roar = 'Pachycephalosaurus_Roar'`, `maxCadence` 3.0), a `SPECIES` view entry with a procedural fallback,
 `CONFIG` species data and AI, spawns, `art/asset-manifest.json`, `test/dino-glb.test.js` and `extraHitZones`
 (dome, snout, tail) measured with `hit_coverage.mjs`.
