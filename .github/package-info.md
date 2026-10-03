@@ -3,7 +3,7 @@
 
 ## Files
 - `workflows/ci.yml` — read-only CI for pull requests targeting `main`, pushes to `main`, merge-group candidates, and manual runs. Installs locked dependencies and runs the Node 22 test suite and submitted-diff whitespace/conflict-marker checks on Ubuntu.
-- `workflows/integration.yml` — trusted-main controller, awakened by PR events, completed CI/repairs, manual runs, and a 15-minute schedule. Does not execute PR source.
+- `workflows/integration.yml` — trusted-main controller, awakened by the ready-to-merge label, completed CI/repairs, and manual runs; no idle schedule. Does not execute PR source.
 - `workflows/integration-repair.yml` — reserved same-repository task repair using Claude subscription credentials; validates eligibility, merges main, repairs files, tests, publishes only the task branch, and wakes the controller for independent candidate CI.
 - `scripts/integration.cjs` — durable ready-label queue controller; checks protection, collaborator eligibility, protected paths, revision-specific CI, repair budgets, and guarded squash merges.
 - `scripts/integration.test.cjs` — mocked integration safety tests, explicitly run by CI because default Node discovery skips hidden directories.

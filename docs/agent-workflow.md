@@ -55,7 +55,7 @@ AI subscription limits still apply. There are no paid API fallbacks in this setu
 
 ## How the controller works
 
-PR events, CI/repair completion, manual dispatch, and a 15-minute schedule wake a
+The ready-to-merge label, CI/repair completion, and manual dispatch wake a
 single controller. Ready labels persist the queue; Actions concurrency only prevents
 simultaneous controllers. Eligible same-repository PRs are considered in creation
 order; blocked tasks do not prevent later independent tasks from progressing.
@@ -87,8 +87,7 @@ without explicit authorization.
 ## Pause and limitations
 
 Set `AUTOMERGE_ENABLED=false` to pause new integrations/repairs. Cancel already
-running jobs too when an immediate stop is required. Disable scheduled controller
-runs if the repository is idle and you want no periodic runner usage.
+running jobs too when an immediate stop is required. There are no scheduled queue runs while the repository is idle.
 
 The existing tests cover headless behavior, not browser rendering or real Steam.
 Browser gameplay smoke tests remain a separate follow-up. Passing checks cannot
