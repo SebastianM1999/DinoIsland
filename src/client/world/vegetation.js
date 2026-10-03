@@ -8,10 +8,11 @@ import { CONFIG } from '../../shared/config.js';
 import { makeRng, fbm, smoothstep } from '../../shared/rng.js';
 import { insideBossArena } from '../../shared/bossArena.js';
 import { MAT } from '../models/kit.js';
-import { treeGeometry, treeMatrix, TREE_WIND, TREE_VARIANTS } from './veg/trees.js';
+import { treeGeometry, treeMatrix, TREE_WIND, TREE_VARIANTS, CROWN_TYPES, CROWN_VARIANTS } from './veg/trees.js';
 import * as plants from './veg/plants.js';
 import { windPair, LEAF_MAT, instanced, foliageTint, withGeometryDetail } from './veg/shapes.js';
 import { SpatialInstances } from './veg/spatialInstances.js';
+import { detailMaterial } from './surfaceDetail.js';
 
 const TAU = Math.PI * 2;
 const C = (h) => new THREE.Color(h);
@@ -40,16 +41,18 @@ export function buildVegetation(terrain, layout) {
   const buckets = new Map();
   for (const t of layout.trees) {
     const nv = TREE_VARIANTS[t.type] ?? 1;
-    const key = `${t.type}:${nv > 1 ? t.id % nv : 0}`;
+    // crown variant independent of the trunk variant (trunks carry the colliders)
+    const crown = CROWN_TYPES.has(t.type) ? Math.floor(t.id / nv + t.hue * 5) % CROWN_VARIANTS : 0;
+    const key = `${t.type}:${nv > 1 ? t.id % nv : 0}:${crown}`;
     if (!buckets.has(key)) buckets.set(key, []);
     buckets.get(key).push(t);
   }
   for (const [key, list] of buckets) {
-    const [type, variant] = key.split(':');
-    const geo = treeGeometry(type, +variant);
+    const [type, variant, crown] = key.split(':');
+    const geo = treeGeometry(type, +variant, 0, +crown);
     const wind = TREE_WIND[type];
     const tw = windPair(MAT.standard, wind);
-    const fw = windPair(type === 'palm' ? LEAF_MAT : MAT.standard, wind);
+    const fw = windPair(detailMaterial(type === 'palm' ? LEAF_MAT : MAT.standard, 'foliage'), wind);
     const trunk = instanced(geo.trunk, tw.mat, list.length, { depth: tw.depth, name: `tree-${key}-trunk` });
     const leaves = instanced(geo.foliage, fw.mat, list.length, { depth: fw.depth, name: `tree-${key}-leaves` });
     list.forEach((t, i) => {
@@ -61,13 +64,13 @@ export function buildVegetation(terrain, layout) {
       trunk.setColorAt(i, col.setRGB(b, b * 0.98, b * 0.96));
     });
     spatial.add(trunk, { wind });
-    spatial.add(leaves, { wind, geometries: [geo.foliage, treeGeometry(type, +variant, 1).foliage, treeGeometry(type, +variant, 2).foliage] });
+    spatial.add(leaves, { wind, geometries: [geo.foliage, treeGeometry(type, +variant, 1, +crown).foliage, treeGeometry(type, +variant, 2, +crown).foliage] });
   }
 
   // ---------------------------------------------------- bushes and ferns
   const addSmall = (geometries, list, windParams, name) => {
     if (!list.length) return;
-    const w = windPair(LEAF_MAT, windParams);
+    const w = windPair(detailMaterial(LEAF_MAT, 'foliage'), windParams);
     const m = instanced(geometries[0], w.mat, list.length, { cast: false, receive: true, name });
     list.forEach((b, i) => {
       e.set(0, b.rot, 0); q.setFromEuler(e);

@@ -488,11 +488,13 @@ export function buildLayout(terrain) {
   }
 
   // -------------------------------------------------------------- rocks
+  // loose rocks: boulder, block, slab, crag, table rock (rockShapes.js variants)
+  const FREE_ROCKS = [0, 1, 2, 0, 1, 5, 6];
   const R = biome.rocks;
   let rockId = 0;
   const addRock = (x, z, scale, flags = {}, r = rng) => {
     const y = terrain.heightAt(x, z);
-    const rock = { id: rockId++, x, z, y, scale, rot: r() * TAU, sx: r.range(0.8, 1.4), sz: r.range(0.8, 1.3), variant: flags.variant ?? r.int(0, 2), mossy: flags.mossy ?? r() < R.mossChance };
+    const rock = { id: rockId++, x, z, y, scale, rot: r() * TAU, sx: r.range(0.8, 1.4), sz: r.range(0.8, 1.3), variant: flags.variant ?? FREE_ROCKS[r.int(0, FREE_ROCKS.length - 1)], mossy: flags.mossy ?? r() < R.mossChance };
     if (flags.sy) rock.sy = flags.sy;   // extra height (boulders)
     if (flags.sink) rock.sink = flags.sink;
     layout.rocks.push(placeRock(rock, terrain));

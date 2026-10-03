@@ -23,7 +23,11 @@ export const BIOMES = {
       grass: 1,
       flowers: 1,
     },
-    rocks: { colors: ['#9c93a8', '#8a8199', '#a79c9a'], moss: '#6fa845', mossChance: 0.7, count: 1 },
+    // kinds: per-rock tints (multiplied onto colors) that also pick the stone pattern in
+    // client/world/surfaceDetail.js: warm = layered sandstone, dark = cracked basalt,
+    // light = pitted limestone, neutral = speckled granite
+    rocks: { colors: ['#9c93a8', '#8a8199', '#a79c9a'], moss: '#6fa845', mossChance: 0.7, count: 1,
+      kinds: [[0.98, 0.98, 1.0], [1.2, 1.0, 0.8], [0.66, 0.66, 0.72], [1.16, 1.14, 1.1]] },
     terrain: {
       sandDry: '#f6d08a', sand: '#efc176', sandWet: '#d9a862',
       seabed: '#e2bd7a', seabedDeep: '#b99a68',
@@ -59,7 +63,9 @@ export const BIOMES = {
       grass: 0.35,
       flowers: 0.1,
     },
-    rocks: { colors: ['#4a4452', '#3a3540', '#5a5058'], moss: '#6b7a4a', mossChance: 0.15, count: 1.6 },
+    // basalt, red scoria, obsidian, pale pumice (see the jungle biome)
+    rocks: { colors: ['#4a4452', '#3a3540', '#5a5058'], moss: '#6b7a4a', mossChance: 0.15, count: 1.6,
+      kinds: [[0.98, 0.98, 1.0], [1.35, 0.95, 0.8], [0.6, 0.6, 0.68], [1.45, 1.42, 1.38]] },
     terrain: {
       sandDry: '#6e6468', sand: '#5a5256', sandWet: '#433c40',
       seabed: '#5a5054', seabedDeep: '#3a3438',

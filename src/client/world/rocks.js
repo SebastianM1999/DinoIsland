@@ -9,9 +9,13 @@ import { treeGeometry, treeMatrix, TREE_WIND } from './veg/trees.js';
 import { clump, windPair, LEAF_MAT, instanced, finishInstanced, foliageTint } from './veg/shapes.js';
 import { rockTable } from '../../shared/rockShapes.js';
 import { SpatialInstances } from './veg/spatialInstances.js';
+import { detailMaterial } from './surfaceDetail.js';
 
 const TAU = Math.PI * 2;
 const DEFAULT_ROCKS = { colors: ['#9c93a8', '#8a8199', '#a79c9a'], moss: '#6fa845' };
+const DEFAULT_KINDS = [[1, 1, 1]];
+/** Share of each stone kind (biome.rocks.kinds order: granite, sandstone, basalt, limestone). */
+const KIND_WEIGHTS = [0.4, 0.25, 0.2, 0.15];
 
 const rockCache = new Map();
 /**
@@ -74,7 +78,7 @@ export function rockGeo(variant, mossy, palette = DEFAULT_ROCKS) {
 
 /** One terraced sea stack in world space. */
 function stackGeometry(st, idx, rng, CLIFF, seedBase, green) {
-  const parts = [];
+  const parts = [], greens = [];
   const tiers = 3 + (idx % 2);
   const weights = tiers === 3 ? [0.46, 0.31, 0.23] : [0.38, 0.26, 0.2, 0.16];
   const baseY = st.y - 1;
@@ -119,7 +123,7 @@ function stackGeometry(st, idx, rng, CLIFF, seedBase, green) {
     for (let b = 0; b < nb; b++) {
       const a = rng() * TAU;
       const r = 0.7 + rng() * 0.8;
-      parts.push(place(clump(r, { seed: seed + b * 3 + k, detail: 0, squash: 0.7, top: '#8fd052', mid: '#6cb842', mid2: '#5fa83c', bottom: '#467f32' }),
+      greens.push(place(clump(r, { seed: seed + b * 3 + k, detail: 0, squash: 0.7, top: '#8fd052', mid: '#6cb842', mid2: '#5fa83c', bottom: '#467f32' }),
         [cx + Math.cos(a) * lipR, y1 + r * 0.15, cz + Math.sin(a) * lipR], [0, a, 0]));
     }
     top = { x: cx, z: cz, y: y1, r: rT };
@@ -135,7 +139,7 @@ function stackGeometry(st, idx, rng, CLIFF, seedBase, green) {
     const sc = 1.2 + rng() * 1.8;
     parts.push(place(rockGeo(b % 3, false, CLIFF.palette).clone(), [st.x + Math.cos(a) * r, -0.35 * sc, st.z + Math.sin(a) * r], [0, rng() * TAU, 0], [sc, sc * 0.9, sc]));
   }
-  return { geo: merge(parts), top };
+  return { geo: merge(parts), green: greens.length ? merge(greens) : null, top };
 }
 
 export function buildRocks(terrain, layout) {
@@ -148,10 +152,24 @@ export function buildRocks(terrain, layout) {
   const p = new THREE.Vector3();
   const s = new THREE.Vector3();
   const col = new THREE.Color();
+  const rockMat = detailMaterial(MAT.standard, 'rock');
 
   const palette = layout.biome?.rocks || DEFAULT_ROCKS;
   const T = layout.biome?.terrain || {};
   const green = layout.biome?.id !== 'volcano';
+  const seed = layout.plan.seed;
+  const kinds = palette.kinds || DEFAULT_KINDS;
+  const stoneKind = (r) => {
+    // fbm clusters around 0.5: stretch it so every kind gets its own patches
+    const region = Math.min(0.999, Math.max(0, (fbm(r.x * 0.018, r.z * 0.018, 2, seed + 71) + 0.6) / 1.2));
+    let u = hash2(r.id, 11, seed) < 0.3 ? hash2(r.id, 17, seed) : region;
+    for (let k = 0; k < kinds.length; k++) {
+      const w = KIND_WEIGHTS[k] ?? 0;
+      if (u < w || k === kinds.length - 1) return k;
+      u -= w;
+    }
+    return 0;
+  };
   const CLIFF = {
     rock: palette.colors[0], rockDark: palette.colors[1], rockWarm: T.rockWarm || '#a88f86',
     top: green ? '#86c650' : (T.ash || '#6f686c'), top2: green ? '#79bb48' : (T.rockDark || '#35303b'),
@@ -167,26 +185,30 @@ export function buildRocks(terrain, layout) {
   }
   for (const [key, list] of buckets) {
     const [variant, mossy] = key.split(':').map(Number);
-    const m = instanced(rockGeo(variant, !!mossy, palette), MAT.standard, list.length, { name: `rocks-${key}` });
+    const m = instanced(rockGeo(variant, !!mossy, palette), rockMat, list.length, { name: `rocks-${key}` });
     list.forEach((r, i) => {
       // fx/fy/fz/by come from placeRock() in the layout (shared with the walkable surface)
       const { fx, fy, fz } = r;
       p.set(r.x, r.by, r.z);
       e.set((r.sx - 1.1) * 0.15, r.rot, (r.sz - 1.05) * 0.15); q.setFromEuler(e);
       m.setMatrixAt(i, m4.compose(p, q, s.set(fx, fy, fz)));
-      const b = 0.88 + 0.12 * ((r.id * 0.377) % 1);
-      m.setColorAt(i, col.setRGB(b, b * (0.97 + 0.03 * (r.id % 2)), b));
+      // stone kind: neighbouring rocks tend to share one (a patch of the same
+      // geology), with a few strays; the tint also picks the shader's stone pattern
+      const tint = kinds[stoneKind(r)] || kinds[0];
+      const b = 0.94 + 0.12 * hash2(r.id, 3, seed);
+      m.setColorAt(i, col.setRGB(tint[0] * b, tint[1] * b, tint[2] * b));
     });
     spatial.add(m);
   }
 
   // --------------------------------------------------------- sea stacks
   const rng = makeRng(layout.plan.seed ^ 0x57ac);
-  const stackParts = [];
+  const stackParts = [], stackGreen = [];
   const palms = [];
   layout.seaStacks.forEach((st, i) => {
-    const { geo, top } = stackGeometry(st, i, rng, CLIFF, layout.plan.seed, green);
+    const { geo, green: greenGeo, top } = stackGeometry(st, i, rng, CLIFF, layout.plan.seed, green);
     stackParts.push(geo);
+    if (greenGeo) stackGreen.push(greenGeo);
     const n = green ? 1 + (i % 2) : 0;
     for (let k = 0; k < n; k++) {
       const a = rng() * TAU, r = top.r * (0.15 + rng() * 0.35);
@@ -194,11 +216,18 @@ export function buildRocks(terrain, layout) {
     }
   });
   if (stackParts.length) {
-    const stacks = new THREE.Mesh(merge(stackParts), MAT.standard);
+    const stacks = new THREE.Mesh(merge(stackParts), rockMat);
     stacks.name = 'sea-stacks';
     stacks.castShadow = true;
     stacks.receiveShadow = true;
     group.add(stacks);
+  }
+  if (stackGreen.length) {
+    const bushes = new THREE.Mesh(merge(stackGreen), detailMaterial(MAT.standard, 'foliage'));
+    bushes.name = 'sea-stack-bushes';
+    bushes.castShadow = true;
+    bushes.receiveShadow = true;
+    group.add(bushes);
   }
   if (palms.length) {
     const geo = treeGeometry('palm', 1);

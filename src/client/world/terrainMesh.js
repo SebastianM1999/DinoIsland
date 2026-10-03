@@ -7,6 +7,7 @@ import * as THREE from 'three';
 import { fbm, smoothstep } from '../../shared/rng.js';
 import { BIOMES } from '../../shared/levels.js';
 import { causewayQuery } from '../../shared/bossArena.js';
+import { withSurfaceDetail, setSurfaceBiome } from './surfaceDetail.js';
 
 const JUNGLE = {
   sandDry: '#f6d08a', sand: '#efc176', sandWet: '#d9a862', seabed: '#e2bd7a', seabedDeep: '#b99a68',
@@ -42,19 +43,25 @@ export function buildTerrainMesh(terrain, layout) {
   const base = new THREE.Color();
   const rock = new THREE.Color();
   const sand = new THREE.Color();
+  // surface weights for the detail shader (surfaceDetail.js), written by vertexColor()
+  const surf = { sand: 0, rock: 0, path: 0, forest: 0, wet: 0, ash: 0 };
 
   const vertexColor = (x, y, z, slope) => {
+    surf.sand = surf.rock = surf.path = surf.forest = surf.wet = surf.ash = 0;
     const lava = terrain.lavaLevelAt(x, z);
     const water = terrain.waterLevelAt(x, z);
     if (water !== null && y < water) {
+      surf.sand = 1; surf.wet = 1;
       color.copy(water > 0.3 ? P.riverbed : P.seabed).lerp(P.seabedDeep, smoothstep(0.5, 8, water - y));
       return color;
     }
-    if (lava !== null && y < lava + 0.2) return color.copy(P.scorch || P.rockDark);
+    if (lava !== null && y < lava + 0.2) { surf.rock = 1; surf.ash = 1; return color.copy(P.scorch || P.rockDark); }
     const noise = fbm(x * 0.04, z * 0.04, 3, S + 91) * 0.5 + 0.5;
     base.copy(P.grass).lerp(P.grassLight, smoothstep(0.45, 0.8, noise));
     base.lerp(P.grassDark, 1 - smoothstep(0.25, 0.5, noise));
-    base.lerp(P.floor, smoothstep(0.55, 1, layout.jungleDensity(x, z)) * 0.75);
+    const dense = layout.jungleDensity(x, z);
+    base.lerp(P.floor, smoothstep(0.55, 1, dense) * 0.75);
+    surf.forest = smoothstep(0.45, 0.95, dense);
     base.lerp(P.high, smoothstep(14, 26, y) * (1 - smoothstep(0.45, 0.8, slope)) * 0.6);
     if (volcanic && P.ash) {
       // ash fields: patchy near the coast, total on the volcano flanks
@@ -62,6 +69,7 @@ export function buildTerrainMesh(terrain, layout) {
       let ash = patch * 0.85;
       if (v) ash = Math.max(ash, 1 - smoothstep(v.radius * 0.55, v.radius * 0.95, Math.hypot(x - v.x, z - v.z)));
       base.lerp(P.ash, ash);
+      surf.ash = ash;
     }
 
     // Patchy hue variety in the greens (yellow-green clearings, teal shade).
@@ -71,7 +79,9 @@ export function buildTerrainMesh(terrain, layout) {
     const beachLine = 1.9 + fbm(x * 0.05, z * 0.05, 2, S + 90) * 0.6;
     sand.copy(P.sandWet).lerp(P.sandDry, smoothstep(0.35, 1.65, y));
     sand.lerp(P.sand, 0.25 + noise * 0.3);
-    color.copy(sand).lerp(base, smoothstep(beachLine - 0.7, beachLine + 0.9, y));
+    const grassK = smoothstep(beachLine - 0.7, beachLine + 0.9, y);
+    color.copy(sand).lerp(base, grassK);
+    surf.sand = 1 - grassK;
 
     // Cliffs and steep slopes: layered stone with warm and cool bands.
     const warp = fbm(x * 0.07, z * 0.07, 2, S + 95) * 2;
@@ -82,7 +92,8 @@ export function buildTerrainMesh(terrain, layout) {
     rock.offsetHSL(band * 0.025, band * 0.05, band * 0.03);
     // mossy ledges on green islands
     if (!volcanic) rock.lerp(P.grassDark, smoothstep(0.5, 0.95, fbm(x * 0.09, z * 0.09, 2, S + 93) * 0.5 + 0.5) * 0.35);
-    color.lerp(rock, smoothstep(0.45, 1.15, slope) * smoothstep(1.5, 3.5, y));
+    surf.rock = smoothstep(0.45, 1.15, slope) * smoothstep(1.5, 3.5, y);
+    color.lerp(rock, surf.rock);
 
     // Muddy / sandy banks along the river and around pools.
     if (water === null) {
@@ -97,6 +108,7 @@ export function buildTerrainMesh(terrain, layout) {
       const above = y - wl;
       // darker in any biome (pale jungle sand and grey volcanic sand alike)
       if (above < 0.7) color.lerp(WET.copy(color).multiplyScalar(0.68), 1 - smoothstep(0.05, 0.7, above));
+      surf.wet = 1 - smoothstep(0.05, 1.4, above);
     }
     // The rock the waterfall runs down: dark, wet stone with a little moss.
     for (const wf of falls) {
@@ -111,7 +123,7 @@ export function buildTerrainMesh(terrain, layout) {
     if (lava === null && volcanic) {
       const hot = terrain.lavaLevelAt(x + 3, z) !== null || terrain.lavaLevelAt(x - 3, z) !== null
         || terrain.lavaLevelAt(x, z + 3) !== null || terrain.lavaLevelAt(x, z - 3) !== null;
-      if (hot) color.lerp(P.scorch || P.rockDark, 0.75);
+      if (hot) { color.lerp(P.scorch || P.rockDark, 0.75); surf.ash = Math.max(surf.ash, 0.75); }
     }
 
     const pd = layout.distToPath(x, z);
@@ -119,9 +131,12 @@ export function buildTerrainMesh(terrain, layout) {
     const pathW = 1.3 + fbm(x * 0.09, z * 0.09, 2, S + 92) * 0.9;
     const worn = smoothstep(-0.35, 0.35, fbm(x * 0.06 + 3, z * 0.06, 3, S + 89)) * 0.55 + 0.2;
     base.copy(P.dirt).lerp(P.dirtDark, 0.25 + noise * 0.3).lerp(color, 0.25);
-    color.lerp(base, (1 - smoothstep(pathW - 0.5, pathW + 1.8, pd + fbm(x * 0.4, z * 0.4, 2, S + 88) * 0.8)) * worn);
+    const trail = (1 - smoothstep(pathW - 0.5, pathW + 1.8, pd + fbm(x * 0.4, z * 0.4, 2, S + 88) * 0.8)) * worn;
+    color.lerp(base, trail);
     const hd = Math.hypot(x - hut.campfire.x, z - hut.campfire.z);
-    color.lerp(base, (1 - smoothstep(6, 13, hd)) * 0.9);
+    const camp = (1 - smoothstep(6, 13, hd)) * 0.9;
+    color.lerp(base, camp);
+    surf.path = Math.min(1, Math.max(trail, camp) * 1.3) * (1 - surf.rock);
     // the boss arena: dark basalt and ash like the volcano island, glowing-hot
     // scorch along the lava, a dark causeway – fading into the beach outside
     if (arena) {
@@ -137,6 +152,8 @@ export function buildTerrainMesh(terrain, layout) {
         // the causeway: lighter, ash-grey basalt so the way across stands out from the dark rim
         if (causewayQuery(arena, x, z).d < arena.causewayW / 2 + 0.6) base.copy(CAUSEWAY).lerp(VOLCANO.ash, 0.2 + noise * 0.3);
         color.lerp(base, k);
+        surf.ash = Math.max(surf.ash, k);
+        surf.forest *= 1 - k;
       }
     }
     // fine speckle so large areas never look flat
@@ -147,17 +164,22 @@ export function buildTerrainMesh(terrain, layout) {
   // vertices (all of them; unused ones are cheap) + colors
   const pos = new Float32Array(stride * stride * 3);
   const col = new Float32Array(stride * stride * 3);
+  const sf = new Float32Array(stride * stride * 4);
+  const sf2 = new Float32Array(stride * stride * 2);
   for (let j = 0; j <= n; j++) {
     for (let i = 0; i <= n; i++) {
       const x = -half + i * cell, z = -half + j * cell;
       const y = terrain.h(i, j);
       const k = (j * stride + i) * 3;
       pos[k] = x; pos[k + 1] = y; pos[k + 2] = z;
-      if (y < -12) { col[k] = P.seabedDeep.r; col[k + 1] = P.seabedDeep.g; col[k + 2] = P.seabedDeep.b; continue; }
+      const ks = (j * stride + i) * 4, k2 = (j * stride + i) * 2;
+      if (y < -12) { col[k] = P.seabedDeep.r; col[k + 1] = P.seabedDeep.g; col[k + 2] = P.seabedDeep.b; sf[ks] = 1; sf2[k2] = 1; continue; }
       const dx = (terrain.h(i + 1, j) - terrain.h(i - 1, j)) / (2 * cell);
       const dz = (terrain.h(i, j + 1) - terrain.h(i, j - 1)) / (2 * cell);
       const c = vertexColor(x, y, z, Math.hypot(dx, dz));
       col[k] = c.r; col[k + 1] = c.g; col[k + 2] = c.b;
+      sf[ks] = surf.sand; sf[ks + 1] = surf.rock; sf[ks + 2] = surf.path; sf[ks + 3] = surf.forest;
+      sf2[k2] = surf.wet; sf2[k2 + 1] = surf.ash;
     }
   }
 
@@ -175,10 +197,13 @@ export function buildTerrainMesh(terrain, layout) {
   const geo = new THREE.BufferGeometry();
   geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
   geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  geo.setAttribute('surface', new THREE.BufferAttribute(sf, 4));
+  geo.setAttribute('surface2', new THREE.BufferAttribute(sf2, 2));
   geo.setIndex(idx);
   geo.computeVertexNormals();     // indexed -> smooth normals across cells
   geo.computeBoundingSphere();
-  const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, metalness: 0 });
+  setSurfaceBiome(layout.biome);
+  const mat = withSurfaceDetail(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, metalness: 0 }), 'terrain');
   const mesh = new THREE.Mesh(geo, mat);
   mesh.receiveShadow = true;
   mesh.name = 'terrain';

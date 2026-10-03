@@ -46,9 +46,13 @@ export const ROCK_VARIANTS = [
   { rings: tiers([[0.36, 1.0], [0.66, 0.68], [0.95, 0.34]]), sx: 1.05, sz: 0.95, wob: 0.12, tierWob: 0.1 },
   // 4 rock formation: five ledges, climbable step by step
   { rings: tiers([[0.22, 1.0], [0.4, 0.8], [0.57, 0.6], [0.74, 0.4], [0.93, 0.2]], 0.025), sx: 1.15, sz: 0.9, wob: 0.18, tierWob: 0.12 },
+  // 5 crag: tall and pointed, leaning lobes
+  { rings: dome(1.25, 1.1, [0, 0.16, 0.36, 0.58, 0.78, 0.93]), sx: 0.88, sz: 1.12, wob: 0.22, tierWob: 0.08 },
+  // 6 table rock: flat top, sharp shoulder, steep flanks
+  { rings: [[0, 0.62], [0.55, 0.61], [0.74, 0.56], [0.84, 0.36], [0.93, 0.1]], sx: 1.08, sz: 0.94, wob: 0.16, tierWob: 0.06 },
 ];
 /** How deep the skirt below the outer ring reaches (unit), so slopes show no gap. */
-const SKIRT = [0.3, 0.3, 0.25, 0.35, 0.3];
+const SKIRT = [0.3, 0.3, 0.25, 0.35, 0.3, 0.3, 0.3];
 
 const tables = new Map();
 /**

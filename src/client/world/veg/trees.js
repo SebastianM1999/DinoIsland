@@ -573,16 +573,63 @@ const BUILD = {
   bamboo: buildBamboo, giant: buildGiant, kapok: buildKapok, banana: buildBanana, pine: buildPine, dead: buildDead,
 };
 const cache = new Map();
-/** @returns {{trunk:THREE.BufferGeometry, foliage:THREE.BufferGeometry, height:number}} */
-export function treeGeometry(type, variant = 0, detail = 0) {
-  const key = `${type}:${variant}:${detail}`;
+/**
+ * @param {number} [crown] crown variant 0..CROWN_VARIANTS-1 (same trunk, so the
+ *   collider is unchanged; only leafy-crown types have more than one)
+ * @returns {{trunk:THREE.BufferGeometry, foliage:THREE.BufferGeometry, height:number}}
+ */
+export function treeGeometry(type, variant = 0, detail = 0, crown = 0) {
+  const c = CROWN_TYPES.has(type) ? crown % CROWN_VARIANTS : 0;
+  const key = `${type}:${variant}:${detail}:${c}`;
   let g = cache.get(key);
   if (!g) {
-    g = withGeometryDetail(detail, () => (BUILD[type] || buildMango)(variant));
+    if (c) {
+      const base = treeGeometry(type, variant, detail, 0);
+      g = { ...base, foliage: crownVariant(base.foliage, c) };
+    } else {
+      g = withGeometryDetail(detail, () => (BUILD[type] || buildMango)(variant));
+    }
     g.trunk.userData.sharedResource = true;
     g.foliage.userData.sharedResource = true;
     cache.set(key, g);
   }
+  return g;
+}
+
+/** Crown variants per leafy tree type: the base crown, a taller lighter one and a wider deeper one. */
+export const CROWN_VARIANTS = 3;
+/** Types whose crowns are leaf clumps (palms, bananas and bamboo keep their fronds; mango keeps its fruit spots). */
+export const CROWN_TYPES = new Set(['round', 'tall', 'jungle', 'giant', 'kapok', 'pine']);
+const CROWN_SHAPE = [null, { sy: 1.12, sxz: 0.93, tint: [1.08, 1.06, 0.86] }, { sy: 0.9, sxz: 1.08, tint: [0.86, 0.97, 1.06] }];
+
+/**
+ * A crown variant of a foliage geometry: lumped by a smooth noise field (so
+ * vertices shared by touching clumps move together), stretched taller or wider
+ * from the crown's foot, and recoloured lighter or deeper green with blotches.
+ * Normals are kept (the shift is small next to the clump size).
+ */
+function crownVariant(foliage, c) {
+  const S = CROWN_SHAPE[c];
+  const g = foliage.clone();
+  const pos = g.attributes.position, col = g.attributes.color;
+  g.computeBoundingBox();
+  const y0 = g.boundingBox.min.y;
+  const f = 0.42;
+  for (let i = 0; i < pos.count; i++) {
+    const x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i);
+    const nx = noise3(x * f + c * 11, y * f, z * f, 300 + c);
+    const ny = noise3(x * f, y * f + c * 7, z * f, 310 + c);
+    const nz = noise3(x * f, y * f, z * f + c * 5, 320 + c);
+    pos.setXYZ(i, x * S.sxz + nx * 0.4, y0 + (y - y0) * S.sy + ny * 0.3, z * S.sxz + nz * 0.4);
+    if (col) {
+      const b = 0.9 + 0.2 * (noise3(x * 0.6, y * 0.6, z * 0.6, 330 + c) * 0.5 + 0.5);
+      col.setXYZ(i, col.getX(i) * S.tint[0] * b, col.getY(i) * S.tint[1] * b, col.getZ(i) * S.tint[2] * b);
+    }
+  }
+  pos.needsUpdate = true;
+  if (col) col.needsUpdate = true;
+  g.computeBoundingSphere();
+  g.computeBoundingBox();
   return g;
 }
 
