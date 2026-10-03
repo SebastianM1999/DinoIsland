@@ -41,27 +41,13 @@ paint_t(bpy.data.objects['RaptorTeethLow'], lambda p, t: mix(P['toothb'], P['too
 paint_t(bpy.data.objects['RaptorSpikes'], lambda p, t: mix(mix(P['back2'], P['stripe'], .35), P['red'], smooth(0.2, 0.8, t)))
 paint_t(bpy.data.objects['RaptorClaws'], lambda p, t: mix(P['claw'], P['clawtip'], smooth(0.4, 1.0, t)))
 
-for n in ('RaptorEyes','RaptorPupils','RaptorLids'): remove(n)
-ec = V(EYE_C)
-bm = bmesh.new()
-for sx in (1, -1): blob_bm(bm, V((sx*ec.x, ec.y, ec.z)), (.032, .036, .033), (0, 0, -sx*0.4), 24, 16)
-mk('RaptorEyes', bm)
-bm = bmesh.new()
-for sx in (1, -1):
-    d = V((sx*math.cos(.4), -math.sin(.4), 0))
-    blob_bm(bm, V((sx*ec.x, ec.y, ec.z)) + d*.029, (.004, .007, .026), (0, 0, -sx*0.4), 16, 10)
-mk('RaptorPupils', bm)
-bm = bmesh.new()
-for sx in (1, -1):
-    # heavy upper lid, slanting down toward the snout: covers the top ~45% of the eye
-    blob_bm(bm, V((sx*ec.x, ec.y, ec.z + .017)), (.037, .044, .022), (0.5, -sx*0.12, -sx*0.4), 24, 14)
-mk('RaptorLids', bm)
-def eye_fn(p, n):
-    q = p - V((math.copysign(ec.x, p.x), ec.y, ec.z))
-    return mix(P['eye'], P['eye2'], smooth(.012, .03, q.length))
-paint(bpy.data.objects['RaptorEyes'], eye_fn)
-paint(bpy.data.objects['RaptorPupils'], lambda p, n: P['pupil'])
-paint(bpy.data.objects['RaptorLids'], lambda p, n: mix(P['mask'], P['back2'], 0.35))
+# living eyes (eyes.py): predator -> slim opening slanting down toward the snout, slit pupil, catchlights
+exec(bpy.data.texts['eyes'].as_string(), globals())
+R_E = dict(c=EYE_C, R=.034, yaw=.4, W=.9, Ht=.38, Hb=.5, tilt=.34, rim=(.26, .07), pupil=(.09, .34), iris=.78)
+build_eyes('Raptor', R_E)
+paint_eyes('Raptor', R_E, dict(iris=P['eye'], iris2=P['eye2'], glow=lin('#ffe07a'), limbal=lin('#2a1206'), pupil=P['pupil'],
+                               sclera=lin('#d8b892'), lid=mix(P['mask'], P['back2'], 0.35), lid2=P['mask']),
+           bpy.data.materials['RaptorGloss'], bpy.data.materials['RaptorSkin'])
 for o in bpy.data.objects:
     if o.type == 'MESH' and not o.data.materials:
         o.data.materials.append(bpy.data.materials['RaptorGloss' if o.name in ('RaptorEyes','RaptorPupils','RaptorTeethUp','RaptorTeethLow','RaptorClaws') else 'RaptorSkin'])

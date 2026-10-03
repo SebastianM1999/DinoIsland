@@ -1,8 +1,9 @@
 
 # Rebuild the whole raptor from an empty scene, then export.
 # Variants: override palette colours / output path in VARIANT before running.
-import bpy, pickle, base64
-VARIANT = dict(name='raptor', palette={}, out=r"C:\code-projekte\DinosaurierGame\assets\models\dinos\raptor.glb")
+import bpy, pickle, base64, os
+# out is relative to this .blend (a hard-coded checkout path would overwrite another worktree's GLB)
+VARIANT = dict(name='raptor', palette={}, out=os.path.normpath(os.path.join(os.path.dirname(bpy.data.filepath), '..', '..', '..', 'assets', 'models', 'dinos', 'raptor.glb')))
 TX = bpy.data.texts
 for o in list(bpy.data.objects): bpy.data.objects.remove(o, do_unlink=True)
 for c in list(bpy.data.collections): bpy.data.collections.remove(c)

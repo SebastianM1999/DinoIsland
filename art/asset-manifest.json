@@ -5,7 +5,7 @@
       "file": "assets/models/dinos/raptor.glb",
       "source": "Project-authored Velociraptor; art/sources/raptor/raptor.blend (build scripts in its text blocks)",
       "license": "Project source",
-      "triangles": 53128
+      "triangles": 56296
     },
     {
       "id": "dino-trex",

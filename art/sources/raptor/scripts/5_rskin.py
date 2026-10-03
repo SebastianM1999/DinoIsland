@@ -4,7 +4,7 @@ rig = bpy.data.objects['RaptorRig']
 # backup collection with unrigged parts
 src = bpy.data.collections.get('RaptorSrc') or bpy.data.collections.new('RaptorSrc')
 if src.name not in bpy.context.scene.collection.children: bpy.context.scene.collection.children.link(src)
-PARTS = ['RaptorBody','RaptorHead','RaptorJaw','RaptorEyes','RaptorPupils','RaptorLids','RaptorTeethUp','RaptorTeethLow','RaptorSpikes','RaptorClaws']
+PARTS = ['RaptorBody','RaptorHead','RaptorJaw','RaptorTongue','RaptorEyes','RaptorPupils','RaptorLids','RaptorGlints','RaptorTeethUp','RaptorTeethLow','RaptorSpikes','RaptorClaws']
 for n in PARTS:
     o = bpy.data.objects[n]
     if not bpy.data.objects.get(n + '_src'):
@@ -47,9 +47,9 @@ def rigid(ob, choose):
         g.add(isl, 1.0, 'REPLACE')
     m = ob.modifiers.new('Armature', 'ARMATURE'); m.object = rig
     ob.parent = rig
-for n in ('RaptorHead','RaptorEyes','RaptorPupils','RaptorLids','RaptorTeethUp'):
+for n in ('RaptorHead','RaptorEyes','RaptorPupils','RaptorLids','RaptorGlints','RaptorTeethUp'):
     rigid(bpy.data.objects[n], lambda c: 'Head')
-rigid(bpy.data.objects['RaptorJaw'], lambda c: 'Jaw'); rigid(bpy.data.objects['RaptorTeethLow'], lambda c: 'Jaw')
+for n in ('RaptorJaw', 'RaptorTeethLow', 'RaptorTongue'): rigid(bpy.data.objects[n], lambda c: 'Jaw')
 SPINE = segs(['Torso','Body','Neck1','Neck2','Tail1','Tail2','Tail3','Tail4','Tail5'])
 rigid(bpy.data.objects['RaptorSpikes'], lambda c: 'Head' if c.y < -0.55 and c.z > 1.3 else nearest(c, SPINE))
 LIMBS = segs(['BackToesL','BackToesR','BackFootL','BackFootR','HandL','HandR'])
