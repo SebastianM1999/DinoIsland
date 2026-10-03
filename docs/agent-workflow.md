@@ -88,8 +88,7 @@ single controller. Ready labels persist the queue; Actions concurrency only prev
 simultaneous controllers. Eligible same-repository PRs are considered in creation
 order; blocked tasks do not prevent later independent tasks from progressing.
 
-The controller requires a collaborator with write access as PR author. It refuses
-automation/configuration edits and validates branch protection before making changes.
+The controller requires a collaborator with write access as PR author. It accepts all file paths and validates branch protection before making changes.
 It rebases the task branch onto current main without running task code, then requests CI (workflow-token pushes
 may leave PR workflows awaiting approval). It automatically approves only eligible
 same-repository PR runs from `github-actions[bot]` for the exact task revision,
@@ -102,8 +101,8 @@ are deleted automatically; local worktrees are kept until safe cleanup.
 The merge API guards the expected task SHA; strict branch protection guards against
 main advancing between validation and merge.
 
-After a bot rebase or repair, a metadata-only job waits for the newly published
-head's CI and explicitly wakes integration on completion. This avoids relying on
+After a bot rebase or repair, or dispatching fallback candidate CI, a metadata-only job waits for the newly published
+head's CI (the current combined candidate for fallback runs) and explicitly wakes integration on completion. This avoids relying on
 chained workflow completion events, which GitHub may suppress. It uses no AI and
 does not execute feature code. The wait stops after 17 minutes and holds the PR
 with an explanatory comment if CI never finishes; it does not poll while idle.

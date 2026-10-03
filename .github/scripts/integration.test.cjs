@@ -48,7 +48,7 @@ function fixture(options = {}) {
     const beforePin = process.env.INTEGRATION_RULESET_UPDATED_AT;
     process.env.CLAUDE_REPAIR_ENABLED = options.repairEnabled === false ? 'false' : 'true';
     process.env.INTEGRATION_RULESET_UPDATED_AT = options.pin === undefined ? '2026-10-03T00:00:00Z' : options.pin;
-    try { await integrate({ github, context: { repo: { owner: 'owner', repo: 'game' } }, core: { info() {}, warning() {} } }); }
+    try { await integrate({ github, context: { repo: { owner: 'owner', repo: 'game' } }, core: { info() {}, warning() {}, setOutput(name, value) { calls.push({ name: 'output', args: { name, value } }); } } }); }
     finally {
       if (before === undefined) delete process.env.CLAUDE_REPAIR_ENABLED; else process.env.CLAUDE_REPAIR_ENABLED = before;
       if (beforePin === undefined) delete process.env.INTEGRATION_RULESET_UPDATED_AT; else process.env.INTEGRATION_RULESET_UPDATED_AT = beforePin;
@@ -301,4 +301,14 @@ test('advanced feature refs survive post-merge cleanup', async () => {
 test('post-merge feature cleanup never deletes main', async () => {
   const f = fixture({ taskRefSha: 'feature-sha', pr: { head: { sha: 'feature-sha', ref: 'main', repo: { full_name: 'owner/game' } } } }); await f.run();
   assert.ok(!f.calls.some(c => c.name === 'deleteRef' && c.args.ref === 'heads/main'));
+});
+
+
+test('fallback candidate dispatch exports the exact task revision for a completion handoff', async () => {
+  const f = fixture({ runs: [] }); await f.run();
+  assert.deepEqual(f.calls.filter(c => c.name === 'output').map(c => c.args), [
+    { name: 'pending_pr', value: '7' }, { name: 'pending_head', value: 'feature-sha' }
+  ]);
+  const passing = fixture(); await passing.run();
+  assert.equal(passing.calls.some(c => c.name === 'output'), false);
 });

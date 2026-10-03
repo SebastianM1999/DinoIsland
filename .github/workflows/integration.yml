@@ -16,12 +16,11 @@ permissions:
   actions: write
   checks: read
 
-concurrency:
-  group: integration-controller
-  cancel-in-progress: false
-
 jobs:
   integrate:
+    concurrency:
+      group: integration-controller
+      cancel-in-progress: false
     if: >-
       vars.AUTOMERGE_ENABLED == 'true' &&
       (github.event_name != 'pull_request_target' || github.event.label.name == 'ready-to-merge') &&
@@ -31,6 +30,9 @@ jobs:
     env:
       CLAUDE_REPAIR_ENABLED: ${{ vars.CLAUDE_REPAIR_ENABLED }}
       INTEGRATION_RULESET_UPDATED_AT: ${{ vars.INTEGRATION_RULESET_UPDATED_AT }}
+    outputs:
+      pending_pr: ${{ steps.controller.outputs.pending_pr }}
+      pending_head: ${{ steps.controller.outputs.pending_head }}
     steps:
       # Never check out or execute the PR here: this job has write permissions.
       - uses: actions/checkout@v6
@@ -38,7 +40,33 @@ jobs:
           ref: main
           persist-credentials: false
       - uses: actions/github-script@v8
+        id: controller
         with:
           script: |
             const integrate = require('./.github/scripts/integration.cjs');
             await integrate({ github, context, core });
+
+  await-candidate-ci:
+    needs: integrate
+    if: needs.integrate.result == 'success' && needs.integrate.outputs.pending_pr != '' && vars.AUTOMERGE_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      pull-requests: read
+      issues: write
+      actions: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: main
+          persist-credentials: false
+      - uses: actions/github-script@v8
+        env:
+          TASK_PR: ${{ needs.integrate.outputs.pending_pr }}
+          TASK_HEAD: ${{ needs.integrate.outputs.pending_head }}
+        with:
+          script: |
+            const awaitCi = require('./.github/scripts/await-task-ci.cjs');
+            await awaitCi({ github, context, core, prNumber: process.env.TASK_PR,
+              expectedHead: process.env.TASK_HEAD, candidateOnly: true });
