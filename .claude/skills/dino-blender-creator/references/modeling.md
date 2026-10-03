@@ -95,7 +95,17 @@ hat, no highlight. `build_eyes(prefix, E)` / `paint_eyes(prefix, E, P, gloss, sk
 - **Pupil:** a curved disc lying on the ball (crisp at any ball density). Round for herbivores
   (`pupil=(.27, .3)`), slit for predators (e.g. `(.09, .34)`).
 - Eye radius ~0.14 at 8 m body length; sink the centre ~0.045 below the measured head surface.
-- Rigid on Head like before (Eyes, Lids, Pupils, Glints). Cost ~2.5k triangles for both eyes.
+- Rigid on Head like before (Eyes, Lids, Pupils, Glints). Cost ~2.5k triangles for both eyes; near the
+  60k budget pass `ball=(24, 16), rimseg=(40, 6)` (brachio).
+- Presets the owner approved (Oct 2026):
+
+  | Species | Ht / Hb | tilt | pupil | mood |
+  |---|---|---|---|---|
+  | Triceratops | .42 / .50 | .24 | round (.27, .30) | grumpy / a bit angry |
+  | Stego | .48 / .56 | .16 | round | grumpy-calm |
+  | Brachio | .56 / .62 | .06 | round | gentle |
+  | Raptor, T-Rex | .38 / .50 | .34 | slit (.09, .34) | angry predator |
+  | Ptera | .40 / .50 | .32 | slit (.10, .34) | angry predator |
 
 ## 5. One fluid mesh (head, jaw, neck)
 
@@ -122,16 +132,23 @@ like a pouch under the snout.
   (`MOUTH - 0.08`) -> inner lip edge -> thin cutting lip at the mouth line (0.8 w) -> outer lip ->
   widest flat side (1.0 w at a third of the depth) -> narrowing side -> jawline keel (0.5 w, 0.18 w)
   -> bottom centre. The trough fades out at the beak tip and at the hinge.
-  See `art/sources/triceratops/scripts/12_thead.py` `tr_jaw_prof`.
+  `mouth.py` `jaw_prof(w, bot, mouth, trough)`; trough depth ~1/8 of the jaw depth, faded with
+  `trough_fade(y, tip_y, hinge_y)`.
 - **Side profile:** shallow (~0.3 m at 8 m length), straight bottom edge rising toward the front,
   deepest under the cheek. Lower jaw narrower than the upper lip at every section (overbite).
 - **Beak/snout tip:** the lower tip ends BEHIND the upper beak's hook, otherwise the boolean welds them
   and a strand of skin stretches between the beak tips when the mouth opens.
-- **Tongue:** a flat blob in the trough, top just under the lip line (hidden when closed), rigid on Jaw.
+- **Tongue:** `add_tongue` - a flat blob in the trough, top just under the lip line (hidden when closed),
+  rigid on Jaw.
+- **Separate rigid jaw (brachio):** the trough shows from the front because no skull covers it - keep it
+  shallow and paint its walls mouth-coloured.
+- **Predators:** the lower teeth root in the new cutting lip (`lip_at` on the evaluated jaw re-roots
+  them automatically); no cheeks - the gape runs back to the corner.
 - **Lip gap scales with size:** `fuse_head(lip_gap=...)` 0.006 at raptor scale, ~0.02 at 8 m.
 - **Cheeks (herbivores):** put the mouth corner well forward (Triceratops `corner_y` -3.45 of a
-  beak at -4.1) and blend Head -> Jaw weights over a band round the lip line behind it (`tr_cheeks` in
-  `art/sources/triceratops/scripts/17_tskin.py`), so the mouth does not split open to the hinge.
+  beak at -4.1) and blend Head -> Jaw weights over a band round the lip line behind it (`mouth.py` `cheeks()`, after
+  `head_jaw_regions`; band ~0.2-0.26 m at 8-9 m length, narrower bands tear the corner), so the mouth
+  does not split open to the hinge.
 - **Paint:** mouth colour in the trough and on the palate, beak colour on the cutting lip.
 - **Verify:** close-ups at jaw 0 and 0.52 rad (the game's roar overlay) from side, 3/4, front and
   below; `check_glb.mjs` prints `jaw skin N verts` (must be hundreds); `ground_report` again - a jaw
