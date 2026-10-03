@@ -1,12 +1,12 @@
 # Dino-Blender-Creator: "living" eyes (exec after lib.py). Replaces the old ball + button pupil + cap lid.
 #   - eyeball sits in an almond lid opening; the ball OUTSIDE the opening is painted as lid skin and uses
 #     the skin material, so the lids read as skin wrapped round the eye, not a hat on top
-#   - a rolled lid rim hugs the ball (thicker upper lid), tilted per species (calm droop / angry slant)
+#   - a rolled lid rim hugs the ball (thicker upper lid), tilted per species (angry slant: tilt > 0, droopy: tilt < 0)
 #   - painted iris: dark limbal ring, radial streaks, bright ring round the pupil, round or slit pupil,
 #     a soft shadow under the upper lid (depth), off-white sclera in the corners
 #   - two white catchlights (big + small, front-top) on the gloss material: the eye "looks back"
 # Every eye is described by a dict E: c (left eye centre, x > 0), R, yaw (forward turn), W/Ht/Hb (opening
-# half-width / upper / lower height as fractions of R), tilt (rad, + = outer corner down), rim (upper,
+# half-width / upper / lower height as fractions of R), tilt (rad, + = back corner up / snout-side corner down = angry, - = droopy/sad), rim (upper,
 # lower tube radius as fractions of R), pupil (rx, ry as fractions of R; ry > rx = slit), iris (fraction of R).
 import bpy, bmesh, math
 from mathutils import Vector as V, Matrix
@@ -62,7 +62,7 @@ def build_eyes(prefix, E):
     bm = bmesh.new()
     for sx in (1, -1):
         c, d, h, v = eye_frame(E, sx)
-        for gx, gy, gr in ((-0.28, 0.3, 0.15), (0.2, -0.24, 0.07)):     # big glint front-top, small one opposite
+        for gx, gy, gr in ((-0.3, 0.12, 0.15), (0.22, -0.2, 0.07)):     # big glint front-top, small one opposite
             x, y = gx * R, gy * R
             n = (h * x + v * y + d * math.sqrt(R * R - x * x - y * y)).normalized()
             rot = n.to_track_quat('Z', 'Y').to_euler()
