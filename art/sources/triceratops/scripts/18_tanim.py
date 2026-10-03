@@ -6,7 +6,7 @@ init('TriRig')
 # hind and front legs need the same ground speed (S / duty equal); the short front legs sweep less.
 # Reach: front legs are near-straight pillars -> keep a crouch, Sf small.
 TR_WALK = dict(S=1.0, duty=0.66, Sf=0.85, h=0.24, hf=0.2, z=-0.07)       # stride 1.515 m
-TR_RUN = dict(S=1.3, duty=0.36, Sf=1.05, h=0.36, hf=0.28, z=-0.15)       # stride 3.611 m
+TR_RUN = dict(S=1.3, duty=0.36, Sf=1.05, h=0.42, hf=0.36, z=-0.17)       # stride 3.611 m
 TR_GALLOP = {'BackL': 0.0, 'BackR': 0.2, 'FrontR': 0.5, 'FrontL': 0.7}  # rotary gallop, always one foot down
 
 def tr_legs(t, g, phases, tilt=0.12):
@@ -29,16 +29,23 @@ def tr_walk(t):
     tr_tail(lambda i: ((X, .012 * math.cos(2 * TAU * t - .5 * i)), (Z, .05 * math.sin(TAU * t - .5 * i))))
 
 def tr_run(t):
-    """Charge: crouched rocking gallop, head lowered so the brow horns point forward, tail up and stiff."""
+    """Charge: a heavy bounding gallop. One big rock per stride: the hind legs drive the body up and
+    nose-up (~0.1, both front feet in the air), the front feet land (0.3, 0.5), catch the weight and
+    the body pitches nose-down and sinks (~0.6). Head, neck and tail follow with lag, the head
+    stays low so the horns keep pointing forward; hips roll and yaw toward the driving hind leg."""
     tr_legs(t, TR_RUN, TR_GALLOP)
-    loc('Body', (.03 * math.sin(TAU * t), 0, TR_RUN['z'] + .05 * math.cos(2 * TAU * (t - .12))))
-    rot('Body', (X, .04 * math.sin(TAU * t + .4)), (Y, .03 * math.sin(TAU * t)), (Z, .02 * math.sin(TAU * t)))
-    rot('Shoulders', (X, .04 - .03 * math.sin(TAU * t + .9)))
-    rot('Neck1', (X, .12 + .03 * math.cos(2 * TAU * t - .4)))
-    rot('Neck2', (X, .08 + .03 * math.cos(2 * TAU * t - .8)))
-    rot('Head', (X, .1 - .05 * math.sin(TAU * t + .4) - .03 * math.cos(2 * TAU * t - 1.2)))
-    rot('Jaw', (X, .06 + .03 * math.sin(2 * TAU * t)))
-    tr_tail(lambda i: ((X, (-.05 if i == 0 else .015) - .06 * math.sin(TAU * t + .4 - .45 * i) / 6), (Z, .03 * math.sin(TAU * t - .45 * i))))
+    def c(ph, k=1): return math.cos(k * TAU * (t - ph))
+    body = -.065 * c(.1); sh = .035 * c(.62); nk = .045 * c(.72) + .035 * c(.8)
+    loc('Body', (.06 * math.sin(TAU * t), 0, TR_RUN['z'] + .075 * c(.15) + .012 * c(.0, 2)))
+    rot('Body', (X, body), (Y, .06 * math.sin(TAU * t + .3)), (Z, .045 * math.sin(TAU * t)))
+    rot('Shoulders', (X, .045 + sh), (Y, -.04 * math.sin(TAU * t + .9)), (Z, -.03 * math.sin(TAU * t + .4)))
+    rot('Neck1', (X, .08 + .045 * c(.72)), (Z, -.03 * math.sin(TAU * t + .6)))
+    rot('Neck2', (X, .05 + .035 * c(.8)), (Z, -.03 * math.sin(TAU * t + .9)))
+    # head counters ~65 % of the pitch below it: the body rocks, the horns stay aimed
+    rot('Head', (X, .01 - .65 * (body + sh + nk) + .02 * c(.9)), (Z, -.035 * math.sin(TAU * t + 1.2)), (Y, .04 * math.sin(TAU * t + .6)))
+    rot('Jaw', (X, .08 + .05 * c(.75)))                                         # panting: opens on the impact
+    tr_tail(lambda i: ((X, (-.06 if i == 0 else .0) + .16 * c(.22 + .07 * i) / 6),
+                       (Z, .09 * math.sin(TAU * t - .5 * i) / (1 + .15 * i))))
 
 TR_LOOK = [(0, 0), (.08, 0), (.18, .5), (.36, .5), (.44, -.38), (.6, -.38), (.66, 0), (1, 0)]
 def tr_idle(t):

@@ -15,7 +15,7 @@ for s in 'LR':
 head_jaw_regions(body)
 print('unweighted', check_weights(body))
 
-for n in ('TriEyes', 'TriPupils', 'TriLids', 'TriFrill', 'TriKnobs', 'TriHorns'):
+for n in ('TriEyes', 'TriGlints', 'TriPupils', 'TriLids', 'TriFrill', 'TriKnobs', 'TriHorns'):
     rigid_islands(bpy.data.objects[n], rig, lambda c: 'Head')
 FEET = segs(rig, [p + 'Foot' + s for p in ('Front', 'Back') for s in 'LR'])
 rigid_islands(bpy.data.objects['TriNails'], rig, lambda c: nearest(c, FEET))
