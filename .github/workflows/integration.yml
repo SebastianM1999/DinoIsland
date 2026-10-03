@@ -1,0 +1,42 @@
+name: Integration queue
+
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened, ready_for_review, labeled]
+    branches: [main]
+  workflow_run:
+    workflows: [CI, Integration repair]
+    types: [completed]
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+  actions: write
+  checks: read
+
+concurrency:
+  group: integration-controller
+  cancel-in-progress: false
+
+jobs:
+  integrate:
+    if: vars.AUTOMERGE_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      CLAUDE_REPAIR_ENABLED: ${{ vars.CLAUDE_REPAIR_ENABLED }}
+    steps:
+      # Never check out or execute the PR here: this job has write permissions.
+      - uses: actions/checkout@v6
+        with:
+          ref: main
+          persist-credentials: false
+      - uses: actions/github-script@v8
+        with:
+          script: |
+            const integrate = require('./.github/scripts/integration.cjs');
+            await integrate({ github, context, core });
