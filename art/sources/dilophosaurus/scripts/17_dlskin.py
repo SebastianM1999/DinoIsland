@@ -42,5 +42,18 @@ for n in ('DlTeethLow', 'DlTongue'):
     rigid_islands(bpy.data.objects[n], rig, lambda c: 'Jaw')
 TIPS = segs(rig, ['HandL', 'HandR', 'BackToesL', 'BackToesR'])
 rigid_islands(bpy.data.objects['DlClaws'], rig, lambda c: nearest(c, TIPS))
+def dl_frill_skin(ob):
+    """Membrane between rib k and k+1 blends FrillXk -> FrillXk+1 by its rib coordinate 'fk'; the root
+    ring also follows Neck3 so the frill never leaves the neck."""
+    ob.vertex_groups.clear(); me = ob.data; fk = me.attributes['fk']; ht = me.attributes['ht']
+    def g(n): return ob.vertex_groups.get(n) or ob.vertex_groups.new(name=n)
+    for v in me.vertices:
+        s = 'L' if v.co.x > 0 else 'R'; k = min(int(fk.data[v.index].value), len(DL_FR_PHI) - 2)
+        t = fk.data[v.index].value - k; nk = smooth(.2, .06, ht.data[v.index].value)
+        g('Frill%s%d' % (s, k)).add([v.index], (1 - t) * (1 - nk), 'REPLACE')
+        g('Frill%s%d' % (s, k + 1)).add([v.index], t * (1 - nk), 'REPLACE')
+        if nk > 0: g('Neck3').add([v.index], nk, 'REPLACE')
+    m = ob.modifiers.new('Armature', 'ARMATURE'); m.object = rig; ob.parent = rig
+dl_frill_skin(bpy.data.objects['DlFrill'])
 limit_influences(body, bpy.data.objects['DlScutes'])
 print('unweighted after limit', check_weights(body))

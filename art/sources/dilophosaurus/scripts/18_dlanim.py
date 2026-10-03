@@ -4,6 +4,18 @@
 # a side roll would bury the crests).
 exec(bpy.data.texts['anim'].as_string(), globals())
 init('DlRig')
+# Neck frill: rest pose = OPEN. dl_frill(f) folds every rib back flat along the neck (f=0) or spreads it
+# (f=1); a small per-rib rattle sells the display. Closed direction hugs the neck, slightly fanned.
+DL_NECK_DIR = V((0, .78, -.63)).normalized()
+def dl_frill(f, rattle=0.0, t=0.0):
+    for s, sx in (('L', 1), ('R', -1)):
+        for k in range(sum(1 for b in pb if b.name.startswith('Frill' + s))):
+            b = pb['Frill%s%d' % (s, k)]; o = (b.bone.tail_local - b.bone.head_local).normalized()
+            c = (DL_NECK_DIR + V((sx * .05, 0, .06 - .03 * k))).normalized()   # tucked against the neck side
+            ax = o.cross(c); ang = math.atan2(ax.length, o.dot(c))
+            fk = max(0.0, min(1.0, f + rattle * math.sin(TAU * 13 * t + 1.3 * k)))
+            if ax.length > 1e-6: rot(b.name, (ax.normalized(), ang * (1 - fk)))
+
 DL_WALK = dict(S=1.2, duty=0.6, h=0.22, lift=0.5, z=-0.04)
 DL_RUN = dict(S=1.45, duty=0.36, h=0.36, lift=0.62, z=-0.12, y0=-0.03)
 
@@ -33,6 +45,7 @@ def dl_walk(t):
     rot('Jaw', (X, .03))
     dl_tail(lambda i: ((X, (.02 if i == 0 else 0) + .025 * math.cos(2 * TAU * m - .5 * i)), (Z, -.08 * math.sin(TAU * t - .55 * i - .3))))
     dl_arms(lambda s, sg: (-.2 + .06 * math.sin(TAU * t + (0 if sg > 0 else math.pi)), -.3, -.15))
+    dl_frill(0)
 
 def dl_run(t):
     """Fast run with a short flight phase: strong lean, neck stretched forward, head level, jaws ajar, the
@@ -49,6 +62,7 @@ def dl_run(t):
     rot('Jaw', (X, .1 + .04 * math.sin(2 * TAU * t)))
     dl_tail(lambda i: ((X, (-.14 if i == 0 else .0) + .03 * math.cos(2 * TAU * m - .6 * i) / 2), (Z, -.05 * math.sin(TAU * t - .6 * i))))
     dl_arms(lambda s, sg: (-.5, -.6, -.3))
+    dl_frill(0)
 
 DL_LOOK = [(0, 0), (.08, .4), (.22, .4), (.28, -.35), (.46, -.35), (.52, .1), (.62, .1), (.68, 0), (1, 0)]
 def dl_idle(t):
@@ -64,6 +78,7 @@ def dl_idle(t):
     dl_tail(lambda i: ((X, .02 * math.sin(TAU * t - .4 * i)), (Z, .07 * math.sin(TAU * t - .5 * i) + .03 * math.sin(2 * TAU * t - i))))
     flex = .5 + .5 * math.sin(TAU * t)
     dl_arms(lambda s, sg: (-.15 + .04 * br, -.3 + .05 * math.sin(TAU * t + sg), -.1 - .2 * flex))
+    dl_frill(.06 * bobh)   # a twitch of the folded frill with the crest bob
 
 def dl_attack(t):
     """Hit and run (1.0 s, plays once): crouch and coil back with jaws opening (0-0.25 = dodge time), dart
@@ -82,6 +97,7 @@ def dl_attack(t):
     rot('Jaw', (X, track(t, [(0, .03), (.24, .45), (.36, .45), (.41, 0), (.7, .04), (1, .03)])))
     dl_arms(lambda s, sg: (track(t, [(0, -.2), (.25, -.55), (.4, .1), (.6, -.2), (1, -.2)]), -.35, -.2))
     dl_tail(lambda i: ((X, track(t, [(0, 0), (.25, -.04), (.4, .05), (.7, -.03), (1, 0)])), (Z, .05 * jerk)))
+    dl_frill(track(t, [(0, 0), (.1, .15), (.2, 1), (.7, 1), (.95, .35), (1, .3)]), .05 * track(t, [(0, 0), (.2, 1), (.6, 1), (.8, 0)]), t)   # snaps open as it coils
 
 def dl_roar(t):
     """Threat display: rear up, head high, crests flashed side to side, jaws wide with a hissing rattle;
@@ -94,6 +110,7 @@ def dl_roar(t):
     rot('Jaw', (X, .03 + .45 * a + .03 * rattle))
     dl_tail(lambda i: ((X, (.08 if i == 0 else .03) * a), (Z, .04 * rattle)))
     dl_arms(lambda s, sg: (-.6 * a, -.5 * a, -.4 * a))
+    dl_frill(1, .06 * a, t)   # full display, rattling (stays open across the loop; the crossfade opens it)
 
 def dl_death(t):
     """Stagger with a cry, legs buckle, falls forward onto the belly and rolls a little onto the left flank,
@@ -112,6 +129,20 @@ def dl_death(t):
         rot('ArmLow' + s, (X, -1.0 * sink)); rot('Hand' + s, (X, -.5 * sink))
     for s, sx in (('L', 1), ('R', -1)):
         loc('IK_Ball' + s, (sx * .32 * sink, .5 * sink, 0)); rot('IK_Toe' + s, (X, -.12 * sink))
+    dl_frill(track(t, [(0, 0), (.1, .7), (.3, .5), (.6, .15), (1, .1)]))   # flares with the cry, folds limp
+
+def dl_hurt(t):
+    """Hit (0.9 s, plays once, held while the game reports hurt): flinch away with the head pulled back and a
+    hiss, the frill snaps open by 0.12 with a rattle and STAYS open (the clip clamps on its last frame)."""
+    jolt = track(t, [(0, 0), (.08, 1), (.3, .7), (.6, .4), (1, .35)])
+    loc('Body', (0, .12 * jolt, -.05 * jolt)); rot('Body', (X, -.1 * jolt), (Y, .06 * math.sin(TAU * 5 * t) * (1 - t)))
+    rot('Neck1', (X, -.16 * jolt)); rot('Neck2', (X, -.06 * jolt)); rot('Neck3', (X, .1 * jolt))
+    rot('Head', (X, .05 * jolt), (Z, .1 * math.sin(TAU * 3 * t) * (1 - t)))
+    rot('Jaw', (X, .03 + .35 * jolt))
+    dl_tail(lambda i: ((X, .04 * jolt), (Z, .06 * math.sin(TAU * 4 * t - .5 * i) * (1 - t))))
+    dl_arms(lambda s, sg: (-.5 * jolt, -.45 * jolt, -.3 * jolt))
+    for s, k in (('L', .4), ('R', .7)): loc('IK_Ball' + s, (0, .12 * jolt * k, 0))
+    dl_frill(track(t, [(0, 0), (.12, 1), (1, 1)]), .05 * track(t, [(0, 0), (.12, 1), (.7, .3), (1, 0)]), t)
 
 DL_CLIPS = {'Idle': (dl_idle, 150), 'Walk': (dl_walk, 36), 'Run': (dl_run, 22), 'Attack': (dl_attack, 30),
-            'Roar': (dl_roar, 60), 'Death': (dl_death, 60)}
+            'Roar': (dl_roar, 60), 'Death': (dl_death, 60), 'Hurt': (dl_hurt, 27)}

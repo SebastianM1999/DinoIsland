@@ -39,6 +39,23 @@ def dl_crest_fn(p, t):
     return shade(c, 1.0 + .08 * fbm(p, 12.0))
 paint_t(bpy.data.objects['DlCrests'], dl_crest_fn)
 
+def dl_paint_frill(ob):
+    """Frill: yellow at the root -> orange -> red rim, dark bands along the ribs, a spotted dark ring at
+    mid radius (display 'eye' ring, reference), a warm bright edge."""
+    me = ob.data; fk = me.attributes['fk']; ht = me.attributes['ht']
+    col = me.color_attributes.get('Col') or me.color_attributes.new('Col', 'FLOAT_COLOR', 'POINT')
+    for v in me.vertices:
+        u = ht.data[v.index].value; k = fk.data[v.index].value; dr = abs(k - round(k)); p = v.co
+        c = mix(lin('#f4c63e'), lin('#f08a2a'), smooth(.15, .55, u))
+        c = mix(c, lin('#c8361a'), smooth(.55, .9, u))
+        c = mix(c, lin('#5a1c10'), smooth(.12, .02, dr) * smooth(.12, .3, u) * .75)          # rib bands
+        ring = math.exp(-((u - .6) / .08) ** 2) * smooth(.35, .55, fbm(p, 9.0) + .5)
+        c = mix(c, lin('#3a140a'), ring * .7)                                                # spotted dark ring
+        c = mix(c, lin('#ff9a4a'), smooth(.93, 1.0, u) * .6)
+        col.data[v.index].color = (*shade(c, 1.0 + .08 * fbm(p, 14.0)), 1.0)
+    me.color_attributes.active_color = col
+dl_paint_frill(bpy.data.objects['DlFrill'])
+
 exec(bpy.data.texts['eyes'].as_string(), globals())
 paint_eyes('Dl', DL_E, dict(iris=lin('#ffb820'), iris2=lin('#c8500c'), glow=lin('#ffe470'), limbal=lin('#261004'),
                             pupil=DLP['pupil'], sclera=lin('#d8b880'), lid=DLP['mask'], lid2=DLP['back2']), gloss, skinm)
