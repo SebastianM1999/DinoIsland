@@ -13,9 +13,9 @@ bone(eb, 'root', (0, 0, 0), (0, .4, 0))
 bone(eb, 'Body', (0, 0.2, 1.33), (0, -0.4, 1.24), 'root')
 bone(eb, 'Torso', (0, -0.4, 1.24), (0, -0.8, 1.28), 'Body', True)
 bone(eb, 'Neck1', (0, -0.8, 1.28), (0, -1.05, 1.47), 'Torso', True)
-bone(eb, 'Neck2', (0, -1.05, 1.47), (0, -1.25, 1.66), 'Neck1', True)
-bone(eb, 'Head', (0, -1.25, 1.66), (0, -2.0, 1.55), 'Neck2', True)
-bone(eb, 'Jaw', (0, -1.32, 1.36), (0, -1.96, 1.42), 'Head', flip=True)
+bone(eb, 'Neck2', (0, -1.05, 1.47), tuple(pch(0, -1.25, 1.66)), 'Neck1', True)
+bone(eb, 'Head', tuple(pch(0, -1.25, 1.66)), tuple(pch(0, -2.0, 1.55)), 'Neck2', True)
+bone(eb, 'Jaw', tuple(pch(0, -1.32, 1.36)), tuple(pch(0, -1.96, 1.42)), 'Head', flip=True)
 PC_TAILY = [0.2, .6, 1.0, 1.4, 1.8, 2.15, 2.46]
 for i in range(6):
     a, b = PC_TAILY[i], PC_TAILY[i + 1]

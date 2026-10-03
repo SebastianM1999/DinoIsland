@@ -1,8 +1,8 @@
 # Skull (+ dome) + lower jaw + trunk -> ONE fluid mesh, then every limb part unioned in on its own (EXACT
 # without use_self: with it Blender 5.2 crashed on the Dilophosaurus) with ONE fillet pass.
 exec(bpy.data.texts['fuse'].as_string(), globals())
-fuse_head('PcBody', 'PcHead', 'PcJaw', PC_CORNER, PC_MOUTH, lip_gap=0.01, region=0.022,
-          seam_width=0.1, fillet_iters=55)
+fuse_head('PcBody', 'PcHead', 'PcJaw', PC_CORNER, PC_MOUTH, lip_gap=0.007, region=0.016,
+          seam_width=0.08, fillet_iters=55)
 
 def pc_union_parts(base_name, names, width=0.1, iters=55, head_back_y=None):
     base = bpy.data.objects[base_name]; Bb = _bvh(_bake(base))
@@ -27,7 +27,7 @@ def pc_union_parts(base_name, names, width=0.1, iters=55, head_back_y=None):
     if head_back_y is not None:
         for n in ('rg_head', 'rg_jaw'):
             if n in base.vertex_groups: base.vertex_groups[n].remove([v.index for v in base.data.vertices if v.co.y > head_back_y])
-pc_union_parts('PcBody', PC_PARTS, head_back_y=-1.15)
+pc_union_parts('PcBody', PC_PARTS, head_back_y=-1.08)
 _b = bpy.data.objects['PcBody']                     # nothing below the jaw belongs to the head regions
 for _n in ('rg_head', 'rg_jaw'):
     if _n in _b.vertex_groups: _b.vertex_groups[_n].remove([v.index for v in _b.data.vertices if v.co.z < 1.15])
