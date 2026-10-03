@@ -121,7 +121,11 @@ module.exports = async function integrate({ github, context, core }) {
     const runs = await github.paginate(api.actions.listWorkflowRuns, { ...repo, workflow_id: 'ci.yml', head_sha: pr.head.sha, per_page: 100 });
     // A pull_request run's head_sha can differ from its checkout merge commit. Strict branch protection
     // is the final authority; this explicit run check additionally prevents bypassing failed/pending CI.
-    const matching = runs.filter(run => run.head_sha === pr.head.sha && run.head_repository?.full_name === pr.base.repo.full_name)
+    // A bot-triggered PR run can require approval without creating any CI jobs. It must not
+    // supersede the independent workflow_dispatch CI we explicitly requested for this revision.
+    // Actual test failures, cancellations and pending runs remain authoritative.
+    const matching = runs.filter(run => run.head_sha === pr.head.sha && run.head_repository?.full_name === pr.base.repo.full_name
+      && !(run.event === 'pull_request' && run.conclusion === 'action_required'))
       .sort((a, b) => b.id - a.id || (b.run_attempt || 1) - (a.run_attempt || 1));
     if (!matching.length) { if (await dispatchCi(pr)) return; continue; }
     const latest = matching[0];

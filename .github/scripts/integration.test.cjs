@@ -51,6 +51,18 @@ function fixture(options = {}) {
 }
 const mutations = calls => calls.filter(call => ['merge', 'update', 'dispatch'].includes(call.name));
 
+test('a bot PR approval request cannot override independently dispatched CI, but still requires a passing run', async () => {
+  const approval = { id: 12, event: 'pull_request', head_sha: 'feature-sha', head_repository: { full_name: 'owner/game' }, status: 'completed', conclusion: 'action_required' };
+  const passed = { id: 11, event: 'workflow_dispatch', head_sha: 'feature-sha', head_repository: { full_name: 'owner/game' }, status: 'completed', conclusion: 'success' };
+  const good = fixture({ runs: [approval, passed] }); await good.run();
+  assert.deepEqual(mutations(good.calls).map(c => c.name), ['merge']);
+  const missing = fixture({ runs: [approval] }); await missing.run();
+  assert.deepEqual(mutations(missing.calls).map(c => c.name), ['dispatch']);
+  const failed = fixture({ runs: [approval, { ...passed, conclusion: 'failure' }] }); await failed.run();
+  assert.equal(failed.calls.some(c => c.name === 'merge'), false);
+  assert.equal(failed.calls.find(c => c.name === 'dispatch').args.workflow_id, 'integration-repair.yml');
+});
+
 test('merges a current passing collaborator task using an exact-head squash guard', async () => {
   const f = fixture(); await f.run();
   assert.deepEqual(mutations(f.calls).map(c => c.name), ['merge']);
