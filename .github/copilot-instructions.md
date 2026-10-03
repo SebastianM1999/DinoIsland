@@ -7,7 +7,8 @@ relevant directory's `package-info.md` before changing files there.
 The required workflow is:
 
 - Before editing, inspect the current branch, status and worktrees. Each feature
-  uses its own worktree and feature branch, normally `codex/<developer>/<feature>`,
+  uses its own worktree and feature branch, normally `<agent>/<feature>`,
+  using `codex`, `claude` or `copilot` as the agent prefix, without a developer name.
   based on fresh `origin/main`. Create that worktree if starting in the shared
   checkout or on `main`. An isolated platform task checkout/branch also qualifies.
 - Run all edits, installs, tests and commits inside that feature checkout. Never
