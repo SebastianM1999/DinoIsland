@@ -43,7 +43,7 @@ def tr_run(t):
     rot('Neck2', (X, .05 + .035 * c(.8)), (Z, -.03 * math.sin(TAU * t + .9)))
     # head counters ~65 % of the pitch below it: the body rocks, the horns stay aimed
     rot('Head', (X, .01 - .65 * (body + sh + nk) + .02 * c(.9)), (Z, -.035 * math.sin(TAU * t + 1.2)), (Y, .04 * math.sin(TAU * t + .6)))
-    rot('Jaw', (X, .08 + .05 * c(.75)))                                         # panting: opens on the impact
+    rot('Jaw', (X, .05 + .03 * c(.25)))                                         # panting: opens at push-off (head high)
     tr_tail(lambda i: ((X, (-.06 if i == 0 else .0) + .16 * c(.22 + .07 * i) / 6),
                        (Z, .09 * math.sin(TAU * t - .5 * i) / (1 + .15 * i))))
 
@@ -55,11 +55,11 @@ def tr_idle(t):
     graze = track(t, [(0, 0), (.66, 0), (.74, 1), (.92, 1), (1, 0)])        # dip to the ground and chew
     snort = .06 * max(0., math.sin(TAU * 6 * t)) * track(t, [(0, 0), (.36, 0), (.38, 1), (.42, 1), (.44, 0), (1, 0)])
     rot('Shoulders', (X, .05 * graze))
-    rot('Neck1', (X, .02 * math.sin(TAU * t) + .2 * graze), (Z, look * .3))
+    rot('Neck1', (X, .02 * math.sin(TAU * t) + .16 * graze), (Z, look * .3))
     rot('Neck2', (X, .14 * graze + snort), (Z, look * .3))
     rot('Head', (X, .03 * math.sin(2 * TAU * t + .5) + .12 * graze), (Z, look * .3), (Y, -.08 * look))
     chew = graze * max(0., math.sin(TAU * 7 * t))
-    rot('Jaw', (X, .02 + .1 * chew))
+    rot('Jaw', (X, .02 + .2 * chew))                                        # visible chewing while grazing
     tr_tail(lambda i: ((X, .01 * math.sin(TAU * t - .4 * i)), (Z, .05 * math.sin(TAU * t - .5 * i) + .025 * math.sin(2 * TAU * t - .7 * i))))
 
 # Horn thrust (1.2 s, plays once): rock back with the head lowered (wind-up = dodge time), shove forward
