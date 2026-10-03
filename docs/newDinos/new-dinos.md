@@ -102,10 +102,10 @@ Usually attacks in small groups. One Deinonychus distracts the player while othe
 
 ### Look
 - Massive, heavy-bodied predator
-- Broad head with powerful jaws and large teeth
+- Recognizable T. rex skull with a defined snout, pronounced brow ridges, and a deep lower jaw lined with large teeth; keep the head proportional to the neck and body
 - Tiny arms with two claws on each hand
 - Thick neck, strong hind legs, and a long balancing tail
-- Dark forest-green body with charcoal markings and a pale tan underside
+- Medium-gray body with charcoal-black markings along the back and tail, fading to a lighter gray underside
 
 ### Attack Behavior
 Stalks the player before committing to a powerful charge. Uses devastating bites at close range, with a brief recovery after each heavy attack that gives the player a chance to escape.
@@ -119,7 +119,7 @@ Stalks the player before committing to a powerful charge. Uses devastating bites
 - Slim body with a narrow, alert head
 - Large curved claw on each foot
 - Long balancing tail and short feathers along its arms and back
-- Slate-blue body with dark stripes and a light gray underside
+- Orange body with a darker back, dark brown stripes across the back and tail, a cream belly and throat, and golden-yellow eyes, matching the existing raptor palette in the code
 
 ### Attack Behavior
 Hunts in packs and constantly changes direction. Raptors flank the player, dart in for quick bites and claw strikes, then pull back to prepare another attack.
@@ -133,7 +133,7 @@ Hunts in packs and constantly changes direction. Raptors flank the player, dart 
 - Small head held high above its body
 - Front legs longer than its hind legs, creating a sloping back
 - Broad body, sturdy feet, and a long tapering tail
-- Muted moss-green body with warm brown patches and a pale cream underside
+- Muted blue-gray body with deeper slate-blue shading along the back and neck, gradually fading into soft light gray on the flanks and underside
 
 ### Attack Behavior
 Usually peaceful until threatened. Defends itself with heavy stomps and sweeping tail strikes, forcing nearby players to keep their distance from its legs and rear.
@@ -143,11 +143,25 @@ Usually peaceful until threatened. Defends itself with heavy stomps and sweeping
 ## Alpha Sarcosuchus
 
 ### Look
-- Gigantic crocodile-like boss creature
-- Long, broad snout lined with prominent teeth
-- Low, muscular body covered in thick armored scales
-- Short, powerful legs and a massive swimming tail
-- Near-black olive body with dark red scars, pale bone-colored back ridges, and amber eyes
+- A colossal crocodile-like boss unique to one map, with a long, low silhouette that dwarfs players and ordinary predators
+- Elongated crocodilian snout with a slightly widened tip, raised nostrils, heavy jaw muscles, and interlocking ivory teeth of varied sizes; several chipped teeth suggest years of fighting
+- Deep-set, glowing red eyes beneath pronounced armored brow ridges; the glow remains clearly visible in shadow and just above the waterline
+- Thick overlapping armor plates along the neck, shoulders, back, and tail, arranged in distinct rows with smaller pebbled scales between them
+- Uneven, worn bone-colored dorsal ridges, chipped plate edges, and old dark red scars across the snout and flanks
+- Near-black charcoal and dark olive hide, with lighter gray scale edges and a muted ash-gray underside; wet surfaces catch subtle highlights that reveal the armor detail
+- A muscular chest and flexible torso, supported by powerful legs with defined joints, spread toes, and hooked black claws; the stance can rise off the ground for fast land movement
+- A massive tail with a thick muscular base, tapering into a flattened swimming blade with paired ridges; it also acts as a counterbalance during rapid turns
+- Visible folds around the jaw hinge, throat, shoulders, and leg joints so the armor looks capable of bending during lunges and changes of direction
+- Keep the detail concentrated in the eyes, jaws, armor, and silhouette so the boss remains readable at a distance
 
 ### Attack Behavior
-Ambushes players from rivers and swamp water. Bursts onto the bank with a fast lunge, bites at close range, and sweeps its tail to knock back players approaching from the sides or behind. Its strongest attacks have visible wind-ups and leave a short recovery window.
+An apex ambush predator and the map's main boss. Waits almost submerged, exposing only its nostrils, back ridges, and glowing red eyes, then explodes from the water with a fast, low lunge. On land it raises its body into a powerful running stance, makes sharp turns, and uses short bursts of speed to cut off fleeing players. Its size should feel terrifying without making its movement sluggish.
+
+- **Lunge and bite:** Lowers its head and gathers its legs before surging forward with snapping jaws. A missed lunge carries it past the target and exposes its flank briefly.
+- **Close-range pressure:** Follows quick bites with a shoulder shove, forcing players to move instead of standing beside its head.
+- **Tail sweep:** Plants its front feet and twists its hips before whipping its tail through a wide arc, knocking back players at its sides and rear.
+- **Rapid repositioning:** Uses quick sidesteps, pivots, and short retreats toward the water to line up a new attack. The tail counterbalances each turn and drives sudden swimming bursts.
+- **Water ambush:** Submerges to approach from a different angle; ripples, disturbed mud, and a brief glimpse of its red eyes warn players before it erupts onto the bank.
+- **Enraged phase:** At low health, chains a bite into a turn and tail sweep, then repositions more aggressively. Keep a recovery window after the full sequence.
+
+Every heavy attack has a distinct body wind-up and sound cue. Keep its mobility dangerous, but avoid instant direction changes or unavoidable attacks; players should survive by reading its movements, dodging, and using the short openings after committed strikes.
