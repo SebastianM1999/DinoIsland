@@ -38,7 +38,7 @@ function fixture(options = {}) {
         (args.head_sha === 'feature-sha' ? (options.headRuns || []) :
           (options.runs || [{ id: 10, head_sha: candidateSha, head_repository: { full_name: 'owner/game' }, status: 'completed', conclusion: 'success' }])))
     },
-    git: { createRef: wrap('createRef', {}), getRef: wrap('getRef', { object: { sha: options.existingCandidate || candidateSha } }), deleteRef: wrap('deleteRef', {}) }
+    git: { createRef: wrap('createRef', {}), getRef: wrap('getRef', args => ({ object: { sha: args.ref === `heads/${pr.head.ref}` ? (options.taskRefSha || 'advanced-head') : (options.existingCandidate || candidateSha) } })), deleteRef: wrap('deleteRef', {}) }
   }, paginate: async (method, args) => typeof method === 'string' ? (options.rules || [{ type: 'required_status_checks',
     parameters: { strict_required_status_checks_policy: true, required_status_checks: [{ context: 'Node 22 tests', integration_id: 15368 }] },
     ruleset_source_type: 'Repository', ruleset_id: 24 }]) : (await method(args)).data,
@@ -48,7 +48,7 @@ function fixture(options = {}) {
     const beforePin = process.env.INTEGRATION_RULESET_UPDATED_AT;
     process.env.CLAUDE_REPAIR_ENABLED = options.repairEnabled === false ? 'false' : 'true';
     process.env.INTEGRATION_RULESET_UPDATED_AT = options.pin === undefined ? '2026-10-03T00:00:00Z' : options.pin;
-    try { await integrate({ github, context: { repo: { owner: 'owner', repo: 'game' } }, core: { info() {} } }); }
+    try { await integrate({ github, context: { repo: { owner: 'owner', repo: 'game' } }, core: { info() {}, warning() {} } }); }
     finally {
       if (before === undefined) delete process.env.CLAUDE_REPAIR_ENABLED; else process.env.CLAUDE_REPAIR_ENABLED = before;
       if (beforePin === undefined) delete process.env.INTEGRATION_RULESET_UPDATED_AT; else process.env.INTEGRATION_RULESET_UPDATED_AT = beforePin;
@@ -279,4 +279,21 @@ test('disabled repair on an older task does not starve a later passing task', as
     head: { sha: 'feature-sha', ref: 'codex/second', repo: { full_name: 'owner/game' } }, base: { ref: 'main', repo: { full_name: 'owner/game' } }, mergeable: true, mergeable_state: 'clean', merge_commit_sha: candidateSha };
   const f = fixture({ repairEnabled: false, pr: { mergeable: false, mergeable_state: 'dirty' }, otherPrs: [second] });
   await f.run(); assert.equal(f.calls.find(c => c.name === 'merge').args.pull_number, 8);
+});
+
+test('successful API merge deletes only its unchanged integrated feature ref', async () => {
+  const f = fixture({ taskRefSha: 'feature-sha' }); await f.run();
+  const deletion = f.calls.find(c => c.name === 'deleteRef' && c.args.ref === 'heads/codex/task');
+  assert.ok(deletion);
+  assert.ok(f.calls.indexOf(deletion) > f.calls.findIndex(c => c.name === 'merge'));
+});
+
+test('advanced feature refs survive post-merge cleanup', async () => {
+  const f = fixture({ taskRefSha: 'newer-work' }); await f.run();
+  assert.ok(!f.calls.some(c => c.name === 'deleteRef' && c.args.ref === 'heads/codex/task'));
+});
+
+test('post-merge feature cleanup never deletes main', async () => {
+  const f = fixture({ taskRefSha: 'feature-sha', pr: { head: { sha: 'feature-sha', ref: 'main', repo: { full_name: 'owner/game' } } } }); await f.run();
+  assert.ok(!f.calls.some(c => c.name === 'deleteRef' && c.args.ref === 'heads/main'));
 });
