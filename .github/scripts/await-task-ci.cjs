@@ -3,7 +3,7 @@
 // Loaded from trusted main; this helper only observes metadata and wakes the controller.
 module.exports = async function awaitTaskCi({ github, context, core, prNumber, expectedHead,
   sleep = ms => new Promise(resolve => setTimeout(resolve, ms)), now = Date.now,
-  maxWaitMs = 17 * 60 * 1000, pollMs = 15000 }) {
+  maxWaitMs = 17 * 60 * 1000, pollMs = 15000, candidateOnly = false }) {
   const sha = value => /^[a-f0-9]{40}$/i.test(value || '');
   if (!Number.isSafeInteger(Number(prNumber)) || Number(prNumber) <= 0 || !sha(expectedHead)) {
     throw new Error('A positive PR number and exact 40-character head SHA are required.');
@@ -39,7 +39,7 @@ module.exports = async function awaitTaskCi({ github, context, core, prNumber, e
       { ...repo, workflow_id: 'ci.yml', head_sha: head, per_page: 100 }))
       .filter(run => run.head_sha === head && run.head_repository?.full_name === fullName);
     const newest = runs => runs.sort((a, b) => b.id - a.id)[0];
-    const normal = newest((await runsFor(expectedHead)).filter(run => run.event === 'pull_request'
+    const normal = candidateOnly ? undefined : newest((await runsFor(expectedHead)).filter(run => run.event === 'pull_request'
       && run.pull_requests?.some(pull => pull.number === Number(prNumber))));
     let pending = false;
     if (normal?.status === 'completed' && normal.conclusion !== 'action_required') {

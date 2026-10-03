@@ -60,6 +60,8 @@ module.exports = async function integrate({ github, context, core }) {
       if (existing.object.sha !== candidate) throw new Error('Integration candidate branch points to an unexpected commit.');
     }
     await api.actions.createWorkflowDispatch({ ...repo, workflow_id: 'ci.yml', ref: candidateBranch });
+    core.setOutput('pending_pr', String(pr.number));
+    core.setOutput('pending_head', pr.head.sha);
     await api.issues.createComment({ ...repo, issue_number: pr.number, body: `${marker}\nRequested CI for merge candidate ${candidate}.` });
     return true;
   };

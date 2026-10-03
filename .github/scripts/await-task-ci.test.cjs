@@ -5,7 +5,7 @@ const awaitCi = require('./await-task-ci.cjs');
 const head = 'a'.repeat(40);
 const candidate = 'b'.repeat(40);
 const name = 'owner/game';
-function fixture({ frames, maxWaitMs = 30, pollMs = 10 }) {
+function fixture({ frames, maxWaitMs = 30, pollMs = 10, candidateOnly = false }) {
   let index = 0;
   let clock = 0;
   const dispatches = [];
@@ -24,7 +24,7 @@ function fixture({ frames, maxWaitMs = 30, pollMs = 10 }) {
     issues: { addLabels: async args => holds.push(args), createComment: async args => comments.push(args) }
   }, paginate: async (_method, args) => (frame().runs || []).map(run).filter(item => item.head_sha === args.head_sha) };
   return { run, dispatches, holds, comments, start: () => awaitCi({ github, context: { repo: { owner: 'owner', repo: 'game' } },
-    core: { info() {} }, prNumber: 1, expectedHead: head, maxWaitMs, pollMs,
+    core: { info() {} }, prNumber: 1, expectedHead: head, maxWaitMs, pollMs, candidateOnly,
     now: () => clock, sleep: async ms => { clock += ms; index++; } }), clock: () => clock };
 }
 test('pending task CI wakes once when success completes', async () => {
@@ -106,4 +106,28 @@ test('a new rebase or repair reservation releases the old wait without blocking 
     assert.equal(f.holds.length, 0);
     assert.equal(f.clock(), 10);
   }
+});
+
+
+test('candidate handoff ignores completed normal CI until exact current candidate finishes', async () => {
+  const normal = { status: 'completed', conclusion: 'success' };
+  const fallback = { id: 2, head_sha: candidate, event: 'workflow_dispatch' };
+  const f = fixture({ candidateOnly: true, frames: [{ runs: [normal, fallback] },
+    { runs: [normal, { ...fallback, status: 'completed', conclusion: 'success' }] }] });
+  assert.match(await f.start(), /Candidate CI completed/);
+  assert.equal(f.clock(), 10);
+  assert.equal(f.dispatches.length, 1);
+});
+
+test('candidate handoff follows a changed merge candidate without accepting old success', async () => {
+  const next = 'c'.repeat(40);
+  const old = { head_sha: candidate, event: 'workflow_dispatch', status: 'completed', conclusion: 'success' };
+  const fallback = { id: 2, head_sha: next, event: 'workflow_dispatch' };
+  const f = fixture({ candidateOnly: true, frames: [
+    { pr: { merge_commit_sha: next }, runs: [old, fallback] },
+    { pr: { merge_commit_sha: next }, runs: [old, { ...fallback, status: 'completed', conclusion: 'failure' }] }
+  ] });
+  assert.match(await f.start(), /Candidate CI completed/);
+  assert.equal(f.clock(), 10);
+  assert.equal(f.dispatches.length, 1);
 });

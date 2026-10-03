@@ -10,7 +10,7 @@
 - `scripts/integration.cjs` — durable ready-label queue controller; checks protection, collaborator eligibility, revision-specific CI, repair budgets, and guarded rebase-and-merge integration.
 - `scripts/rebase.test.cjs` — real temporary-Git tests for clean rebasing, exact-head lease rejection and conflict preservation.
 - `scripts/integration.test.cjs` — mocked integration safety tests, explicitly run by CI because default Node discovery skips hidden directories.
-- `scripts/await-task-ci.cjs` — bounded metadata-only wait after a rebased/repaired head is published; explicitly dispatches integration on CI completion instead of relying on recursive workflow completion events.
+- `scripts/await-task-ci.cjs` — bounded metadata-only wait after a rebased/repaired head is published or fallback candidate CI is dispatched; explicitly dispatches integration on CI completion instead of relying on recursive workflow completion events.
 - `scripts/await-task-ci.test.cjs` — fake-clock checks for pending/stale/head-changing CI, approval wakeups and timeout holds.
 
 ## Entry points
@@ -34,6 +34,7 @@
 - `INTEGRATION_RULESET_UPDATED_AT` pins the administrator-verified ruleset snapshot. Missing or changed snapshots fail closed; an administrator must verify bypass actors and repin after editing the ruleset, since GitHub hides bypass metadata from ordinary workflow tokens.
 - No file paths are excluded from automatic integration or task repair. Workflow, configuration, skill and instruction changes still require passing independent CI.
 - A bot-triggered PR run marked `action_required` has no CI jobs and cannot supersede the independently dispatched CI for the same revision. Test failures and pending runs still prevent merging.
+- Candidate CI dispatch starts a separate trusted metadata-only wait job, which ignores completed task-head CI and explicitly wakes integration when current combined-candidate CI finishes. It shares the bounded timeout and eligibility checks of the rebase/repair handoff. Controller concurrency applies only to the integrate job; metadata waits release that lock so candidate changes and replacement rebases can progress.
 - Candidate CI runs on a temporary `integration/ci-pr-*` branch pointing at GitHub's combined PR merge commit. A task-head result alone is insufficient: strict rules require checks on the combined commit. Candidate refs are validated before reuse and cleaned up after successful integration.
 - Each repair has a 25-minute timeout and 25-turn limit; at most two attempts per task. Ready/blocked/attempt labels persist state across Actions runs; concurrency is only mutual exclusion.
 - See `docs/agent-workflow.md` for setup, operation, pausing and coverage limitations.
