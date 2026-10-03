@@ -1,5 +1,5 @@
 # Vertex colours: warm red-brown hide with soft dark saddles and speckles, cream belly/throat, the dome bone-cream
-# with fine darker crazing toward its rim, knobs/spikes bone with brown bases, grey beak, grumpy amber eyes.
+# with fine darker crazing toward its rim, knobs/spikes bone with brown bases, darker snout tip, alert amber eyes.
 exec(bpy.data.texts['fuse'].as_string(), globals())
 skinm = vc_mat('PcSkin', 0.6, 0.35); gloss = vc_mat('PcGloss', 0.25, 0.55)
 
@@ -17,21 +17,22 @@ def pc_body_fn(p, n):
 def pc_head_fn(p, n):
     sx = 1 if p.x >= 0 else -1
     c = pchide(p, n)
-    c = mix(c, PCP['belly'], smooth(-.15, -.6, n.z) * .85)
+    c = mix(c, PCP['belly'], smooth(-.45, -.8, n.z) * .85)
     d = pc_dome_w(p)
     craze = smooth(.38, .46, fbm(p, 22.0) + .5) * .35                      # fine cracks in the bone
     dome = mix(mix(PCP['dome'], PCP['dome2'], .5 + fbm(p, 6.0)), PCP['domeb'], craze + smooth(.4, .0, d) * .4)
     c = mix(c, dome, d)
-    c = mix(c, mix(PCP['beak'], PCP['beak2'], .3 + .5 * fbm(p, 9.0)), smooth(-1.93, -1.99, p.y + .3 * max(0., p.z - PC_MOUTH)))
-    c = mix(c, PCP['mouth'], smooth(.02, .006, abs(p.z - PC_MOUTH - .004)) * smooth(-.2, .3, -n.z + .2))
-    nd = p - V((sx * .05, -1.99, 1.57)); nd = V((nd.x * 1.6, nd.y * .8, nd.z * 1.6)).length
-    return mix(c, PCP['nostril'], smooth(.022, .011, nd))
+    c = mix(c, PCP['mask'], smooth(pch(0, -1.9, 0).y, pch(0, -2.04, 0).y, p.y) * .45)          # slightly darker snout tip (no beak)
+    c = mix(c, PCP['mask'], smooth(.016, .004, abs(p.z - PC_MOUTH - .003)) * .8)
+    nd = p - pch(sx * .05, -1.99, 1.58); nd = V((nd.x * 1.6, nd.y * .8, nd.z * 1.6)).length
+    return mix(c, PCP['nostril'], smooth(.016, .008, nd))
 
 def pc_jaw_fn(p, n):
     c = pchide(p, n)
-    c = mix(c, mix(PCP['belly'], PCP['belly2'], .5 + fbm(p, 3)), smooth(-.05, -.55, n.z))
-    c = mix(c, mix(PCP['beak'], PCP['beak2'], .3 + .4 * fbm(p, 9.0)), smooth(-1.88, -1.94, p.y))
-    return mix(c, PCP['mouth'], smooth(.3, .7, n.z) * smooth(PC_MOUTH - .06, PC_MOUTH - .035, p.z) * smooth(PC_MOUTH + .002, PC_MOUTH - .004, p.z))
+    c = mix(c, mix(PCP['belly'], PCP['belly2'], .5 + fbm(p, 3)), smooth(-.45, -.8, n.z))      # cream only underneath (pale sides read as a pouting lip)
+    c = mix(c, PCP['mask'], smooth(pch(0, -1.88, 0).y, pch(0, -1.98, 0).y, p.y) * .4)
+    c = mix(c, PCP['mask'], smooth(PC_MOUTH - .02, PC_MOUTH - .004, p.z) * .7)               # thin dark mouth line
+    return mix(c, PCP['mouth'], smooth(.3, .7, n.z) * smooth(PC_MOUTH - .045, PC_MOUTH - .025, p.z) * smooth(PC_MOUTH + .002, PC_MOUTH - .004, p.z))
 
 paint_regions(bpy.data.objects['PcBody'], pc_body_fn, pc_head_fn, pc_jaw_fn)
 paint(bpy.data.objects['PcKnobs'], lambda p, n: mix(PCP['knobb'], PCP['knob'], smooth(-.2, .6, n.dot((p - PC_DOME_C).normalized())) * (.8 + .2 * fbm(p, 20))))

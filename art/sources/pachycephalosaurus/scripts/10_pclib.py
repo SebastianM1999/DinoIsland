@@ -16,3 +16,9 @@ def pchide(p, n):
     c = mix(c, PCP['stripe'], smooth(0.45, 0.85, band) * smooth(-0.1, 0.45, up) * 0.6)
     c = mix(c, PCP['stripe'], smooth(0.32, 0.44, fbm(p, 16.0)) * smooth(-0.35, 0.3, up) * 0.45)   # speckles
     return c
+
+# Head scale: the whole head (skull, dome, jaw, eyes, ornaments, Head/Jaw bones) is designed in the original
+# reference measurements and shrunk about the neck joint - the owner found the first head "too big, funny".
+PC_HK = 0.7; PC_HPIV = (-1.12, 1.6)
+def pch(x, y, z):
+    return V((x * PC_HK, PC_HPIV[0] + (y - PC_HPIV[0]) * PC_HK, PC_HPIV[1] + (z - PC_HPIV[1]) * PC_HK))
