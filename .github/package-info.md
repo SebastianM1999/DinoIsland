@@ -4,12 +4,14 @@
 ## Files
 - `copilot-instructions.md` — automatically discovered Copilot repository instructions; points to root AGENTS.md and repeats the essential isolated-worktree, one-feature/one-PR workflow for clients that do not load AGENTS.md themselves.
 - `workflows/ci.yml` — read-only CI for pull requests targeting `main`, pushes to `main`, merge-group candidates, and manual runs. Installs locked dependencies and runs the Node 22 test suite and submitted-diff whitespace/conflict-marker checks on Ubuntu.
-- `workflows/integration.yml` — trusted-main controller, awakened by the ready-to-merge label, completed CI/rebases/repairs, and manual runs; no idle schedule. Does not execute PR source.
+- `workflows/integration.yml` — trusted-main controller, awakened by the ready-to-merge label, completed CI, explicit rebase/repair handoffs, and manual runs; no idle schedule. Does not execute PR source.
 - `workflows/integration-repair.yml` — reserved same-repository task repair using Claude subscription credentials; validates eligibility, rebases onto main and continues resolved conflicts, repairs files, tests, publishes only the task branch, and wakes the controller for independent candidate CI.
 - `workflows/integration-rebase.yml` — deterministic same-repository feature rebase onto current main, with exact-head reservation, trusted eligibility checks, disabled Git hooks and lease-guarded publication; holds conflicts for repair without running feature code.
 - `scripts/integration.cjs` — durable ready-label queue controller; checks protection, collaborator eligibility, protected paths, revision-specific CI, repair budgets, and guarded rebase-and-merge integration.
 - `scripts/rebase.test.cjs` — real temporary-Git tests for clean rebasing, exact-head lease rejection and conflict preservation.
 - `scripts/integration.test.cjs` — mocked integration safety tests, explicitly run by CI because default Node discovery skips hidden directories.
+- `scripts/await-task-ci.cjs` — bounded metadata-only wait after a rebased/repaired head is published; explicitly dispatches integration on CI completion instead of relying on recursive workflow completion events.
+- `scripts/await-task-ci.test.cjs` — fake-clock checks for pending/stale/head-changing CI, approval wakeups and timeout holds.
 
 ## Entry points
 - GitHub Actions runs `CI / Node 22 tests`; use this stable check name when configuring required status checks.
@@ -20,6 +22,7 @@
 - CI has read-only repository permissions, no AI credentials, and no persisted checkout credentials.
 - Use `npm ci` with the committed lockfile and Node 22. Electron's binary download is disabled because headless tests do not launch Electron.
 - Superseded CI runs are cancelled per PR or ref to limit runner usage.
+- Successful rebase/repair publication starts a separate metadata-only wait job (17-minute wait, 20-minute job limit) with trusted-main checkout. It wakes integration after current-revision CI completes, stops on closed/ineligible tasks, and holds timed-out tasks with a comment. There is no idle schedule and CI itself remains read-only. Rebase/repair completion events are replaced by explicit handoffs to avoid missed recursive workflow_run events.
 - Update feature branches by rebase, never by merging main into them. Land passing feature PRs with GitHub Rebase and merge. GitHub automatically deletes merged remote PR branches; local worktrees are cleaned only when safe.
 - Only reserved feature branches may be rewritten, using force-with-lease pinned to the validated head SHA. Never rewrite main or overwrite concurrent changes. The rebase-conflict label holds a PR for optional repair, and rebasing reservations prevent duplicate dispatches.
 - Workflows must not execute untrusted pull-request code with write tokens or secrets.

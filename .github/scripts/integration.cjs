@@ -123,7 +123,10 @@ module.exports = async function integrate({ github, context, core }) {
       if (await repair(pr, 'Rebasing this task onto main has conflicts.')) return;
       continue;
     }
-    if (pr.mergeable === null || !pr.mergeable_state || pr.mergeable_state === 'unknown') continue;
+    if (pr.mergeable === null || !pr.mergeable_state || pr.mergeable_state === 'unknown') {
+      core.info(`PR ${pr.number}: waiting for GitHub to calculate mergeability.`);
+      continue;
+    }
     if (pr.mergeable === false || pr.mergeable_state === 'dirty') {
       if (await repair(pr, 'The branch has merge conflicts.')) return;
       continue;
@@ -162,7 +165,10 @@ module.exports = async function integrate({ github, context, core }) {
     let candidateTested = false;
     if (normalRuns.length) {
       const latestNormal = normalRuns[0];
-      if (latestNormal.status !== 'completed') continue;
+      if (latestNormal.status !== 'completed') {
+        core.info(`PR ${pr.number}: waiting for CI run ${latestNormal.id} (${latestNormal.status}).`);
+        continue;
+      }
       if (['failure', 'timed_out'].includes(latestNormal.conclusion)) {
         if (await repair(pr, 'CI failed.')) return;
         continue;
@@ -196,6 +202,7 @@ module.exports = async function integrate({ github, context, core }) {
       const result = await api.pulls.merge({ ...repo, pull_number: pr.number, sha: pr.head.sha, merge_method: 'rebase' });
       if (!result.data.merged) core.info(`PR ${pr.number}: GitHub declined the merge.`);
       else {
+        core.info(`PR ${pr.number}: merged successfully with Rebase and merge.`);
         const candidateBranch = `integration/ci-pr-${pr.number}-${candidate.slice(0, 16)}`;
         try {
           const existing = (await api.git.getRef({ ...repo, ref: `heads/${candidateBranch}` })).data;

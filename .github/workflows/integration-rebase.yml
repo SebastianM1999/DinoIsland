@@ -25,6 +25,8 @@ jobs:
     if: vars.AUTOMERGE_ENABLED == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    outputs:
+      published_head: ${{ steps.rebase.outputs.published_head }}
     env:
       INTEGRATION_RULESET_UPDATED_AT: ${{ vars.INTEGRATION_RULESET_UPDATED_AT }}
     steps:
@@ -82,6 +84,7 @@ jobs:
           fi
           git diff --exit-code origin/main HEAD -- .github .claude AGENTS.md CLAUDE.md .mcp.json
           git push --force-with-lease="refs/heads/$TASK_BRANCH:$TASK_SHA" origin "HEAD:refs/heads/$TASK_BRANCH"
+          echo "published_head=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
       - name: Hold conflicting rebase for repair
         if: steps.rebase.outputs.conflict == 'true'
         uses: actions/github-script@v8
@@ -115,3 +118,26 @@ jobs:
         with:
           script: |
             await github.rest.actions.createWorkflowDispatch({ ...context.repo, workflow_id: 'integration.yml', ref: 'main' });
+  await-ci:
+    needs: rebase
+    if: needs.rebase.result == 'success' && needs.rebase.outputs.published_head != '' && vars.AUTOMERGE_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      pull-requests: read
+      issues: write
+      actions: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: main
+          persist-credentials: false
+      - uses: actions/github-script@v8
+        env:
+          TASK_PR: ${{ inputs.pr_number }}
+          TASK_HEAD: ${{ needs.rebase.outputs.published_head }}
+        with:
+          script: |
+            const awaitCi = require('./.github/scripts/await-task-ci.cjs');
+            await awaitCi({ github, context, core, prNumber: process.env.TASK_PR, expectedHead: process.env.TASK_HEAD });
