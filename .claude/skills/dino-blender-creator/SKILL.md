@@ -126,6 +126,7 @@ scripts as text blocks and a `scripts/` mirror.
 | rebuild overwrote another checkout's GLB | hard-coded absolute output path in the build script | output path relative to the .blend |
 | over 60k after adding eyes/tongue (brachio) | default eye/tongue resolution | `E['ball']`, `E['rimseg']`, `add_tongue(seg=...)` |
 | lifeless eyes (ball, button pupil, cap lid) | no highlight, no lid wrap, flat iris | `eyes.py`; slim + `tilt > 0` for an angry look |
+| fused body came back as a scrap of the head (whole trunk gone) | exact boolean without self-intersection handling (spino jaw union); a joined limb set that intersects itself (toes in the leg, fingers in the arm) | `fuse.py` sets `use_self`; union each limb part separately (`art/sources/spinosaurus` `spfuse`); check vertex count after every union |
 | shots pass through snout, lower legs, plates, beak, wings | generic GLB joint spheres cover ~65-75 % | `hit_coverage.mjs`, add `extraHitZones` until ≥ 95 % |
 
 ## Done checklist
