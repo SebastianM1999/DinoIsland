@@ -37,6 +37,12 @@ if (rig.jaw) {
   const y0 = w(tip).y; rig.jaw.rotateX(-.52); rig.root.updateMatrixWorld(true);
   console.log('jaw     ', w(tip).y < y0 ? 'opens downward (ok)' : 'OPENS UPWARD: flip the Jaw bone roll'); rig.jaw.rotateX(.52);
 }
+// The bone turning is not enough: count skin vertices that really follow it (stego/ptera shipped with 0).
+let jawVerts = 0;
+rig.root.traverse(o => { if (!o.isSkinnedMesh) return; const ji = o.skeleton.bones.findIndex(b => b.name === 'Jaw');
+  const si = o.geometry.attributes.skinIndex, sw = o.geometry.attributes.skinWeight;
+  for (let i = 0; ji >= 0 && i < si.count; i++) for (let k = 0; k < 4; k++) if (si.getComponent(i, k) === ji && sw.getComponent(i, k) > .5) { jawVerts++; break; } });
+if (rig.jaw) console.log('jaw skin', jawVerts, jawVerts > 500 ? 'verts follow the Jaw (ok)' : 'MOUTH CANNOT OPEN: no skin on the Jaw bone (rg_* groups wiped before head_jaw_regions?)');
 for (const state of ['idle', 'walk', 'run']) for (const track of rig.clips[state]?.tracks ?? []) {
   const n = track.getValueSize();
   for (let i = 0; i < n; i++) if (Math.abs(track.values[i] - track.values[track.values.length - n + i]) > 1e-4) { console.log(`SEAM    ${state} ${track.name}`); break; }

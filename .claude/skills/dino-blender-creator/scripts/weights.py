@@ -34,7 +34,10 @@ def rigid_islands(ob, rig, choose):
     m = ob.modifiers.new('Armature', 'ARMATURE'); m.object = rig; ob.parent = rig
 
 def set_weights(ob, v, ws):
-    for g in list(v.groups): ob.vertex_groups[g.group].remove([v.index])
+    """Replace v's bone weights with ws. fuse.py's region groups (rg_*) are kept: distance_weights runs
+    before head_jaw_regions, and wiping them left the jaw with no skin (the mouth never opened)."""
+    for g in list(v.groups):
+        if not ob.vertex_groups[g.group].name.startswith('rg_'): ob.vertex_groups[g.group].remove([v.index])
     for n, w in ws.items():
         if w > 1e-3: (ob.vertex_groups.get(n) or ob.vertex_groups.new(name=n)).add([v.index], w, 'REPLACE')
 

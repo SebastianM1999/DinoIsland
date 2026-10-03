@@ -22,6 +22,7 @@ Also read `map-design-rules` (art style source of truth) when it is available.
 | `scripts/lib.py` | shapes (`loft2`, `tube_path`, `tube_ref` (bent limbs/wings: never twists), `skin_body`, `horn_bm`, `blob_bm`, `sculpt`, `lip_at`), paint (`paint`, `paint_t`, `countershade`, `vc_mat`) |
 | `scripts/anim.py` | rig building (`bone`, `theropod_leg_ik`, `quad_leg_ik`), posing (`rot`, `loc`, `track`, `chain`), gaits (`biped_leg`, `quad_leg`, `LATERAL`, `follow_body`), baking (`sample`) and checks (`min_z`, `max_step`, `ground_report`) |
 | `scripts/fuse.py` | `fuse_head()` + `paint_regions()` — head, jaw and neck as ONE mesh; `union_fillet()` — limbs grown out of the trunk |
+| `scripts/eyes.py` | `build_eyes` / `paint_eyes`: living eyes (almond lid opening, rolled lid rim, painted iris, pupil disc, catchlights; `tilt` sets the mood) |
 | `scripts/weights.py` | `distance_weights`, `crisp_chain`, `limb_weights` (limbs unioned into a trunk), `head_jaw_regions`, `rigid_islands`, `check_weights`, `limit_influences` (glTF = 4) |
 | `scripts/views.py` | `s_views()` / `s_clip_sheet()` — ortho-camera model views and 8-frame clip sheets you can Read (use these; `sheet.py` viewport renders mis-frame) |
 | `scripts/export.py` | `export_dino()` — clean deform-only rig, one skinned mesh, `<Source>_<Clip>` actions, GLB |
@@ -66,7 +67,8 @@ scripts as text blocks and a `scripts/` mirror.
 3. **Body** (`skin_body` or `tube_path`), **head** (`loft2` profiles + `sculpt`), **jaw**,
    then **fuse** (`fuse_head`). Show the user a side + 3/4 screenshot of the grey model early —
    proportions are cheap to change now, expensive later.
-4. **Details:** teeth rooted with `lip_at`, eyes + angry/soft lids, claws, spikes/scutes/plates.
+4. **Details:** teeth rooted with `lip_at`, eyes with `eyes.py` (catchlights, lid opening, tilt), lower jaw
+   per `references/modeling.md` §5b (jawline keel, inward lip, mouth trough + tongue), claws, spikes/scutes/plates.
 5. **Paint** (`countershade` + species pattern + head accents, `paint_regions` for the fused mesh).
 6. **Rig:** bones in the YZ plane, Jaw roll flipped, IK legs; verify the rest pose is unchanged by
    IK (print joint positions) before animating.
@@ -111,12 +113,18 @@ scripts as text blocks and a `scripts/` mirror.
 | rim/edge where leg or arm enters the body | limb tube just overlapping the trunk | `union_fillet` (then clear stray `rg_*` weights behind the head) |
 | skin torn along straight edges in strong poses; belly dragged down by swinging legs; feet 1.9 m under ground | box-selected / height-faded / `side_x` limb weights | `limb_weights`: trunk-membership x distance-to-limb fade |
 | red mouth-paint specks on the thighs | boolean union gave leg verts head-region weights | `union_fillet(..., head_back_y=...)` |
+| mouth never opens although the Jaw bone turns (stego, ptera, first triceratops) | `set_weights` wiped the `rg_*` groups before `head_jaw_regions` | keep `rg_*` (fixed in `weights.py`); `check_glb.mjs` prints `jaw skin` |
+| lower jaw like a fat sausage / pouch under the snout | round loft profile, flat top, too deep | §5b profile: flat sides, jawline keel, inward lip, trough + tongue |
+| strand of skin between the beak tips when open | lower tip inside the upper hook (welded) | lower tip ends behind the hook; scale `lip_gap` |
+| mouth splits open to the hinge, see-through | mouth corner too far back | herbivores: corner forward + cheek blend |
+| lifeless eyes (ball, button pupil, cap lid) | no highlight, no lid wrap, flat iris | `eyes.py`; slim + `tilt > 0` for an angry look |
 | shots pass through snout, lower legs, plates, beak, wings | generic GLB joint spheres cover ~65-75 % | `hit_coverage.mjs`, add `extraHitZones` until ≥ 95 % |
 
 ## Done checklist
 
 - [ ] Grey model approved-looking from side, front, 3/4 and behind (no head/neck seam)
-- [ ] Jaw at 1.0 rad: lips separate, no webs/tears, teeth seated, cheeks stretch smoothly
+- [ ] Jaw at 0.52 and 1.0 rad: lips separate, no webs/strands at the tip, teeth seated, cheeks stretch smoothly, mouth trough + tongue visible, nothing see-through
+- [ ] `check_glb.mjs` `jaw skin` is hundreds of verts; eyes have catchlights inside the lid opening
 - [ ] `check_weights() == 0`; rest pose unchanged under IK
 - [ ] `ground_report` all ≥ -0.01; `max_step` legs < 0.4 rad per 1/60 s at max cadence
 - [ ] Contact sheets for every clip Read and clean; arms/head close-up sheet clean
