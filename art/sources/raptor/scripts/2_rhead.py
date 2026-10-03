@@ -1,6 +1,6 @@
 
 V = mathutils.Vector
-for n in ('RaptorHead','RaptorJaw','RaptorNostrils'): remove(n)
+for n in ('RaptorHead','RaptorJaw','RaptorNostrils','RaptorTongue'): remove(n)
 H = [list(s) for s in HEAD_SECS]
 def narrow(i, f):
     H[i][1] = [(x * f, z) for x, z in H[i][1]]
@@ -25,8 +25,11 @@ for v in head.data.vertices:
     v.co = p
 head.data.update()
 HJ = [(y * 1, w * (.93 if y < -0.95 else 1) * (.86 if y < -1.05 else 1), b) for y, w, b in JAW_SECS]
-T = [(0,0.9),(0.5,0.93),(0.82,1.0),(0.97,0.9),(1.0,0.62),(0.92,0.3),(0.72,0.1),(0.4,0.015),(0,0.0)]
-jaw = loft2('RaptorJaw', [(y, [(tx*w, bot + tz*(1.348-bot)) for tx, tz in T]) for y, w, bot in HJ])
+# lower jaw (mouth.py): flat sides to a jawline keel, thin inward-rolled lip the lower teeth root in,
+# mouth trough + tongue (the cavity you see when it snaps)
+exec(bpy.data.texts['mouth'].as_string(), globals())
+jaw = loft2('RaptorJaw', [(y, jaw_prof(w, bot, 1.348, 0.02 * trough_fade(y, -1.228, -0.6))) for y, w, bot in HJ])
+add_tongue('RaptorTongue', (0, -0.93, 1.348 - .016), (.045, .15, .009), seg=(16, 10))
 def head_fn(p, n):
     sx = 1 if p.x >= 0 else -1
     c = skin(p, n, stripes=False)
@@ -46,6 +49,7 @@ def jaw_fn(p, n):
     c = skin(p, n, stripes=False)
     c = mix(c, P['belly'], smooth(-0.1, -0.6, n.z))
     c = mix(c, P['lip'], smooth(1.30, 1.335, p.z) * 0.7)
-    return mix(c, mix(P['tongue'], P['gum'], 0.5 + fbm(p, 6)), smooth(0.4, 0.8, n.z) * smooth(1.32, 1.335, p.z))
+    return mix(c, mix(P['tongue'], P['gum'], 0.5 + fbm(p, 6)), smooth(0.2, 0.6, n.z) * smooth(1.322, 1.33, p.z) * smooth(1.35, 1.344, p.z))  # trough
 paint(head, head_fn); paint(jaw, jaw_fn)
-for o in (head, jaw): o.data.materials.append(bpy.data.materials['RaptorSkin'])
+paint(bpy.data.objects['RaptorTongue'], lambda p, n: mix(P['tongue'], P['gum'], smooth(0.6, -0.2, n.z)))
+for o in (head, jaw, bpy.data.objects['RaptorTongue']): o.data.materials.append(bpy.data.materials['RaptorSkin'])
