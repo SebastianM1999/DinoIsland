@@ -33,13 +33,20 @@ function fixture(options = {}) {
       listWorkflowRuns: wrap('runs', args => args.workflow_id === 'integration-repair.yml' ? (options.repairRuns || []) :
         (options.runs || [{ id: 10, head_sha: 'feature-sha', head_repository: { full_name: 'owner/game' }, status: 'completed', conclusion: 'success' }]))
     }
-  }, paginate: async (method, args) => (await method(args)).data,
-    graphql: async () => ({ repository: { ref: { branchProtectionRule: options.rule || { requiresStrictStatusChecks: true, requiresStatusChecks: true, isAdminEnforced: true, requiredStatusCheckContexts: ['Node 22 tests'] } } } }) };
+  }, paginate: async (method, args) => typeof method === 'string' ? (options.rules || [{ type: 'required_status_checks',
+    parameters: { strict_required_status_checks_policy: true, required_status_checks: [{ context: 'Node 22 tests', integration_id: 15368 }] },
+    ruleset_source_type: 'Repository', ruleset_id: 24 }]) : (await method(args)).data,
+    request: async (route, args) => { calls.push({ name: 'ruleset', args }); return { data: options.ruleset || { enforcement: 'active', bypass_actors: [], updated_at: '2026-10-03T00:00:00Z' } }; } };
   return { calls, run: async () => {
     const before = process.env.CLAUDE_REPAIR_ENABLED;
+    const beforePin = process.env.INTEGRATION_RULESET_UPDATED_AT;
     process.env.CLAUDE_REPAIR_ENABLED = options.repairEnabled === false ? 'false' : 'true';
+    process.env.INTEGRATION_RULESET_UPDATED_AT = options.pin === undefined ? '2026-10-03T00:00:00Z' : options.pin;
     try { await integrate({ github, context: { repo: { owner: 'owner', repo: 'game' } }, core: { info() {} } }); }
-    finally { if (before === undefined) delete process.env.CLAUDE_REPAIR_ENABLED; else process.env.CLAUDE_REPAIR_ENABLED = before; }
+    finally {
+      if (before === undefined) delete process.env.CLAUDE_REPAIR_ENABLED; else process.env.CLAUDE_REPAIR_ENABLED = before;
+      if (beforePin === undefined) delete process.env.INTEGRATION_RULESET_UPDATED_AT; else process.env.INTEGRATION_RULESET_UPDATED_AT = beforePin;
+    }
   } };
 }
 const mutations = calls => calls.filter(call => ['merge', 'update', 'dispatch'].includes(call.name));
@@ -56,8 +63,24 @@ test('fails closed if required CI protection is missing or allows bypass', async
     { enabled: true, required_status_checks: { enforcement_level: 'everyone', checks: [{ context: 'Node 22 tests', app_id: 42 }] } } ]) {
     const f = fixture({ protection }); await assert.rejects(f.run(), /requires strict/); assert.deepEqual(mutations(f.calls), []);
   }
-  const f = fixture({ rule: { requiresStrictStatusChecks: false, requiresStatusChecks: true, isAdminEnforced: true, requiredStatusCheckContexts: ['Node 22 tests'] } });
+  const f = fixture({ rules: [{ type: 'required_status_checks', parameters: { strict_required_status_checks_policy: false,
+    required_status_checks: [{ context: 'Node 22 tests', integration_id: 15368 }] }, ruleset_source_type: 'Repository', ruleset_id: 24 }] });
   await assert.rejects(f.run(), /requires strict/);
+});
+test('effective rules require an approved active ruleset and reject visible bypass actors', async () => {
+  for (const ruleset of [{ enforcement: 'evaluate', bypass_actors: [], updated_at: '2026-10-03T00:00:00Z' },
+    { enforcement: 'active', bypass_actors: [{ actor_type: 'RepositoryRole', actor_id: 5 }], updated_at: '2026-10-03T00:00:00Z' }]) {
+    const f = fixture({ ruleset }); await assert.rejects(f.run(), /no bypass actors/); assert.deepEqual(mutations(f.calls), []);
+  }
+  const absent = fixture({ rules: [] }); await assert.rejects(absent.run(), /no bypass actors/);
+});
+test('an exact administrator-approved timestamp permits hidden bypass metadata but any changed or missing pin blocks', async () => {
+  const approved = fixture({ ruleset: { enforcement: 'active', updated_at: '2026-10-03T00:00:00Z' } });
+  await approved.run(); assert.equal(mutations(approved.calls)[0].name, 'merge');
+  for (const options of [{ pin: '' }, { pin: '2026-10-02T00:00:00Z' },
+    { ruleset: { enforcement: 'active', bypass_actors: [], updated_at: '2026-10-03T00:01:00Z' } }]) {
+    const f = fixture(options); await assert.rejects(f.run(), /approved unchanged/); assert.deepEqual(mutations(f.calls), []);
+  }
 });
 test('forks, drafts and blocked tasks never reach integration', async () => {
   for (const options of [{ fork: true }, { pr: { draft: true } }, { labels: ['integration-blocked'] }]) {
