@@ -30,9 +30,10 @@ module.exports = async function integrate({ github, context, core }) {
     const comments = await github.paginate(api.issues.listComments, { ...repo, issue_number: pr.number, per_page: 100 });
     // Allow recovery if dispatch failed or GitHub never created a run. Never trust a user-written marker.
     if (comments.some(c => c.user?.login === 'github-actions[bot]' && c.body?.includes(marker)
-      && Date.now() - Date.parse(c.created_at) < 10 * 60 * 1000)) return;
+      && Date.now() - Date.parse(c.created_at) < 10 * 60 * 1000)) return false;
     await api.actions.createWorkflowDispatch({ ...repo, workflow_id: 'ci.yml', ref: pr.head.ref });
     await api.issues.createComment({ ...repo, issue_number: pr.number, body: `${marker}\nRequested CI for ${pr.head.sha}.` });
+    return true;
   };
   const repair = async (pr, reason) => {
     if (process.env.CLAUDE_REPAIR_ENABLED !== 'true') {
@@ -104,13 +105,13 @@ module.exports = async function integrate({ github, context, core }) {
     // is the final authority; this explicit run check additionally prevents bypassing failed/pending CI.
     const matching = runs.filter(run => run.head_sha === pr.head.sha && run.head_repository?.full_name === pr.base.repo.full_name)
       .sort((a, b) => b.id - a.id || (b.run_attempt || 1) - (a.run_attempt || 1));
-    if (!matching.length) { await dispatchCi(pr); return; }
+    if (!matching.length) { if (await dispatchCi(pr)) return; continue; }
     const latest = matching[0];
     if (latest.status !== 'completed') continue;
     if (latest.conclusion !== 'success') {
       if (['failure', 'timed_out'].includes(latest.conclusion)) {
         if (await repair(pr, 'CI failed.')) return;
-      } else { await dispatchCi(pr); return; }
+      } else if (await dispatchCi(pr)) return;
       continue;
     }
     try {
