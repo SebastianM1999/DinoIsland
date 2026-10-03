@@ -5,7 +5,7 @@ on:
     types: [labeled]
     branches: [main]
   workflow_run:
-    workflows: [CI, Integration repair, Integration rebase]
+    workflows: [CI]
     types: [completed]
   workflow_dispatch:
 

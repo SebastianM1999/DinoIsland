@@ -46,7 +46,7 @@ jobs:
       - name: Run automated tests
         run: npm test
       - name: Test integration safety rules
-        run: node --test .github/scripts/integration.test.cjs .github/scripts/rebase.test.cjs
+        run: node --test .github/scripts/integration.test.cjs .github/scripts/rebase.test.cjs .github/scripts/await-task-ci.test.cjs
       - name: Record tested merge candidate
         run: git rev-parse HEAD > tested-commit.txt
       - uses: actions/upload-artifact@v4

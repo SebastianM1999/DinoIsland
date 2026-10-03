@@ -26,6 +26,8 @@ jobs:
     if: vars.AUTOMERGE_ENABLED == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 25
+    outputs:
+      published_head: ${{ steps.publish.outputs.published_head }}
     env:
       ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
       GIT_EDITOR: 'true'
@@ -116,13 +118,14 @@ jobs:
           git diff --cached --check
           npm ci
           npm test
-          node --test .github/scripts/integration.test.cjs .github/scripts/rebase.test.cjs
+          node --test .github/scripts/integration.test.cjs .github/scripts/rebase.test.cjs .github/scripts/await-task-ci.test.cjs
           git add -A
           git diff --cached --check
           if ! git diff --cached --quiet; then
             git commit -m 'Repair failing checks after rebasing onto main'
           fi
       - name: Publish only the reserved task branch
+        id: publish
         env:
           TASK_BRANCH: ${{ steps.validate.outputs.branch }}
           TASK_SHA: ${{ steps.validate.outputs.sha }}
@@ -133,6 +136,7 @@ jobs:
           test "$(git rev-parse FETCH_HEAD)" = "$TASK_SHA"
           git diff --exit-code origin/main HEAD -- .github .claude AGENTS.md CLAUDE.md .mcp.json
           git push --force-with-lease="refs/heads/$TASK_BRANCH:$TASK_SHA" origin "HEAD:refs/heads/$TASK_BRANCH"
+          echo "published_head=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
       - name: Request independent candidate validation
         uses: actions/github-script@v8
         with:
@@ -151,3 +155,26 @@ jobs:
             try {
               await github.rest.issues.removeLabel({ ...context.repo, issue_number: number, name: 'integration-repairing' });
             } catch (error) { if (error.status !== 404) throw error; }
+  await-ci:
+    needs: repair
+    if: needs.repair.result == 'success' && needs.repair.outputs.published_head != '' && vars.AUTOMERGE_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      pull-requests: read
+      issues: write
+      actions: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: main
+          persist-credentials: false
+      - uses: actions/github-script@v8
+        env:
+          TASK_PR: ${{ inputs.pr_number }}
+          TASK_HEAD: ${{ needs.repair.outputs.published_head }}
+        with:
+          script: |
+            const awaitCi = require('./.github/scripts/await-task-ci.cjs');
+            await awaitCi({ github, context, core, prNumber: process.env.TASK_PR, expectedHead: process.env.TASK_HEAD });
