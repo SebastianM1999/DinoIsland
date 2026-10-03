@@ -42,7 +42,7 @@ paint_t(bpy.data.objects['PcClaws'], lambda p, t: mix(PCP['nail2'], PCP['nail'],
 paint(bpy.data.objects['PcTongue'], lambda p, n: mix(PCP['tongue'], PCP['mouth'], smooth(.6, -.2, n.z)))
 exec(bpy.data.texts['eyes'].as_string(), globals())
 paint_eyes('Pc', PC_E, dict(iris=lin('#e8a030'), iris2=lin('#9a5012'), glow=lin('#ffd870'), limbal=lin('#2a1608'),
-                            pupil=PCP['pupil'], sclera=lin('#d6c2a0'), lid=PCP['back2'], lid2=PCP['mask']), gloss, skinm)
+                            pupil=PCP['pupil'], sclera=lin('#d6c2a0'), lid=PCP['back'], lid2=PCP['back2']), gloss, skinm)   # lids in skin colour
 for o in bpy.data.objects:
     if o.type == 'MESH' and o.name.startswith('Pc') and o.name not in ('PcEyes', 'PcLids', 'PcGlints', 'PcPupils'):
         o.data.materials.clear(); o.data.materials.append(skinm)

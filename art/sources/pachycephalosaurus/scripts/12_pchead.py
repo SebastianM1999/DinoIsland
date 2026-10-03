@@ -42,7 +42,8 @@ add_tongue('PcTongue', pch(0, -1.62, 1.44), (.045, .11, .012), seg=(14, 8))
 exec(bpy.data.texts['eyes'].as_string(), globals())
 dg = bpy.context.evaluated_depsgraph_get(); eh = head.evaluated_get(dg)
 hit = eh.ray_cast(V((1.0, PC_EYE0.y, PC_EYE0.z)), V((-1, 0, 0)))
-PC_EYE = V((hit[1].x - .017, PC_EYE0.y, PC_EYE0.z)) if hit[0] else PC_EYE0
-PC_E = dict(c=tuple(PC_EYE), R=.048, yaw=.25, W=.88, Ht=.46, Hb=.54, tilt=.2, rim=(.22, .06), pupil=(.27, .3), iris=.74,
+PC_EYE = V((hit[1].x - .02, PC_EYE0.y, PC_EYE0.z)) if hit[0] else PC_EYE0
+# smaller, deeper-set eye with a thin rim and a slight focused slant (the big round bulging eye read as "stupid")
+PC_E = dict(c=tuple(PC_EYE), R=.038, yaw=.3, W=.9, Ht=.4, Hb=.5, tilt=.28, rim=(.14, .05), pupil=(.2, .28), iris=.78,
             ball=(24, 16), rimseg=(40, 6))
 build_eyes('Pc', PC_E)
