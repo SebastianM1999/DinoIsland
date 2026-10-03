@@ -29,3 +29,14 @@ Every main directory has a `package-info.md` with its responsibility, files, ent
 - `test/package-info.md`: test layout and conventions
 
 Not documented by a package-info: `art/` (Blender sources, see the `dino-blender-creator` skill), `assets/` (runtime models/audio), `scripts/` (offline asset tooling), `docs/` (design notes), `dist/` and `output/` (build output).
+
+## Parallel agents and integration
+
+- Each independent task owns one short-lived `codex/<developer>/<task>` branch and one worktree, based on fresh `origin/main`. Claude may use the same prefix. Never have two agents edit the same worktree or task branch concurrently.
+- Keep commits focused. Run `npm test` and `git diff --check` before submission. Describe intended behavior and validation in the PR so the integration agent can preserve intent.
+- Never push unless the user explicitly authorizes it. Once authorized for a task, push its task branch, create a PR targeting `main`, attach it to the chat, and label it `ready-to-merge` when complete. Do not push directly to `main` or independently merge task PRs.
+- The shared integration controller updates, validates, and squash-merges eligible PRs. Required CI runs against current `main`; a branch-only pass is insufficient.
+- Coordinate ownership of sections in `src/sim/world.js`, `src/client/core/game.js`, and `src/client/ui/hud.js`. Prefer independent modules with small integration edits. One writer per binary asset (Blender/GLB/audio).
+- Automation/configuration changes under `.github/`, `.claude/`, `AGENTS.md`, `CLAUDE.md`, or `.mcp.json` require explicit manual integration and are excluded from unattended merging.
+- When integration is blocked, preserve the branch and explain the ambiguity. Do not choose all of `ours`/`theirs`, discard another task, weaken checks, or force-push shared history.
+- See `.github/package-info.md` and `docs/agent-workflow.md` for operation and setup.
