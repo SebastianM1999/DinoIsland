@@ -44,13 +44,23 @@ module.exports = async function integrate({ github, context, core }) {
     await api.issues.createComment({ ...repo, issue_number: pr.number, body: `Automatic integration paused: ${reason}` });
   };
   const dispatchCi = async pr => {
-    const marker = `<!-- integration-ci:${pr.head.sha} -->`;
+    const candidate = pr.merge_commit_sha;
+    if (!/^[a-f0-9]{40}$/i.test(candidate || '')) return false;
+    const candidateBranch = `integration/ci-pr-${pr.number}-${candidate.slice(0, 16)}`;
+    const marker = `<!-- integration-ci:${candidate} -->`;
     const comments = await github.paginate(api.issues.listComments, { ...repo, issue_number: pr.number, per_page: 100 });
     // Allow recovery if dispatch failed or GitHub never created a run. Never trust a user-written marker.
     if (comments.some(c => c.user?.login === 'github-actions[bot]' && c.body?.includes(marker)
       && Date.now() - Date.parse(c.created_at) < 10 * 60 * 1000)) return false;
-    await api.actions.createWorkflowDispatch({ ...repo, workflow_id: 'ci.yml', ref: pr.head.ref });
-    await api.issues.createComment({ ...repo, issue_number: pr.number, body: `${marker}\nRequested CI for ${pr.head.sha}.` });
+    try {
+      await api.git.createRef({ ...repo, ref: `refs/heads/${candidateBranch}`, sha: candidate });
+    } catch (error) {
+      if (error.status !== 422) throw error;
+      const existing = (await api.git.getRef({ ...repo, ref: `heads/${candidateBranch}` })).data;
+      if (existing.object.sha !== candidate) throw new Error('Integration candidate branch points to an unexpected commit.');
+    }
+    await api.actions.createWorkflowDispatch({ ...repo, workflow_id: 'ci.yml', ref: candidateBranch });
+    await api.issues.createComment({ ...repo, issue_number: pr.number, body: `${marker}\nRequested CI for merge candidate ${candidate}.` });
     return true;
   };
   const repair = async (pr, reason) => {
@@ -114,17 +124,17 @@ module.exports = async function integrate({ github, context, core }) {
         if ([409, 422].includes(error.status)) { core.info(`PR ${pr.number}: branch update deferred.`); return; }
         throw error;
       }
-      const updated = (await api.pulls.get({ ...repo, pull_number: pr.number })).data;
-      await dispatchCi(updated);
+      // Wait for GitHub to recalculate mergeability and its synthetic commit after updating.
       return;
     }
-    const runs = await github.paginate(api.actions.listWorkflowRuns, { ...repo, workflow_id: 'ci.yml', head_sha: pr.head.sha, per_page: 100 });
-    // A pull_request run's head_sha can differ from its checkout merge commit. Strict branch protection
-    // is the final authority; this explicit run check additionally prevents bypassing failed/pending CI.
+    const candidate = pr.merge_commit_sha;
+    if (!/^[a-f0-9]{40}$/i.test(candidate || '')) continue;
+    const runs = await github.paginate(api.actions.listWorkflowRuns, { ...repo, workflow_id: 'ci.yml', head_sha: candidate, per_page: 100 });
+    // Strict checks must pass on the synthetic merge candidate. Task-head success never substitutes.
     // A bot-triggered PR run can require approval without creating any CI jobs. It must not
     // supersede the independent workflow_dispatch CI we explicitly requested for this revision.
     // Actual test failures, cancellations and pending runs remain authoritative.
-    const matching = runs.filter(run => run.head_sha === pr.head.sha && run.head_repository?.full_name === pr.base.repo.full_name
+    const matching = runs.filter(run => run.head_sha === candidate && run.head_repository?.full_name === pr.base.repo.full_name
       && !(run.event === 'pull_request' && run.conclusion === 'action_required'))
       .sort((a, b) => b.id - a.id || (b.run_attempt || 1) - (a.run_attempt || 1));
     if (!matching.length) { if (await dispatchCi(pr)) return; continue; }
@@ -139,6 +149,13 @@ module.exports = async function integrate({ github, context, core }) {
     try {
       const result = await api.pulls.merge({ ...repo, pull_number: pr.number, sha: pr.head.sha, merge_method: 'squash' });
       if (!result.data.merged) core.info(`PR ${pr.number}: GitHub declined the merge.`);
+      else {
+        const candidateBranch = `integration/ci-pr-${pr.number}-${candidate.slice(0, 16)}`;
+        try {
+          const existing = (await api.git.getRef({ ...repo, ref: `heads/${candidateBranch}` })).data;
+          if (existing.object.sha === candidate) await api.git.deleteRef({ ...repo, ref: `heads/${candidateBranch}` });
+        } catch (error) { core.info(`PR ${pr.number}: candidate branch cleanup deferred (${error.status || 'request error'}).`); }
+      }
     } catch (error) {
       if (![405, 409, 422].includes(error.status)) throw error;
       core.info(`PR ${pr.number}: merge deferred because its head, checks, or protected base changed.`);

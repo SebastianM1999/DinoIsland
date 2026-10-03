@@ -63,7 +63,11 @@ order; blocked tasks do not prevent later independent tasks from progressing.
 The controller requires a collaborator with write access as PR author. It refuses
 automation/configuration edits and validates branch protection before making changes.
 It brings the task branch up to date, explicitly requests CI (workflow-token pushes
-do not trigger ordinary workflows), and merges only a passing current revision.
+may leave PR workflows awaiting approval), and merges only a passing current
+combined merge commit. CI runs on a temporary `integration/ci-pr-*` branch pointing
+at GitHub's PR merge commit so the required check attaches to the exact candidate
+GitHub will merge. Testing only the task head is insufficient. Candidate branches
+are removed after their task merges; task branches are preserved.
 The merge API guards the expected task SHA; strict branch protection guards against
 main advancing between validation and merge.
 
