@@ -47,3 +47,10 @@ jobs:
         run: npm test
       - name: Test integration safety rules
         run: node --test .github/scripts/integration.test.cjs
+      - name: Record tested merge candidate
+        run: git rev-parse HEAD > tested-commit.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tested-${{ github.sha }}
+          path: tested-commit.txt
+          retention-days: 1

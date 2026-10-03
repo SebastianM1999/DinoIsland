@@ -2,13 +2,11 @@ name: Integration queue
 
 on:
   pull_request_target:
-    types: [opened, synchronize, reopened, ready_for_review, labeled]
+    types: [labeled]
     branches: [main]
   workflow_run:
     workflows: [CI, Integration repair]
     types: [completed]
-  schedule:
-    - cron: '*/15 * * * *'
   workflow_dispatch:
 
 permissions:
@@ -24,7 +22,10 @@ concurrency:
 
 jobs:
   integrate:
-    if: vars.AUTOMERGE_ENABLED == 'true'
+    if: >-
+      vars.AUTOMERGE_ENABLED == 'true' &&
+      (github.event_name != 'pull_request_target' || github.event.label.name == 'ready-to-merge') &&
+      (github.event_name != 'workflow_run' || github.event.workflow_run.event != 'push')
     runs-on: ubuntu-latest
     timeout-minutes: 5
     env:

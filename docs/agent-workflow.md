@@ -55,7 +55,7 @@ AI subscription limits still apply. There are no paid API fallbacks in this setu
 
 ## How the controller works
 
-PR events, CI/repair completion, manual dispatch, and a 15-minute schedule wake a
+The ready-to-merge label, CI/repair completion, and manual dispatch wake a
 single controller. Ready labels persist the queue; Actions concurrency only prevents
 simultaneous controllers. Eligible same-repository PRs are considered in creation
 order; blocked tasks do not prevent later independent tasks from progressing.
@@ -66,10 +66,10 @@ It brings the task branch up to date, explicitly requests CI (workflow-token pus
 may leave PR workflows awaiting approval). It automatically approves only eligible
 same-repository PR runs from `github-actions[bot]` for the exact task revision,
 then merges only a passing current
-combined merge commit. CI runs on a temporary `integration/ci-pr-*` branch pointing
-at GitHub's PR merge commit so the required check attaches to the exact candidate
-GitHub will merge. Testing only the task head is insufficient. Candidate branches
-are removed after their task merges; task branches are preserved.
+combined merge commit. Normal PR CI records the tested merge SHA after all tests pass;
+the controller requires that exact current candidate before merging. This avoids a
+second test run for the same feature revision. Older runs without this record use a
+temporary candidate branch as a compatibility fallback. Task branches are preserved.
 The merge API guards the expected task SHA; strict branch protection guards against
 main advancing between validation and merge.
 
@@ -92,8 +92,7 @@ button on `main`, or run `gh workflow run integration.yml --ref main`.
 ## Pause and limitations
 
 Set `AUTOMERGE_ENABLED=false` to pause new integrations/repairs. Cancel already
-running jobs too when an immediate stop is required. Disable scheduled controller
-runs if the repository is idle and you want no periodic runner usage.
+running jobs too when an immediate stop is required. There are no scheduled queue runs while the repository is idle.
 
 The existing tests cover headless behavior, not browser rendering or real Steam.
 Browser gameplay smoke tests remain a separate follow-up. Passing checks cannot
