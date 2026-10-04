@@ -10,15 +10,17 @@ import { dinoBodyCircles } from '../shared/dinoContact.js';
 import { angleDiff, clamp } from '../shared/rng.js';
 import { insideGrove } from '../shared/grove.js';
 import { insideBossArena } from '../shared/bossArena.js';
+import { insideSwampArena } from '../shared/swampArena.js';
 import { brachioBrain } from './ai/brachio.js';
 import { stegoBrain } from './ai/stego.js';
 import { raptorBrain } from './ai/raptor.js';
 import { pteraBrain } from './ai/ptera.js';
 import { trexBrain } from './ai/trex.js';
+import { sarcosuchusBrain } from './ai/sarcosuchus.js';
 import { raiderStep } from './raids.js';
 import { findPath } from './pathfind.js';
 
-const BRAINS = { brachio: brachioBrain, stego: stegoBrain, raptor: raptorBrain, ptera: pteraBrain, trex: trexBrain };
+const BRAINS = { brachio: brachioBrain, stego: stegoBrain, raptor: raptorBrain, ptera: pteraBrain, trex: trexBrain, 'alpha-sarcosuchus': sarcosuchusBrain };
 const r2 = (v) => Math.round(v * 100) / 100;
 const r3 = (v) => Math.round(v * 1000) / 1000;
 const TRACK_SPACING = { brachio: 1.3, stego: 1, raptor: 2.2, trex: 1.5 };
@@ -184,10 +186,12 @@ export class DinoSystem {
       // everyone else stays off the boss arena's islet (the titan's home)
       return false;
     }
-    if (t.waterDepthAt(x, z) > (d.type === 'brachio' ? 1.2 : 0.35)) return false;
+    const sarco = d.type === 'alpha-sarcosuchus';
+    if (t.waterDepthAt(x, z) > (sarco ? 6 : d.type === 'brachio' ? 1.2 : 0.35)) return false;
+    if (sarco && t.seaDepthAt(x, z) > CONFIG.player.maxWadeDepth) return false;
     // the heightfield is continuous, so there is no wall too steep to run down (move() slows the
     // descent to an along-the-surface speed); one shut in a pit below scrambles out (#detour)
-    if (!downhill && t.slopeAt(x, z) > climbSlope(d) && !(d.scrambleUntil > this.world.now)) return false;
+    if (!downhill && t.slopeAt(x, z) > climbSlope(d) && !(d.scrambleUntil > this.world.now) && !(sarco && t.waterDepthAt(x, z) > 0.5)) return false;
     if (t.lavaLevelAt(x, z) !== null) return false;
     // the volcano: no dinosaur sets foot on a crust plate (hot ground it only avoids: sim/pathfind.js)
     if (t.heatMask && t.crustAt(x, z)) return false;
@@ -260,7 +264,7 @@ export class DinoSystem {
   }
 
   /** Move forward along the current yaw at (smoothly approached) speed `want`. */
-  move(d, want, dt, accel = 4) {
+  move(d, want, dt, accel = 4, lockedHeading = false) {
     d.spd += clamp(want - d.spd, -accel * 2 * dt, accel * dt);
     if (d.spd < 0.01) { d.spd = 0; return; }
     // wading through a bog (swamp) slows walkers like players (fliers never touch it)
@@ -279,9 +283,10 @@ export class DinoSystem {
         !this.bodyBlocked(d, px, pz, yaw);
     };
     if (!open(d.x + fx * look, d.z + fz * look, d.yaw)) {
+      if (lockedHeading) { d.spd *= 0.5; this.#progress(d, 0, want, dt); return; }
       // probe left/right for a way around. Turn away faster than steer() turns back to the goal,
       // or a nimble raptor just twitches at the edge of a wall it can't climb
-      const avoid = Math.max(3, CONFIG.dinos[d.type].turnRate * 2) * dt;
+      const avoid = (d.type === 'alpha-sarcosuchus' ? CONFIG.dinos[d.type].turnRate : Math.max(3, CONFIG.dinos[d.type].turnRate * 2)) * dt;
       let found = false;
       for (const a of [0.5, -0.5, 1.0, -1.0, 1.6, -1.6, 2.4, -2.4]) {
         const yy = d.yaw + a * (d.avoidSide || 1);
@@ -299,7 +304,7 @@ export class DinoSystem {
     // judge a full stride, not the ground under its feet: standing on a spot just over the climb
     // limit must not pin it (any tiny step there reads as "steep, uphill")
     const stride = Math.max(step, 0.6);
-    if (!this.walkable(d.x + fx * stride, d.z + fz * stride, d, down(d.x + fx * look, d.z + fz * look)) || this.#pastLeash(d, nx, nz)) { d.spd *= 0.5; d.yaw += 1.5 * dt * (d.avoidSide || 1); this.#progress(d, 0, want, dt); return; }
+    if (!this.walkable(d.x + fx * stride, d.z + fz * stride, d, down(d.x + fx * look, d.z + fz * look)) || this.#pastLeash(d, nx, nz)) { d.spd *= 0.5; if (!lockedHeading) d.yaw += 1.5 * dt * (d.avoidSide || 1); this.#progress(d, 0, want, dt); return; }
     // on a steep wall the speed runs along the surface: a raptor slides down a cliff instead of
     // dropping 40 m/s (and the client's interpolation can follow)
     const drop = Math.abs(h0 - this.terrain.heightAt(nx, nz));
@@ -468,6 +473,16 @@ export class DinoSystem {
   /** Stand still (decelerate). */
   halt(d, dt) { this.move(d, 0, dt); }
 
+  /** A short lateral step with the same body collision and arena leash as forward movement. */
+  strafe(d, dx, dz, speed, dt) {
+    const length = Math.hypot(dx, dz) || 1, step = speed * dt;
+    let nx = d.x + dx / length * step, nz = d.z + dz / length * step;
+    if (!this.walkable(nx, nz, d) || this.#pastLeash(d, nx, nz) || this.bodyBlocked(d, nx, nz, d.yaw)) { d.spd = 0; return; }
+    if (this.resolveBody(d, nx, nz, d.yaw)) { nx = push.x; nz = push.z; }
+    const moved = Math.hypot(nx - d.x, nz - d.z);
+    d.x = nx; d.z = nz; d.trackDist += moved; d.spd = moved / dt;
+  }
+
   /** Animation cue for an attack (bite lunge, tail swing wind-up ...). */
   cue(d, target = null) {
     this.world.event(EV.ATTACK, { id: d.id, target });
@@ -544,11 +559,12 @@ export class DinoSystem {
     if (!d.alive) return;
     // a raider (sim/raids.js) turns on whoever attacks it
     if (d.raid && this.world.players.has(byId)) d.raid.foe = byId;
-    // The grove's titan can only be hurt by someone standing inside the grove:
-    // shots, throws and stabs from outside stop at the barrier.
+    // Arena bosses can only be hurt from inside their own arena:
+    // shots, throws and stabs from outside stop at the boundary.
     if (d.leash) {
       const p = this.world.players.get(byId);
-      if (!p || !insideGrove(this.world.layout, p.x, p.z)) return;
+      const inside = d.leash.kind === 'swamp' ? insideSwampArena : insideGrove;
+      if (!p || !inside(this.world.layout, p.x, p.z)) return;
     }
     const Z = CONFIG.hitZones;
     const base = Z[zone] ?? 1;
@@ -586,7 +602,7 @@ export class DinoSystem {
     this.world.mission.onDinoKilled(d);
     this.world.awardXp(XP_BY_TYPE[d.type] ?? 0, c.name);   // every player, raid dinos included
     if (killer) this.world.onPlayerKill(killer);
-    if (!d.raid) this.respawnQueue.push({ type: d.type, at: this.world.now + c.respawn, group: d.group });
+    if (!d.raid && !d.boss) this.respawnQueue.push({ type: d.type, at: this.world.now + c.respawn, group: d.group });
   }
 
   dropCarcassLoot(d) {
@@ -652,7 +668,7 @@ export class DinoSystem {
         }
       }
 
-      if (d.type !== 'ptera' || d.grounded) d.y = this.terrain.heightAt(d.x, d.z);
+      if (d.type !== 'ptera' || d.grounded) d.y = this.terrain.heightAt(d.x, d.z) + (d.alive ? d.swimOffset ?? 0 : 0);
 
       // footprints
       const sp = TRACK_SPACING[d.type];
