@@ -27,13 +27,34 @@
   <script type="module">
     import * as THREE from 'three';
     import { SPECIES } from '../../entities/dinoViews.js';
-    import { preloadDinoModels } from './glbDino.js';
+    import { preloadDinoModels, registerDinoGLTF, buildGLBDino } from './glbDino.js';
+    import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+    import { SARCO_TYPE, SARCO_MODEL } from './sarcoModel.js';
+
+    const previewSpecies = { ...SPECIES, [SARCO_TYPE]: {
+      build: () => buildGLBDino(SARCO_TYPE), anim: { walkSpeed: 2, runSpeed: 8 },
+      createAnimator: rig => rig.createAnimator(),
+    } };
+    let sarcoLoad;
+    async function loadReviewModel(nextType) {
+      if (nextType !== SARCO_TYPE) return;
+      if (!sarcoLoad) sarcoLoad = (async () => {
+        const gltf = await new GLTFLoader().loadAsync(SARCO_MODEL.url);
+        registerDinoGLTF(SARCO_TYPE, gltf, SARCO_MODEL);
+      })().catch(error => { sarcoLoad = null; throw error; });
+      await sarcoLoad;
+    }
 
     const qs = new URLSearchParams(location.search);
-    let type = SPECIES[qs.get('type')] ? qs.get('type') : 'brachio';
+    let type = previewSpecies[qs.get('type')] ? qs.get('type') : 'brachio';
     document.getElementById('info').textContent = 'Loading dinosaur models…';
     await preloadDinoModels();
-    let species = SPECIES[type];
+    try { await loadReviewModel(type); }
+    catch (error) {
+      document.getElementById('info').textContent = `Alpha Sarcosuchus could not load: ${error.message}`;
+      throw error;
+    }
+    let species = previewSpecies[type];
     let build = species.build;
     let ANIM = species.anim;
     let extra = species.extraUpdate;
@@ -98,8 +119,8 @@
     speciesRow.setAttribute('role', 'group');
     speciesRow.setAttribute('aria-label', 'Dinosaur species');
     const speciesButtons = {};
-    const speciesNames = { brachio: 'Brachio', stego: 'Stego', raptor: 'Raptor', ptera: 'Ptera', trex: 'T-Rex' };
-    for (const name of Object.keys(SPECIES)) {
+    const speciesNames = { brachio: 'Brachio', stego: 'Stego', raptor: 'Raptor', ptera: 'Ptera', trex: 'T-Rex', [SARCO_TYPE]: 'Alpha Sarcosuchus' };
+    for (const name of Object.keys(previewSpecies)) {
       const button = document.createElement('button');
       button.textContent = speciesNames[name];
       button.setAttribute('aria-pressed', name === type);
@@ -151,14 +172,19 @@
       qs.set('type', type); qs.set('state', state); qs.set('view', view); qs.set('orbit', orbit ? '1' : '0');
       history.replaceState(null, '', `${location.pathname}?${qs}`);
     }
-    function switchSpecies(nextType) {
+    async function switchSpecies(nextType) {
       if (nextType === type) return;
+      try { await loadReviewModel(nextType); }
+      catch (error) {
+        document.getElementById('info').textContent = `Alpha Sarcosuchus could not load: ${error.message}`;
+        return;
+      }
       for (const old of [{ rig, anim }, ...copies]) {
         scene.remove(old.rig.root);
         old.anim.dispose?.(); old.rig.dispose?.();
       }
       copies.length = 0;
-      type = nextType; species = SPECIES[type];
+      type = nextType; species = previewSpecies[type];
       build = species.build; ANIM = species.anim; extra = species.extraUpdate;
       rig = build(); anim = species.createAnimator(rig);
       scene.add(rig.root); addCopies();
