@@ -68,6 +68,20 @@ test('Sarcosuchus boss asset has dark hide, distinct glowing eyes and fourteen c
     }
   }
   const mixer = new THREE.AnimationMixer(rig.model), p = new THREE.Vector3();
+  // Loading actual baked bones catches the old all-feet-sliding lunge. Both
+  // front contacts must hold through anticipation, then land at different times.
+  const attack = mixer.clipAction(rig.clips.attack).setLoop(THREE.LoopOnce, 1);
+  attack.clampWhenFinished = true; attack.play();
+  const front = rig.legChains.filter(l => l.foot.name.startsWith('Front'));
+  mixer.setTime(0); rig.root.updateMatrixWorld(true);
+  const planted = front.map(l => l.foot.getWorldPosition(new THREE.Vector3()));
+  mixer.setTime(rig.clips.attack.duration * .38); rig.root.updateMatrixWorld(true);
+  front.forEach((l, i) => assert.ok(l.foot.getWorldPosition(new THREE.Vector3()).distanceTo(planted[i]) < .005,
+    'front pad braces rather than sliding with the winding-up trunk'));
+  mixer.setTime(rig.clips.attack.duration * .53); rig.root.updateMatrixWorld(true);
+  const contactHeights = front.map(l => l.foot.getWorldPosition(new THREE.Vector3()).y);
+  assert.ok(Math.abs(contactHeights[0] - contactHeights[1]) > .07, 'front swing arcs are staggered');
+  mixer.stopAllAction();
   for (const [state, clip] of Object.entries(rig.clips)) {
     const action = mixer.clipAction(clip).setLoop(THREE.LoopOnce, 1); action.clampWhenFinished = true; action.play();
     for (let f = 0; f <= 20; f++) {

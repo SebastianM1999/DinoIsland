@@ -7,7 +7,8 @@ dense plate scales and irregular bloody scars rather than pale armor, dots or tu
 The model is the unique boss in Drowned Hollow, the middle arena on the second
 island (Misty Swamp). The authoritative simulation owns spawning, attack damage,
 ambushes and the low-health phase. The client plays the matching clips, sound
-warnings, water ripples and disturbed mud. The fitted length is 18 m.
+warnings, water ripples and disturbed mud. The fitted length is 16.2 m: the owner's
+follow-up reduces length and height by 10% while retaining the original width.
 
 ## Source and rebuild
 
@@ -24,6 +25,9 @@ addon running. Rebuild verified from an empty scene.
   claws and one red / one yellow glowing slit eye.
   Irregular scar masks stain the actual skin and plates and slightly recess the skin;
   there are no separate scar sticks or tubes.
+  The refined skin combines irregular scale cells, dark seams, mottled olive
+  centers, ventral shield bands, joint folds and weathered, ribbed plate crowns.
+  Raptor hide variation and stego plate painting informed the contrast and density.
 - `arig`: Body/Shoulders, Neck1/2, Head, flipped Jaw, Tail1..8 and four IK legs.
   Plates over the limbs are separated from the body armor into the leg scale mesh.
   Plate weights are interpolated from the underlying skin, including shoulder/hip
@@ -32,29 +36,40 @@ addon running. Rebuild verified from an empty scene.
   TailSweep 1.6 s, Swim 1.6 s, Bite 0.767 s, Shove 0.867 s, Pivot 1 s,
   Retreat 1.2 s, Ambush 1.6 s and Recovery 1.467 s. Attack includes head lift for
   runtime jaw clearance. Dedicated attack clips have wind-up, strike and settle.
+  Refined attacks brace the front pads, compress the hips, snap the jaws with a
+  short rebound, then take staggered contact steps. TailSweep plants the front
+  legs while the hind legs widen their brace; Ambush paddles into two front-foot
+  bank contacts and a separate hind drive. Pivot and Recovery transfer weight
+  through individual swing arcs rather than sliding all four feet together.
 - `aexport`: deform-only rig, joined skinned model, four vertex-color materials,
   30 fps sampled animation. Source and export collections are separate.
 
 ## Measurements and validation
 
 - 58,575 triangles, below the 60,000 limit; no image textures.
-- Game fit: 18 m long, 3.812 m high, about 4.4 m wide.
-- Measured walk/run strides: 1.866 / 3.775 m per cycle; maximum cadence 2.3 Hz.
+- Game fit: 16.2 m long, 3.4308 m high, about 4.428 m wide.
+- Original walk/run strides: 1.866 / 3.775 m per cycle; fitted strides are 90%
+  of those values (1.679 / 3.398 m). Maximum cadence is 2.55 Hz to preserve speed.
 - IK rest knee error: 0; normalized deform weights, no unweighted vertices.
 - 3,588 exported vertices carry majority Jaw weight.
-- Knee changes at maximum cadence: walk 0.166 / run 0.184 rad per 1/60 s.
-- Rest-pose client hit-sphere coverage: 98.6% at 0.12 m margin.
+- Knee changes at maximum cadence: walk 0.184 / run 0.204 rad per 1/60 s.
+- Rest-pose client hit-sphere coverage: 99.6% at 0.12 m margin.
 - 94 leg-area plates transferred out of body armor; walk/run limb close-ups are
   saved as `review/walk-legs.png` and `review/run-legs.png`.
 - Fourteen clip contact sheets and facial reviews are in `review/`.
 - Tail sweep damage geometry was measured from the animated tail skin: hip pivot
-  1.744 m behind the root, strike 0.667–1.267 s, approximately 144 degrees across
-  the rear and sides. Reach varies from 6.395–8.08 m while the tail folds and extends.
+  1.5696 m behind the root, strike 0.667–1.267 s, approximately 148 degrees across
+  the rear and sides. Reach varies from 6.365–7.523 m while the tail folds and extends.
+  The 1,792 sampled tail skin vertices use unchanged lateral scale and 90%
+  longitudinal scale; damage envelopes are measured after fitting, not uniformly shrunk.
+- The torso stays level on banks; bounded two-bone leg corrections follow the terrain.
+  Water support is resolved after movement in absolute world height, with a smooth
+  committed emergence rather than adding an old swimming offset to a new bank height.
 
 From the repository root:
 
 ```powershell
-node art/sources/alpha-sarcosuchus/scripts/90_validate.mjs assets/models/dinos/alpha-sarcosuchus.glb alpha-sarcosuchus --length 18
+node art/sources/alpha-sarcosuchus/scripts/90_validate.mjs assets/models/dinos/alpha-sarcosuchus.glb alpha-sarcosuchus --length 16.2
 node art/sources/alpha-sarcosuchus/scripts/91_coverage.mjs
 node --test test/sarco-model.test.js
 npm test
