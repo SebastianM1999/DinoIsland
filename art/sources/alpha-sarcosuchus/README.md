@@ -23,6 +23,9 @@ addon running. Rebuild verified from an empty scene.
   Irregular scar masks stain the actual skin and plates and slightly recess the skin;
   there are no separate scar sticks or tubes.
 - `arig`: Body/Shoulders, Neck1/2, Head, flipped Jaw, Tail1..8 and four IK legs.
+  Plates over the limbs are separated from the body armor into the leg scale mesh.
+  Plate weights are interpolated from the underlying skin, including shoulder/hip
+  transitions, so scales follow the leg surface during walk and run.
 - `aanim`: Idle 5 s, Walk 1.6 s, Run 1 s, Attack 1.2 s, Roar 2 s, Death 2.2 s,
   TailSweep 1.6 s and Swim 1.6 s. Attack includes head lift for runtime jaw clearance.
 - `aexport`: deform-only rig, joined skinned model, three vertex-color materials,
@@ -36,7 +39,9 @@ addon running. Rebuild verified from an empty scene.
 - IK rest knee error: 0; normalized deform weights, no unweighted vertices.
 - 3,588 exported vertices carry majority Jaw weight.
 - Knee changes at maximum cadence: walk 0.166 / run 0.184 rad per 1/60 s.
-- Rest-pose client hit-sphere coverage: 98.7% at 0.12 m margin.
+- Rest-pose client hit-sphere coverage: 98.6% at 0.12 m margin.
+- 94 leg-area plates transferred out of body armor; walk/run limb close-ups are
+  saved as `review/walk-legs.png` and `review/run-legs.png`.
 - Eight clip contact sheets and facial reviews are in `review/`.
 
 From the repository root:
