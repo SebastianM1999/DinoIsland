@@ -98,6 +98,25 @@ export const ICONS = {
     <path d="M10 18c2-1 4-1 6 0M16 23c2-1 4-1 6 0M13 14c1.5-.8 3-.8 4.5 0" stroke="#b7a9ff" stroke-width="1.5" stroke-linecap="round" fill="none"/>
     <circle cx="11" cy="14.5" r="1.4" fill="#fff" opacity=".8"/>`),
 
+  marshberry: svg(`<path d="M16 10c-.6-3 .4-5.5 3-7" stroke="#7a2e2a" stroke-width="1.8" stroke-linecap="round" fill="none"/>
+    <path d="M18 6.5c2.5-3 6-3.2 8-1.4-2.6 2.2-5.4 2.6-8 1.4z" fill="#6f8a46" stroke="${OUT}" stroke-width=".8"/>
+    <circle cx="11" cy="18" r="5" fill="#8c1f3a" stroke="${OUT}" stroke-width="1"/>
+    <circle cx="21" cy="18" r="5" fill="#a42a46" stroke="${OUT}" stroke-width="1"/>
+    <circle cx="16" cy="25" r="5" fill="#8c1f3a" stroke="${OUT}" stroke-width="1"/>
+    <circle cx="16" cy="13" r="4" fill="#a42a46" stroke="${OUT}" stroke-width="1"/>
+    <circle cx="9.6" cy="16.4" r="1.3" fill="#e08ca0"/><circle cx="19.6" cy="16.4" r="1.3" fill="#e08ca0"/><circle cx="14.6" cy="23.4" r="1.3" fill="#e08ca0"/>`),
+
+  swampfig: svg(`<path d="M16 8c0-2.5.6-4.2 2.2-5.4" stroke="#5a4a30" stroke-width="1.8" stroke-linecap="round" fill="none"/>
+    <path d="M16 7.5c-2 2.5-4 5-6 8-3 4.5-1.5 13.5 6 13.5s9-9 6-13.5c-2-3-4-5.5-6-8z" fill="#6b3a6e" stroke="${OUT}" stroke-width="1"/>
+    <path d="M12 15c-1.5 2.5-1.8 6-.6 8.5" stroke="#9a6a96" stroke-width="1.6" stroke-linecap="round" fill="none"/>
+    <ellipse cx="16" cy="27.4" rx="2" ry="1" fill="#d8c0a0"/>`),
+
+  glowlotus: svg(`<path d="M16 30V18" stroke="#4f8a46" stroke-width="2" stroke-linecap="round"/>
+    <path d="M16 18c-6 0-10-3-11-7 4 0 8 2 11 7zM16 18c6 0 10-3 11-7-4 0-8 2-11 7z" fill="#e8c0d8" stroke="${OUT}" stroke-width=".8"/>
+    <path d="M9 12h14l-2.5 6h-9z" fill="#5f9a58" stroke="${OUT}" stroke-width="1" stroke-linejoin="round"/>
+    <circle cx="12.5" cy="12" r="1.6" fill="#7ffff0"/><circle cx="16" cy="11.4" r="1.6" fill="#7ffff0"/><circle cx="19.5" cy="12" r="1.6" fill="#7ffff0"/>
+    <circle cx="16" cy="12" r="7" fill="#7ffff0" opacity=".18"/>`),
+
   fruit: svg(`<path d="M16 9c0-3 1-5 3-6" stroke="#6b3f1e" stroke-width="1.8" stroke-linecap="round" fill="none"/>
     <path d="M17 6c3-3 7-3 9-1-3 2.5-6.5 2.8-9 1z" fill="#6fbf45" stroke="${OUT}" stroke-width=".8"/>
     <path d="M16 10c-3-2-11-2-11 7 0 7 5 12 8 12 1.3 0 2-.6 3-.6s1.7.6 3 .6c3 0 8-5 8-12 0-9-8-9-11-7z" fill="#e8323c" stroke="${OUT}" stroke-width="1"/>

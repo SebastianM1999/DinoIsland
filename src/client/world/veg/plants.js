@@ -197,6 +197,50 @@ export function dragonPlantGeometry() {
 }
 
 
+/** Marsh berry shrub (swamp): a low, spreading bog shrub with red stems and small dark leaves, ~0.8 m. */
+export function marshBushGeometry() {
+  return cached('marshbush', () => {
+    const col = { top: '#7d8f4c', mid: '#556b38', mid2: '#4b6033', bottom: '#38492a' };
+    const parts = [place(clump(0.6, { seed: 401, ...col, squash: 0.6 }), [0, 0.45, 0])];
+    for (let k = 0; k < 6; k++) {
+      const a = (k / 6) * TAU + 0.2;
+      parts.push(place(clump(0.42, { seed: 402 + k, ...col, detail: 1, squash: 0.6 }), [Math.cos(a) * 0.62, 0.3 + 0.08 * Math.sin(k * 2.1), Math.sin(a) * 0.62], [0, a, 0]));
+      // red stems arching out over the mud
+      parts.push(tube([V(0, 0.02, 0), V(Math.cos(a) * 0.4, 0.32, Math.sin(a) * 0.4), V(Math.cos(a) * 0.85, 0.2, Math.sin(a) * 0.85)], (t) => 0.025 - 0.01 * t, { radial: 4, color: () => '#7a2e2a', capStart: false }));
+    }
+    return merge(parts);
+  });
+}
+
+/** Local positions of the berry clusters on the marsh shrub. */
+export const MARSH_SPOTS_LOCAL = [
+  [0.62, 0.62, 0.25], [-0.5, 0.6, 0.45], [0.05, 0.55, -0.72], [0.1, 0.92, 0.3],
+];
+
+/** Glow lotus (swamp, rare): a ring of lotus pads on the mud and a tall stalk with a glowing seed pod, ~1.1 m. */
+export const LOTUS_FRUIT_LOCAL = [0, 1.05, 0];
+export function lotusPlantGeometry() {
+  return cached('lotusplant', () => {
+    const parts = [];
+    for (let k = 0; k < 6; k++) {
+      const a = (k / 6) * TAU + (k % 2) * 0.4, r = 0.35 + (k % 2) * 0.18;
+      const pad = paint(new THREE.CircleGeometry(0.3 + (k % 3) * 0.05, 12, 0.3, TAU - 0.45).rotateX(-Math.PI / 2), (c) => (Math.hypot(c.x, c.z) > 0.24 ? '#6f9a4c' : '#3f7a3a'));
+      parts.push(place(pad, [Math.cos(a) * r, 0.04 + (k % 2) * 0.03, Math.sin(a) * r], [0.08, a, 0]));
+    }
+    // the stalk, two pale petals curled round the pod's foot
+    const top = V(LOTUS_FRUIT_LOCAL[0], LOTUS_FRUIT_LOCAL[1] - 0.12, LOTUS_FRUIT_LOCAL[2]);
+    parts.push(tube([V(0, 0, 0), V(0.05, 0.5, 0.03), top], (t) => 0.03 - 0.01 * t, { radial: 5, color: (t) => (t > 0.7 ? '#7fb36a' : '#4f8a46') }));
+    for (let k = 0; k < 5; k++) {
+      const a = (k / 5) * TAU;
+      const dx = Math.cos(a), dz = Math.sin(a);
+      parts.push(leafStrip(arcPath(V(top.x, top.y, top.z), dx, dz, 0.2, 1.1, 1.3, 3), (t) => (t >= 1 ? 0.005 : 0.07 * Math.sin(Math.PI * (0.1 + 0.9 * t))), {
+        side: V(-dz, 0, dx), ridge: 0.4, serrate: 0, color: (t, h) => (t > 0.6 ? '#f4e6f0' : h ? '#e8c0d8' : '#c890b4'),
+      }));
+    }
+    return merge(parts);
+  });
+}
+
 /**
  * Big tropical leaf plant (elephant ear / banana leaf), ~1.5�2.2 m: long
  * stalks carrying large smooth heart-shaped leaves that droop at the tip.

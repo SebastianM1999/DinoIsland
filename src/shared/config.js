@@ -140,10 +140,23 @@ export const CONFIG = {
   fruit: {
     maxCarried: 5,
     eatTime: 1.1,
+    // role: where it grows – 'bush' (common), 'tree' (medium), 'plant' (rare, hidden).
+    // Each island grows its own three (levels.js biome.fruit; jungle fruit by default).
+    // buff: an extra effect for `time` seconds after eating it (see buffs).
     types: {
-      berry:  { name: 'Red Berries',       heal: 15, hot: 0,  hotTime: 0, regrow: 45,  color: '#e8323c' },
-      mango:  { name: 'Sun Mango',         heal: 35, hot: 0,  hotTime: 0, regrow: 90,  color: '#ffab1f' },
-      dragon: { name: 'Blue Dragon Fruit', heal: 70, hot: 20, hotTime: 6, regrow: 180, color: '#6a5cff' },
+      berry:  { name: 'Red Berries',       role: 'bush',  heal: 15, hot: 0,  hotTime: 0, regrow: 45,  color: '#e8323c' },
+      mango:  { name: 'Sun Mango',         role: 'tree',  heal: 35, hot: 0,  hotTime: 0, regrow: 90,  color: '#ffab1f' },
+      dragon: { name: 'Blue Dragon Fruit', role: 'plant', heal: 70, hot: 20, hotTime: 6, regrow: 180, color: '#6a5cff' },
+      // the Misty Swamp
+      marshberry: { name: 'Marsh Berries', role: 'bush',  heal: 10, hot: 0,  hotTime: 0, regrow: 45,  color: '#8c1f3a', buff: 'mudwalker' },
+      swampfig:   { name: 'Swamp Fig',     role: 'tree',  heal: 25, hot: 0,  hotTime: 0, regrow: 90,  color: '#6b3a6e', buff: 'secondwind' },
+      glowlotus:  { name: 'Glow Lotus',    role: 'plant', heal: 40, hot: 30, hotTime: 8, regrow: 180, color: '#5ff0d8', buff: 'lotusskin' },
+    },
+    // fruit effects beyond healing (server: duration, damage; client: movement and stamina)
+    buffs: {
+      mudwalker:  { name: 'Mud Walker',  time: 30, text: 'No swamp slowdown' },
+      secondwind: { name: 'Second Wind', time: 25, text: 'Stamina refills twice as fast, sprinting costs less', regenMul: 2, drainMul: 0.6 },
+      lotusskin:  { name: 'Lotus Skin',  time: 20, text: 'Takes 25 % less damage', damageMul: 0.75 },
     },
   },
 

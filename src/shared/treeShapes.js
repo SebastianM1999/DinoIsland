@@ -81,6 +81,13 @@ export const TRUNKS = {
     r: (t) => 0.3 - 0.12 * t,
     base: [[1.5, 1.15], [0.6, 1.4]],
   })),
+  // swamp fig (the swamp's fruit tree): a strangler fig – a thick trunk of
+  // fused, twisting roots with a ring of root flanks at its foot
+  swampfig: [{
+    pts: [[0, 0, 0], [0.1, 1.6, 0.05], [-0.1, 3.2, 0.1], [0.12, 4.4, 0]],
+    r: (t) => 0.44 - 0.14 * t + (t < 0.05 ? 0.12 : 0),
+    base: [[0.9, 0.95]],
+  }],
   // swamp snag: a dead grey trunk, no embers (same bends as the volcanic 'dead')
   snag: [0, 1].map((variant) => ({
     pts: variant

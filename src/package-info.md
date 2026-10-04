@@ -41,7 +41,7 @@ Where each feature lives in each layer. Paths are relative to `src/` unless they
 | Firearms | gunshots.js | firearms.js | models/firearms/, entities/gunEffects.js, player/actions.js | firearms |
 | Traps | crafting.js (recipe) | dinos.js (trigger), world.js (`ACT.TRAP`) | player/actions.js, entities/items.js | weapons, inventory-drop |
 | Items, inventory, loot | protocol.js, config.js (loot) | world.js (items section) | entities/items.js, ui/hud.js, ui/itemInfo.js, ui/icons.js | inventory-drop, butcher |
-| Fruit | config.js (fruit) | world.js (regrowth, eat) | world/fruitPlants.js, models/fruit.js | discovery-fruit |
+| Fruit (per island: `biome.fruit`; buffs) | config.js (fruit), levels.js, layout.js (fruit spots) | world.js (regrowth, eat, `applyFruit`, buffs) | world/fruitPlants.js, models/fruit.js, player/controller.js (buffs), ui/hud.js (`setBuffs`) | discovery-fruit, swamp-fruit |
 | Crafting | crafting.js | world.js (`craft`) | ui/craftingPanel.js, world/hut/props.js | crafting |
 | Skills, XP, downed/revive | skills.js | world.js (skills, downed sections) | ui/skillPanel.js, skillModel.js, core/profile.js, ui/hud.js | skills, skills-server, skills-movement, skills-ui |
 | Base, towers, raids | base.js | world.js (base), towers.js, raids.js | world/base.js, ui/basePanel.js | base, raids, raptor-fear |

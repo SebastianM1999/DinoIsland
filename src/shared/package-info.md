@@ -36,7 +36,7 @@
 
 ### Netcode, config & brand
 - `protocol.js` — JSON message types (`MSG`), client actions (`ACT`), events (`EV`), snapshot field lists, player flags (`PF`), `EQUIP`, dino states (`DS`), `DINO_TYPES`; the header documents the authority model.
-- `config.js` — `CONFIG`: all tunables (net, world, player, weapons, hit zones, fruit, loot, dinos, tracks, mission, render, audio).
+- `config.js` — `CONFIG`: all tunables (net, world, player, weapons, hit zones, fruit – kinds with a `role` and optional `buff`, and the `buffs` –, loot, dinos, tracks, mission, render, audio).
 - `brand.js` — `BRAND` (name, slug, storage prefix), `storageKey`, `migrateStorage`.
 
 ## Entry points

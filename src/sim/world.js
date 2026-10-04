@@ -230,12 +230,33 @@ export class ServerWorld {
 
   sendInv(p) {
     p.inv.caps = this.caps();
+    p.inv.buffs = this.buffsLeft(p);
     p.inv.upgrades = [...this.upgrades];
     this.send(p.id, { t: MSG.INV, inv: p.inv });
   }
 
   /** Effects of the team's workbench upgrades. */
   mods() { return upgradeMods(this.upgrades); }
+
+  /** Fruit buffs still running on `p`: { kind: seconds left } (sent with the inventory). */
+  buffsLeft(p) {
+    const out = {};
+    for (const [k, until] of Object.entries(p.buffs || {})) if (until > this.now) out[k] = Math.round((until - this.now) * 10) / 10;
+    return out;
+  }
+
+  /** `target` gets the good of a fruit of `type` (eaten, or fed by a Field Medic with `by`'s skills). */
+  applyFruit(target, type, by = target) {
+    const ft = CONFIG.fruit.types[type];
+    if (!ft) return;
+    this.healPlayer(target, ft.heal * by.mods.fruitHealMul);
+    if (ft.hot > 0) target.hot = { rate: (ft.hot * by.mods.fruitHealMul) / ft.hotTime, t: ft.hotTime };
+    const buff = ft.buff && CONFIG.fruit.buffs[ft.buff];
+    if (buff) {
+      target.buffs = { ...(target.buffs || {}), [ft.buff]: this.now + buff.time };
+      this.sendInv(target);
+    }
+  }
 
   /** Inventory limits: config base values plus team upgrades from contracts and the workbench. */
   caps() {
@@ -273,6 +294,8 @@ export class ServerWorld {
     const knock = p.mods.knockMul;
     if (knock !== 1) { kx *= knock; kz *= knock; if (knock === 0) down = 0; }
     p.lastHurtAt = this.now;
+    // Lotus Skin (glow lotus): less damage while it lasts
+    if (p.buffs?.lotusskin > this.now) dmg *= CONFIG.fruit.buffs.lotusskin.damageMul;
     p.hp = Math.max(0, p.hp - dmg);
     // Last Stand: one lethal hit per life leaves 1 HP and a moment of invulnerability
     if (p.hp <= 0 && p.mods.lastStand && !p.lastStandUsed) {
@@ -356,6 +379,7 @@ export class ServerWorld {
     p.downedAt = this.now;
     p.eating = null;
     p.hot = null;
+    p.buffs = {};
     p.spd = 0;
     p.reviving = null;
     if (p.inv.reloading) { p.inv.reloading = null; this.sendInv(p); }
@@ -372,6 +396,7 @@ export class ServerWorld {
     p.deadT = respawnIn;
     p.eating = null;
     p.hot = null;
+    p.buffs = {};
     // Carried loot and fruit are lost.
     const lostMeat = p.inv.loot.meat;
     for (const k of LOOT_KEYS) p.inv.loot[k] = 0;
@@ -1081,9 +1106,7 @@ export class ServerWorld {
         if (m.heal && p.mods.fieldMedic) {
           if (p.eating || q.hp >= q.maxHp) return;
           const type = inv.fruit.splice(this.bestFruitIndex(p, q), 1)[0];
-          const ft = CONFIG.fruit.types[type];
-          this.healPlayer(q, ft.heal * p.mods.fruitHealMul);
-          if (ft.hot > 0) q.hot = { rate: (ft.hot * p.mods.fruitHealMul) / ft.hotTime, t: ft.hotTime };
+          this.applyFruit(q, type, p);
           this.sendInv(p);
           this.event(EV.HEAL, { id: q.id, by: p.id, hp: Math.ceil(q.hp) });
           return;
@@ -1364,7 +1387,6 @@ export class ServerWorld {
     this.now += dt;
     this._safe = undefined;
     if (this.base.building && this.now >= this.base.building.until) this.finishBuilding();
-    const F = CONFIG.fruit;
 
     // Healing Aura sources (the strongest aura in range counts, they never stack)
     let auras = null;
@@ -1390,10 +1412,9 @@ export class ServerWorld {
       if (p.eating) {
         p.eating.t -= dt;
         if (p.eating.t <= 0) {
-          const ft = F.types[p.eating.type];
-          this.healPlayer(p, ft.heal * p.mods.fruitHealMul);
-          if (ft.hot > 0) p.hot = { rate: (ft.hot * p.mods.fruitHealMul) / ft.hotTime, t: ft.hotTime };
+          const type = p.eating.type;
           p.eating = null;
+          this.applyFruit(p, type);
         }
       }
       if (p.hot) {

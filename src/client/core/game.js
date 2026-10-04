@@ -55,7 +55,7 @@ import { GrovePrompt } from '../ui/grovePrompt.js';
 import { mayEnterGrove, GROVE_STONE_REACH } from '../../shared/grove.js';
 import { buildBossArena } from '../world/bossArena.js';
 import { buildSwampArena } from '../world/swampArena.js';
-import { buildSwampFx } from '../world/swampFx.js';
+import { buildSwampFx, thickSky } from '../world/swampFx.js';
 import { BIOMES } from '../../shared/levels.js';
 import { disposeIslandScenes } from './resources.js';
 
@@ -277,7 +277,9 @@ export class Game {
     this.logs = buildLogs(this.terrain, this.layout);
     this.bossArena = buildBossArena(this.terrain, this.layout);
     this.swampArena = buildSwampArena(this.terrain, this.layout);
-    this.swampFx = buildSwampFx(this.terrain, this.layout, this.gfx.camera);
+    // the swamp's fog draws in where the mist is thick (swampFx.js mistiness)
+    const swampSky = this.layout.biome.sky, swampThick = thickSky(swampSky || {});
+    this.swampFx = buildSwampFx(this.terrain, this.layout, this.gfx.camera, (k) => this.gfx.blendBiome(swampSky, swampThick, k));
     scene.add(this.sky.group, this.water.group, this.vegetation.group, this.rocks.group, this.fruitPlants.group, this.hut.group, this.baseView.group, this.sites.group, this.grove.group, this.logs.group, this.bossArena.group, this.swampArena.group, this.swampFx.group);
     this.worldUpdaters = [this.sky, this.water, this.vegetation, this.rocks, this.fruitPlants, this.hut, this.baseView, this.sites, this.grove, this.bossArena, this.swampArena, this.swampFx];
     this.moodK = 0;
@@ -449,7 +451,7 @@ export class Game {
       }
       for (const sys of this.systems) sys.onSnapshot?.(m);
     });
-    net.on(MSG.INV, (m) => { this.me.inv = m.inv; this.#syncCrafting(); });
+    net.on(MSG.INV, (m) => { this.me.inv = m.inv; this.player?.setBuffs?.(m.inv.buffs); this.#syncCrafting(); });
     // the net layer already sanitized and saved m.prof; here it reaches the movement mods, the HUD ring and the panel
     net.on(MSG.PROF, (m) => this.#setProfile(m.prof));
     net.on(`ev:${EV.XP}`, (m) => this.hud.xpGain(m));
@@ -939,6 +941,7 @@ export class Game {
     hud.setHealth(this.me.hp, this.maxHp);
     hud.setStamina(p.stamina, p.maxStamina);
     hud.setSwamp(p.inBog && !p.flying);
+    hud.setBuffs(p.buffs);
     hud.setCompass(p.yaw, this.compassMarkers());
     const team = [{ id: this.me.id, name: this.me.name, slot: this.me.slot, hp: this.me.hp, mhp: this.maxHp, alive: this.me.alive, downed: !!this.downed, isYou: true }];
     for (const rp of this.remotes.map.values()) team.push({ id: rp.id, name: rp.name, slot: rp.slot, hp: rp.hp, mhp: rp.mhp, alive: rp.alive, downed: (rp.fl & PF.DOWNED) !== 0, isYou: false });

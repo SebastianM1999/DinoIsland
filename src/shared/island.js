@@ -1039,19 +1039,19 @@ function planBogs(plan, taken, rng, fnN) {
     // the trail crosses the basin on a causeway, gate to gate
     plan.bogs.push({ id: 0, field: 0, x: sa.x, z: sa.z, r, reach: r * 1.2, level, round: true, arena: true, segs: segsNear(sa.x, sa.z, r * 1.2 + BOG.pathHalf + 5) });
   }
-  const want = Math.round(70 * (plan.k / 0.86) ** 2);
-  for (let i = 0; i < 6000 && plan.bogs.length < want; i++) {
+  const want = Math.round(95 * (plan.k / 0.86) ** 2);
+  for (let i = 0; i < 9000 && plan.bogs.length < want; i++) {
     const x = rng.range(-A * 0.85, A * 0.85), z = rng.range(-plan.B, plan.B);
     if (!insideOutline(plan, x, z, 0.8)) continue;
-    const r = i < 2000 ? rng.range(18, 34) : rng.range(8, 20);   // big bogs first, then smaller ones between
+    const r = i < 3000 ? rng.range(22, 38) : rng.range(9, 22);   // big lagoons first (the crocodiles' home), then smaller bogs between
     const reach = r * 1.15 * 1.3;
     // the whole shoreline (up to ~1.4 r out) clear of the hut, boat, sites and plots; meadows may get wet edges
-    if (taken.some((t) => !t.hill && Math.hypot(t.x - x, t.z - z) < (t.meadow ? t.r * 0.5 + r : t.r + r * 1.4))) continue;
+    if (taken.some((t) => !t.hill && Math.hypot(t.x - x, t.z - z) < (t.meadow ? t.r * 0.5 + r : t.r * 0.85 + r * 1.3))) continue;
     // a bog either joins the field it overlaps (deep enough into it) or keeps clear of all others
     const near = plan.bogs.filter((b) => Math.hypot(b.x - x, b.z - z) < (b.r + r) * 1.35 + 2);
-    if (near.some((b) => b.arena || Math.hypot(b.x - x, b.z - z) > (b.r + r) * 1.0)) continue;
+    if (near.some((b) => b.arena || Math.hypot(b.x - x, b.z - z) > (b.r + r) * 1.15)) continue;
     const field = new Set(near.map((b) => b.field));
-    if (field.size > 1 || (near.length && plan.bogs.filter((b) => b.field === near[0].field).length >= 10)) continue;
+    if (field.size > 1 || (near.length && plan.bogs.filter((b) => b.field === near[0].field).length >= 14)) continue;
     if (plan.sites.peak && Math.hypot(plan.sites.peak.x - x, plan.sites.peak.z - z) < r * 1.3 + 14) continue;
     if (distToPolyline(plan.river.pts, x, z) < reach + 6) continue;
     if (plan.pools.some((p) => Math.hypot(p.x - x, p.z - z) < p.r * 2.6 + reach)) continue;
