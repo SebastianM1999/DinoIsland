@@ -32,6 +32,10 @@ const duration = (mode) => {
     mode === 'shove' ? T.shoveWindup + T.shoveStrike : mode === 'tail' ? T.tailWindup + T.tailStrike + T.tailSettle :
       mode === 'ambush' ? T.ambushWindup + T.ambushStrike : mode === 'pivot' ? T.pivot : T.reposition;
 };
+function phase(d, sys, clip, seconds) {
+  d.phaseSeq = (d.phaseSeq ?? 0) + 1;
+  d.phase = clip ? { clip, started: sys.world.now, duration: seconds, seq: d.phaseSeq } : null;
+}
 function start(d, sys, mode, p = null) {
   d.mode = mode; d.modeT = 0; d.victims = new Set();
   d.strikeYaw = d.yaw;
@@ -39,12 +43,18 @@ function start(d, sys, mode, p = null) {
   d.st = ({ lunge: DS.LUNGE, bite: DS.BITE, shove: DS.SHOVE, tail: DS.TAIL,
     ambush: DS.AMBUSH, pivot: DS.REPOSITION, reposition: DS.REPOSITION, retreat: DS.RETREAT, recover: DS.RECOVER })[mode] ?? DS.IDLE;
   if (p) d.targetId = p.id;
+  const clip = ({ lunge: 'attack', tail: 'tailsweep', recover: 'recovery', reposition: 'pivot' })[mode] ?? mode;
   if (mode === 'recover') {
     d.recoverFor = d.hitAttack ? SARCO_TIMING.recovery : SARCO_TIMING.missRecovery;
-    sys.world.event(EV.ATTACK, { id: d.id, kind: 'recovery', duration: d.recoverFor });
+    phase(d, sys, clip, d.recoverFor);
+    sys.world.event(EV.ATTACK, { id: d.id, kind: 'recovery', duration: d.recoverFor, phase: d.phase });
   } else if (mode !== 'reposition') {
-    sys.world.event(EV.ATTACK, { id: d.id, target: p?.id, kind: mode, duration: duration(mode) });
-  } else sys.world.event(EV.ATTACK, { id: d.id, kind: 'pivot', duration: duration(mode) });
+    phase(d, sys, clip, duration(mode));
+    sys.world.event(EV.ATTACK, { id: d.id, target: p?.id, kind: mode, duration: duration(mode), phase: d.phase });
+  } else {
+    phase(d, sys, clip, duration(mode));
+    sys.world.event(EV.ATTACK, { id: d.id, kind: 'pivot', duration: duration(mode), phase: d.phase });
+  }
 }
 function vulnerable(p, d, sys) {
   return p.alive && !sys.inSafeZone(p) && insideSwampArena(sys.world.layout, p.x, p.z, 2) &&
@@ -57,6 +67,11 @@ function local(d, p, rear = 0) {
 }
 function hit(d, sys, p, damage, knock, origin = null) {
   if (d.victims.has(p.id) || !vulnerable(p, d, sys) || !sys.canReach(d, p, origin)) return;
+  // Acquisition can see a bank from a deep pocket. A strike still needs its
+  // actual jaw/shoulder/tail volume to overlap the player's vertical capsule.
+  const tail = d.mode === 'tail', centre = d.y + (tail ? 1.5 : d.mode === 'shove' ? 1.9 : 2.3);
+  const halfHeight = tail ? 0.75 : d.mode === 'shove' ? 1 : 0.9;
+  if (p.y > centre + halfHeight || p.y + CONFIG.player.height < centre - halfHeight) return;
   d.victims.add(p.id); d.hitAttack = true;
   sys.hitPlayer(d, p, damage, knock, 0.65, origin);
 }
@@ -121,12 +136,13 @@ export const sarcosuchusBrain = {
     const ground = sys.terrain.heightAt(d.x, d.z), water = sys.terrain.waterLevelAt(d.x, d.z);
     d.swimOffset = water === null ? 0 : Math.max(0, water - ground - 3.1);
     d.y = ground + d.swimOffset; d.st = DS.SUBMERGED; d.fl |= 8;
+    phase(d, sys, 'swim', 1.6);
   },
   onHurt(d, sys, byId) {
     if (sys.world.players.has(byId)) d.targetId = byId;
     // Damage never cancels wind-ups or the recovery opening.
   },
-  onStuck(d) { if (!ACTIVE.has(d.mode)) { d.mode = 'reposition'; d.modeT = 0; } },
+  onStuck(d, sys) { if (!ACTIVE.has(d.mode)) start(d, sys, 'reposition'); },
   update(d, sys, dt) {
     const c = C(), T = SARCO_TIMING, previous = d.modeT;
     d.modeT += dt;
@@ -139,6 +155,7 @@ export const sarcosuchusBrain = {
     immersion(d, sys, dt, d.mode === 'submerged' || d.mode === 'swim' || (d.mode === 'ambush' && d.modeT < T.ambushWindup));
 
     if (d.mode === 'submerged') {
+      if (d.phase?.clip !== 'swim') phase(d, sys, 'swim', 1.6);
       d.st = DS.SUBMERGED; sys.halt(d, dt);
       if (p) {
         sys.turnTo(d, toYaw(d, p), dt, c.turnRate * 0.7);
@@ -152,6 +169,8 @@ export const sarcosuchusBrain = {
       const q = d.waterGoal ??= waterGoal(d, sys, p);
       const deep = sys.terrain.waterDepthAt(d.x, d.z) > 2;
       d.st = deep ? DS.SWIM : DS.RETREAT; d.mode = deep ? 'swim' : 'retreat';
+      if (deep && d.phase?.clip !== 'swim') phase(d, sys, 'swim', 1.6);
+      else if (!deep && (d.phase?.clip !== 'retreat' || sys.world.now - d.phase.started >= d.phase.duration)) phase(d, sys, 'retreat', T.reposition);
       const left = sys.distTo(d, q.x, q.z);
       if (deep) sys.steer(d, q.x, q.z, c.runSpeed, dt, c.turnRate);
       else {
@@ -161,7 +180,7 @@ export const sarcosuchusBrain = {
         sys.strafe(d, q.x - d.x, q.z - d.z, c.walkSpeed * 1.7, dt);
       }
       if (left < 2 && deep) { d.waterGoal = null; d.mode = 'submerged'; d.modeT = 0; }
-      else if (d.modeT > 6) { d.waterGoal = null; d.mode = 'hunt'; d.modeT = 0; }
+      else if (d.modeT > 6) { d.waterGoal = null; d.mode = 'hunt'; d.modeT = 0; phase(d, sys, null); }
       return;
     }
     if (d.mode === 'recover') {
@@ -179,10 +198,11 @@ export const sarcosuchusBrain = {
         const sign = d.attacks % 2 ? 1 : -1;
         sys.strafe(d, Math.cos(d.yaw) * sign, -Math.sin(d.yaw) * sign, c.walkSpeed * 1.5, dt);
       } else sys.halt(d, dt);
-      if (d.modeT > T.reposition) { d.mode = 'hunt'; d.modeT = 0; }
+      if (d.modeT > T.reposition) { d.mode = 'hunt'; d.modeT = 0; phase(d, sys, null); }
       return;
     }
     if (d.mode === 'hunt') {
+      if (d.phase) phase(d, sys, null);
       if (!p) { start(d, sys, 'retreat'); return; }
       const dist = sys.distTo(d, p.x, p.z), off = Math.abs(angleDiff(d.yaw, toYaw(d, p)));
       if (dist < c.tailRange && off > 1.25) { d.hitAttack = false; d.attacks++; d.pivotTail = true; start(d, sys, 'pivot', p); return; }

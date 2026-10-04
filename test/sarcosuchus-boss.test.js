@@ -20,6 +20,7 @@ function fixture(mode = 'hunt') {
   Object.assign(d, { x: 0, z: 0, y: world.terrain.heightAt(0, 0), yaw: 0, strikeYaw: 0, spd: 0,
     hp: d.maxHp, alive: true, st: DS.IDLE, fl: 1, targetId: p.id, mode, modeT: 0, attacks: 1,
     swimOffset: 0, hitAttack: false, combo: false, pivotTail: false, victims: new Set(), route: null, approach: null });
+  d.phase = null; d.phaseSeq = 0;
   Object.assign(p, { x: 0, z: -6.5, y: d.y, alive: true, hp: 100, invulnUntil: 0, downed: false });
   events.length = 0;
   return shared;
@@ -212,6 +213,51 @@ test('retreat backsteps move toward water while keeping the enemy in front', () 
   assert.equal(f.d.st, DS.RETREAT);
   assert.equal(f.d.yaw, 0, 'continues facing the enemy');
   assert.ok(f.d.z > z, 'travels backwards toward the water');
+});
+
+test('late join descriptions and snapshots retain the active strike phase and sequence', () => {
+  const f = fixture(); f.p.z = -15; f.world.now = 20;
+  brain.update(f.d, f.sys, DT);
+  const cue = f.events.find(e => e.e === EV.ATTACK && e.kind === 'lunge');
+  assert.deepEqual(cue.phase, { clip: 'attack', started: 20, duration: T.lungeWindup + T.lungeStrike, seq: 1 });
+  advance(f, 0.9);
+  assert.ok(f.d.modeT > T.lungeWindup, 'late arrival happens during the active strike');
+  assert.deepEqual(f.sys.describe(f.d).phase, cue.phase);
+  const row = f.sys.snapshotRows().find(row => row[0] === f.d.id);
+  assert.deepEqual(row.slice(9), ['attack', 20, T.lungeWindup + T.lungeStrike, 1]);
+  assert.ok(f.world.now - row[10] > T.lungeWindup, 'client can seek past the completed wind-up');
+  advance(f, 0.5);
+  assert.equal(f.d.phase.clip, 'recovery');
+  assert.equal(f.d.phase.seq, 2);
+  const ordinary = [...f.sys.byId.values()].find(d => d.type === 'raptor');
+  f.sys.list.push(ordinary);
+  assert.equal(f.sys.snapshotRows().find(row => row[0] === ordinary.id).length, 9, 'ordinary rows retain their wire shape');
+  f.sys.list.pop();
+  f.sys.kill(f.d, f.p.id);
+  assert.equal(f.sys.describe(f.d).phase, null);
+  assert.equal(f.sys.snapshotRows()[0][9], null);
+});
+
+test('jumping above the actual bite, shoulder or tail volume avoids strike damage', () => {
+  for (const mode of ['bite', 'shove', 'tail']) {
+    const f = fixture(mode);
+    if (mode === 'tail') { f.p.x = 0; f.p.z = 1.744 + 6.5; }
+    if (mode === 'shove') { f.p.x = 3; f.p.z = -3; }
+    f.p.y = f.d.y + 3.5;
+    // The target remains below the 4 m flying-exclusion threshold, so this
+    // specifically verifies the strike's vertical envelope rather than aggro.
+    const windup = mode === 'tail' ? T.tailWindup : mode === 'shove' ? T.shoveWindup : T.biteWindup;
+    const realHeight = f.sys.terrain.heightAt;
+    f.sys.terrain.heightAt = () => f.d.y; // level combat floor isolates strike-height checks from pocket depth
+    try {
+      assert.ok(f.p.y - f.sys.terrain.heightAt(f.p.x, f.p.z) < 4);
+      advance(f, windup + 0.3);
+      assert.equal(f.p.hp, 100, `${mode} misses above its actual vertical volume`);
+      f.p.y = f.d.y; f.d.modeT = 0; f.d.victims.clear();
+      advance(f, windup + 0.3);
+      assert.ok(f.p.hp < 100, `${mode} hits at ground height in the same horizontal location`);
+    } finally { f.sys.terrain.heightAt = realHeight; }
+  }
 });
 
 test('arena boundary blocks attacks from outside, death rewards once and never respawns the boss', () => {
