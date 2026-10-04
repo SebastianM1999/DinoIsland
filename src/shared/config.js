@@ -30,6 +30,7 @@ export const CONFIG = {
     maxHealth: 100,
     walkSpeed: 5.2,
     sprintSpeed: 8.6,
+    swampSpeedMul: 0.8,      // wading through a bog (swamp island): everyone walks 20 % slower (Terrain.swampSpeedAt)
     backwardFactor: 0.75,
     airControl: 0.35,
     accel: 40,

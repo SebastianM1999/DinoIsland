@@ -163,6 +163,8 @@ uniform float uRipple;
 uniform float uFlowRef;
 uniform float uFogAmount;
 uniform vec2 uAlpha;        // alpha in the shallows / in deep water
+uniform float uGloss;       // sun glints and sparkles (dull bog water: low)
+uniform float uFoamAmt;     // shoreline foam strength
 uniform vec3 uShallow;
 uniform vec3 uMid;
 uniform vec3 uDeep;
@@ -254,11 +256,11 @@ void main() {
   col = mix(col, skyCol, clamp(fres * 0.85 + 0.06, 0.0, 0.62) * mix(0.45, 1.0, smoothstep(0.2, 1.5, depth)));
   vec3 H = normalize(uSunDir + V);
   float spec = pow(max(dot(N, H), 0.0), 180.0) * 1.8;
-  col += uSunColor * spec;
+  col += uSunColor * spec * uGloss;
 
   // sparkles on open water (more where a gust ruffles it)
   float sp = vnoise(vWorld.xz * 0.9 + vec2(uTime * 0.6, -uTime * 0.4));
-  col += uSunColor * smoothstep(0.96 - gust * 0.03, 0.995, sp) * 0.25 * smoothstep(1.0, 4.0, depth) * lod;
+  col += uSunColor * smoothstep(0.96 - gust * 0.03, 0.995, sp) * 0.25 * smoothstep(1.0, 4.0, depth) * lod * uGloss;
 
   // shoreline foam: a solid edge plus (on sheets) bands rolling toward the beach
   float n = vnoise(vWorld.xz * 0.35 + uTime * 0.15);
@@ -268,7 +270,7 @@ void main() {
   float lace = smoothstep(0.25, 0.65, vnoise(vWorld.xz * 1.3 + vec2(uTime * 0.2, 0.0)));
   float edge = (1.0 - smoothstep(lap * 0.5, lap + 0.04 + n * 0.05, depth)) * (0.55 + 0.45 * lace);
   float band = smoothstep(0.82, 0.97, sin(depth * 5.0 - uTime * 1.9 + n * 3.0)) * (1.0 - smoothstep(0.35, 1.5, depth)) * shoreBands;
-  float foam = max(max(edge, band * 0.85), max(flowFoam, ringFoam));
+  float foam = max(max(edge, band * 0.85) * uFoamAmt, max(flowFoam, ringFoam));
   foam *= smoothstep(-0.05, 0.02, depth);
   col = mix(col, uFoam, clamp(foam, 0.0, 1.0));
 
@@ -449,6 +451,44 @@ function fogUniforms() {
   };
 }
 
+/**
+ * Bog water (swamp): a quad at the bog's level over each terrain cell that
+ * has bog water in it (Terrain.bogLevel), or null on islands without bogs.
+ * Where the mud rises above the level the terrain hides the sheet.
+ */
+export function bogGeometry(terrain) {
+  const L = terrain.bogLevel;
+  if (!L) return null;
+  const n = terrain.n, n1 = n + 1, cell = terrain.cell, half = terrain.half;
+  const pos = [], idx = [];
+  const verts = new Map();
+  const vert = (i, j, y) => {
+    const k = `${j * n1 + i}:${y}`;
+    let v = verts.get(k);
+    if (v === undefined) { v = pos.length / 3; pos.push(-half + i * cell, y, -half + j * cell); verts.set(k, v); }
+    return v;
+  };
+  for (let j = 0; j < n; j++) {
+    for (let i = 0; i < n; i++) {
+      const c = [j * n1 + i, j * n1 + i + 1, (j + 1) * n1 + i, (j + 1) * n1 + i + 1];
+      let level = -Infinity;
+      for (const k of c) if (L[k] > level) level = L[k];
+      if (level === -Infinity) continue;
+      if (Math.min(...c.map((k) => terrain.heights[k])) >= level) continue;
+      const a = vert(i, j, level), b = vert(i + 1, j, level), cc = vert(i, j + 1, level), d = vert(i + 1, j + 1, level);
+      idx.push(a, cc, b, b, cc, d);
+    }
+  }
+  if (!idx.length) return null;
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  geo.setAttribute('uv', new THREE.Float32BufferAttribute(new Float32Array((pos.length / 3) * 2), 2));
+  geo.setIndex(idx);
+  geo.computeVertexNormals();
+  geo.computeBoundingSphere();
+  return withSheetAttrs(geo);
+}
+
 // ---------------------------------------------------------------- build
 
 export function buildWater(terrain, layout = {}, sunDir = new THREE.Vector3(-0.45, 0.78, 0.43).normalize()) {
@@ -493,7 +533,7 @@ export function buildWater(terrain, layout = {}, sunDir = new THREE.Vector3(-0.4
 
   // Same shader source for every water surface -> one compiled program;
   // only the small per-surface uniforms differ.
-  const waterMaterial = ({ mode = 0, waveAmp = 0.22, ripple = 0.25, alpha = [0.55, 0.94], fog = 0.5, flowRef = 1.6 } = {}) => {
+  const waterMaterial = ({ mode = 0, waveAmp = 0.22, ripple = 0.25, alpha = [0.55, 0.94], fog = 0.5, flowRef = 1.6, gloss = 1, foam = 1 } = {}) => {
     const m = new THREE.ShaderMaterial({
       vertexShader: SURF_VERT,
       fragmentShader: WATER_FRAG,
@@ -506,6 +546,8 @@ export function buildWater(terrain, layout = {}, sunDir = new THREE.Vector3(-0.4
         uAlpha: { value: new THREE.Vector2(alpha[0], alpha[1]) },
         uFogAmount: { value: fog },
         uFlowRef: { value: flowRef },
+        uGloss: { value: gloss },
+        uFoamAmt: { value: foam },
       },
       transparent: true,
       fog: true,
@@ -551,6 +593,16 @@ export function buildWater(terrain, layout = {}, sunDir = new THREE.Vector3(-0.4
     mesh.position.set(pool.x, level, pool.z);
     mesh.renderOrder = 2;
     mesh.name = lava ? 'lavaPool' : 'pool';
+    group.add(mesh);
+  }
+
+  // --- bogs (swamp): one sheet over every grid cell their water covers, at
+  // each field's level; murky, dull, a faint foam line at the mud
+  const bogGeo = bogGeometry(terrain);
+  if (bogGeo) {
+    const mesh = new THREE.Mesh(bogGeo, waterMaterial({ waveAmp: 0.01, ripple: 0.1, alpha: [0.8, 0.94], gloss: 0.25, foam: 0.35 }));
+    mesh.renderOrder = 2;
+    mesh.name = 'bogs';
     group.add(mesh);
   }
 

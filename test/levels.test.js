@@ -6,7 +6,7 @@ import { planIsland } from '../src/shared/island.js';
 import { levelDef } from '../src/shared/levels.js';
 
 test('every island has a hut beach, a boat beach and three reachable relic spots', () => {
-  for (const level of [0, 1]) {
+  for (const level of [0, 1, 2]) {
     for (const variant of [1, 2, 3]) {
       const world = new ServerWorld({ send() {} }, { level, variant });
       const { layout, terrain } = world;
@@ -18,10 +18,13 @@ test('every island has a hut beach, a boat beach and three reachable relic spots
       }
     }
   }
-  // the starter island is small, the volcano island bigger and harder; there are only two
+  // the starter island is small, the swamp and volcano islands bigger and each harder; there are three
   assert.ok(planIsland(0, 1).A < planIsland(1, 1).A * 0.7);
+  assert.ok(planIsland(0, 1).A < planIsland(2, 1).A * 0.7);
   assert.ok(levelDef(1).difficulty > levelDef(0).difficulty);
-  assert.equal(levelDef(5).index, 1);
+  assert.ok(levelDef(2).difficulty > levelDef(1).difficulty);
+  assert.deepEqual([0, 1, 2].map((i) => levelDef(i).biome.id), ['jungle', 'swamp', 'volcano']);
+  assert.equal(levelDef(5).index, 2);
 });
 
 test('find the parts, repair the boat and sail to the next island together', () => {
@@ -68,7 +71,7 @@ test('find the parts, repair the boat and sail to the next island together', () 
 });
 
 test('lava burns players', () => {
-  const world = new ServerWorld({ send() {} }, { level: 1, variant: 3 });
+  const world = new ServerWorld({ send() {} }, { level: 2, variant: 3 });
   const a = world.join('Bo');
   const p = world.players.get(a.id);
   const pt = world.layout.rivers[0].pts[3];
@@ -79,7 +82,7 @@ test('lava burns players', () => {
 });
 
 test('sailing away from the last island wins and starts a fresh first island', () => {
-  const world = new ServerWorld({ send() {} }, { level: 1, variant: 4 });
+  const world = new ServerWorld({ send() {} }, { level: 2, variant: 4 });
   const a = world.join('Cy');
   world.players.get(a.id).creative = true;
   world.mission.phase = 'sailing';

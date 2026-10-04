@@ -13,6 +13,7 @@ import { CONFIG } from './config.js';
 import { makeRng, fbm, valueNoise, clamp, smoothstep, lerp } from './rng.js';
 import { levelDef } from './levels.js';
 import { planBossArena, bossArenaHeight } from './bossArena.js';
+import { planSwampArena, SWAMP_ARENA } from './swampArena.js';
 import { BASE_PLOT_RADIUS } from './base.js';
 
 const TAU = Math.PI * 2;
@@ -31,11 +32,29 @@ export function islandSeed(levelIndex, variant) {
   return (h ^ (h >>> 13)) >>> 0;
 }
 
+// ------------------------------------------------------------------ outline
+
+/** Hourglass outline (swamp): how deep the waist pinches and how long it is (share of A). */
+export const HOURGLASS = { depth: 0.6, width: 0.2 };
+
+/**
+ * Half-width (z extent) of the island's outline frame at x: B for the oval
+ * islands; the hourglass pinches it to a waist around x = 0.
+ */
+export function halfWidthAt(plan, x) {
+  if (plan.shape !== 'hourglass') return plan.B;
+  return plan.B * (1 - HOURGLASS.depth * Math.exp(-((x / (HOURGLASS.width * plan.A)) ** 2)));
+}
+
+/** Inside the island's outline at normalized radius < k (roughly, ignoring coast wobble). */
+export const insideOutline = (plan, x, z, k) => (x / plan.A) ** 2 + (z / halfWidthAt(plan, x)) ** 2 < k * k;
+
 // ------------------------------------------------------------------ height pieces
 
-/** Base land: ellipse with wavy long sides, beach ring rising into lowland. */
+/** Base land: ellipse (or hourglass) with wavy long sides, beach ring rising into lowland. */
 function coastHeight(plan, x, z) {
-  const { A, B, seed } = plan;
+  const { A, seed } = plan;
+  const B = halfWidthAt(plan, x);
   const nx = x / A, nz = z / B;
   const ang = Math.atan2(nz, nx);
   // bays and headlands only along the long sides – the tips stay clean beaches
@@ -44,7 +63,10 @@ function coastHeight(plan, x, z) {
     + 0.06 * valueNoise(Math.cos(ang) * 5.3 + 9, Math.sin(ang) * 5.3, seed + 2));
   const d = Math.sqrt(nx * nx + nz * nz) / warp;
   const scale = B + (A - B) * Math.cos(ang) ** 2;        // meters per unit of d along this direction
-  const inland = (1 - d) * scale;                         // meters from the coastline
+  let inland = (1 - d) * scale;                           // meters from the coastline
+  // the swamp arena bulges out of the waist: land all round its ring
+  const sa = plan.swampArena;
+  if (sa) inland = Math.max(inland, sa.r + 20 - Math.hypot(x - sa.x, z - sa.z));
   if (inland < 0) {
     const out = -inland;
     let h = -out * 0.05 - Math.max(0, out - 24) * 0.16;   // turquoise shelf, then drop-off
@@ -52,7 +74,8 @@ function coastHeight(plan, x, z) {
     return h + fbm(x * 0.02, z * 0.02, 2, seed + 3) * 1.1;
   }
   const t = clamp(inland / 48, 0, 1);
-  let h = 0.35 + 1.6 * smoothstep(0, 0.45, t) + 2.4 * smoothstep(0.35, 1, t);
+  const [r1, r2] = plan.lowland ?? [1.6, 2.4];
+  let h = 0.35 + r1 * smoothstep(0, 0.45, t) + r2 * smoothstep(0.35, 1, t);
   h += fbm(x * 0.017, z * 0.017, 4, seed + 4) * plan.rolling * smoothstep(0.3, 1, t);
   h += fbm(x * 0.07, z * 0.07, 2, seed + 5) * 0.5 * t;
   return h;
@@ -230,6 +253,72 @@ function padEffect(plan, x, z, h) {
   return h;
 }
 
+// ------------------------------------------------------------------ bogs (swamp)
+
+/**
+ * Bog rules: the water never stands deeper than maxDepth above the mud (players
+ * wade, dinosaurs walk through – sim/dinos.js stops at 0.35 m), and the paths
+ * cross on causeways pathHalf + a few metres wide that stay dry above it.
+ */
+export const BOG = { maxDepth: 0.3, pathHalf: 2.2 };
+
+/** Distance from (x, z) to the nearest of the segments [ax, az, bx, bz]. */
+function segsDist(segs, x, z) {
+  let best = Infinity;
+  for (const [ax, az, bx, bz] of segs) {
+    const vx = bx - ax, vz = bz - az;
+    const u = clamp(((x - ax) * vx + (z - az) * vz) / (vx * vx + vz * vz || 1), 0, 1);
+    const d = Math.hypot(ax + vx * u - x, az + vz * u - z);
+    if (d < best) best = d;
+  }
+  return best;
+}
+
+/**
+ * The bog at (x, z), or null: { bog, k (0 centre .. 1 shore), inner (bog
+ * share 0..1), dam (causeway share 0..1), mask (where its water stands) }.
+ */
+export function bogSample(plan, x, z) {
+  const bogs = plan.bogs;
+  if (!bogs || !bogs.length) return null;
+  // overlapping bogs of one swamp field share their water level: the one we are deepest in wins
+  let best = null;
+  for (const b of bogs) {
+    const dx = x - b.x, dz = z - b.z;
+    if (Math.abs(dx) > b.reach || Math.abs(dz) > b.reach) continue;
+    const ang = Math.atan2(dz, dx);
+    // an organic shoreline: lobes and inlets around the circle
+    const warp = b.round ? 1 : 1 + 0.2 * valueNoise(Math.cos(ang) * 1.6 + b.id * 3.1, Math.sin(ang) * 1.6, plan.seed + 91)
+      + 0.08 * valueNoise(Math.cos(ang) * 4.1, Math.sin(ang) * 4.1 + b.id * 1.7, plan.seed + 92);
+    const k = Math.hypot(dx, dz) / (b.r * warp);
+    if (k >= 1.15 || (best && k >= best.k)) continue;
+    best = { bog: b, k };
+  }
+  if (!best) return null;
+  const b = best.bog;
+  const inner = 1 - smoothstep(0.8, 1.06, best.k);
+  // the causeway's dry crown reaches past the terrain grid's cell, so the path itself never reads as bog
+  const dam = b.segs.length ? 1 - smoothstep(BOG.pathHalf + 2, BOG.pathHalf + 5, segsDist(b.segs, x, z)) : 0;
+  return { bog: b, k: best.k, inner, dam, mask: inner * (1 - dam) };
+}
+
+/** Sink the ground into the bogs: a shallow mud bed with hummocks, dry causeways across. */
+function bogEffect(plan, x, z, h) {
+  const s = bogSample(plan, x, z);
+  if (!s) return h;
+  const b = s.bog;
+  const depth = 0.06 + 0.22 * (1 - smoothstep(0.4, 0.95, s.k));
+  // mud islands poke out of the water (bigger ones in the arena basin)
+  const hum = fbm(x * 0.08 + b.id * 5.3, z * 0.08, 2, plan.seed + 93);
+  const bed = b.level - depth + Math.max(0, hum - (b.round ? 0.05 : 0.2)) * (b.round ? 1.6 : 1.1);
+  // (never more than ~1.2 m down into higher ground: the shore stays a gentle bank)
+  let out = lerp(h, Math.max(bed, h - 1.2), s.inner);
+  out = Math.max(out, b.level - BOG.maxDepth + 0.01);
+  // causeway: the path crosses dry, a little above the water
+  if (s.dam > 0) out = lerp(out, Math.max(out, b.level + 0.4), s.dam);
+  return out;
+}
+
 /** Inside a water pool's basin (its bowl, a little past the waterline)? */
 function inWaterPool(plan, x, z) {
   for (const p of plan.pools) if (p.kind === 'water' && Math.hypot(x - p.x, z - p.z) < p.r * 1.1) return true;
@@ -249,6 +338,7 @@ export function islandHeight(plan, x, z) {
   const hr = h;
   if (keep > 0) h = lerp(h, rampEffect(plan, x, z, h), keep);
   h = padEffect(plan, x, z, h);
+  if (plan.bogs?.length) h = bogEffect(plan, x, z, h);
   // paths and flattened sites never dig the river's levee away – except in the
   // pool the river flows out of: its basin must stay a basin (no levee hump in
   // the middle of it, where the waterfall comes down)
@@ -277,8 +367,8 @@ function slopeOf(fn, x, z, e = 2) {
   return Math.hypot(fn(x + e, z) - fn(x - e, z), fn(x, z + e) - fn(x, z - e)) / (2 * e);
 }
 
-/** Inside the ellipse at normalized radius < k (roughly, ignoring coast wobble). */
-const insideEllipse = (plan, x, z, k) => (x / plan.A) ** 2 + (z / plan.B) ** 2 < k * k;
+/** Inside the outline (ellipse or hourglass) at normalized radius < k. */
+const insideEllipse = insideOutline;
 
 function distToPolyline(pts, x, z) {
   let best = Infinity;
@@ -356,17 +446,23 @@ function indexRiver(river) {
 export function planIsland(levelIndex = 0, variant = 1) {
   const level = levelDef(levelIndex);
   const biome = level.biome;
-  const seed = islandSeed(levelIndex, variant);
+  const seed = islandSeed(level.seedIndex, variant);
   const rng = makeRng(seed);
   const volcanic = biome.id === 'volcano';
+  const swamp = biome.id === 'swamp';
   const plan = {
     level, biome, seed, variant,
-    // the first island is a small tutorial island; later ones grow to full size
-    k: level.index === 0 ? 0.52 : 0.87,
+    // island size (levels.js): the first island is a small tutorial island, later ones larger
+    k: level.scale,
+    shape: biome.shape || 'oval',
     A: 0,
     B: 0,
     ramps: [],
-    rolling: volcanic ? 3.2 : 5.5,
+    rolling: volcanic ? 3.2 : swamp ? 1.6 : 5.5,
+    // the swamp is low and flat: its lowland rises only ~2.6 m above the beach
+    lowland: swamp ? [1.2, 1.1] : null,
+    bogs: [],
+    paths: [],
     hills: [],
     volcano: null,
     pools: [],
@@ -380,7 +476,13 @@ export function planIsland(levelIndex = 0, variant = 1) {
   const K = plan.k;
   plan.A = rng.range(285, 310) * K;
   plan.B = Math.max(64, rng.range(118, 138) * K);
+  // the hourglass's round halves are a little wider than the oval's sides
+  if (plan.shape === 'hourglass') plan.B *= 1.15;
   const { A, B } = plan;
+  // the swamp arena sits in the waist (shared/swampArena.js): planned first, the coast bulges round it
+  if (level.swampArena) plan.swampArena = planSwampArena(plan, halfWidthAt(plan, 0), rng() < 0.5 ? -1 : 1);
+  const sa = plan.swampArena;
+  const clearOfArena = (x, z, r) => !sa || Math.hypot(x - sa.x, z - sa.z) > sa.r + r;
 
   // --- hut (west beach) and boat (east beach)
   plan.hut = { x: -A + 34, z: rng.range(-10, 10) * K, radius: 21, ground: HUT_GROUND };
@@ -398,7 +500,17 @@ export function planIsland(levelIndex = 0, variant = 1) {
     return null;
   };
 
-  if (volcanic) {
+  if (swamp) {
+    // flat and low: one moor hill (the peak) in a round half, dry knolls between the bogs
+    const lobe = rng() < 0.5 ? -1 : 1;
+    const hill = place(300, (x, z) => clearOf(x, z, 40 * K) && Math.abs(x) > 0.3 * A && Math.sign(x) === lobe && insideEllipse(plan, x, z, 0.62));
+    if (hill) addHill({ ...hill, radius: rng.range(26, 32), height: rng.range(8, 11), terrace: 0, rough: 1.5, core: 0.2, shape: 0.9, moor: true });
+    for (let i = 0; i < 14; i++) {
+      const p = place(120, (x, z) => clearOf(x, z, 16) && clearOfArena(x, z, 22) && insideEllipse(plan, x, z, 0.78)
+        && plan.hills.every((h) => Math.hypot(x - h.x, z - h.z) > h.radius * 0.8 + 14));
+      if (p) addHill({ ...p, radius: rng.range(12, 22), height: rng.range(1.6, 3.6), terrace: 0, rough: 0.8, core: 0.1, shape: 1.3 });
+    }
+  } else if (volcanic) {
     const vx = rng.range(0.02, 0.28) * A, vz = rng.range(-0.12, 0.12) * B;
     const notchAngle = rng() < 0.5 ? -Math.PI / 2 + rng.range(-0.5, 0.5) : Math.PI / 2 + rng.range(-0.5, 0.5);
     plan.volcano = { x: vx, z: vz, radius: rng.range(100, 112) * K, height: rng.range(70, 80) * K, craterR: 17 * Math.max(0.75, K), craterDepth: 13 * K, notchAngle };
@@ -547,6 +659,27 @@ export function planIsland(levelIndex = 0, variant = 1) {
     plan.river = traceFlow(plan, start, goal, { kind: 'lava', width0: 4.5, width1: 7, surface0: rimH - v.craterDepth * 0.55 - 0.4, stopAt: 3.2 });
     const end = plan.river.pts[plan.river.pts.length - 1];
     plan.pools.push({ x: end.x, z: end.z, r: 9, level: end.y, depth: 0.9, kind: 'lava' });
+  } else if (swamp) {
+    // a slow brackish creek: from a dark spring pool in one round half, winding
+    // along the half and out to the nearer long coast
+    const lobe = rng() < 0.5 ? -1 : 1;
+    const side = rng() < 0.5 ? -1 : 1;
+    const px = lobe * rng.range(0.42, 0.58) * A;
+    const pool = { x: px, z: -side * halfWidthAt(plan, px) * rng.range(0.1, 0.25), r: 9, depth: 2.2, kind: 'water' };
+    let ring = 0;
+    for (let k = 0; k < 12; k++) {
+      const a = (k / 12) * TAU;
+      ring += naturalHeight(plan, pool.x + Math.cos(a) * pool.r * 1.6, pool.z + Math.sin(a) * pool.r * 1.6);
+    }
+    pool.level = Math.max(1.6, ring / 12 - 0.35);
+    plan.pools.push(pool);
+    const toWaist = -lobe;
+    const goals = [
+      { x: pool.x + toWaist * 30, z: side * halfWidthAt(plan, pool.x) * 0.3 },
+      { x: pool.x + toWaist * 45, z: side * halfWidthAt(plan, pool.x + toWaist * 45) * 1.3 },
+    ];
+    const start = { x: pool.x + side * 0 + toWaist * pool.r * 0.6, z: pool.z + side * pool.r * 0.6 };
+    plan.river = traceFlow(plan, start, goals, { kind: 'water', width0: 5, width1: 9, surface0: pool.level, stopAt: 'sea' });
   } else {
     const pool = plan.pools[0];
     const out = { x: -plan.waterfallDir.x, z: -plan.waterfallDir.z };
@@ -581,7 +714,9 @@ export function planIsland(levelIndex = 0, variant = 1) {
       if (p) p.w *= 1 + (1 - Math.abs(k) / 3) * 1.1;
     }
     const c = pts[pick];
-    plan.sandbank = { x: c.x, z: c.z, r: Math.min(3.4, c.w * 0.22), top: c.y + 0.45 };
+    // (the swamp's flat creek can step down sharply: stay above its upstream water too)
+    const wl = swamp ? Math.max(...pts.slice(Math.max(0, pick - 2), pick + 3).map((p) => p.y)) : c.y;
+    plan.sandbank = { x: c.x, z: c.z, r: Math.min(3.4, c.w * 0.22), top: wl + 0.45 };
   }
   indexRiver(plan.river);
 
@@ -598,7 +733,10 @@ export function planIsland(levelIndex = 0, variant = 1) {
     const pts = [{ x: plan.hut.x + 8, z: plan.hut.z - 6 }];
     let z = plan.hut.z;
     const lavaPenalty = (x, zz) => (volcanic ? Math.max(0, 40 - distToPolyline(plan.river.pts, x, zz)) * 3 : 0)
-      + (plan.volcano ? Math.max(0, plan.volcano.radius * 0.75 - Math.hypot(x - plan.volcano.x, zz - plan.volcano.z)) * 2 : 0);
+      + (plan.volcano ? Math.max(0, plan.volcano.radius * 0.75 - Math.hypot(x - plan.volcano.x, zz - plan.volcano.z)) * 2 : 0)
+      // through the swamp's waist past the arena, never into it, and round the creek's spring
+      + (sa ? Math.max(0, sa.r + 16 - Math.hypot(x - sa.x, zz - sa.z)) * 8 : 0)
+      + (swamp ? plan.pools.reduce((s, q) => s + Math.max(0, q.r * 1.6 + 8 - Math.hypot(x - q.x, zz - q.z)) * 6, 0) : 0);
     for (let x = plan.hut.x + 40; x < plan.boat.x - 25; x += 34) {
       let bestZ = z, bestS = Infinity;
       for (let k = -8; k <= 8; k++) {
@@ -633,11 +771,13 @@ export function planIsland(levelIndex = 0, variant = 1) {
     { x: plan.boat.x, z: plan.boat.z, r: 30 },
     ...plan.pools.map((p) => ({ x: p.x, z: p.z, r: p.r + 14 })),
     ...(plan.bossArena ? [{ x: plan.bossArena.center.x, z: plan.bossArena.center.z, r: plan.bossArena.outerR + 10 }] : []),
-    ...plan.hills.filter((h) => h.main || h.spur).map((h) => ({ x: h.x, z: h.z, r: h.radius * 0.7, hill: true })),
+    ...plan.hills.filter((h) => h.main || h.spur || h.moor).map((h) => ({ x: h.x, z: h.z, r: h.radius * (h.moor ? 0.45 : 0.7), hill: true })),
+    ...(sa ? [{ x: sa.x, z: sa.z, r: sa.r + 10 }] : []),
   ];
   if (plan.volcano) taken.push({ x: plan.volcano.x, z: plan.volcano.z, r: plan.volcano.radius * 0.72 });
   const fnN = (x, z) => poolEffect(plan, x, z, naturalHeight(plan, x, z));
-  const findSpot = (r, { minH = 3, maxH = 30, maxSlope = 0.4, trailGap = 14, riverGap = 16 } = {}) => {
+  // the swamp's lowland lies low: its sites may stand lower
+  const findSpot = (r, { minH = swamp ? 1.4 : 3, maxH = 30, maxSlope = 0.4, trailGap = 14, riverGap = 16 } = {}) => {
     for (let i = 0; i < 900; i++) {
       const x = rng.range(-A * 0.75, A * 0.75), z = rng.range(-B * 0.7, B * 0.7);
       if (!insideEllipse(plan, x, z, 0.8)) continue;
@@ -715,7 +855,7 @@ export function planIsland(levelIndex = 0, variant = 1) {
   for (let i = 0; i < 2; i++) {
     const mr = 22 * Math.max(0.55, K);
     const s = findSpot(mr, { maxSlope: 0.32, trailGap: 4, riverGap: 6, maxH: 18 });
-    if (s) plan.meadows.push({ x: s.x, z: s.z, r: mr * 1.2 });
+    if (s) { plan.meadows.push({ x: s.x, z: s.z, r: mr * 1.2 }); taken[taken.length - 1].meadow = true; }
   }
 
   // --- base building plots (every island after the first, see shared/base.js).
@@ -732,7 +872,7 @@ export function planIsland(levelIndex = 0, variant = 1) {
         if (!insideEllipse(plan, x, z, 0.84)) continue;
         if (taken.some((t) => Math.hypot(t.x - x, t.z - z) < t.r + R)) continue;
         const h = fnN(x, z);
-        if (h < 1.8 || h > 32) continue;
+        if (h < (swamp ? 1.4 : 1.8) || h > 32) continue;
         const trail = distToPolyline(plan.trail, x, z), river = distToPolyline(plan.river.pts, x, z);
         if (trail < R + 1 || river < R + riverGap) continue;
         if (plan.ramps.some((rp) => rp.pts.some((p) => Math.hypot(p.x - x, p.z - z) < R * 1.6 + 6))) continue;
@@ -786,7 +926,7 @@ export function planIsland(levelIndex = 0, variant = 1) {
   {
     const top = volcanic
       ? plan.hills.filter((h) => h.radius > 20).sort((a, b) => b.height - a.height)[0]
-      : plan.mainPeak;
+      : swamp ? plan.hills.find((h) => h.moor) : plan.mainPeak;
     if (top) {
       let best = null;
       for (let i = 0; i < 400; i++) {
@@ -812,7 +952,115 @@ export function planIsland(levelIndex = 0, variant = 1) {
   while (chosen.length < level.relicCount && pool.length) chosen.push(pool.splice(Math.floor(rng() * pool.length), 1)[0]);
   plan.relicSites = chosen;
 
+  // --- swamp: side paths from the trail, then the bogs around them
+  if (swamp) planSwampPaths(plan, taken);
+  if (swamp) planBogs(plan, taken, makeRng(seed ^ 0xb06), fnN);
+
   return plan;
+}
+
+/**
+ * Side paths (swamp): from the nearest trail point out to the sites, base plots
+ * and the arena gate, wandering a little. They join layout.path, so they are
+ * worn in, kept clear of trees – and raised as dry causeways through the bogs.
+ */
+function planSwampPaths(plan, taken) {
+  const sa = plan.swampArena;
+  const targets = [];
+  for (const key of ['ruins', 'nest']) if (plan.sites[key]) targets.push({ x: plan.sites[key].x, z: plan.sites[key].z, stop: key === 'ruins' ? 11 : 4 });
+  if (plan.sites.peak) targets.push({ x: plan.sites.peak.x, z: plan.sites.peak.z, stop: 2 });
+  for (const p of plan.basePlots) targets.push({ x: p.x, z: p.z, stop: p.r - 2 });
+  if (sa) targets.push({ x: sa.gate.x, z: sa.gate.z, stop: 0 });
+  // never through the arena (only up to its gate) or the creek's spring pool
+  const blocked = (p) => (sa && Math.hypot(p.x - sa.x, p.z - sa.z) < sa.r + 2)
+    || plan.pools.some((q) => q.kind === 'water' && Math.hypot(p.x - q.x, p.z - q.z) < q.r * 1.5 + 2);
+  for (const t of targets) {
+    // from the nearest trail point whose way out is clear
+    const starts = plan.trail.map((p) => ({ p, d: Math.hypot(p.x - t.x, p.z - t.z) })).sort((a, b) => a.d - b.d);
+    if (!starts.length || starts[0].d < t.stop + 6) continue;
+    for (const { p: best, d: bd } of starts.slice(0, 24)) {
+      const len = bd - t.stop;
+      const dx = (t.x - best.x) / bd, dz = (t.z - best.z) / bd;
+      const n = Math.max(3, Math.ceil(len / 6));
+      const pts = [];
+      for (let i = 0; i <= n; i++) {
+        const u = i / n;
+        const wob = i > 0 && i < n ? valueNoise(best.x * 0.1 + u * 3, best.z * 0.1, plan.seed + 97) * Math.min(5, len * 0.12) * Math.sin(Math.PI * u) : 0;
+        pts.push({ x: best.x + dx * len * u - dz * wob, z: best.z + dz * len * u + dx * wob });
+      }
+      if (pts.some(blocked)) continue;
+      plan.paths.push(pts);
+      break;
+    }
+  }
+}
+
+/**
+ * The swamp's bogs: irregular shallow pools of mud water between the dry
+ * knolls, each with one flat water level a little below its shore. They keep
+ * clear of the hut, boat, sites, base plots and the creek; paths cross them on
+ * causeways. The arena basin is one more (round, sunken) bog.
+ */
+function planBogs(plan, taken, rng, fnN) {
+  const { A } = plan;
+  const sa = plan.swampArena;
+  const lines = [plan.trail, ...plan.paths];
+  const segsNear = (x, z, reach) => {
+    const out = [];
+    for (const line of lines) {
+      for (let i = 0; i < line.length - 1; i++) {
+        const a = line[i], b = line[i + 1];
+        if (Math.min(a.x, b.x) > x + reach || Math.max(a.x, b.x) < x - reach || Math.min(a.z, b.z) > z + reach || Math.max(a.z, b.z) < z - reach) continue;
+        out.push([a.x, a.z, b.x, b.z]);
+      }
+    }
+    return out;
+  };
+  const ringMin = (x, z, r) => {
+    let lo = Infinity;
+    for (let k = 0; k < 14; k++) {
+      const a = (k / 14) * TAU;
+      lo = Math.min(lo, fnN(x + Math.cos(a) * r, z + Math.sin(a) * r));
+    }
+    return lo;
+  };
+  if (sa) {
+    // below the median of the ground round the ring (its coast side may dip toward the beach)
+    const ring = [];
+    for (let k = 0; k < 16; k++) ring.push(fnN(sa.x + Math.cos((k / 16) * TAU) * (sa.r + 4), sa.z + Math.sin((k / 16) * TAU) * (sa.r + 4)));
+    ring.sort((a, b) => a - b);
+    const level = Math.max(0.9, ring[8] - SWAMP_ARENA.sink);
+    const r = sa.r - 3;
+    plan.bogs.push({ id: 0, field: 0, x: sa.x, z: sa.z, r, reach: r * 1.2, level, round: true, arena: true, segs: [] });
+  }
+  const want = Math.round(70 * (plan.k / 0.86) ** 2);
+  for (let i = 0; i < 6000 && plan.bogs.length < want; i++) {
+    const x = rng.range(-A * 0.85, A * 0.85), z = rng.range(-plan.B, plan.B);
+    if (!insideOutline(plan, x, z, 0.8)) continue;
+    const r = i < 2000 ? rng.range(18, 34) : rng.range(8, 20);   // big bogs first, then smaller ones between
+    const reach = r * 1.15 * 1.3;
+    // the whole shoreline (up to ~1.4 r out) clear of the hut, boat, sites and plots; meadows may get wet edges
+    if (taken.some((t) => !t.hill && Math.hypot(t.x - x, t.z - z) < (t.meadow ? t.r * 0.5 + r : t.r + r * 1.4))) continue;
+    // a bog either joins the field it overlaps (deep enough into it) or keeps clear of all others
+    const near = plan.bogs.filter((b) => Math.hypot(b.x - x, b.z - z) < (b.r + r) * 1.35 + 2);
+    if (near.some((b) => b.arena || Math.hypot(b.x - x, b.z - z) > (b.r + r) * 1.0)) continue;
+    const field = new Set(near.map((b) => b.field));
+    if (field.size > 1 || (near.length && plan.bogs.filter((b) => b.field === near[0].field).length >= 10)) continue;
+    if (plan.sites.peak && Math.hypot(plan.sites.peak.x - x, plan.sites.peak.z - z) < r * 1.3 + 14) continue;
+    if (distToPolyline(plan.river.pts, x, z) < reach + 6) continue;
+    if (plan.pools.some((p) => Math.hypot(p.x - x, p.z - z) < p.r * 2.6 + reach)) continue;
+    const h = fnN(x, z);
+    if (h < 0.9 || h > 4.5) continue;
+    // the water stands a little below the lowest point of the shore
+    const level = ringMin(x, z, r * 1.2) - 0.22;
+    if (level < 0.7) continue;
+    const id = plan.bogs.length;
+    plan.bogs.push({ id, field: near.length ? near[0].field : id, x, z, r, reach, level, segs: segsNear(x, z, reach + BOG.pathHalf + 5) });
+  }
+  // one water level per field: the lowest of its bogs
+  const levels = new Map();
+  for (const b of plan.bogs) levels.set(b.field, Math.min(levels.get(b.field) ?? Infinity, b.level));
+  for (const b of plan.bogs) b.level = levels.get(b.field);
 }
 
 /** River surface / lava helpers used by Terrain. */

@@ -5,12 +5,13 @@
 
 ### Island generation & terrain
 - `rng.js` — seeded PRNG (`makeRng`, Mulberry32), `hash2`, `valueNoise`, `fbm`, and math helpers (`clamp`, `lerp`, `smoothstep`, `angleDiff`).
-- `levels.js` — biome definitions (`BIOMES`: vegetation, rock palette + stone-kind tints, sites, dinos, music) and the island list (`LEVELS`); `levelDef(index)` returns the full definition incl. difficulty, dino counts, grove/boss-arena flags.
-- `island.js` — island generator: `planIsland(levelIndex, variant)` builds the plan (hut beach, boat beach, hills/volcano, rivers/lava, pools, sites, trail); `islandHeight`, `riverQuery`, `poolAt`, `islandSeed`; `CAVES_ENABLED` (currently `false`).
-- `terrain.js` — `Terrain`: samples the plan onto a grid once and answers `heightAt`, `slopeAt`, `gradientAt`, water/lava/sea level and depth queries, `isWalkable`.
+- `levels.js` — biome definitions (`BIOMES` jungle, volcano, swamp: vegetation, rock palette + stone-kind tints, sites, dinos, music, outline `shape`) and the island list (`LEVELS`: Emerald Jungle, Misty Swamp, Ashfall Isle); `levelDef(index)` returns the full definition incl. difficulty, dino counts, size `scale`, `seedIndex` (Ashfall keeps the seeds it had as island 2), grove/boss-arena/swamp-arena flags.
+- `island.js` — island generator: `planIsland(levelIndex, variant)` builds the plan (hut beach, boat beach, hills/volcano, rivers/lava, pools, sites, trail; swamp: hourglass outline, flat relief, creek, side `paths`, `bogs`); `islandHeight`, `riverQuery`, `poolAt`, `islandSeed`, outline `halfWidthAt` / `insideOutline` (`HOURGLASS`), bogs `bogSample` (`BOG`: max 0.3 m deep, dry causeways); `CAVES_ENABLED` (currently `false`).
+- `terrain.js` — `Terrain`: samples the plan onto a grid once and answers `heightAt`, `slopeAt`, `gradientAt`, water/lava/sea level and depth queries (bog water included), `isWalkable`; swamp: `bogAt`, `bogLevelAt`, `swampSpeedAt` (the -20 % rule for players and dinosaurs).
 - `layout.js` — `buildLayout(terrain)`: deterministic placement of hut, boat, trees, rocks, bushes, fruit spots, sites, dino zones, nests, paths and all static colliders.
 - `bossArena.js` — the first island's lava islet: `planBossArena` (placed from the boat, no randomness), causeway and height shaping, `insideBossArena`.
 - `grove.js` — the giant Brachiosaurus pen on the boss arena plateau (`GROVE`): barrier tests `insideGrove`, `groveEntry`, `mayEnterGrove`, `titanScale`.
+- `swampArena.js` — the swamp's root-walled kettle in the hourglass waist (`SWAMP_ARENA`): `planSwampArena`, `insideSwampArena`, wall colliders with one gate (`arenaWallColliders`, `onArenaWall`), boss spawn; its boss comes later.
 
 ### Collider/shape builders
 - `siteFrame.js` — local-to-world frame for placed sites (`toWorld`, `boxRot`, `siteBox`).

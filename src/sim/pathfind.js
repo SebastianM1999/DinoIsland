@@ -126,7 +126,8 @@ export function findPath(sys, d, fx, fz, tx, tz, reach = 8, maxNodes = MAX_NODES
       // no corner cutting past an unwalkable cell
       if (di && dj && (!walk(n.i, n.j, n.i + di, n.j) || !walk(n.i, n.j, n.i, n.j + dj))) continue;
       const k = key(i, j);
-      const cost = gn + (di && dj ? Math.SQRT2 : 1);
+      // bogs (swamp) are slow going: weigh them by the time they take, so the dry paths win
+      const cost = gn + (di && dj ? Math.SQRT2 : 1) / (sys.terrain.swampSpeedAt?.(i * CELL, j * CELL) ?? 1);
       if (cost >= (g.get(k) ?? Infinity)) continue;
       g.set(k, cost);
       from.set(k, nk);

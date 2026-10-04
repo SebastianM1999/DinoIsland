@@ -198,7 +198,7 @@ export function dragonPlantGeometry() {
 
 
 /**
- * Big tropical leaf plant (elephant ear / banana leaf), ~1.5–2.2 m: long
+ * Big tropical leaf plant (elephant ear / banana leaf), ~1.5ï¿½2.2 m: long
  * stalks carrying large smooth heart-shaped leaves that droop at the tip.
  */
 export function bigLeafGeometry() {
@@ -262,6 +262,33 @@ export function shrubGeometry() {
   });
 }
 
+/** Reeds and cattails (swamp shores): a tuft of tall blades, a few brown cattail heads, ~1.7 m. */
+export function reedGeometry() {
+  return cached('reed', () => {
+    const parts = [];
+    const n = 14;
+    for (let k = 0; k < n; k++) {
+      const a = (k / n) * TAU + Math.sin(k * 3.7) * 0.4;
+      const dx = Math.cos(a), dz = Math.sin(a);
+      const r0 = 0.06 + 0.12 * ((k * 7) % 5) / 5;
+      const L = 1.3 + 0.5 * Math.abs(Math.sin(k * 2.3));
+      const path = arcPath(V(dx * r0, 0, dz * r0), dx, dz, L * 0.25, 3.6, 0.35 + 0.25 * Math.abs(Math.sin(k)), 5);
+      parts.push(leafStrip(path, (t) => (t >= 1 ? 0.004 : 0.035 * (1 - t * 0.7)), {
+        side: V(-dz, 0, dx), ridge: 0.2, serrate: 0,
+        color: (t, h) => (t > 0.75 ? (h ? '#a9b46a' : '#8a9452') : h ? '#6f8e45' : '#4f6e34'),
+      }));
+    }
+    // cattails: a stalk with a velvety brown head
+    for (let k = 0; k < 4; k++) {
+      const a = k * 1.7 + 0.3, r = 0.08 + k * 0.03;
+      const x = Math.cos(a) * r, z = Math.sin(a) * r, h = 1.45 + k * 0.12;
+      parts.push(tube([V(x, 0, z), V(x + 0.02, h * 0.5, z), V(x + 0.05, h, z + 0.02)], () => 0.012, { radial: 3, color: () => '#6f7a44', capStart: false }));
+      parts.push(place(blob(0.04, 0.14, 0.04, (c, nn) => (nn.y > 0.8 ? '#4a3420' : '#6a4a2a'), { w: 6, h: 5 }), [x + 0.05, h - 0.1, z + 0.02]));
+    }
+    return merge(parts);
+  });
+}
+
 /**
  * Instanced bush kinds for vegetation.js: geometry builder + wind params
  * ({ strength, pivotY, frequency, heightScale }, as in VEG_TUNING).
@@ -271,4 +298,5 @@ export const BUSH_TYPES = {
   fern: { geometry: fernGeometry, wind: { strength: 0.035, pivotY: 0.05, frequency: 2.0, heightScale: 0.9 } },
   bigleaf: { geometry: bigLeafGeometry, wind: { strength: 0.022, pivotY: 0.4, frequency: 1.4, heightScale: 0.5 } },
   shrub: { geometry: shrubGeometry, wind: { strength: 0.018, pivotY: 0.1, frequency: 2.1, heightScale: 0.6 } },
+  reed: { geometry: reedGeometry, wind: { strength: 0.04, pivotY: 0.05, frequency: 1.7, heightScale: 0.8 } },
 };

@@ -5,6 +5,7 @@
 // World coordinates: x = east, z = south (-z is north). The map is north-up.
 
 import { Terrain } from '../../shared/terrain.js';
+import { SWAMP_ARENA } from '../../shared/swampArena.js';
 
 const TAU = Math.PI * 2;
 
@@ -22,6 +23,9 @@ const C = {
   path: [214, 178, 110],
   lava: [255, 120, 30],
   ash: [120, 112, 116],
+  bog: [96, 104, 62],
+  mud: [104, 88, 62],
+  arena: [58, 52, 44],
 };
 
 const mix = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
@@ -47,6 +51,8 @@ export function buildMapBase(terrain, layout, res = 640) {
   const mpp = size / res;
   const jungle = layout && typeof layout.jungleDensity === 'function' ? layout.jungleDensity : null;
   const volcanic = layout?.biome?.id === 'volcano';
+  // the swamp's lowland lies low: less of it reads as beach
+  const beach = layout?.biome?.id === 'swamp' ? [0.9, 1.5] : [1.4, 2.4];
   // light from the north-west for a soft hillshade
   const lx = -0.7, lz = -0.7;
 
@@ -57,16 +63,20 @@ export function buildMapBase(terrain, layout, res = 640) {
       const h = terrain.heightAt(x, z);
       const w = terrain.waterLevelAt(x, z);
       let col;
+      const bog = terrain.bogAt?.(x, z) ?? 0;
       if (terrain.lavaLevelAt?.(x, z) != null) {
         col = C.lava;
+      } else if (bog > 0.3) {
+        // bogs (swamp): murky olive water over dark mud
+        col = w !== null && w - h > 0.03 ? C.bog : C.mud;
       } else if (w !== null && w - h > 0.05) {
         const depth = w - h;
         if (w > 1) col = mix(C.shallow, C.lake, clamp01(depth / 2.5));
         else col = depth < 2.2 ? mix(C.shallow, C.sea, clamp01(depth / 2.2)) : mix(C.sea, C.deep, clamp01((depth - 2.2) / 8));
       } else {
         const slope = terrain.slopeAt(x, z);
-        if (h < 1.4) col = C.sand;
-        else if (h < 2.4) col = mix(C.sand, C.grass, (h - 1.4) / 1.0);
+        if (h < beach[0]) col = C.sand;
+        else if (h < beach[1]) col = mix(C.sand, C.grass, (h - beach[0]) / (beach[1] - beach[0]));
         else {
           col = h > 30 ? mix(C.grass, C.meadow, clamp01((h - 30) / 20)) : C.grass;
           if (volcanic) col = mix(col, C.ash, 0.55);
@@ -97,6 +107,17 @@ export function buildMapBase(terrain, layout, res = 640) {
       line.forEach(([x, z], i) => (i ? ctx.lineTo : ctx.moveTo).call(ctx, (x + half) / mpp, (z + half) / mpp));
       ctx.stroke();
     }
+  }
+
+  // The swamp arena: its root wall as a dark ring, open at the gate.
+  const sa = layout?.swampArena;
+  if (sa) {
+    ctx.strokeStyle = `rgb(${C.arena.join(',')})`;
+    ctx.lineWidth = Math.max(2, 2.4 / mpp);
+    const gap = (SWAMP_ARENA.gateW / 2 + 0.5) / sa.r;
+    ctx.beginPath();
+    ctx.arc((sa.x + half) / mpp, (sa.z + half) / mpp, sa.r / mpp, sa.gateAngle + gap, sa.gateAngle + TAU - gap);
+    ctx.stroke();
   }
 
   // Big rocks as small grey blobs, like the stones on the reference minimap.

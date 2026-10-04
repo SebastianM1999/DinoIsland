@@ -9,7 +9,7 @@ import { TRUNKS } from '../src/shared/treeShapes.js';
 import { CONFIG } from '../src/shared/config.js';
 
 const islands = [];
-for (const level of [0, 1]) {
+for (const level of [0, 1, 2]) {
   for (let variant = 1; variant <= 16; variant++) {
     const terrain = new Terrain(planIsland(level, variant));
     islands.push({ level, variant, terrain, plan: terrain.plan, layout: buildLayout(terrain) });

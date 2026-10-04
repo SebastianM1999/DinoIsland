@@ -123,7 +123,7 @@ test('UNSTUCK moves a player out of a tree trunk to a free spot and corrects the
 });
 
 test('UNSTUCK gets a player out of a steep pit; automatic requests on free ground are ignored', () => {
-  const { world, player, messages } = setup({ level: 1, variant: 2 });
+  const { world, player, messages } = setup({ level: 2, variant: 2 });
   const t = world.terrain, L = world.layout;
   // free ground: an automatic request does nothing
   let free = null;
