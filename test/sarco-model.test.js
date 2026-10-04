@@ -1,0 +1,91 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs/promises';
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { GLB_DINOS } from '../src/client/models/dino/glbCatalog.js';
+import { registerDinoGLTF, buildGLBDino } from '../src/client/models/dino/glbDino.js';
+import { SARCO_MODEL, SARCO_TYPE } from '../src/client/models/dino/sarcoModel.js';
+
+test('Sarcosuchus review asset has complete skins and eight clean clips without registering gameplay', async () => {
+  const bytes = await fs.readFile(new URL('../assets/models/dinos/alpha-sarcosuchus.glb', import.meta.url));
+  const gltf = await new GLTFLoader().parseAsync(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength), '');
+  assert.equal(GLB_DINOS[SARCO_TYPE], undefined);
+  registerDinoGLTF(SARCO_TYPE, gltf, SARCO_MODEL);
+  const rig = buildGLBDino(SARCO_TYPE), other = buildGLBDino(SARCO_TYPE);
+  assert.notEqual(rig.jaw, other.jaw);
+  assert.equal(rig.legChains.length, 4);
+  assert.equal(rig.tail.length, 8);
+  assert.equal(Object.keys(rig.clips).length, 8);
+  let tris = 0, jawVerts = 0;
+  rig.model.traverse(o => {
+    if (!o.isSkinnedMesh) return;
+    tris += o.geometry.index.count / 3;
+    assert.ok(o.geometry.attributes.color, 'vertex colors survive export');
+    assert.ok(o.material.name, 'no empty/default material slots');
+    if (o.material.name === 'AlphaHide') {
+      const col = o.geometry.attributes.color;
+      let red = 0, green = 0;
+      for (let i = 0; i < col.count; i += 11) { red += col.getX(i); green += col.getY(i); }
+      assert.ok(green > red, 'green crocodilian palette survives export');
+      assert.ok(green / Math.ceil(col.count / 11) < .5, 'skin must not export white');
+    }
+    const ji = o.skeleton.bones.findIndex(b => b.name === 'Jaw');
+    const si = o.geometry.attributes.skinIndex, sw = o.geometry.attributes.skinWeight;
+    for (let i = 0; i < si.count; i++) {
+      let sum = 0;
+      for (let k = 0; k < 4; k++) {
+        sum += sw.getComponent(i, k);
+        if (si.getComponent(i, k) === ji && sw.getComponent(i, k) > .5) jawVerts++;
+      }
+      assert.ok(Math.abs(sum - 1) < .001, 'normalized deform weights');
+    }
+  });
+  assert.ok(jawVerts > 500, 'jaw opens actual skin');
+  assert.ok(tris <= 60000);
+  const manifest = JSON.parse(await fs.readFile(new URL('../art/asset-manifest.json', import.meta.url)));
+  assert.equal(tris, manifest.models.find(m => m.id === 'dino-alpha-sarcosuchus').triangles);
+  const size = new THREE.Box3().setFromObject(rig.root, true).getSize(new THREE.Vector3());
+  assert.ok(Math.abs(size.z - 18) < .01);
+  assert.ok(Math.abs(size.y - SARCO_MODEL.height) < .01);
+  for (const state of ['idle', 'walk', 'run', 'roar', 'swim']) {
+    for (const track of rig.clips[state].tracks) {
+      const n = track.getValueSize();
+      for (let k = 0; k < n; k++) assert.ok(Math.abs(track.values[k] - track.values[track.values.length - n + k]) < 1e-5, `${state} loop seam`);
+    }
+  }
+  const mixer = new THREE.AnimationMixer(rig.model), p = new THREE.Vector3();
+  for (const [state, clip] of Object.entries(rig.clips)) {
+    const action = mixer.clipAction(clip).setLoop(THREE.LoopOnce, 1); action.clampWhenFinished = true; action.play();
+    for (let f = 0; f <= 20; f++) {
+      mixer.setTime(clip.duration * f / 20); rig.root.updateMatrixWorld(true);
+      rig.model.traverse(o => {
+        if (!o.isSkinnedMesh) return;
+        for (let i = 0; i < o.geometry.attributes.position.count; i += 7) {
+          o.getVertexPosition(i, p).applyMatrix4(o.matrixWorld);
+          assert.ok(p.toArray().every(Number.isFinite), `${state} finite skin`);
+          assert.ok(p.y >= -.025, `${state} underground vertex at ${p.y}`);
+        }
+      });
+    }
+    mixer.stopAllAction();
+  }
+  const anim = rig.createAnimator();
+  for (const input of [{speed:2}, {speed:8}, {pose:{attack:1,jaw:1}}, {pose:{roar:1,jaw:1}}, {dead:true}, {}]) {
+    for (let i = 0; i < 120; i++) {
+      anim.update(1/60, input);
+      if (i % 10 === 0) {
+        rig.root.updateMatrixWorld(true);
+        rig.model.traverse(o => {
+          if (!o.isSkinnedMesh) return;
+          for (let v = 0; v < o.geometry.attributes.position.count; v += 11) {
+            o.getVertexPosition(v, p).applyMatrix4(o.matrixWorld);
+            assert.ok(p.y >= -.025, 'runtime jaw/head overlays must also clear the ground');
+          }
+        });
+      }
+    }
+    assert.ok(rig.jaw.quaternion.toArray().every(Number.isFinite));
+  }
+  anim.dispose(); rig.dispose(); other.dispose();
+});
