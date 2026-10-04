@@ -3,6 +3,7 @@
 
 ## Files
 - `glbCatalog.js` — `GLB_DINOS`: per species the GLB URL (`/assets/models/dinos/<type>.glb`), fitted size, strides, bone aliases, clip names (`<Source>_<Clip>`), flyer flags and extra hit zones.
+- `sarcoModel.js` — Alpha Sarcosuchus review-only GLB contract, loaded on demand by the preview; it does not register a gameplay species or add a startup download.
 - `glbDino.js` — `preloadDinoModels()` (fetch + parse, 20 s timeout, warn and fall back on failure), `registerDinoGLTF()`, `buildGLBDino(type)` (clone, fit, bones, hit zones; `null` if not loaded) and `GLBDinoAnimator` (AnimationMixer clips plus procedural layers).
 - `rig.js` — `Rig` (joint hierarchy + meshes) and `DinoAnimator` for procedural rigs: distance-driven gait, 2-bone leg IK on terrain, bob/sway, neck/tail follow-through, breathing, blinking, look, jaw, death, trap struggle.
 - `skin.js` — `loft`, `SkinBuilder`, `restPoint`/`restMatrix`: lofted soft bodies bound to joints as a `SkinnedMesh`.
@@ -28,6 +29,7 @@
 ## Rules
 - Every server species (`CONFIG.dinos`: brachio, stego, raptor, ptera, trex) needs a `SPECIES` entry; all five currently also have a `GLB_DINOS` entry. Clip names in the catalog must exist in the GLB: `registerDinoGLTF` throws on a missing clip (and that species falls back to procedural).
 - Missing art never blocks play: `buildGLBDino` returns `null` until a template is registered, and `SPECIES` then uses the procedural builder.
+- `registerDinoGLTF(type, gltf, spec)` accepts an explicit asset contract for review models outside `GLB_DINOS`; that contract is retained with the template. `preview.html?type=alpha-sarcosuchus` uses this path and reports missing review assets without substituting another creature.
 - Creatures face -Z; GLB exports face +Z and are turned by `yaw: Math.PI` in the catalog.
 - Hit zones (`rig.hitZones` / `rig.hitSpheres`) are what client hit tests use; GLB radii are derived from `spec.height` plus `extraHitZones`.
 - Stride values in `glbCatalog.js` come from `scripts/measure-dino-strides.mjs`; the gait phase advances by distance so planted feet do not slide.

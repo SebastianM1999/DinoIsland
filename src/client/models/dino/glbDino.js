@@ -12,8 +12,7 @@ const clamp = THREE.MathUtils.clamp;
 const damp = (a, b, dt, rate = 8) => THREE.MathUtils.damp(a, b, rate, dt);
 
 /** Accept parsed glTF too: tests and future asset providers need no browser/WebGL. */
-export function registerDinoGLTF(type, gltf) {
-  const spec = GLB_DINOS[type];
+export function registerDinoGLTF(type, gltf, spec = GLB_DINOS[type]) {
   if (!spec) throw new Error(`Unknown GLB species: ${type}`);
   const clips = {};
   for (const [state, name] of Object.entries(spec.clips)) {
@@ -32,7 +31,7 @@ export function registerDinoGLTF(type, gltf) {
     }
   });
   retainObjectResources(scene);
-  templates.set(type, { scene, clips, box, size });
+  templates.set(type, { scene, clips, box, size, spec });
 }
 
 /** Cache successful loads, retry failures next launch, never block play on missing art. */
@@ -62,7 +61,7 @@ export async function preloadDinoModels(onProgress = () => {}) {
 export function buildGLBDino(type) {
   const template = templates.get(type);
   if (!template) return null;
-  const spec = GLB_DINOS[type];
+  const spec = template.spec;
   const root = new THREE.Group(), tilt = new THREE.Group(), body = new THREE.Group();
   const model = clone(template.scene);
   const scale = spec.length / template.size.z;
