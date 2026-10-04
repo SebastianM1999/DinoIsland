@@ -1,18 +1,17 @@
-// The volcano (Ashfall Isle, see shared/levels.js). Three things the server
+// The volcano (Ashfall Isle, see shared/levels.js). Two things the server
 // decides for everyone:
 //
 // - Heat: the ground near lava and fumaroles is hot (Terrain.heatAt). Players
 //   standing on very hot ground burn a little (the client also drains their
 //   stamina faster there, player/controller.js). Fireproof (ember chili) helps.
-// - Crust plates over the lava flows (Terrain.crustAt): they hold a moment –
-//   whoever stands on one too long breaks it. A broken plate is lava until it
-//   has cooled again.
-// - The eruption cycle: calm -> rumble (a warning) -> erupt (lava bombs rain
-//   down, each one announced with a warning circle where it lands; they hurt
-//   dinosaurs too) -> ash (ash rain: thick air, dinosaurs see less far) -> calm.
+// - Lava bombs. The eruption cycle: calm -> rumble (a warning) -> erupt (waves
+//   of bombs rain down) -> ash (ash rain: thick air, dinosaurs see less far)
+//   -> calm. Between eruptions the volcano still spits a stray bomb now and
+//   then. Every bomb is announced with a warning circle where it lands; bombs
+//   hurt dinosaurs too.
 //
-// Everything replicates through EV.VOLCANO / EV.BOMB / EV.CRUST and, for late
-// joiners, fullState().volcano (public()).
+// Everything replicates through EV.VOLCANO / EV.BOMB and, for late joiners,
+// fullState().volcano (public()).
 
 import { CONFIG } from '../shared/config.js';
 import { EV } from '../shared/protocol.js';
@@ -24,36 +23,23 @@ const r2 = (v) => Math.round(v * 100) / 100;
 export class Volcano {
   constructor(world) {
     this.world = world;
-    const layout = world.layout;
-    this.active = !!layout.plan.volcano;
+    this.active = !!world.layout.plan.volcano;
     this.rng = makeRng((Math.random() * 0xffffffff) >>> 0);
     this.phase = 'calm';
     this.until = world.now + V.cycle.first;
     this.nextWave = 0;
+    this.nextStray = world.now + this.rng.range(V.bomb.stray[0], V.bomb.stray[1]);
     this.bombs = [];                 // pending impacts { x, z, y, at }
-    // crust plates: broken until `until`; who stood on which one for how long
-    this.crusts = (layout.crusts || []).map((c) => ({ id: c.id, broken: false, until: 0, warned: false }));
   }
 
-  /** Replicated state (fullState): phase, seconds left, broken crust plates. */
+  /** Replicated state (fullState): phase and seconds left. */
   public() {
     if (!this.active) return null;
-    return {
-      phase: this.phase,
-      left: r2(Math.max(0, this.until - this.world.now)),
-      broken: this.crusts.filter((c) => c.broken).map((c) => ({ id: c.id, left: r2(c.until - this.world.now) })),
-    };
+    return { phase: this.phase, left: r2(Math.max(0, this.until - this.world.now)) };
   }
 
   /** Dinosaurs see this much less far (ash rain). */
   sightMul() { return this.active && this.phase === 'ash' ? V.bomb.ashSight : 1; }
-
-  /** Lava surface of a broken crust plate at (x, z), or null (see world.js: it burns like lava). */
-  lavaAt(x, z) {
-    if (!this.active) return null;
-    const c = this.world.terrain.crustAt(x, z);
-    return c && this.crusts[c.id]?.broken ? c.y : null;
-  }
 
   #setPhase(phase, seconds) {
     this.phase = phase;
@@ -63,9 +49,10 @@ export class Volcano {
 
   update(dt) {
     if (!this.active) return;
-    const w = this.world, now = w.now;
+    const w = this.world, now = w.now, B = V.bomb;
     // --- the cycle
-    if (w.mission.phase === 'sailing' && this.phase !== 'calm') this.#setPhase('calm', V.cycle.calmMax);
+    const sailing = w.mission.phase === 'sailing';
+    if (sailing && this.phase !== 'calm') this.#setPhase('calm', V.cycle.calmMax);
     if (now >= this.until) {
       const C = V.cycle;
       if (this.phase === 'calm') this.#setPhase('rumble', C.rumble);
@@ -74,8 +61,13 @@ export class Volcano {
       else this.#setPhase('calm', this.rng.range(C.calmMin, C.calmMax));
     }
     if (this.phase === 'erupt' && now >= this.nextWave) {
-      this.nextWave = now + V.bomb.wave;
+      this.nextWave = now + B.wave;
       this.#wave();
+    }
+    // between eruptions: now and then a stray bomb
+    if (this.phase !== 'erupt' && !sailing && now >= this.nextStray) {
+      this.nextStray = now + this.rng.range(B.stray[0], B.stray[1]);
+      this.#stray();
     }
     // --- bombs landing
     for (let i = this.bombs.length - 1; i >= 0; i--) {
@@ -83,72 +75,66 @@ export class Volcano {
       this.#impact(this.bombs[i]);
       this.bombs.splice(i, 1);
     }
-    // --- crust plates cool down again
-    for (const c of this.crusts) {
-      if (c.broken && now >= c.until) {
-        c.broken = false;
-        c.warned = false;
-        w.event(EV.CRUST, { id: c.id, state: 'solid' });
-      }
-    }
-    // --- players: hot ground and crust plates
+    // --- players on hot ground
     const H = V.heat;
     for (const p of w.players.values()) {
-      if (!p.alive || p.creative) { p.heatT = 0; p.crust = null; continue; }
-      const proof = p.buffs?.heatproof > now;
+      if (!p.alive || p.creative) { p.heatT = 0; continue; }
       const ground = w.terrain.heightAt(p.x, p.z);
       const onGround = p.y < Math.max(ground, w.layout.groundAt(p.x, p.z, p.y + 0.5)) + 1.2;
-      const heat = w.terrain.heatAt(p.x, p.z);
-      if (onGround && !proof && heat >= H.dmgFrom) {
+      if (onGround && !(p.buffs?.heatproof > now) && w.terrain.heatAt(p.x, p.z) >= H.dmgFrom) {
         p.heatT = (p.heatT ?? 0) + dt;
         if (p.heatT >= 0.5) {
           p.heatT -= 0.5;
           w.hurtPlayer(p, H.dps * 0.5, { src: 'heat' });
-          if (!p.alive) continue;
         }
       } else p.heatT = 0;
-      // standing on a crust plate: it cracks, then breaks
-      const plate = w.terrain.crustAt(p.x, p.z);
-      const c = plate && this.crusts[plate.id];
-      if (!c || c.broken || p.y > plate.y + 1.2) { p.crust = null; continue; }
-      if (p.crust?.id !== c.id) p.crust = { id: c.id, t: 0 };
-      p.crust.t += dt;
-      const hold = V.crust.hold * (proof ? CONFIG.fruit.buffs.heatproof.crustMul : 1);
-      if (!c.warned && p.crust.t >= V.crust.warn) {
-        c.warned = true;
-        w.event(EV.CRUST, { id: c.id, state: 'crack' });
-      }
-      if (p.crust.t >= hold) {
-        c.broken = true;
-        c.until = now + V.crust.broken;
-        p.crust = null;
-        w.event(EV.CRUST, { id: c.id, state: 'broken', left: V.crust.broken });
-      }
     }
   }
 
-  /** One wave of lava bombs: one near each player out in the open, one anywhere on the island. */
+  /** A landing spot within `d0..d1` m of (x, z), or null after a few tries. */
+  #near(x, z, [d0, d1]) {
+    for (let k = 0; k < 8; k++) {
+      const a = this.rng() * Math.PI * 2, d = this.rng.range(d0, d1);
+      const spot = this.#spot(x + Math.cos(a) * d, z + Math.sin(a) * d);
+      if (spot) return spot;
+    }
+    return null;
+  }
+
+  /** A landing spot anywhere on the island, or null after a few tries. */
+  #anywhere() {
+    const A = this.world.layout.plan.A;
+    for (let k = 0; k < 12; k++) {
+      const spot = this.#spot(this.rng.range(-A, A), this.rng.range(-A, A));
+      if (spot) return spot;
+    }
+    return null;
+  }
+
+  /** One wave of the eruption: a few bombs round each player out in the open, more anywhere on the island. */
   #wave() {
-    const w = this.world, B = V.bomb, rng = this.rng;
+    const w = this.world, B = V.bomb;
     const targets = [];
     for (const p of w.players.values()) {
       if (!p.alive || p.creative) continue;
-      for (let k = 0; k < 8; k++) {
-        const a = rng() * Math.PI * 2, d = rng.range(B.near[0], B.near[1]);
-        const spot = this.#spot(p.x + Math.cos(a) * d, p.z + Math.sin(a) * d);
-        if (spot) { targets.push(spot); break; }
-      }
+      for (let k = 0; k < B.perPlayer; k++) targets.push(this.#near(p.x, p.z, B.near));
     }
-    const A = w.layout.plan.A;
-    for (let k = 0; k < 12; k++) {
-      const spot = this.#spot(rng.range(-A, A), rng.range(-A, A));
-      if (spot) { targets.push(spot); break; }
-    }
-    for (const t of targets) {
-      const bomb = { ...t, at: w.now + B.warn };
-      this.bombs.push(bomb);
-      w.event(EV.BOMB, { x: r2(t.x), z: r2(t.z), y: r2(t.y), eta: B.warn, r: B.radius });
-    }
+    for (let k = 0; k < B.anywhere; k++) targets.push(this.#anywhere());
+    for (const t of targets) if (t) this.#launch(t);
+  }
+
+  /** A stray bomb between eruptions: half the time somewhere round a player, else anywhere. */
+  #stray() {
+    const players = [...this.world.players.values()].filter((p) => p.alive && !p.creative);
+    const p = players.length && this.rng() < 0.5 ? players[Math.floor(this.rng() * players.length)] : null;
+    const t = p ? this.#near(p.x, p.z, V.bomb.strayNear) : this.#anywhere();
+    if (t) this.#launch(t);
+  }
+
+  #launch(t) {
+    const B = V.bomb;
+    this.bombs.push({ ...t, at: this.world.now + B.warn });
+    this.world.event(EV.BOMB, { x: r2(t.x), z: r2(t.z), y: r2(t.y), eta: B.warn, r: B.radius });
   }
 
   /** A landing spot for a bomb at (x, z), or null: on land, never at the camp, the base or the boat. */

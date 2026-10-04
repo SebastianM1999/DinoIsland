@@ -117,7 +117,6 @@ export const EV = {
   HEAL: 'heal',             // { id, by, hp }                    Field Medic healed id
   VOLCANO: 'volcano',       // { phase, left }                   eruption cycle (sim/volcano.js): calm | rumble | erupt | ash
   BOMB: 'bomb',             // { x, y, z, eta, r }               a lava bomb lands at (x, z) in eta seconds (radius r)
-  CRUST: 'crust',           // { id, state, left? }              crust plate id: crack | broken (lava for `left` s) | solid
 };
 
 /** Player snapshot tuple layout. */

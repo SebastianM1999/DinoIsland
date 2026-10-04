@@ -3,18 +3,18 @@
 // - ash flakes drift down round the camera all the time – a few when it is
 //   calm, a thick fall during the ash rain, when the fog draws in too
 //   (onFog blends the biome's sky toward ashSky);
-// - fumaroles steam;
-// - crust plates over the lava: dark cooled lava with glowing cracks that
-//   flare when someone cracks a plate, molten while it is broken;
+// - fumaroles steam; the vents the lava flows well out of are glowing
+//   spatter cones; lava bombs still glow in some of the small craters;
 // - an eruption throws lava up out of the crater; every lava bomb gets a red
-//   warning circle where it will land, flies in glowing and bursts.
+//   warning circle where it will land, flies in glowing, bursts and leaves a
+//   scorched, glowing mark that cools and fades.
 //
-// State comes from the server (setState on welcome, setPhase / bomb / crust on
-// its events). How many flakes and puffs follows the graphics tier.
+// State comes from the server (setState on welcome, setPhase / bomb on its
+// events). How many flakes and puffs follows the graphics tier.
 
 import * as THREE from 'three';
 import { makeRng } from '../../shared/rng.js';
-import { crustWarp } from '../../shared/island.js';
+import { MAT, paint, place, merge, mesh } from '../models/kit.js';
 
 const TAU = Math.PI * 2;
 // [ash flakes, fumarole puffs each, crater spray]
@@ -22,7 +22,9 @@ const TIER = { Low: [160, 3, 60], Medium: [320, 4, 110], High: [600, 6, 160], Ul
 const ASH_BOX = 36;              // half size of the box of ash round the camera (m)
 const FUMAROLE_RANGE = 170;      // fumaroles further away do not steam
 const BOMB_FLIGHT = 1.7;         // the last seconds of a bomb's warning: it flies in from the crater
-const MAX_BOMBS = 24;
+const MAX_BOMBS = 32;
+const MAX_MARKS = 40;            // scorch marks left by bomb impacts
+const MARK_LIFE = 90;            // seconds until a scorch mark has faded
 
 /** The air in the ash rain: close, grey-brown, the sun a dull disc. */
 export function ashSky(sky) {
@@ -45,87 +47,48 @@ function softTexture() {
   return t;
 }
 
-/** Crust plate surface: cooled lava cut by glowing cracks; uCrack flares them, uBroken melts it. */
-function crustMaterial() {
+/** A vent's spatter cone (local, ground at y = 0): a ring of dark slag round a glowing mouth. */
+function ventGeometry() {
+  const cone = new THREE.CylinderGeometry(1.5, 3.4, 1.6, 14, 2, true).translate(0, 0.6, 0);
+  const slag = paint(cone, (c) => (c.y > 1.2 ? '#4a2a22' : '#2a2224'));
+  const lip = paint(new THREE.TorusGeometry(1.5, 0.35, 5, 14).rotateX(Math.PI / 2).translate(0, 1.4, 0), '#3a2a28');
+  return merge([slag, lip]);
+}
+
+/** A scorched blast mark (flat disc, local XZ): dark, a glowing ring of embers that cools. */
+function markMaterial() {
   return new THREE.ShaderMaterial({
-    fog: true,
-    uniforms: THREE.UniformsUtils.merge([THREE.UniformsLib.fog, { uTime: { value: 0 }, uCrack: { value: 0 }, uBroken: { value: 0 } }]),
-    polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2,
+    fog: true, transparent: true, depthWrite: false,
+    polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3,
+    uniforms: THREE.UniformsUtils.merge([THREE.UniformsLib.fog, { uHeat: { value: 1 }, uAlpha: { value: 1 } }]),
     vertexShader: /* glsl */`
       #include <fog_pars_vertex>
-      varying vec2 vP;
-      varying float vEdge;
-      attribute float aEdge;
+      varying vec2 vUv;
       void main() {
-        vP = (modelMatrix * vec4(position, 1.0)).xz;
-        vEdge = aEdge;
+        vUv = uv;
         vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
         gl_Position = projectionMatrix * mvPosition;
         #include <fog_vertex>
       }`,
     fragmentShader: /* glsl */`
       #include <fog_pars_fragment>
-      uniform float uTime, uCrack, uBroken;
-      varying vec2 vP;
-      varying float vEdge;
-      vec2 hash2(vec2 p) { p = vec2(dot(p, vec2(127.1, 311.7)), dot(p, vec2(269.5, 183.3))); return fract(sin(p) * 43758.5453); }
-      float cells(vec2 p) {
-        vec2 i = floor(p), f = fract(p);
-        float d1 = 8.0, d2 = 8.0;
-        for (int y = -1; y <= 1; y++) for (int x = -1; x <= 1; x++) {
-          vec2 g = vec2(float(x), float(y));
-          vec2 r = g + hash2(i + g) - f;
-          float d = dot(r, r);
-          if (d < d1) { d2 = d1; d1 = d; } else if (d < d2) d2 = d;
-        }
-        return sqrt(d2) - sqrt(d1);
-      }
+      uniform float uHeat, uAlpha;
+      varying vec2 vUv;
+      float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
       void main() {
-        float e = cells(vP * 0.55);
-        float crack = 1.0 - smoothstep(0.02, 0.08 + uCrack * 0.1, e);
-        vec3 crust = mix(vec3(0.07, 0.055, 0.06), vec3(0.15, 0.12, 0.12), smoothstep(0.1, 0.6, e));
-        float pulse = 0.5 + 0.5 * sin(uTime * 9.0);
-        vec3 glow = vec3(1.0, 0.33, 0.05) * (0.45 + uCrack * (1.2 + 0.8 * pulse));
-        vec3 col = mix(crust, glow, crack);
-        float flow = 0.5 + 0.5 * sin(vP.x * 0.7 + uTime * 1.3) * sin(vP.y * 0.6 - uTime * 0.9);
-        vec3 lava = mix(vec3(0.95, 0.24, 0.03), vec3(1.0, 0.78, 0.25), flow * 0.8 + crack * 0.2);
-        col = mix(col, lava * 1.6, uBroken);
-        // the rim blends into the ground
-        col = mix(col, vec3(0.12, 0.1, 0.1), smoothstep(0.75, 1.0, vEdge) * (1.0 - uBroken));
-        gl_FragColor = vec4(col, 1.0);
+        vec2 p = vUv * 2.0 - 1.0;
+        float r = length(p);
+        float n = hash(floor(p * 9.0));
+        float edge = 1.0 - smoothstep(0.55 + n * 0.3, 1.0, r);
+        vec3 col = mix(vec3(0.05, 0.04, 0.04), vec3(0.14, 0.11, 0.1), smoothstep(0.0, 0.9, r));
+        float embers = step(0.72, n) * (1.0 - smoothstep(0.2, 0.8, r));
+        col = mix(col, vec3(1.0, 0.35, 0.06) * 1.6, embers * uHeat);
+        gl_FragColor = vec4(col, edge * 0.85 * uAlpha);
         #include <tonemapping_fragment>
         #include <colorspace_fragment>
         #include <fog_fragment>
       }`,
   });
-}
-
-/** Flat disc following a crust plate's outline at its height (aEdge: 0 middle .. 1 rim). */
-function crustGeometry(plan, c) {
-  const n = 40, rings = 4;
-  const pos = [], edge = [], idx = [];
-  pos.push(c.x, c.y + 0.07, c.z); edge.push(0);
-  for (let r = 1; r <= rings; r++) {
-    for (let k = 0; k < n; k++) {
-      const a = (k / n) * TAU, rr = (r / rings) * c.r * crustWarp(plan, c, a);
-      pos.push(c.x + Math.cos(a) * rr, c.y + 0.07, c.z + Math.sin(a) * rr);
-      edge.push(r / rings);
-    }
-  }
-  for (let k = 0; k < n; k++) idx.push(0, 1 + ((k + 1) % n), 1 + k);
-  for (let r = 1; r < rings; r++) {
-    const a0 = 1 + (r - 1) * n, a1 = 1 + r * n;
-    for (let k = 0; k < n; k++) {
-      const k1 = (k + 1) % n;
-      idx.push(a0 + k, a0 + k1, a1 + k, a0 + k1, a1 + k1, a1 + k);
-    }
-  }
-  const g = new THREE.BufferGeometry();
-  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-  g.setAttribute('aEdge', new THREE.Float32BufferAttribute(edge, 1));
-  g.setIndex(idx);
-  g.computeBoundingSphere();
-  return g;
 }
 
 /**
@@ -137,7 +100,7 @@ function crustGeometry(plan, c) {
 export function buildVolcanoFx(terrain, layout, camera, { onFog = null, onImpact = null } = {}) {
   const group = new THREE.Group();
   group.name = 'volcano-fx';
-  const none = { group, update() {}, setQuality() {}, setState() {}, setPhase() {}, bomb() {}, crust() {} };
+  const none = { group, update() {}, setQuality() {}, setState() {}, setPhase() {}, bomb() {} };
   if (!layout.plan.volcano || typeof document === 'undefined') return none;
   const plan = layout.plan;
   const rng = makeRng(plan.seed ^ 0xa5f);
@@ -175,14 +138,50 @@ export function buildVolcanoFx(terrain, layout, camera, { onFog = null, onImpact
     }),
   }));
 
-  // ------------------------------------------------------------ crust plates
-  const crusts = (layout.crusts || []).map((c) => {
-    const m = new THREE.Mesh(crustGeometry(plan, c), crustMaterial());
-    m.receiveShadow = true;
-    m.name = 'crust';
+  // ----------------------------------------------- vents and glowing craters
+  // spatter cones where the lava flows well out of the flanks; a lava bomb
+  // still glowing in some of the small craters
+  {
+    const cones = [], glow = [];
+    for (const f of plan.flows || []) {
+      if (f.ring || !f.vent) continue;
+      const y = terrain.heightAt(f.vent.x, f.vent.z);
+      cones.push(place(ventGeometry(), [f.vent.x, y - 0.3, f.vent.z], [0, f.vent.x * 0.7, 0]));
+      glow.push(place(paint(new THREE.CircleGeometry(1.45, 14).rotateX(-Math.PI / 2), '#ff8a2a'), [f.vent.x, y + 0.85, f.vent.z]));
+    }
+    for (const c of layout.craters || []) {
+      if (!c.ember) continue;
+      const r = 0.45 + c.r * 0.12;
+      const rock = paint(new THREE.IcosahedronGeometry(r, 1), (p) => (Math.sin(p.x * 9 + p.z * 7) > 0.55 ? '#ff6a1c' : '#2a2022'));
+      glow.push(place(rock, [c.x, c.y - c.depth + r * 0.5, c.z], [c.id, c.id * 2, 0]));
+    }
+    if (cones.length) group.add(mesh(merge(cones), MAT.standard));
+    if (glow.length) {
+      const g = mesh(merge(glow), new THREE.MeshBasicMaterial({ vertexColors: true, fog: true }), { cast: false });
+      g.name = 'volcano-embers';
+      group.add(g);
+    }
+  }
+
+  // --------------------------------------------------- bomb scorch marks
+  const markGeo = new THREE.CircleGeometry(1, 20).rotateX(-Math.PI / 2);
+  const marks = Array.from({ length: MAX_MARKS }, () => {
+    const m = new THREE.Mesh(markGeo, markMaterial());
+    m.visible = false;
+    m.renderOrder = 3;
     group.add(m);
-    return { c, m, crackT: -1, broken: false, left: 0 };
+    return { m, age: 0 };
   });
+  let nextMark = 0;
+  const scorch = (x, y, z, r) => {
+    const k = marks[nextMark];
+    nextMark = (nextMark + 1) % MAX_MARKS;
+    k.age = 0;
+    k.m.visible = true;
+    k.m.position.set(x, y + 0.08, z);
+    k.m.scale.setScalar(r * 0.95);
+    k.m.rotation.y = Math.random() * TAU;
+  };
 
   // ------------------------------------------------------ eruption: crater spray
   const maxSpray = TIER.Ultra[2];
@@ -225,11 +224,9 @@ export function buildVolcanoFx(terrain, layout, camera, { onFog = null, onImpact
       sprayGeo.setDrawRange(0, nSpray);
       for (const f of fumaroles) f.puffs.forEach((m, i) => { if (i >= nPuff) m.visible = false; });
     },
-    /** The server's volcano state (welcome): phase and broken plates. */
+    /** The server's volcano state (welcome): its phase. */
     setState(s) {
-      if (!s) return;
-      setPhase(s.phase, s.left);
-      for (const b of s.broken || []) { const c = crusts[b.id]; if (c) { c.broken = true; c.left = b.left; } }
+      if (s) setPhase(s.phase, s.left);
     },
     setPhase,
     /** A lava bomb lands at (x, z) in m.eta seconds. */
@@ -244,14 +241,6 @@ export function buildVolcanoFx(terrain, layout, camera, { onFog = null, onImpact
       b.disc.position.copy(b.ring.position);
       b.ring.scale.setScalar(b.r);
       b.disc.scale.setScalar(b.r);
-    },
-    /** A crust plate cracks (warning), breaks (molten for `left` s) or is solid again. */
-    crust(id, state, left = 0) {
-      const c = crusts[id];
-      if (!c) return;
-      if (state === 'crack') c.crackT = 0;
-      else if (state === 'broken') { c.broken = true; c.left = left; c.crackT = -1; }
-      else { c.broken = false; c.crackT = -1; }
     },
     update(dt, time) {
       clock += dt;
@@ -293,15 +282,14 @@ export function buildVolcanoFx(terrain, layout, camera, { onFog = null, onImpact
         }
       }
       puffMat.opacity = 0.3;
-      // --- crust plates
-      for (const c of crusts) {
-        const u = c.m.material.uniforms;
-        u.uTime.value = time;
-        if (c.broken) { c.left -= dt; if (c.left <= 0) c.broken = false; }
-        if (c.crackT >= 0) c.crackT += dt;
-        const crack = c.crackT >= 0 ? Math.min(1, c.crackT / 1.2) : 0;
-        u.uCrack.value = crack;
-        u.uBroken.value += ((c.broken ? 1 : 0) - u.uBroken.value) * Math.min(1, dt * (c.broken ? 6 : 0.4));
+      // --- scorch marks cool and fade
+      for (const k of marks) {
+        if (!k.m.visible) continue;
+        k.age += dt;
+        const u = k.m.material.uniforms;
+        u.uHeat.value = Math.max(0, 1 - k.age / 12) * (0.75 + 0.25 * Math.sin(time * 6 + k.m.position.x));
+        u.uAlpha.value = 1 - Math.max(0, (k.age - MARK_LIFE * 0.7) / (MARK_LIFE * 0.3));
+        if (k.age > MARK_LIFE) k.m.visible = false;
       }
       // --- the eruption: lava thrown up out of the crater, the crater glows
       const erupting = phase === 'erupt';
@@ -350,6 +338,7 @@ export function buildVolcanoFx(terrain, layout, camera, { onFog = null, onImpact
             b.flash.visible = b.smoke.visible = true;
             b.flash.position.set(b.x, b.y + 0.5, b.z);
             b.smoke.position.set(b.x, b.y + 1, b.z);
+            scorch(b.x, b.y, b.z, b.r);
             onImpact?.(b.x, b.y, b.z);
           }
         } else {

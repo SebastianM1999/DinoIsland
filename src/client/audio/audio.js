@@ -386,7 +386,7 @@ export class GameAudio {
         this.#osc('triangle', 330, 110, t, 1.2, out, 0.4, 0.02);
         break;
       // the volcano (sim/volcano.js): a long deep rumble, the eruption's boom,
-      // a lava bomb's whistle and impact, a crust plate cracking and breaking
+      // a lava bomb's whistle and impact
       case 'rumble':
         this.#noise(t, 5.5, out, { vol: 0.55, type: 'lowpass', f0: 120, f1: 70, q: 0.9, a: 1.2 });
         this.#osc('sine', 38, 30, t, 5, out, 0.5, 1.5);
@@ -402,14 +402,6 @@ export class GameAudio {
         this.#osc('sine', 110, 32, t, 0.6, out, 1, 0.004);
         this.#noise(t, 0.8, out, { vol: 0.6, type: 'lowpass', f0: 2600, f1: 160, q: 0.8, a: 0.004 });
         for (let i = 0; i < 6; i++) this.#noise(t + 0.15 + Math.random() * 0.7, 0.04, out, { vol: 0.12, f0: 3000 + Math.random() * 2000, q: 3 });
-        break;
-      case 'crustCrack':
-        for (let i = 0; i < 5; i++) this.#noise(t + i * 0.09 + Math.random() * 0.05, 0.035, out, { vol: 0.3, f0: 1600 + Math.random() * 1600, q: 4 });
-        break;
-      case 'crustBreak':
-        this.#noise(t, 0.25, out, { vol: 0.5, f0: 1200, f1: 400, q: 1.5, a: 0.003 });
-        this.#noise(t + 0.1, 2.2, out, { vol: 0.2, f0: 5200, f1: 3800, q: 0.8, a: 0.2 });
-        this.#osc('sine', 90, 40, t, 0.4, out, 0.6, 0.005);
         break;
       case 'complete': {
         const notes = [523, 659, 784, 1047, 784, 1047];

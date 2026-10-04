@@ -180,8 +180,7 @@ export function buildLayout(terrain) {
   const nearHut = (x, z, pad = 0) => Math.hypot(x - hf.x, z - (hf.z + 2)) < hf.radius + pad
     || layout.basePlots.some((p) => Math.hypot(x - p.x, z - p.z) < p.r + 2 + Math.min(pad, 12));
   const nearBoat = (x, z, pad = 0) => Math.hypot(x - plan.boat.x, z - plan.boat.z) < 10 + pad;
-  // (a volcano's crust plates are not dry ground either: nothing stands on them)
-  const dry = (x, z, min = 0.4) => terrain.waterLevelAt(x, z) === null && terrain.lavaLevelAt(x, z) === null && terrain.heightAt(x, z) > min && !terrain.crustAt(x, z);
+  const dry = (x, z, min = 0.4) => terrain.waterLevelAt(x, z) === null && terrain.lavaLevelAt(x, z) === null && terrain.heightAt(x, z) > min;
   const inside = (x, z, k) => insideOutline(plan, x, z, k);
   // (every flow: the river, or the volcano's lava flows and crater moat)
   const riverDist = (x, z) => {
@@ -359,8 +358,10 @@ export function buildLayout(terrain) {
       arena.bones.push({ x, z, y: groundAt(x, z), rot: ra() * TAU, kind: ra() < 0.3 ? 'skull' : 'rib', s: ra.range(0.9, 1.6) });
     }
   }
-  // the volcano's crust plates, basalt bridges and fumaroles (shared/island.js): nothing grows on them
-  layout.crusts = (plan.crusts || []).map((c) => ({ ...c }));
+  // the volcano's small craters (some with a still glowing lava bomb in them), basalt bridges
+  // and fumaroles (shared/island.js): nothing grows on them
+  layout.craters = (plan.craters || []).map((c) => ({ ...c, y: terrain.heightAt(c.x, c.z), ember: c.r > 2.6 && c.id % 3 === 0 }));
+  for (const c of layout.craters) reserve(c.x, c.z, c.r * 1.25);
   layout.bridges = (plan.bridges || []).map((b) => ({ ...b }));
   layout.fumaroles = (plan.fumaroles || []).map((f) => ({ ...f, y: terrain.heightAt(f.x, f.z) }));
   for (const f of layout.fumaroles) reserve(f.x, f.z, 3.5);
@@ -631,6 +632,8 @@ export function buildLayout(terrain) {
       if (!ok) continue;
       // (the volcano's flanks are steep: there the ground beside the trunk must be walkable too)
       if (volcanic && pts.some((p) => [-3, 3].some((s) => terrain.slopeAt(p.x - dz * s, p.z + dx * s) > 0.55))) continue;
+      // ... and the walk up to it never dips into one of its small craters
+      if (volcanic && layout.craters.some((c) => Math.hypot(c.x - x, c.z - z) < c.r * 1.8 + len / 2 + 4)) continue;
       // root plate end: room for the torn-up disc of roots too
       const roots = rl() < 0.6;
       if (roots && !free(x - dx * (len / 2 + r * 0.3), z - dz * (len / 2 + r * 0.3), r * 2.2)) continue;
@@ -731,7 +734,7 @@ export function buildLayout(terrain) {
   // Bushes (common): along the trail and jungle edges – on the swamp, along the bog shores.
   {
     let placed = 0;
-    for (let i = 0; i < 6000 && placed < fruitCounts.berry; i++) {
+    for (let i = 0; i < (volcanic ? 16000 : 6000) && placed < fruitCounts.berry; i++) {
       const x = rng.range(-plan.A * 0.9, plan.A * 0.9), z = rng.range(-plan.B * 0.9, plan.B * 0.9);
       if (!dry(x, z, lowGround ? 1.0 : 1.5) || nearHut(x, z, 3) || terrain.slopeAt(x, z) > 0.45) continue;
       const pd = distToPath(x, z);

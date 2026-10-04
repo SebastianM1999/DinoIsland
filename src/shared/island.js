@@ -373,36 +373,17 @@ function bridgeEffect(plan, x, z, h) {
   return h;
 }
 
-/** A crust plate's outline: its radius toward bearing `ang` is c.r times this (an irregular blob). */
-export function crustWarp(plan, c, ang) {
-  return 1 + 0.18 * valueNoise(Math.cos(ang) * 1.7 + c.id * 2.3, Math.sin(ang) * 1.7, plan.seed + 131);
-}
-
-/** Where (x, z) lies on crust plate c: 0 at its middle, 1 on its edge. */
-function crustK(plan, c, x, z) {
-  return Math.hypot(x - c.x, z - c.z) / (c.r * crustWarp(plan, c, Math.atan2(z - c.z, x - c.x)));
-}
-
 /**
- * The crust field at (x, z), or null: a thin plate of cooled lava over a lava
- * flow. It holds a moment – stand on it too long and it breaks (sim/volcano.js).
+ * The volcano's small craters: bowls blasted into the ground by old lava
+ * bombs, each with a low ring wall (plan.craters: { x, z, r, depth, rim }).
  */
-export function crustAt(plan, x, z) {
-  for (const c of plan.crusts || []) {
-    if (Math.abs(x - c.x) > c.r * 1.3 || Math.abs(z - c.z) > c.r * 1.3) continue;
-    if (crustK(plan, c, x, z) < 1) return c;
-  }
-  return null;
-}
-
-/** Flatten the crust plates: level with the lava, banks graded down to them. */
-function crustEffect(plan, x, z, h) {
-  for (const c of plan.crusts) {
-    if (Math.abs(x - c.x) > c.r * 2.4 || Math.abs(z - c.z) > c.r * 2.4) continue;
-    const k = crustK(plan, c, x, z);
-    if (k > 2) continue;
-    const w = 1 - smoothstep(0.95, 2, k);   // (gentle banks: no pits beside the plate)
-    h = lerp(h, c.y + fbm(x * 0.3, z * 0.3, 2, plan.seed + 132) * 0.04, w);
+function craterEffect(plan, x, z, h) {
+  for (const c of plan.craters) {
+    if (Math.abs(x - c.x) > c.r * 1.8 || Math.abs(z - c.z) > c.r * 1.8) continue;
+    const k = Math.hypot(x - c.x, z - c.z) / c.r;
+    if (k > 1.8) continue;
+    if (k < 1) h -= c.depth * (1 - k * k);
+    h += c.rim * Math.exp(-(((k - 1) / 0.32) ** 2));
   }
   return h;
 }
@@ -433,8 +414,8 @@ export function islandHeight(plan, x, z) {
   // the middle of it, where the waterfall comes down)
   // (a lava flow needs no levee over the paths: it runs in its own carved channel)
   if (q && q.flow.kind === 'water' && q.d >= q.width / 2 && q.surface > 0.3 && !inWaterPool(plan, x, z)) h = Math.max(h, Math.min(hr, q.surface + 0.35 + (q.d - q.width / 2) * 0.12));
-  // the volcano's crust plates and basalt bridges over its lava flows
-  if (plan.crusts?.length) h = crustEffect(plan, x, z, h);
+  // the volcano's small craters and basalt bridges over its lava flows
+  if (plan.craters?.length) h = craterEffect(plan, x, z, h);
   if (plan.bridges?.length) h = bridgeEffect(plan, x, z, h);
   // Cut the cliff foot and clear the grotto opening. The drop has no shelf
   // or ramp: all ground directly beneath the outlet lies under the pool.
@@ -627,7 +608,7 @@ export function planIsland(levelIndex = 0, variant = 1) {
     for (let i = 0; i < 9; i++) {
       const p = place(150, (x, z) => clearOf(x, z, 10) && insideEllipse(plan, x, z, 0.84) && Math.hypot(x, z) > vr * 1.05 + 8
         && plan.hills.every((h) => Math.hypot(x - h.x, z - h.z) > h.radius + 10));
-      if (p) addHill({ ...p, radius: rng.range(6, 10), height: rng.range(9, 16), terrace: 0, rough: 2, core: 0.3, shape: 0.35 });
+      if (p) addHill({ ...p, radius: rng.range(7, 11), height: rng.range(8, 14), terrace: 0, rough: 2, core: 0.25, shape: 0.5 });
     }
   } else {
     // main peak with terraces, plus rolling hills
@@ -768,22 +749,22 @@ export function planIsland(levelIndex = 0, variant = 1) {
     plan.flows = [];
     const climb = plan.ramps.find((r) => r.caldera).pts;
     for (const a of angles) {
-      // the vent keeps clear of the mountain path (the flow crosses it further down, on a bridge)
-      let vr = 0;
+      // the vent and the first stretch of its flow keep clear of the mountain path
+      // (the flow crosses it further down, on a bridge)
+      const goal = { x: Math.cos(a) * A * 1.35, z: Math.sin(a) * A * 1.35 };
+      let flow = null, bestGap = -1;
       for (let k = 0; k < 24; k++) {
         const r = v.craterR + (v.radius - v.craterR) * rng.range(0.2, 0.55);
-        const gap = distToPolyline(climb, v.x + Math.cos(a) * r, v.z + Math.sin(a) * r);
-        if (gap > 22) { vr = r; break; }
-        if (!vr || gap > distToPolyline(climb, v.x + Math.cos(a) * vr, v.z + Math.sin(a) * vr)) vr = r;
+        const start = { x: v.x + Math.cos(a) * r, z: v.z + Math.sin(a) * r };
+        const y0 = naturalHeight(plan, start.x, start.z);
+        const f = traceFlow(plan, start, goal, { kind: 'lava', width0: 4, width1: 7.5, surface0: y0 - 0.6, stopAt: 0.5 });
+        f.vent = { x: start.x, z: start.z, y: y0 };
+        const gap = Math.min(...f.pts.slice(0, 4).map((p) => distToPolyline(climb, p.x, p.z)));
+        if (gap > bestGap) { flow = f; bestGap = gap; }
+        if (gap > 22) break;
       }
-      const start = { x: v.x + Math.cos(a) * vr, z: v.z + Math.sin(a) * vr };
-      const goal = { x: Math.cos(a) * A * 1.35, z: Math.sin(a) * A * 1.35 };
-      const y0 = naturalHeight(plan, start.x, start.z);
-      const flow = traceFlow(plan, start, goal, { kind: 'lava', width0: 4, width1: 7.5, surface0: y0 - 0.6, stopAt: 0.5 });
-      flow.vent = { x: start.x, z: start.z, y: y0 };
+      // (the vent: a glowing spatter cone, client/world/volcanoFx.js)
       plan.flows.push(flow);
-      // the vent: a small glowing cone the lava wells out of
-      plan.pools.push({ x: start.x, z: start.z, r: 4, level: y0 - 0.6, depth: 0.5, kind: 'lava', vent: true });
     }
     plan.volcanoArena = planVolcanoArena(plan);
     plan.flows.push(moatFlow(plan.volcanoArena));
@@ -1112,10 +1093,10 @@ export function planIsland(levelIndex = 0, variant = 1) {
   // --- swamp: side paths from the trail, then the bogs around them
   if (swamp) planSwampPaths(plan, taken);
   if (swamp) planBogs(plan, taken, makeRng(seed ^ 0xb06), fnN);
-  // --- volcano: crust plates on the lava flows, steaming fumaroles
-  plan.crusts = [];
+  // --- volcano: small craters all over, steaming fumaroles
+  plan.craters = [];
   plan.fumaroles = [];
-  if (volcanic) planCrusts(plan, taken, makeRng(seed ^ 0xc257));
+  if (volcanic) planCraters(plan, taken, makeRng(seed ^ 0xc257), fnN);
   if (volcanic) planFumaroles(plan, taken, makeRng(seed ^ 0xf0a1), fnN);
 
   return plan;
@@ -1219,31 +1200,26 @@ function lavaBridges(plan) {
 }
 
 /**
- * Crust plates on the lava flows: thin cooled lava you can walk on – a short
- * way across, if you are quick (sim/volcano.js breaks a plate under someone
- * who lingers). Flat stretches of the flows, clear of the bridges and camps.
+ * Small craters all over the volcano island: where old lava bombs came down.
+ * Mostly small, a few bigger; never on a path, a camp, a site, a plot or the
+ * lava, and not in the caldera.
  */
-function planCrusts(plan, taken, rng) {
-  for (const f of plan.flows) {
-    if (f.ring) continue;
-    let placed = 0;
-    const idx = f.pts.map((_, i) => i).slice(6, -3).sort(() => rng() - 0.5);
-    for (const i of idx) {
-      if (placed >= 4) break;
-      const p = f.pts[i];
-      const r = p.w / 2 + rng.range(2.5, 4.5);
-      if (p.y < 0.8 || p.y > 40) continue;
-      if (plan.bridges.some((b) => Math.hypot(b.x - p.x, b.z - p.z) < b.r + r + 6)) continue;
-      if (plan.crusts.some((c) => Math.hypot(c.x - p.x, c.z - p.z) < c.r + r + 12)) continue;
-      if (taken.some((t) => !t.hill && Math.hypot(t.x - p.x, t.z - p.z) < t.r + r && !(plan.volcano && t.x === plan.volcano.x && t.z === plan.volcano.z))) continue;
-      if (Math.hypot(p.x - plan.hut.x, p.z - plan.hut.z) < 60 || Math.hypot(p.x - plan.boat.x, p.z - plan.boat.z) < 40) continue;
-      // the plate is flat: it sits a little above the highest lava under it
-      let top = -Infinity;
-      for (const q of f.pts) if (Math.hypot(q.x - p.x, q.z - p.z) < r * 1.3) top = Math.max(top, q.y);
-      if (top - p.y > 0.9) continue;                  // too steep a stretch for a flat plate
-      plan.crusts.push({ id: plan.crusts.length, x: p.x, z: p.z, r, y: top + 0.15, lava: p.y });
-      placed++;
-    }
+function planCraters(plan, taken, rng, fnN) {
+  const { A } = plan;
+  const lines = [plan.trail, ...plan.ramps.map((r) => r.pts)];
+  const want = Math.round(60 * (plan.k / 0.65) ** 2);
+  for (let i = 0; i < 9000 && plan.craters.length < want; i++) {
+    const x = rng.range(-A * 0.9, A * 0.9), z = rng.range(-A * 0.9, A * 0.9);
+    if (!insideEllipse(plan, x, z, 0.86) || insideVolcanoCrater(plan, x, z, 10)) continue;
+    const r = 3.2 + rng() ** 2 * 4.3;              // (smaller ones would fall between the 2.7 m terrain grid points)
+    const h = fnN(x, z);
+    if (h < 1.6 || h > 48 || slopeOf(fnN, x, z, r) > 0.35) continue;   // (on a steep slope a bowl hardly shows)
+    if (Math.hypot(x - plan.hut.x, z - plan.hut.z) < 45 + r || Math.hypot(x - plan.boat.x, z - plan.boat.z) < 30 + r) continue;
+    if (taken.some((t) => !t.hill && t.r < 60 && Math.hypot(t.x - x, t.z - z) < t.r + r)) continue;
+    if (flowDist(plan, x, z) < r + 9 || lines.some((l) => distToPolyline(l, x, z) < r * 1.8 + 4)) continue;
+    if (plan.bridges.some((b) => Math.hypot(b.x - x, b.z - z) < b.r + r + 6)) continue;
+    if (plan.craters.some((c) => Math.hypot(c.x - x, c.z - z) < c.r * 1.8 + r * 1.8 + 1)) continue;
+    plan.craters.push({ id: plan.craters.length, x, z, r, depth: r * rng.range(0.16, 0.26), rim: r * rng.range(0.07, 0.11) });
   }
 }
 
@@ -1260,6 +1236,7 @@ function planFumaroles(plan, taken, rng, fnN) {
     if (taken.some((t) => !t.hill && t.r < 60 && Math.hypot(t.x - x, t.z - z) < t.r + 4)) continue;
     if (flowDist(plan, x, z) < 12 || lines.some((l) => distToPolyline(l, x, z) < 7)) continue;
     if (plan.fumaroles.some((f) => Math.hypot(f.x - x, f.z - z) < 26)) continue;
+    if (plan.craters.some((c) => Math.hypot(c.x - x, c.z - z) < c.r * 1.8 + 3)) continue;
     plan.fumaroles.push({ id: plan.fumaroles.length, x, z });
   }
 }

@@ -189,8 +189,6 @@ export class DinoSystem {
     // descent to an along-the-surface speed); one shut in a pit below scrambles out (#detour)
     if (!downhill && t.slopeAt(x, z) > climbSlope(d) && !(d.scrambleUntil > this.world.now)) return false;
     if (t.lavaLevelAt(x, z) !== null) return false;
-    // the volcano: no dinosaur sets foot on a crust plate (hot ground it only avoids: sim/pathfind.js)
-    if (t.heatMask && t.crustAt(x, z)) return false;
     // the hut / the team's base (shared/base.js safeZone): dinosaurs keep out
     const zone = this.world.safeZone();
     if (zone && !d.raid && (x - zone.x) ** 2 + (z - zone.z) ** 2 < (zone.r + 10) ** 2) return false;

@@ -4,7 +4,7 @@
 // rendered triangles.
 
 import { CONFIG } from './config.js';
-import { WORLD, HUT_GROUND, planIsland, islandHeight, riverQuery, poolAt, bogSample, bridgeAt, crustAt } from './island.js';
+import { WORLD, HUT_GROUND, planIsland, islandHeight, riverQuery, poolAt, bogSample, bridgeAt } from './island.js';
 import { smoothstep } from './rng.js';
 
 /**
@@ -95,11 +95,6 @@ export class Terrain {
     return (a * (1 - fx) + b * fx) * (1 - fz) + (c * (1 - fx) + d * fx) * fz;
   }
 
-  /** The crust plate (volcano) at (x, z), or null: { id, x, z, r, y } (see island.js crustAt). */
-  crustAt(x, z) {
-    return this.plan.crusts?.length ? crustAt(this.plan, x, z) : null;
-  }
-
   /**
    * How much of a bog (swamp) lies at (x, z): 0 on dry ground and on the
    * causeways, 1 in the middle of a bog. Wading through more than half is slow.
@@ -172,8 +167,8 @@ export class Terrain {
   #flowLevelAt(x, z, g, kind) {
     const pool = poolAt(this.plan, x, z, kind);
     if (pool && g < pool.level) return pool.level;
-    // (the lava runs under the basalt bridges and the crust plates)
-    if (!(kind === 'lava' && (this.plan.crusts?.length || this.plan.bridges?.length) && (bridgeAt(this.plan, x, z) || crustAt(this.plan, x, z)))) {
+    // (the lava runs under the basalt bridges)
+    if (!(kind === 'lava' && this.plan.bridges?.length && bridgeAt(this.plan, x, z))) {
       const q = riverQuery(this.plan, x, z, 12, kind);
       if (q && q.d < q.width / 2 + 1.5 && g < q.surface) return q.surface;
     }

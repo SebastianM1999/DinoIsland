@@ -863,8 +863,11 @@ export function treeGeometry(type, variant = 0, detail = 0, crown = 0) {
 
 /** Crown variants per leafy tree type: the base crown, a taller lighter one and a wider deeper one. */
 export const CROWN_VARIANTS = 3;
-/** Types whose crowns are leaf clumps (palms, bananas and bamboo keep their fronds; mango keeps its fruit spots). */
-export const CROWN_TYPES = new Set(['round', 'tall', 'jungle', 'giant', 'kapok', 'pine']);
+/**
+ * Types whose crowns are leaf clumps (palms, bananas and bamboo keep their fronds; mango keeps its
+ * fruit spots; pines keep their tiers – the clump warp tore their thin tiers and lifted the tip off the trunk).
+ */
+export const CROWN_TYPES = new Set(['round', 'tall', 'jungle', 'giant', 'kapok']);
 const CROWN_SHAPE = [null, { sy: 1.12, sxz: 0.93, tint: [1.08, 1.06, 0.86] }, { sy: 0.9, sxz: 1.08, tint: [0.86, 0.97, 1.06] }];
 
 /**

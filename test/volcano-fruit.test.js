@@ -25,7 +25,7 @@ test('the volcano grows its own three fruit, each where it belongs', () => {
     assert.ok(by('emberchili').length >= 10, `v${variant}: chili shrubs`);
     assert.ok(by('ashplum').length >= 2, `v${variant}: plum trees`);
     assert.ok(by('obsidianfig').length >= 2, `v${variant}: obsidian figs`);
-    // chilis on warm (not burning) ground, plums hanging in an ash plum tree, nothing on lava or a crust
+    // chilis on warm (not burning) ground, plums hanging in an ash plum tree, nothing on lava
     for (const s of by('emberchili')) {
       const h = terrain.heatAt(s.x, s.z);
       assert.ok(h > 0.15 && h < 0.45, `v${variant}: chili on warm ground (${h.toFixed(2)})`);
@@ -33,7 +33,6 @@ test('the volcano grows its own three fruit, each where it belongs', () => {
     for (const s of by('ashplum')) assert.equal(layout.trees.find((t) => `tree:${t.id}` === s.host)?.type, 'ashplum');
     for (const s of layout.fruitSpots) {
       assert.equal(terrain.lavaLevelAt(s.x, s.z), null);
-      assert.equal(terrain.crustAt(s.x, s.z), null);
     }
   }
 });

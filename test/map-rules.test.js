@@ -33,8 +33,8 @@ test('rivers flow downhill and always have higher ground on both sides', () => {
           assert.ok(terrain.inlandWaterLevelAt(x, z) !== null, 'lake reaches the river outlet');
           continue;
         }
-        // (under a basalt bridge or a crust plate the lava runs covered)
-        if ((plan.bridges || []).some((b) => Math.hypot(b.x - x, b.z - z) < b.r + 5) || (plan.crusts || []).some((c) => Math.hypot(c.x - x, c.z - z) < c.r * 1.6)) continue;
+        // (under a basalt bridge the lava runs covered)
+        if ((plan.bridges || []).some((b) => Math.hypot(b.x - x, b.z - z) < b.r + 5)) continue;
         const g = terrain.heightAt(x, z);
         // (a lava flow drops steeply down the volcano's flank: its bank is measured
         // against the lava right beside it, lower than this point's own surface – and

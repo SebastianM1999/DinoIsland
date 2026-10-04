@@ -24,7 +24,7 @@ const C = {
   lava: [255, 120, 30],
   ash: [120, 112, 116],
   bog: [96, 104, 62],
-  crust: [58, 40, 44],
+  crater: [48, 36, 38],
   mud: [104, 88, 62],
   arena: [58, 52, 44],
 };
@@ -67,9 +67,9 @@ export function buildMapBase(terrain, layout, res = 640) {
       const bog = terrain.bogAt?.(x, z) ?? 0;
       if (terrain.lavaLevelAt?.(x, z) != null) {
         col = C.lava;
-      } else if (terrain.crustAt?.(x, z)) {
-        // crust plates (volcano): dark cooled lava over the flow
-        col = C.crust;
+      } else if (layout?.craters?.some((c) => Math.abs(c.x - x) < c.r && Math.abs(c.z - z) < c.r && Math.hypot(c.x - x, c.z - z) < c.r)) {
+        // the volcano's small craters: dark scorched bowls
+        col = C.crater;
       } else if (bog > 0.3) {
         // bogs (swamp): murky olive water over dark mud
         col = w !== null && w - h > 0.03 ? C.bog : C.mud;

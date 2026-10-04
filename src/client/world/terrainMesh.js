@@ -143,6 +143,16 @@ export function buildTerrainMesh(terrain, layout) {
         color.lerp(base.copy(VOLCANO.rock).lerp(VOLCANO.rockDark, noise), 0.7);
         surf.ash = Math.max(surf.ash, 0.6);
       }
+      // the small craters: scorched dark bowls, a glow of embers at the bottom of some
+      for (const c of layout.craters || []) {
+        if (Math.abs(x - c.x) > c.r * 1.4 || Math.abs(z - c.z) > c.r * 1.4) continue;
+        const k = Math.hypot(x - c.x, z - c.z) / c.r;
+        if (k > 1.4) continue;
+        color.lerp(P.scorch || P.rockDark, (1 - smoothstep(0.7, 1.4, k)) * 0.85);
+        if (c.ember) color.lerp(EMBER, (1 - smoothstep(0, 0.5, k)) * 0.6);
+        surf.ash = Math.max(surf.ash, 1 - smoothstep(0.9, 1.4, k));
+        surf.forest = 0;
+      }
       for (const b of layout.bridges || []) {
         const k = 1 - smoothstep(b.r - 1.5, b.r + 1, Math.hypot(x - b.x, z - b.z));
         if (k > 0) color.lerp(base.copy(CAUSEWAY).lerp(VOLCANO.ash, 0.2 + noise * 0.3), k * 0.85);
