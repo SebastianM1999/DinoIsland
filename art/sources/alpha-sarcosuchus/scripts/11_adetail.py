@@ -3,8 +3,11 @@ body=bpy.data.objects['AlphaBody']; A_BVH=_bvh(_bake(body))
 A_SKIN=vc_mat('AlphaHide',.53); A_GLOSS=vc_mat('AlphaWet',.29)
 A_RED=vc_mat('AlphaEyeGlow',.2)
 bs=next(n for n in A_RED.node_tree.nodes if n.type=='BSDF_PRINCIPLED')
-bs.inputs['Emission Color'].default_value=(1,.007,.002,1); bs.inputs['Emission Strength'].default_value=.7
-A_P={k:lin(v) for k,v in dict(back='#40583a',back2='#566c46',flank='#657b4e',flank2='#7c8d5c',belly='#838967',stripe='#33482e').items()}
+bs.inputs['Emission Color'].default_value=(1,.01,.003,1); bs.inputs['Emission Strength'].default_value=1.8
+A_YELLOW=vc_mat('AlphaYellowEyeGlow',.2)
+bs=next(n for n in A_YELLOW.node_tree.nodes if n.type=='BSDF_PRINCIPLED')
+bs.inputs['Emission Color'].default_value=(1,.63,.015,1);bs.inputs['Emission Strength'].default_value=1.8
+A_P={k:lin(v) for k,v in dict(back='#17271b',back2='#243b29',flank='#29412c',flank2='#395237',belly='#414a36',stripe='#111d15').items()}
 A_WOUNDS=[(-6.1,2.6,.54,-.54,.075,1.4),(-2.7,2.95,.38,-.86,.105,2.1),(-.9,2.7,.7,-1.12,.09,3.3),(1.0,2.55,.76,-.87,.12,4.5),(2.4,2.3,.22,-.42,.055,5.8)]
 def a_wound(p):
     if abs(p.x)<.35:return 0
@@ -26,8 +29,8 @@ def a_wound(p):
     return mask
 def a_scar_tint(p,c):
     wound=a_wound(p)
-    blood=mix(lin('#54231e'),lin('#a54836'),.32+.4*fbm(p,13))
-    return mix(c,blood,wound*.9)
+    blood=mix(lin('#a21d23'),lin('#f24b38'),.48+.4*fbm(p,13))
+    return mix(c,blood,wound*.97)
 def a_hide(p,n):
     c=countershade(p,n,A_P,mottle=2.4)
     # Smaller irregular scale fields painted between the modeled scutes. Dark borders,
@@ -36,14 +39,14 @@ def a_hide(p,n):
     band=math.floor(aa/.18); yy=p.y/.23+(.5 if band%2 else 0)
     edge=min(abs(math.sin(math.pi*aa/.18)),abs(math.sin(math.pi*yy)))
     c=shade(c,.66+.34*smooth(.05,.35,edge))
-    c=mix(c,lin('#91a16e'),smooth(.08,.32,fbm(p,5))*.15)
+    c=mix(c,lin('#486442'),smooth(.08,.32,fbm(p,5))*.12)
     return a_scar_tint(p,c)
 def a_headpaint(p,n):
     c=a_hide(p,n)
     c=mix(c,lin('#282d29'),math.exp(-((p.y+4.05)/.45)**2-((p.z-2.78)/.2)**2)*.55)
     return mix(c,lin('#73392f'),math.exp(-((p.z-A_MOUTH)/.06)**2)*.65)
 def a_jawpaint(p,n):
-    c=mix(a_hide(p,n),lin('#8c946e'),.35)
+    c=mix(a_hide(p,n),lin('#45513a'),.28)
     return mix(c,lin('#63372f'),smooth(1.98,2.13,p.z)*smooth(.5,.05,abs(p.x)))
 paint_regions(body,a_hide,a_headpaint,a_jawpaint)
 for v in body.data.vertices:
@@ -100,13 +103,13 @@ for i in range(29):
             if hit[0] is not None and abs(hit[1].x)>.3:a_plate(peb,hit,.165,.18,.04)
 armor=mk('AlphaArmor',bm); ridges=mk('AlphaRidges',rbm); pebbles=mk('AlphaPebbles',peb)
 def a_armor(p,n):
-    return mix(lin('#354b30'),lin('#7f925c'),smooth(-.15,.8,n.z)*.4+.14*fbm(p,3))
+    return mix(lin('#15251a'),lin('#405a37'),smooth(-.15,.8,n.z)*.4+.14*fbm(p,3))
 def a_scale_color(p,t):
-    green=mix(lin('#47603b'),lin('#768956'),.45+.6*fbm(p,3))
-    green=mix(green,lin('#8a9b66'),.18*math.sin(p.y*3+p.z*7)**2)
+    green=mix(lin('#1a3020'),lin('#355132'),.45+.6*fbm(p,3))
+    green=mix(green,lin('#4d6940'),.18*math.sin(p.y*3+p.z*7)**2)
     return shade(green,.6+.4*smooth(.0,.65,t))
 paint_t(armor,a_scale_color);armor.data.materials.append(A_SKIN)
-paint_t(ridges,lambda p,t:mix(lin('#35492f'),lin('#7d8c59'),smooth(.15,.8,t)));ridges.data.materials.append(A_SKIN)
+paint_t(ridges,lambda p,t:mix(lin('#122219'),lin('#425b36'),smooth(.15,.8,t)));ridges.data.materials.append(A_SKIN)
 paint_t(pebbles,a_scale_color);pebbles.data.materials.append(A_SKIN)
 # Fine cranial scutes: compact asymmetric fields, not oversized separate lumps.
 hbm=bmesh.new()
@@ -146,8 +149,14 @@ claws=mk('AlphaClaws',bm); paint_t(claws,lambda p,t:mix(lin('#484a42'),lin('#171
 tongue=add_tongue('AlphaTongue',(0,-5,1.98),(.39,1.34,.10),seg=(18,10));paint(tongue,lambda p,n:lin('#8f4e48'));tongue.data.materials.append(A_SKIN)
 A_E=dict(c=(1.02,-4.03,2.79),R=.205,yaw=.12,W=.9,Ht=.36,Hb=.46,tilt=.34,rim=(.16,.075),pupil=(.095,.33),iris=.78,ball=(24,16),rimseg=(36,6))
 build_eyes('Alpha',A_E)
-A_EP={k:lin(v) for k,v in dict(iris='#e6381f',iris2='#95241a',glow='#ff7b36',limbal='#411a16',pupil='#160b09',sclera='#902a1d',lid='#405339',lid2='#6d8050').items()}
-paint_eyes('Alpha',A_E,A_EP,A_RED,A_SKIN)
+A_EP={k:lin(v) for k,v in dict(iris='#ff2818',iris2='#a31c17',glow='#ff6330',limbal='#581813',pupil='#100b08',sclera='#b52a1c',lid='#213725',lid2='#365033').items()}
+A_YP={**A_EP,**{k:lin(v) for k,v in dict(iris='#ffd52c',iris2='#bc7614',glow='#fff077',limbal='#674818',sclera='#c89421').items()}}
+paint_eyes('Alpha',A_E,lambda p:A_YP if p.x>0 else A_EP,A_RED,A_SKIN)
+eyes=bpy.data.objects['AlphaEyes'];eyes.data.materials.append(A_YELLOW)
+for f in eyes.data.polygons:
+    if f.material_index==0 and f.center.x>0:f.material_index=2
+for name in ['AlphaPupils','AlphaGlints']:
+    bpy.data.objects[name].data.materials.clear();bpy.data.objects[name].data.materials.append(A_GLOSS)
 # Raised nasal bosses, heavy brows and joint armor follow the head/limbs.
 bm=bmesh.new()
 for sx in (-1,1):
