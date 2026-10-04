@@ -22,6 +22,7 @@
 - Exceptions that report to the server instead of deciding: `Projectiles` simulates the local player's own arrows/spears and sends `ACT.FIRE` / `ACT.LAND` (with the hit dino, zone and render time); `DinoViews.spotVisibleDinosaurs()` sends `ACT.SPOT`. Remote projectiles are visual only.
 - Collision and visibility math comes from `shared/` (`collision.js`, `visibility.js`, `grove.js`) so client hit tests agree with the sim.
 - Every server dino type needs an entry in `SPECIES`. Each entry first tries the GLB model (`buildGLBDino`) and falls back to the procedural builder; per-species `extraUpdate` runs only for procedural rigs.
+- Boss attack phases carry authoritative start time, duration and sequence; clip sampling uses the interpolated server render clock, including late joins and low FPS.
 - Positions come from `net/interp.js` `InterpBuffer` sampled at render time, not from raw latest rows.
 - Cached geometries/materials shared across islands are marked with `retainResource` (`core/resources.js`); `DinoView.dispose()` uses `disposeIslandScenes`, which skips retained resources. Keep new caches retained or they get disposed on island change.
 - Models come from `client/models/`; this directory only places, animates and disposes them.

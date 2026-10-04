@@ -13,6 +13,7 @@ export const SARCO_MODEL = {
   },
   clips: Object.fromEntries(['Idle', 'Walk', 'Run', 'Attack', 'Death', 'Roar', 'Swim', 'TailSweep', 'Bite', 'Shove', 'Pivot', 'Retreat', 'Ambush', 'Recovery'].map(
     name => [name.toLowerCase(), `AlphaSarcosuchus_${name}`])),
+  authoredJawClips: ['attack', 'bite', 'ambush'],
   extraHitZones: [
     ...[4.3, 5.4, 6.5, 7.5].map(f => ({ zone: 'head', bone: 'Head', at: [0, 2.45, f], radius: 1 })),
     { zone: 'head', bone: 'Head', at: [0, 2.55, 3.9], radius: 1.55 },
