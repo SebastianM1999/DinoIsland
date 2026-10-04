@@ -7,28 +7,37 @@ import { GLB_DINOS } from '../src/client/models/dino/glbCatalog.js';
 import { registerDinoGLTF, buildGLBDino } from '../src/client/models/dino/glbDino.js';
 import { SARCO_MODEL, SARCO_TYPE } from '../src/client/models/dino/sarcoModel.js';
 
-test('Sarcosuchus review asset has complete skins and eight clean clips without registering gameplay', async () => {
+test('Sarcosuchus boss asset has dark hide, distinct glowing eyes and fourteen clean clips', async () => {
   const bytes = await fs.readFile(new URL('../assets/models/dinos/alpha-sarcosuchus.glb', import.meta.url));
   const gltf = await new GLTFLoader().parseAsync(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength), '');
-  assert.equal(GLB_DINOS[SARCO_TYPE], undefined);
+  assert.ok(GLB_DINOS[SARCO_TYPE], 'boss has a gameplay model registration');
   registerDinoGLTF(SARCO_TYPE, gltf, SARCO_MODEL);
   const rig = buildGLBDino(SARCO_TYPE), other = buildGLBDino(SARCO_TYPE);
   assert.notEqual(rig.jaw, other.jaw);
   assert.equal(rig.legChains.length, 4);
   assert.equal(rig.tail.length, 8);
-  assert.equal(Object.keys(rig.clips).length, 8);
+  for (const state of ['idle','walk','run','attack','roar','death','swim','tailsweep','bite','shove','pivot','retreat','ambush','recovery']) {
+    assert.ok(rig.clips[state], `${state} has an authored clip`);
+  }
+  const eyeMaterials = new Map();
   let tris = 0, jawVerts = 0;
   rig.model.traverse(o => {
     if (!o.isSkinnedMesh) return;
     tris += o.geometry.index.count / 3;
     assert.ok(o.geometry.attributes.color, 'vertex colors survive export');
     assert.ok(o.material.name, 'no empty/default material slots');
+    eyeMaterials.set(o.material.name, o.material);
     if (o.material.name === 'AlphaHide') {
       const col = o.geometry.attributes.color;
       let red = 0, green = 0;
       for (let i = 0; i < col.count; i += 11) { red += col.getX(i); green += col.getY(i); }
       assert.ok(green > red, 'green crocodilian palette survives export');
-      assert.ok(green / Math.ceil(col.count / 11) < .5, 'skin must not export white');
+      assert.ok(green / Math.ceil(col.count / 11) < .12, 'near-black dark green skin');
+      let brightScars = 0;
+      for (let i = 0; i < col.count; i++) {
+        if (col.getX(i) > .18 && col.getX(i) > col.getY(i)*3) brightScars++;
+      }
+      assert.ok(brightScars > 100, 'bright red irregular scars survive export');
     }
     const ji = o.skeleton.bones.findIndex(b => b.name === 'Jaw');
     const si = o.geometry.attributes.skinIndex, sw = o.geometry.attributes.skinWeight;
@@ -41,6 +50,10 @@ test('Sarcosuchus review asset has complete skins and eight clean clips without 
       assert.ok(Math.abs(sum - 1) < .001, 'normalized deform weights');
     }
   });
+  const redEye = eyeMaterials.get('AlphaEyeGlow'), yellowEye = eyeMaterials.get('AlphaYellowEyeGlow');
+  assert.ok(redEye?.emissive.r > redEye?.emissive.g*5, 'one red glowing eye');
+  assert.ok(yellowEye?.emissive.g > yellowEye?.emissive.b*5, 'one yellow glowing eye');
+  assert.ok(redEye.emissiveIntensity > 1 && yellowEye.emissiveIntensity > 1);
   assert.ok(jawVerts > 500, 'jaw opens actual skin');
   assert.ok(tris <= 60000);
   const manifest = JSON.parse(await fs.readFile(new URL('../art/asset-manifest.json', import.meta.url)));

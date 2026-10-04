@@ -89,18 +89,19 @@ def paint_eyes(prefix, E, P, gloss, skin):
     """P: iris, iris2 (edge), glow (ring round the pupil), limbal, pupil, sclera, lid, lid2 (linear RGB)."""
     eyes = bpy.data.objects[prefix + 'Eyes']; me = eyes.data
     def ball(p, n):
+        colors = P(p) if callable(P) else P
         sx = 1 if p.x >= 0 else -1; x, y, z = eye_local(E, sx, p)
         o = eye_open(E, x, y)
         if o > 1.0 or z < 0:                                   # outside the opening: lid skin
-            return mix(P['lid'], P['lid2'], smooth(1.0, 1.25, o) * 0.6)
+            return mix(colors['lid'], colors['lid2'], smooth(1.0, 1.25, o) * 0.6)
         r = math.hypot(x, y); ph = math.atan2(y, x); ir = E['iris']
         rx, ry = E['pupil']; pr = math.hypot(x / rx, y / ry)
-        c = mix(P['iris'], P['iris2'], smooth(0.35 * ir, ir, r))
+        c = mix(colors['iris'], colors['iris2'], smooth(0.35 * ir, ir, r))
         c = shade(c, 1 + 0.13 * math.sin(ph * 17 + 3 * fbm(p * 40, 1.0)) * smooth(0.3 * ir, 0.6 * ir, r))   # streaks
-        c = mix(c, P['glow'], smooth(1.9, 1.15, pr) * 0.75)                # bright ring round the pupil
-        c = mix(c, P['limbal'], smooth(0.84 * ir, 0.97 * ir, r))           # dark iris edge
-        c = mix(c, P['sclera'], smooth(ir, 1.06 * ir, r))                  # off-white corners
-        c = mix(c, P['pupil'], smooth(1.0, 0.9, pr))          # under the pupil disc
+        c = mix(c, colors['glow'], smooth(1.9, 1.15, pr) * 0.75)                # bright ring round the pupil
+        c = mix(c, colors['limbal'], smooth(0.84 * ir, 0.97 * ir, r))           # dark iris edge
+        c = mix(c, colors['sclera'], smooth(ir, 1.06 * ir, r))                  # off-white corners
+        c = mix(c, colors['pupil'], smooth(1.0, 0.9, pr))          # under the pupil disc
         c = shade(c, 1 - 0.45 * smooth(0.0, E['Ht'] * 0.95, y))            # upper lid shadow -> depth
         return shade(c, 1 - 0.35 * smooth(0.8, 1.0, o))                    # darken toward the rim
     paint(eyes, ball)
@@ -109,10 +110,10 @@ def paint_eyes(prefix, E, P, gloss, skin):
         p = eyes.matrix_world @ f.center; sx = 1 if p.x >= 0 else -1; x, y, z = eye_local(E, sx, p)
         f.material_index = 1 if (eye_open(E, x, y) > 1.0 or z < 0) else 0
     lids = bpy.data.objects[prefix + 'Lids']
-    paint(lids, lambda p, n: mix(P['lid'], P['lid2'], smooth(0.3, -0.5, n.z) * 0.5 + 0.2))
+    paint(lids, lambda p, n: mix((P(p) if callable(P) else P)['lid'], (P(p) if callable(P) else P)['lid2'], smooth(0.3, -0.5, n.z) * 0.5 + 0.2))
     lids.data.materials.clear(); lids.data.materials.append(skin)
     pu = bpy.data.objects[prefix + 'Pupils']
-    paint(pu, lambda p, n: P['pupil'])
+    paint(pu, lambda p, n: (P(p) if callable(P) else P)['pupil'])
     pu.data.materials.clear(); pu.data.materials.append(gloss)
     gl = bpy.data.objects[prefix + 'Glints']
     paint(gl, lambda p, n: [1.0, 0.98, 0.93])
