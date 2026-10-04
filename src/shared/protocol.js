@@ -166,6 +166,7 @@ export const DS = {
   RECOVER: 21,
   BITE: 22,
   RETREAT: 23,
+  AMBUSH: 24,
 };
 
 export const DINO_TYPES = ['brachio', 'stego', 'raptor', 'ptera', 'trex', 'alpha-sarcosuchus'];

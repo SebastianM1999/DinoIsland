@@ -206,11 +206,16 @@
           for (const [bone, base] of actor.bases) { bone.quaternion.copy(base.q); bone.position.copy(base.p); }
           actor.bases.clear(); actor.mixer.stopAllAction();
           actor.state = null; actor.previewClip = key;
+          direct.setLoop(THREE.LoopRepeat, Infinity); direct.clampWhenFinished = false;
           direct.reset().setEffectiveWeight(1).setEffectiveTimeScale(1).play();
         }
         actor.mixer.update(dt);
       } else {
-        if (actor.previewClip) { actor.mixer.stopAllAction(); actor.previewClip = null; actor.state = null; }
+        if (actor.previewClip) {
+          const previous = actor.actions[actor.previewClip];
+          if (actor.previewClip !== 'swim') { previous.setLoop(THREE.LoopOnce, 1); previous.clampWhenFinished = true; }
+          actor.mixer.stopAllAction(); actor.previewClip = null; actor.state = null;
+        }
         actor.update(dt, input);
       }
     }
