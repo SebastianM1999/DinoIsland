@@ -13,7 +13,7 @@ import { CONFIG } from './config.js';
 import { makeRng, fbm, valueNoise, clamp, smoothstep, lerp } from './rng.js';
 import { levelDef } from './levels.js';
 import { planBossArena, bossArenaHeight } from './bossArena.js';
-import { planSwampArena, SWAMP_ARENA } from './swampArena.js';
+import { planSwampArena, SWAMP_ARENA, ambushPocket } from './swampArena.js';
 import { planVolcanoArena, moatFlow, VOLCANO_ARENA } from './volcanoArena.js';
 import { BASE_PLOT_RADIUS } from './base.js';
 
@@ -349,6 +349,8 @@ function bogEffect(plan, x, z, h) {
   out = Math.max(out, b.level - BOG.maxDepth + 0.01);
   // causeway: the path crosses dry, a little above the water
   if (s.dam > 0) out = lerp(out, Math.max(out, b.level + 0.4), s.dam);
+  // Only the boss hollows are deep; the causeway and ordinary bogs stay dry/shallow.
+  if (b.arena) out -= 3.25 * ambushPocket(plan.swampArena, x, z) * (1 - s.dam);
   return out;
 }
 
