@@ -350,7 +350,7 @@ function bogEffect(plan, x, z, h) {
   // causeway: the path crosses dry, a little above the water
   if (s.dam > 0) out = lerp(out, Math.max(out, b.level + 0.4), s.dam);
   // Only the boss hollows are deep; the causeway and ordinary bogs stay dry/shallow.
-  if (b.arena) out -= 3.25 * ambushPocket(plan.swampArena, x, z) * (1 - s.dam);
+  if (b.arena) out = lerp(out, b.level - 3.4, ambushPocket(plan.swampArena, x, z) * (1 - s.dam));
   return out;
 }
 

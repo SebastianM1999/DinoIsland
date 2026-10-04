@@ -5,7 +5,7 @@
 // walls run from the ring north and south out into the deep sea, so nobody
 // walks or wades round it. Inside, the ground drops into a sunken basin of mud
 // and bog water; the trail crosses it on a causeway. The Alpha Sarcosuchus
-// guards the exit; the authoritative boss lifecycle controls its gate.
+// occupies the central arena; both gates stay open.
 //
 // Planned from the island's outline alone (no rng draws), shared by client
 // (look, minimap) and server (terrain, colliders, AI).
@@ -133,8 +133,8 @@ export function ambushPocket(a, x, z) {
   if (!a) return 0;
   let depth = 0;
   for (const side of [-1, 1]) {
-    const d = Math.hypot((x - a.x) / 1.2, z - a.z - side * a.r * .45);
-    depth = Math.max(depth, 1 - smoothstep(3, 9, d));
+    const d = Math.hypot((x - a.x) / 1.4, z - a.z - side * a.r * .45);
+    depth = Math.max(depth, 1 - smoothstep(6, 10, d));
   }
   return depth;
 }
