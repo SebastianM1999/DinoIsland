@@ -1,6 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
+import fs from 'node:fs/promises';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { registerDinoGLTF, buildGLBDino } from '../src/client/models/dino/glbDino.js';
 import { SarcoEffects } from '../src/client/entities/sarcoEffects.js';
 import { DS } from '../src/shared/protocol.js';
 import { CONFIG } from '../src/shared/config.js';
@@ -174,5 +177,59 @@ test('generic attack input preserves the Sarcosuchus authored jaw instead of add
   for (let i = 0; i < 6; i++) animator.update(.1, { pose: { attack: 1, jaw: 1 } });
   assert.equal(animator.state, 'attack');
   assert.ok(bone.quaternion.angleTo(new THREE.Quaternion()) < .001);
+  animator.dispose();
+});
+
+
+test('Sarcosuchus fit shrinks length and height only and keeps its torso level with terrain-adjusted feet', async () => {
+  const bytes = await fs.readFile(new URL('../assets/models/dinos/alpha-sarcosuchus.glb', import.meta.url));
+  const gltf = await new GLTFLoader().parseAsync(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength), '');
+  registerDinoGLTF('alpha-sarcosuchus', gltf);
+  const rig = buildGLBDino('alpha-sarcosuchus'), reference = buildGLBDino('alpha-sarcosuchus');
+  const size = new THREE.Box3().setFromObject(rig.root, true).getSize(new THREE.Vector3());
+  assert.ok(Math.abs(size.z - 16.2) < .001);
+  assert.ok(Math.abs(size.y - 3.4308) < .001);
+  assert.ok(Math.abs(size.x - 4.4277908988) < .001, 'width remains equal to the previous fitted model');
+  const animator = rig.createAnimator(), flat = reference.createAnimator();
+  animator.update(.1, { speed: 2, groundAt: (x, z) => x * .1 + z * .1, groundPitch: .5 });
+  flat.update(.1, { speed: 2, groundAt: () => 0 });
+  assert.equal(rig.body.rotation.x, 0, 'walking cannot tilt the long body on a bank');
+  for (let i = 0; i < 4; i++) {
+    const foot = rig.feet[i].getWorldPosition(new THREE.Vector3()), base = reference.feet[i].getWorldPosition(new THREE.Vector3());
+    assert.ok(Math.abs(foot.y - base.y - foot.x * .1 - foot.z * .1) < .003, 'foot follows the local bank while preserving the baked lift');
+  }
+  for (let i = 0; i < 60; i++) {
+    animator.update(1/60, { speed: 2, groundAt: () => 0 });
+    flat.update(1/60, { speed: 2, groundAt: () => 0 });
+  }
+  for (let i = 0; i < 4; i++) for (const joint of ['upper', 'lower', 'foot'])
+    assert.ok(rig.legChains[i][joint].quaternion.angleTo(reference.legChains[i][joint].quaternion) < .001,
+      'bank adaptation never accumulates into the authored flat-ground gait');
+  let previous = rig.legChains.map(leg => leg.lower.quaternion.clone());
+  for (let frame = 0; frame < 360; frame++) {
+    animator.update(1/60, { speed: 8.5, groundAt: () => 0 });
+    if (frame > 20) for (let i = 0; i < previous.length; i++)
+      assert.ok(previous[i].angleTo(rig.legChains[i].lower.quaternion) < .4, 'smaller stride keeps run knees stable');
+    previous = rig.legChains.map(leg => leg.lower.quaternion.clone());
+  }
+  assert.ok(animator.actions.run.timeScale / rig.clips.run.duration > 2.3, 'scaled stride maintains the same running speed');
+  for (const input of [{ pose: { clip: 'swim', clipDuration: 1.6, phaseElapsed: .5, clipId: 100 } }, { dead: true }]) {
+    animator.update(.1, { groundAt: () => 10, groundPitch: 1, ...input });
+    flat.update(.1, input);
+    for (let i = 0; i < 4; i++) for (const joint of ['upper', 'lower', 'foot'])
+      assert.ok(rig.legChains[i][joint].quaternion.angleTo(reference.legChains[i][joint].quaternion) < .001,
+        'swimming and death preserve the source pose without terrain leg correction');
+    assert.equal(rig.body.rotation.x, 0);
+  }
+  animator.dispose(); flat.dispose();
+});
+
+test('authored boss attack poses ignore camera head-look and procedural neck/tail overlays', () => {
+  const { animator, bone } = phaseFixture();
+  animator.rig.head = bone; animator.rig.neck = [bone]; animator.rig.tail = [bone];
+  animator.update(.1, { groundPitch: .8, yawRate: 5, lookTarget: new THREE.Vector3(10, 8, 0),
+    pose: { clip: 'shove', clipDuration: 1, phaseElapsed: .5, clipId: 3, alert: 1, neckRaise: 1 } });
+  assert.ok(bone.quaternion.angleTo(new THREE.Quaternion()) < .001);
+  assert.equal(animator.rig.body.rotation.x, 0);
   animator.dispose();
 });

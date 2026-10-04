@@ -59,7 +59,7 @@ test('Sarcosuchus boss asset has dark hide, distinct glowing eyes and fourteen c
   const manifest = JSON.parse(await fs.readFile(new URL('../art/asset-manifest.json', import.meta.url)));
   assert.equal(tris, manifest.models.find(m => m.id === 'dino-alpha-sarcosuchus').triangles);
   const size = new THREE.Box3().setFromObject(rig.root, true).getSize(new THREE.Vector3());
-  assert.ok(Math.abs(size.z - 18) < .01);
+  assert.ok(Math.abs(size.z - 16.2) < .01);
   assert.ok(Math.abs(size.y - SARCO_MODEL.height) < .01);
   for (const state of ['idle', 'walk', 'run', 'roar', 'swim']) {
     for (const track of rig.clips[state].tracks) {

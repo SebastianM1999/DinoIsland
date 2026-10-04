@@ -23,7 +23,7 @@ import { disposeIslandScenes } from '../core/resources.js';
 
 /** Every server species needs a visible model and its animation tuning. */
 export const SPECIES = {
-  'alpha-sarcosuchus': { build: buildSarcoFallback, anim: SARCO_ANIM, barHeight: 4.4, heavy: true },
+  'alpha-sarcosuchus': { build: buildSarcoFallback, anim: SARCO_ANIM, barHeight: 3.96, heavy: true },
   brachio: { build: buildBrachio, anim: BRACHIO_ANIM, extraUpdate: brachioExtraUpdate, barHeight: 13.8, heavy: true },
   stego: { build: buildStego, anim: STEGO_ANIM, extraUpdate: stegoExtraUpdate, barHeight: 4.2, heavy: true },
   raptor: { build: buildRaptor, anim: RAPTOR_ANIM, extraUpdate: raptorExtraUpdate, barHeight: 1.8 },
@@ -178,7 +178,7 @@ export class DinoView {
       pose,
       hurt: this.flinch,
       airborne: this.type === 'ptera' && !this.grounded(),   // flyers: flight clips, Fall until impact
-      lookTarget: this.st === DS.ALERT || this.attackT > 0 || this.st === DS.CHARGE
+      lookTarget: !pose.clip && (this.st === DS.ALERT || this.attackT > 0 || this.st === DS.CHARGE)
         ? this.ctx.camera.position : null,
     });
     if (!this.rig.isGLB && this.flinch > 0) this.rig.body.rotation.z += Math.sin(this.flinch * 30) * 0.05 * this.flinch;
