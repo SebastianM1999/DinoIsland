@@ -12,7 +12,7 @@
 - `bossArena.js` — the first island's lava islet: `planBossArena` (placed from the boat, no randomness), causeway and height shaping, `insideBossArena`.
 - `grove.js` — the giant Brachiosaurus pen on the boss arena plateau (`GROVE`): barrier tests `insideGrove`, `groveEntry`, `mayEnterGrove`, `titanScale`.
 - `volcanoArena.js` — the crater arena on top of the volcano (`VOLCANO_ARENA`): `planVolcanoArena` (the floor, the lava moat round it, the entrance at the notch – `locked` once the boss exists – and the boss spawn), `insideVolcanoArena`, `entranceOffset`, `moatFlow` (the moat as a lava flow, open at the entrance); its boss (the T-Rex) comes later.
-- `swampArena.js` — the swamp's root-walled kettle in the middle of the hourglass waist, the only way to the second half (`SWAMP_ARENA`): `planSwampArena` (entrance gate west, exit gate east – `locked` once the boss exists), `insideSwampArena`, `gateOffset`, ring colliders (`arenaWallColliders`, `onArenaWall`), the waist walls out into the deep sea (`waistWalls`, `waistWallColliders`), boss spawn and deep ambush pockets beside the dry causeway for Alpha Sarcosuchus.
+- `swampArena.js` — the swamp's root-walled kettle in the middle of the hourglass waist, the only way to the second half (`SWAMP_ARENA`): `planSwampArena` (entrance gate west, exit gate east, both gates remain open), `insideSwampArena`, `gateOffset`, ring colliders (`arenaWallColliders`, `onArenaWall`), the waist walls out into the deep sea (`waistWalls`, `waistWallColliders`), boss spawn and deep ambush pockets beside the dry causeway for Alpha Sarcosuchus.
 
 ### Collider/shape builders
 - `siteFrame.js` — local-to-world frame for placed sites (`toWorld`, `boxRot`, `siteBox`).
