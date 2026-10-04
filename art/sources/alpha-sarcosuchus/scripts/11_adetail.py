@@ -31,15 +31,39 @@ def a_scar_tint(p,c):
     wound=a_wound(p)
     blood=mix(lin('#a21d23'),lin('#f24b38'),.48+.4*fbm(p,13))
     return mix(c,blood,wound*.97)
+def a_cells(u,v):
+    # Staggered, irregular scale cells. Cell-level tonal drift gives each scale
+    # identity; smooth distance fields keep the existing skin normals intact.
+    near=[]
+    for j in range(math.floor(v)-1,math.floor(v)+2):
+        for i in range(math.floor(u)-1,math.floor(u)+2):
+            seed=math.sin(i*127.1+j*311.7)*43758.5453
+            seed-=math.floor(seed)
+            x=i+.5+.17*math.sin(i*4.3+j*1.7)
+            y=j+.5+.15*math.sin(i*2.1-j*3.5)
+            near.append(((u-x)**2+(v-y)**2,seed))
+    near.sort()
+    return smooth(.025,.20,math.sqrt(near[1][0])-math.sqrt(near[0][0])),near[0][1]
+
 def a_hide(p,n):
     c=countershade(p,n,A_P,mottle=2.4)
-    # Smaller irregular scale fields painted between the modeled scutes. Dark borders,
-    # olive centers and moss-green tonal drift are all vertex colors, no image textures.
-    aa=p.x if abs(n.z)>.6 else p.z
-    band=math.floor(aa/.18); yy=p.y/.23+(.5 if band%2 else 0)
-    edge=min(abs(math.sin(math.pi*aa/.18)),abs(math.sin(math.pi*yy)))
-    c=shade(c,.66+.34*smooth(.05,.35,edge))
-    c=mix(c,lin('#486442'),smooth(.08,.32,fbm(p,5))*.12)
+    # Raptor-like broad mottling and stego-like rim/center contrast, translated
+    # into crocodilian scutes, transverse belly shields and folded joint skin.
+    grain=fbm(p,3.1);broad=fbm(p,.85)
+    top=abs(n.z)**3/(abs(n.z)**3+abs(n.x)**3+.001)
+    centre,variation=a_cells(p.y/.38+.13*math.sin(p.z*3),p.x/.32)
+    side,sv=a_cells(p.y/.37+.15*math.sin(p.z*4),p.z/.31)
+    centre=centre*top+side*(1-top);variation=variation*top+sv*(1-top)
+    c=shade(c,.46+.42*centre+.30*variation)
+    c=mix(c,lin('#527445'),smooth(-.03,.28,broad)*(.08+.14*centre))
+    c=mix(c,lin('#14241a'),smooth(.10,.32,grain)*.28)
+    # Longer rectangular ventral shields and irregular folds at elbows/hips.
+    belly=smooth(.15,-.55,n.z)
+    shield=abs(math.sin(p.y*math.pi/.43+.15*math.sin(p.x*4)))
+    c=shade(c,1-belly*.38*(1-smooth(.10,.40,shield)))
+    joints=math.exp(-((p.y+1.1)/.48)**2)+math.exp(-((p.y-.95)/.5)**2)
+    folds=(1-smooth(.06,.38,abs(math.sin(p.z*17+.8*math.sin(p.y*4)))))
+    c=shade(c,1-.28*folds*min(1,joints)*smooth(1.15,1.6,abs(p.x)))
     return a_scar_tint(p,c)
 def a_headpaint(p,n):
     c=a_hide(p,n)
@@ -105,9 +129,15 @@ armor=mk('AlphaArmor',bm); ridges=mk('AlphaRidges',rbm); pebbles=mk('AlphaPebble
 def a_armor(p,n):
     return mix(lin('#15251a'),lin('#405a37'),smooth(-.15,.8,n.z)*.4+.14*fbm(p,3))
 def a_scale_color(p,t):
-    green=mix(lin('#1a3020'),lin('#355132'),.45+.6*fbm(p,3))
-    green=mix(green,lin('#4d6940'),.18*math.sin(p.y*3+p.z*7)**2)
-    return shade(green,.6+.4*smooth(.0,.65,t))
+    green=mix(lin('#172b1e'),lin('#47623c'),.40+.7*fbm(p,2.2))
+    # Embedded almost-black seams, olive crown, weathered lichen flecks, and
+    # directional ribbing carry detail like the stego's modeled plate painting.
+    crown=smooth(.12,.70,t)
+    green=shade(green,.35+.65*crown)
+    rib=abs(math.sin(p.y*19+.65*math.sin(p.x*8+p.z*5)))
+    green=shade(green,1-.24*smooth(.65,.95,rib)*crown)
+    green=mix(green,lin('#6c8050'),smooth(.16,.36,fbm(p,8))*.22*crown)
+    return green
 paint_t(armor,a_scale_color);armor.data.materials.append(A_SKIN)
 paint_t(ridges,lambda p,t:mix(lin('#122219'),lin('#425b36'),smooth(.15,.8,t)));ridges.data.materials.append(A_SKIN)
 paint_t(pebbles,a_scale_color);pebbles.data.materials.append(A_SKIN)
