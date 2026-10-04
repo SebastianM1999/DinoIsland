@@ -34,4 +34,3 @@ console.log(`covered ${(100 * (1 - miss.length / pts.length)).toFixed(1)} % of $
 const bucket = {};
 for (const p of miss) { const k = `y${Math.floor(p.y / 0.5) * 0.5} f${Math.round(-p.z)}`; bucket[k] = (bucket[k] || 0) + 1; }
 console.log('misses', Object.entries(bucket).sort((a, b) => b[1] - a[1]).slice(0, 14));
-
