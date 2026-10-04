@@ -88,11 +88,30 @@ module.exports = async function integrate({ github, context, core }) {
     return true;
   };
   for (const listed of pulls) {
-    if (listed.draft || !labels(listed).has('ready-to-merge') || labels(listed).has('integration-blocked')) continue;
+    if (listed.draft || labels(listed).has('integration-blocked')) continue;
     const pr = (await api.pulls.get({ ...repo, pull_number: listed.number })).data;
-    if (pr.state !== 'open' || pr.draft || !labels(pr).has('ready-to-merge') || labels(pr).has('integration-blocked')
+    if (pr.state !== 'open' || pr.draft || labels(pr).has('integration-blocked')
       || pr.base.ref !== 'main' || pr.head.repo?.full_name !== pr.base.repo?.full_name) continue;
     const permission = (await api.repos.getCollaboratorPermissionLevel({ ...repo, username: pr.user.login })).data.permission;
+    if (!labels(pr).has('ready-to-merge')) {
+      if (!['write', 'maintain', 'admin'].includes(permission)) continue;
+      // Read API metadata only. A successful older revision or rerun cannot enroll a new head.
+      const runs = await github.paginate(api.actions.listWorkflowRuns, { ...repo, workflow_id: 'ci.yml', head_sha: pr.head.sha, per_page: 100 });
+      const latest = runs.filter(run => run.head_sha === pr.head.sha && run.event === 'pull_request'
+        && run.head_repository?.full_name === pr.base.repo.full_name
+        && run.pull_requests?.some(pull => pull.number === pr.number))
+        .sort((a, b) => b.id - a.id || (b.run_attempt || 1) - (a.run_attempt || 1))[0];
+      if (latest?.status !== 'completed' || latest.conclusion !== 'success') continue;
+      const current = (await api.pulls.get({ ...repo, pull_number: pr.number })).data;
+      if (current.state !== 'open' || current.draft || current.head.sha !== pr.head.sha
+        || current.base.ref !== 'main' || current.head.repo?.full_name !== current.base.repo?.full_name
+        || labels(current).has('integration-blocked')) continue;
+      Object.assign(pr, current);
+      await api.issues.addLabels({ ...repo, issue_number: pr.number, labels: ['ready-to-merge'] });
+      pr.labels.push({ name: 'ready-to-merge' });
+      core.info(`PR ${pr.number}: automatically ready after successful CI for ${pr.head.sha}.`);
+      // Continue in this run: labels added by GITHUB_TOKEN do not trigger another workflow.
+    }
     if (!['write', 'maintain', 'admin'].includes(permission)) { await block(pr, 'The author must have write permission.'); continue; }
     if (pr.changed_files > 3000) { await block(pr, 'The task exceeds GitHub\'s file-list limit and requires manual integration.'); continue; }
     if (labels(pr).has('integration-repairing')) {

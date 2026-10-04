@@ -22,7 +22,7 @@ function fixture(options = {}) {
       compareCommits: wrap('compare', { ahead_by: options.behind ? 1 : 0 })
     },
     pulls: {
-      list: wrap('list', [pr, ...(options.otherPrs || [])]), get: wrap('get', args => args.pull_number === pr.number ? pr : options.otherPrs.find(p => p.number === args.pull_number)), listFiles: wrap('files', options.files || [{ filename: 'src/sim/world.js' }]),
+      list: wrap('list', [pr, ...(options.otherPrs || [])]), get: wrap('get', args => args.pull_number === pr.number ? (options.getPr ? options.getPr(pr, calls) : pr) : options.otherPrs.find(p => p.number === args.pull_number)), listFiles: wrap('files', options.files || [{ filename: 'src/sim/world.js' }]),
       updateBranch: wrap('update', {}), merge: wrap('merge', { merged: true })
     },
     issues: {
@@ -311,4 +311,50 @@ test('fallback candidate dispatch exports the exact task revision for a completi
   ]);
   const passing = fixture(); await passing.run();
   assert.equal(passing.calls.some(c => c.name === 'output'), false);
+});
+
+const readinessRun = { id: 81, event: 'pull_request', head_sha: 'feature-sha', status: 'completed', conclusion: 'success',
+  head_repository: { full_name: 'owner/game' }, pull_requests: [{ number: 7 }] };
+
+test('successful current PR CI automatically enrolls and integrates in the same invocation', async () => {
+  const f = fixture({ pr: { labels: [] }, headRuns: [readinessRun], artifacts: [{ name: `tested-${candidateSha}`, expired: false }] });
+  await f.run();
+  assert.ok(f.calls.some(c => c.name === 'labels' && c.args.labels.includes('ready-to-merge')));
+  assert.ok(f.calls.some(c => c.name === 'merge'));
+});
+
+test('automatic readiness rejects missing, stale, unrelated, pending and unsuccessful CI', async () => {
+  for (const headRuns of [[], [{ ...readinessRun, head_sha: 'old' }], [{ ...readinessRun, event: 'push' }],
+    [{ ...readinessRun, head_repository: { full_name: 'other/game' } }], [{ ...readinessRun, pull_requests: [{ number: 8 }] }],
+    [{ ...readinessRun, status: 'in_progress' }], ...['failure', 'cancelled', 'timed_out', 'action_required'].map(conclusion => [{ ...readinessRun, conclusion }]),
+    [readinessRun, { ...readinessRun, id: 82, conclusion: 'failure' }],
+    [readinessRun, { ...readinessRun, run_attempt: 2, conclusion: 'failure' }]]) {
+    const f = fixture({ pr: { labels: [] }, headRuns }); await f.run();
+    assert.ok(!f.calls.some(c => ['labels', 'merge', 'dispatch'].includes(c.name)));
+  }
+});
+
+test('automatic readiness respects forks, drafts, blocked PRs and author permissions', async () => {
+  for (const extra of [{ fork: true }, { permission: 'read' }, { pr: { draft: true } }, { pr: { labels: [{ name: 'integration-blocked' }] } }]) {
+    const f = fixture({ ...extra, pr: { labels: [], ...extra.pr }, headRuns: [readinessRun] }); await f.run();
+    assert.ok(!f.calls.some(c => ['labels', 'merge', 'dispatch'].includes(c.name)));
+  }
+});
+
+test('automatic readiness rechecks head, draft, closure and blocking before labeling', async () => {
+  for (const changed of [{ head: { sha: 'new-head', repo: { full_name: 'owner/game' } } }, { draft: true }, { state: 'closed' },
+    { labels: [{ name: 'integration-blocked' }] }, { base: { ref: 'other', repo: { full_name: 'owner/game' } } }]) {
+    const f = fixture({ pr: { labels: [] }, headRuns: [readinessRun], getPr: (pr, calls) =>
+      calls.filter(c => c.name === 'get').length > 1 ? { ...pr, ...changed } : pr });
+    await f.run(); assert.ok(!f.calls.some(c => ['labels', 'merge', 'dispatch'].includes(c.name)));
+  }
+});
+
+test('automatic enrollment does not bypass testing the current merge candidate', async () => {
+  const f = fixture({ pr: { labels: [] }, headRuns: [readinessRun], runs: [],
+    artifacts: [{ name: 'tested-old-candidate', expired: false }] });
+  await f.run();
+  assert.ok(f.calls.some(c => c.name === 'labels' && c.args.labels.includes('ready-to-merge')));
+  assert.ok(!f.calls.some(c => c.name === 'merge'));
+  assert.equal(f.calls.find(c => c.name === 'dispatch').args.workflow_id, 'ci.yml');
 });
