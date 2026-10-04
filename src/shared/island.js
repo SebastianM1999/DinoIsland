@@ -35,7 +35,7 @@ export function islandSeed(levelIndex, variant) {
 // ------------------------------------------------------------------ outline
 
 /** Hourglass outline (swamp): how deep the waist pinches and how long it is (share of A). */
-export const HOURGLASS = { depth: 0.6, width: 0.2 };
+export const HOURGLASS = { depth: 0.63, width: 0.2 };
 
 /**
  * Half-width (z extent) of the island's outline frame at x: B for the oval
@@ -63,10 +63,7 @@ function coastHeight(plan, x, z) {
     + 0.06 * valueNoise(Math.cos(ang) * 5.3 + 9, Math.sin(ang) * 5.3, seed + 2));
   const d = Math.sqrt(nx * nx + nz * nz) / warp;
   const scale = B + (A - B) * Math.cos(ang) ** 2;        // meters per unit of d along this direction
-  let inland = (1 - d) * scale;                           // meters from the coastline
-  // the swamp arena bulges out of the waist: land all round its ring
-  const sa = plan.swampArena;
-  if (sa) inland = Math.max(inland, sa.r + 20 - Math.hypot(x - sa.x, z - sa.z));
+  const inland = (1 - d) * scale;                         // meters from the coastline
   if (inland < 0) {
     const out = -inland;
     let h = -out * 0.05 - Math.max(0, out - 24) * 0.16;   // turquoise shelf, then drop-off
@@ -333,7 +330,8 @@ export function islandHeight(plan, x, z) {
   // mountain paths win over the wide river valley walls (so the valley never
   // bites a cliff out of a trail), but give way right at the water: a path
   // never dams a river, it dips down to cross it
-  const q = plan.ramps.length ? riverQuery(plan, x, z, 12) : null;
+  // (also on the flat swamp, which has no mountain paths but sites and plots beside its creek)
+  const q = plan.ramps.length || plan.shape === 'hourglass' ? riverQuery(plan, x, z, 12) : null;
   const keep = q ? smoothstep(q.width / 2 + 1.5, q.width / 2 + 8, q.d) : 1;
   const hr = h;
   if (keep > 0) h = lerp(h, rampEffect(plan, x, z, h), keep);
@@ -479,8 +477,8 @@ export function planIsland(levelIndex = 0, variant = 1) {
   // the hourglass's round halves are a little wider than the oval's sides
   if (plan.shape === 'hourglass') plan.B *= 1.15;
   const { A, B } = plan;
-  // the swamp arena sits in the waist (shared/swampArena.js): planned first, the coast bulges round it
-  if (level.swampArena) plan.swampArena = planSwampArena(plan, halfWidthAt(plan, 0), rng() < 0.5 ? -1 : 1);
+  // the swamp arena fills the middle of the waist (shared/swampArena.js): the way to the second half
+  if (level.swampArena) plan.swampArena = planSwampArena(plan);
   const sa = plan.swampArena;
   const clearOfArena = (x, z, r) => !sa || Math.hypot(x - sa.x, z - sa.z) > sa.r + r;
 
@@ -678,7 +676,8 @@ export function planIsland(levelIndex = 0, variant = 1) {
       { x: pool.x + toWaist * 30, z: side * halfWidthAt(plan, pool.x) * 0.3 },
       { x: pool.x + toWaist * 45, z: side * halfWidthAt(plan, pool.x + toWaist * 45) * 1.3 },
     ];
-    const start = { x: pool.x + side * 0 + toWaist * pool.r * 0.6, z: pool.z + side * pool.r * 0.6 };
+    // out of the pool's edge (not its bowl), toward the waist and the coast
+    const start = { x: pool.x + toWaist * pool.r * 0.67, z: pool.z + side * pool.r * 0.67 };
     plan.river = traceFlow(plan, start, goals, { kind: 'water', width0: 5, width1: 9, surface0: pool.level, stopAt: 'sea' });
   } else {
     const pool = plan.pools[0];
@@ -734,8 +733,8 @@ export function planIsland(levelIndex = 0, variant = 1) {
     let z = plan.hut.z;
     const lavaPenalty = (x, zz) => (volcanic ? Math.max(0, 40 - distToPolyline(plan.river.pts, x, zz)) * 3 : 0)
       + (plan.volcano ? Math.max(0, plan.volcano.radius * 0.75 - Math.hypot(x - plan.volcano.x, zz - plan.volcano.z)) * 2 : 0)
-      // through the swamp's waist past the arena, never into it, and round the creek's spring
-      + (sa ? Math.max(0, sa.r + 16 - Math.hypot(x - sa.x, zz - sa.z)) * 8 : 0)
+      // through the swamp's waist: straight through the arena, gate to gate; round the creek's spring
+      + (sa && Math.abs(x - sa.x) < sa.r + 24 ? Math.abs(zz - sa.z) * 20 : 0)
       + (swamp ? plan.pools.reduce((s, q) => s + Math.max(0, q.r * 1.6 + 8 - Math.hypot(x - q.x, zz - q.z)) * 6, 0) : 0);
     for (let x = plan.hut.x + 40; x < plan.boat.x - 25; x += 34) {
       let bestZ = z, bestS = Infinity;
@@ -749,6 +748,13 @@ export function planIsland(levelIndex = 0, variant = 1) {
       pts.push({ x, z });
     }
     pts.push({ x: plan.boat.x - 10, z: plan.boat.z });
+    // the swamp: straight through the arena, in at the west gate and out at the east gate
+    if (sa) {
+      const keep = pts.filter((p) => Math.abs(p.x - sa.x) > sa.r + 22);
+      const lane = [-(sa.r + 14), -(sa.r + 4), 0, sa.r + 4, sa.r + 14].map((dx) => ({ x: sa.x + dx, z: sa.z, fixed: true }));
+      pts.length = 0;
+      pts.push(...keep.filter((p) => p.x < sa.x), ...lane, ...keep.filter((p) => p.x > sa.x));
+    }
     // round the corners and let it wander a little between the waypoints
     const smooth = [];
     for (let i = 0; i < pts.length - 1; i++) {
@@ -757,7 +763,7 @@ export function planIsland(levelIndex = 0, variant = 1) {
         const t = k / 6, t2 = t * t, t3 = t2 * t;
         const cr = (a, b, c, d) => 0.5 * ((2 * b) + (-a + c) * t + (2 * a - 5 * b + 4 * c - d) * t2 + (-a + 3 * b - 3 * c + d) * t3);
         const x = cr(p0.x, p1.x, p2.x, p3.x), zz = cr(p0.z, p1.z, p2.z, p3.z);
-        const n = i > 0 && i < pts.length - 2 ? valueNoise(x * 0.05, zz * 0.05, plan.seed + 77) * 4 : 0;
+        const n = i > 0 && i < pts.length - 2 && !p1.fixed && !p2.fixed ? valueNoise(x * 0.05, zz * 0.05, plan.seed + 77) * 4 : 0;
         smooth.push({ x, z: zz + n });
       }
     }
@@ -970,7 +976,6 @@ function planSwampPaths(plan, taken) {
   for (const key of ['ruins', 'nest']) if (plan.sites[key]) targets.push({ x: plan.sites[key].x, z: plan.sites[key].z, stop: key === 'ruins' ? 11 : 4 });
   if (plan.sites.peak) targets.push({ x: plan.sites.peak.x, z: plan.sites.peak.z, stop: 2 });
   for (const p of plan.basePlots) targets.push({ x: p.x, z: p.z, stop: p.r - 2 });
-  if (sa) targets.push({ x: sa.gate.x, z: sa.gate.z, stop: 0 });
   // never through the arena (only up to its gate) or the creek's spring pool
   const blocked = (p) => (sa && Math.hypot(p.x - sa.x, p.z - sa.z) < sa.r + 2)
     || plan.pools.some((q) => q.kind === 'water' && Math.hypot(p.x - q.x, p.z - q.z) < q.r * 1.5 + 2);
@@ -1031,7 +1036,8 @@ function planBogs(plan, taken, rng, fnN) {
     ring.sort((a, b) => a - b);
     const level = Math.max(0.9, ring[8] - SWAMP_ARENA.sink);
     const r = sa.r - 3;
-    plan.bogs.push({ id: 0, field: 0, x: sa.x, z: sa.z, r, reach: r * 1.2, level, round: true, arena: true, segs: [] });
+    // the trail crosses the basin on a causeway, gate to gate
+    plan.bogs.push({ id: 0, field: 0, x: sa.x, z: sa.z, r, reach: r * 1.2, level, round: true, arena: true, segs: segsNear(sa.x, sa.z, r * 1.2 + BOG.pathHalf + 5) });
   }
   const want = Math.round(70 * (plan.k / 0.86) ** 2);
   for (let i = 0; i < 6000 && plan.bogs.length < want; i++) {

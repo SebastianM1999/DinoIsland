@@ -11,7 +11,7 @@
 - `layout.js` — `buildLayout(terrain)`: deterministic placement of hut, boat, trees, rocks, bushes, fruit spots, sites, dino zones, nests, paths and all static colliders.
 - `bossArena.js` — the first island's lava islet: `planBossArena` (placed from the boat, no randomness), causeway and height shaping, `insideBossArena`.
 - `grove.js` — the giant Brachiosaurus pen on the boss arena plateau (`GROVE`): barrier tests `insideGrove`, `groveEntry`, `mayEnterGrove`, `titanScale`.
-- `swampArena.js` — the swamp's root-walled kettle in the hourglass waist (`SWAMP_ARENA`): `planSwampArena`, `insideSwampArena`, wall colliders with one gate (`arenaWallColliders`, `onArenaWall`), boss spawn; its boss comes later.
+- `swampArena.js` — the swamp's root-walled kettle in the middle of the hourglass waist, the only way to the second half (`SWAMP_ARENA`): `planSwampArena` (entrance gate west, exit gate east – `locked` once the boss exists), `insideSwampArena`, `gateOffset`, ring colliders (`arenaWallColliders`, `onArenaWall`), the waist walls out into the deep sea (`waistWalls`, `waistWallColliders`), boss spawn; its boss comes later.
 
 ### Collider/shape builders
 - `siteFrame.js` — local-to-world frame for placed sites (`toWorld`, `boxRot`, `siteBox`).

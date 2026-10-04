@@ -7,7 +7,8 @@ import { makeRng } from '../../shared/rng.js';
 
 const TAU = Math.PI * 2;
 const RANGE = 70;                 // metres around the camera that get mist and fireflies
-const TIER = { Low: [0, 0], Medium: [12, 50], High: [22, 110], Ultra: [30, 160] };
+// [mist banks, fireflies]; even Low keeps some mist (it is cheap and the swamp's look)
+const TIER = { Low: [10, 0], Medium: [20, 50], High: [32, 110], Ultra: [44, 160] };
 
 /** A soft round sprite (radial falloff). */
 function softTexture() {
@@ -40,7 +41,7 @@ export function buildSwampFx(terrain, layout, camera) {
   const fogColor = new THREE.Color(layout.biome.sky?.fog || '#7a8670');
 
   // mist: flat-ish billboards hugging the water
-  const mistMat = new THREE.MeshBasicMaterial({ map: tex, color: fogColor.clone().lerp(new THREE.Color('#ffffff'), 0.25), transparent: true, opacity: 0.22, depthWrite: false, fog: true });
+  const mistMat = new THREE.MeshBasicMaterial({ map: tex, color: fogColor.clone().lerp(new THREE.Color('#ffffff'), 0.25), transparent: true, opacity: 0.3, depthWrite: false, fog: true });
   const mistGeo = new THREE.PlaneGeometry(1, 1);
   const mists = Array.from({ length: TIER.Ultra[0] }, () => {
     const m = new THREE.Mesh(mistGeo, mistMat);
@@ -66,17 +67,17 @@ export function buildSwampFx(terrain, layout, camera) {
 
   let [nMist, nFly] = TIER.High;
   const center = new THREE.Vector3(Infinity, 0, Infinity);
-  /** A random spot over a bog near (cx, cz), or null. */
-  const bogSpot = (cx, cz) => {
+  /** A random spot over a bog (or, when wet, any damp ground beside one) near (cx, cz), or null. */
+  const bogSpot = (cx, cz, wet = false) => {
     for (let k = 0; k < 12; k++) {
       const a = rng() * TAU, r = 8 + Math.sqrt(rng()) * RANGE;
       const x = cx + Math.cos(a) * r, z = cz + Math.sin(a) * r;
-      if (terrain.bogAt(x, z) > 0.35) return { x, z, y: terrain.bogLevelAt(x, z) ?? terrain.heightAt(x, z) };
+      if (terrain.bogAt(x, z) > (wet ? 0.02 : 0.35)) return { x, z, y: Math.max(terrain.bogLevelAt(x, z) ?? -Infinity, terrain.heightAt(x, z)) };
     }
     return null;
   };
-  const respawn = (o, cx, cz) => {
-    const s = bogSpot(cx, cz);
+  const respawn = (o, cx, cz, wet = false) => {
+    const s = bogSpot(cx, cz, wet) ?? (wet ? bogSpot(cx, cz) : null);
     if (!s) { o.set = false; return; }
     Object.assign(o, s, { set: true });
   };
@@ -97,7 +98,8 @@ export function buildSwampFx(terrain, layout, camera) {
       if (moved) center.set(cx, 0, cz);
       for (let i = 0; i < nMist; i++) {
         const m = mists[i], u = m.userData;
-        if (!u.set || moved && Math.hypot(u.x - cx, u.z - cz) > RANGE) { respawn(u, cx, cz); u.s = 9 + rng() * 10; }
+        // every third bank drifts over the damp ground beside the bogs, not just their water
+        if (!u.set || moved && Math.hypot(u.x - cx, u.z - cz) > RANGE) { respawn(u, cx, cz, i % 3 === 0); u.s = 14 + rng() * 12; }
         m.visible = u.set;
         if (!u.set) continue;
         const drift = Math.sin(time * 0.05 + u.ph) * 3;

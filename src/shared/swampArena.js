@@ -1,47 +1,46 @@
-// The swamp arena (Misty Swamp, island 2): a round kettle in the waist of the
-// hourglass island. A wall of huge dead stilt-root mangroves rings it – the
-// barrier – with a single gap, the gate, facing the corridor the main trail
-// takes past it. Inside, the ground drops into a sunken basin of mud and bog
-// water with mud islands. Its boss (a giant alpha Sarcosuchus) comes later;
-// for now the arena holds its spawn point.
+// The swamp arena (Misty Swamp, island 2): a round kettle in the middle of the
+// hourglass island's waist – the only way from the first half to the second.
+// A wall of huge dead stilt-root mangroves rings it with two gates: the
+// entrance facing west (the hut) and the exit facing east (the boat). Root
+// walls run from the ring north and south out into the deep sea, so nobody
+// walks or wades round it. Inside, the ground drops into a sunken basin of mud
+// and bog water; the trail crosses it on a causeway. Its boss (a giant alpha
+// Sarcosuchus) comes later: then the exit gate (gates[1].locked) only opens
+// once it is beaten. For now both gates are open.
 //
-// Planned from the island's outline alone (no rng draws besides the side),
-// shared by client (look, minimap) and server (terrain, colliders, AI).
+// Planned from the island's outline alone (no rng draws), shared by client
+// (look, minimap) and server (terrain, colliders, AI).
 
 import { smoothstep } from './rng.js';
 
 export const SWAMP_ARENA = {
   name: 'Drowned Hollow',
   /** Barrier ring radius (m): the root wall stands on this circle. */
-  r: 27,
+  r: 28,
   /** Wall thickness and height (colliders). */
   wallW: 2.4,
   wallH: 4.2,
-  /** Width of the gate opening in the wall. */
+  /** Width of each gate opening in the wall. */
   gateW: 6.5,
   /** The basin's bog water lies this far below the ground around the arena. */
   sink: 1.1,
-  /** The arena bulges out of the waist: its centre sits this share of r inside the coastline. */
-  inset: 0.35,
+  /** The waist walls reach this far into water deeper than a player can wade. */
+  deepRun: 8,
 };
 
 /**
- * Plan the arena for an hourglass island: centred on the waist (x = 0), pushed
- * toward one coast so the trail has a corridor on the other side.
- * @param {{ A: number, B: number }} plan
- * @param {number} waistHalf half-width of the island at the waist (m)
- * @param {number} side +1 (south) or -1 (north)
+ * Plan the arena: centred in the waist of an hourglass island, gates west and east.
+ * @param {{ A: number }} plan
  */
-export function planSwampArena(plan, waistHalf, side) {
-  const A = SWAMP_ARENA;
-  const z = side * (waistHalf - A.r * A.inset);
-  // the gate looks across the waist toward the corridor (away from the coast)
-  const gateAngle = Math.atan2(-side, 0);   // angle in the x-z plane (cos -> x, sin -> z)
+export function planSwampArena(plan) {
+  const r = SWAMP_ARENA.r;
+  const x = 0, z = 0;
+  const gate = (angle, kind) => ({ angle, kind, locked: false, x: x + Math.cos(angle) * (r + 3), z: z + Math.sin(angle) * (r + 3) });
   return {
-    x: 0, z, r: A.r, side,
-    gateAngle,
-    gate: { x: Math.cos(gateAngle) * (A.r + 3), z: z + Math.sin(gateAngle) * (A.r + 3) },
-    spawn: { x: 0, z },
+    x, z, r,
+    gates: [gate(Math.PI, 'entrance'), gate(0, 'exit')],
+    // beside the causeway that crosses the basin
+    spawn: { x, z: z + r * 0.45 },
   };
 }
 
@@ -53,34 +52,73 @@ export function insideSwampArena(layout, x, z, pad = 0) {
   return (x - a.x) ** 2 + (z - a.z) ** 2 < r * r;
 }
 
-/** Angle distance of (x, z) on the ring from the gate (0 = in the gate's middle). */
-function gateOffset(a, x, z) {
+/** Distance along the ring (m) from (x, z) to the nearest gate's middle. */
+export function gateOffset(a, x, z) {
   const ang = Math.atan2(z - a.z, x - a.x);
-  return Math.abs(Math.atan2(Math.sin(ang - a.gateAngle), Math.cos(ang - a.gateAngle)));
+  let best = Infinity;
+  for (const g of a.gates) best = Math.min(best, Math.abs(Math.atan2(Math.sin(ang - g.angle), Math.cos(ang - g.angle))) * a.r);
+  return best;
 }
 
-/** True where the ring wall stands (not in the gate's opening). */
+/** True where the ring wall stands (not in a gate's opening). */
 export function onArenaWall(a, x, z) {
   const d = Math.hypot(x - a.x, z - a.z);
   if (Math.abs(d - a.r) > SWAMP_ARENA.wallW / 2) return false;
-  return gateOffset(a, x, z) * a.r > SWAMP_ARENA.gateW / 2;
+  return gateOffset(a, x, z) > SWAMP_ARENA.gateW / 2;
 }
 
 /**
- * Wall colliders: short boxes along the ring, leaving the gate open.
- * @param {{x:number,z:number,r:number,gateAngle:number}} a
+ * Ring wall colliders: short boxes along the ring, leaving the gates open.
+ * @param {{x:number,z:number,r:number,gates:object[]}} a
  * @param {number} groundY ground height around the wall
  */
 export function arenaWallColliders(a, groundY) {
   const out = [];
-  const n = 40;
+  const n = 44;
   const seg = (2 * Math.PI * a.r) / n;
   for (let k = 0; k < n; k++) {
     const ang = (k / n) * Math.PI * 2;
     const x = a.x + Math.cos(ang) * a.r, z = a.z + Math.sin(ang) * a.r;
-    if (gateOffset(a, x, z) * a.r < SWAMP_ARENA.gateW / 2 + seg / 2) continue;
+    if (gateOffset(a, x, z) < SWAMP_ARENA.gateW / 2 + seg / 2) continue;
     // box: long side along the ring tangent; collider rot is the negated yaw
     out.push({ x, z, hw: seg / 2 + 0.15, hd: SWAMP_ARENA.wallW / 2, rot: ang + Math.PI / 2, top: groundY + SWAMP_ARENA.wallH, kind: 'arena' });
+  }
+  return out;
+}
+
+/**
+ * The waist walls: from the ring's north and south points straight out (±z)
+ * until the sea has been deeper than `maxWade` for SWAMP_ARENA.deepRun metres.
+ * @param {{x:number,z:number,r:number}} a
+ * @param {{ heightAt(x:number,z:number):number, seaDepthAt(x:number,z:number):number }} terrain
+ * @param {number} maxWade deepest water a player walks through
+ * @returns {{ side: number, z0: number, z1: number }[]} the two wall lines (z0 at the ring)
+ */
+export function waistWalls(a, terrain, maxWade) {
+  const out = [];
+  for (const side of [-1, 1]) {
+    const z0 = a.z + side * (a.r - 0.5);
+    let z = z0, deep = 0;
+    for (let k = 0; k < 400 && deep < SWAMP_ARENA.deepRun; k++) {
+      z += side;
+      deep = terrain.seaDepthAt(a.x, z) > maxWade + 0.2 ? deep + 1 : 0;
+    }
+    out.push({ side, z0, z1: z });
+  }
+  return out;
+}
+
+/** Colliders of the waist walls (boxes ~3 m long along z). */
+export function waistWallColliders(a, walls, groundAt) {
+  const out = [];
+  for (const w of walls) {
+    const len = Math.abs(w.z1 - w.z0), n = Math.max(1, Math.ceil(len / 3));
+    for (let k = 0; k < n; k++) {
+      const z = w.z0 + w.side * (k + 0.5) * (len / n);
+      // walls stand on the sea floor out there too: tall enough to never be climbed or waded round
+      const top = Math.max(groundAt(a.x, z), 0) + SWAMP_ARENA.wallH;
+      out.push({ x: a.x, z, hw: SWAMP_ARENA.wallW / 2, hd: len / n / 2 + 0.15, rot: 0, top, kind: 'arena' });
+    }
   }
   return out;
 }

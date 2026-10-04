@@ -13,7 +13,8 @@ import { boatColliders, boatInteractPoint } from './boatShape.js';
 import { insideGrove } from './grove.js';
 import { standTop } from './collision.js';
 import { causewayQuery, insideBossArena } from './bossArena.js';
-import { insideSwampArena, arenaWallColliders, SWAMP_ARENA } from './swampArena.js';
+import { insideSwampArena, arenaWallColliders, waistWalls, waistWallColliders, gateOffset, SWAMP_ARENA } from './swampArena.js';
+import { CONFIG } from './config.js';
 import { insideOutline, halfWidthAt } from './island.js';
 import { SPRING_LIP_OFFSET, SPRING_FLOOR, springColliders } from './springShape.js';
 
@@ -260,27 +261,37 @@ export function buildLayout(terrain) {
       ...sa,
       y: wallY,
       spawn: { ...sa.spawn, y: groundAt(sa.spawn.x, sa.spawn.z) },
-      gate: { ...sa.gate, y: groundAt(sa.gate.x, sa.gate.z), rot: Math.atan2(Math.cos(sa.gateAngle), Math.sin(sa.gateAngle)) },
+      gates: sa.gates.map((g) => ({ ...g, y: groundAt(g.x, g.z) })),
+      // the root walls closing the waist north and south of the ring, out into the deep sea
+      waist: waistWalls(sa, terrain, CONFIG.world.maxWadeDepth),
       sign: null, roots: [], bones: [],
     };
     layout.swampArena = arena;
-    boxes.push(...arenaWallColliders(sa, wallY));
+    boxes.push(...arenaWallColliders(sa, wallY), ...waistWallColliders(sa, arena.waist, groundAt));
     reserve(sa.x, sa.z, sa.r + 3);
-    // warning sign beside the gate, on the corridor side
+    for (const w of arena.waist) for (let z = w.z0; Math.abs(z - w.z0) < Math.abs(w.z1 - w.z0); z += w.side * 3) reserve(sa.x, z, 3);
+    // warning sign beside the entrance (west gate)
     {
-      const a = sa.gateAngle + 0.32, rr = sa.r + 3.2;
+      const a = sa.gates[0].angle + 0.3, rr = sa.r + 3.2;
       const sx = sa.x + Math.cos(a) * rr, sz = sa.z + Math.sin(a) * rr;
-      arena.sign = { x: sx, z: sz, y: groundAt(sx, sz), rot: arena.gate.rot };
+      arena.sign = { x: sx, z: sz, y: groundAt(sx, sz), angle: sa.gates[0].angle };
       circles.push({ x: sx, z: sz, r: 0.35, top: arena.sign.y + 2.4, kind: 'arena' });
     }
     // the wall: giant dead mangroves standing on arched stilt roots (visual; the boxes block)
     const n = 26;
     for (let k = 0; k < n; k++) {
       const a = (k / n) * TAU + ra.range(-0.04, 0.04);
-      const off = Math.abs(Math.atan2(Math.sin(a - sa.gateAngle), Math.cos(a - sa.gateAngle))) * sa.r;
-      if (off < SWAMP_ARENA.gateW / 2 + 1.2) continue;
       const x = sa.x + Math.cos(a) * sa.r, z = sa.z + Math.sin(a) * sa.r;
+      if (gateOffset(sa, x, z) < SWAMP_ARENA.gateW / 2 + 1.2) continue;
       arena.roots.push({ x, z, y: groundAt(x, z), rot: a + ra.range(-0.3, 0.3), scale: ra.range(1.25, 1.7), tall: ra() < 0.4, seed: ra.int(1, 999) });
+    }
+    // more of them along the waist walls, as long as there is land under them
+    for (const w of arena.waist) {
+      for (let d = 7; d < Math.abs(w.z1 - w.z0); d += ra.range(7, 10)) {
+        const z = w.z0 + w.side * d, x = sa.x + ra.range(-0.6, 0.6);
+        if (groundAt(x, z) < 0.3) break;
+        arena.roots.push({ x, z, y: groundAt(x, z), rot: ra() * TAU, scale: ra.range(1.1, 1.5), tall: ra() < 0.3, seed: ra.int(1, 999) });
+      }
     }
     // bones in the mud (visual only)
     for (let i = 0; i < 18; i++) {
@@ -474,7 +485,7 @@ export function buildLayout(terrain) {
   if (plan.bogs?.length && TRUNKS.mangrove) {
     const rm = makeRng(S ^ 0x3a9e);
     let placed = 0;
-    for (let i = 0; i < 9000 && placed < 170; i++) {
+    for (let i = 0; i < 14000 && placed < 320; i++) {
       const x = rm.range(-plan.A, plan.A), z = rm.range(-plan.B, plan.B);
       const b = terrain.bogAt(x, z);
       if (b < 0.12 || b > 0.9 || terrain.waterDepthAt(x, z) > 0.3) continue;

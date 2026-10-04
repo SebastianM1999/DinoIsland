@@ -1,6 +1,7 @@
 // The swamp arena's look (Misty Swamp): a ring of huge dead mangroves on
-// arched stilt roots with tangled roots between them – the wall –, open only
-// at the gate, where a warning sign stands; bones in the mud of the basin.
+// arched stilt roots with tangled roots between them – the wall –, open at the
+// west and east gates (a warning sign at the entrance), root walls closing the
+// waist north and south out into the sea; bones in the mud of the basin.
 // Data from the shared layout (shared/swampArena.js, layout.swampArena); the
 // wall's colliders are boxes in layout.colliders. The basin's water is a bog
 // (world/water.js), its mud painted in terrainMesh.js.
@@ -8,7 +9,7 @@
 import * as THREE from 'three';
 import { MAT, paint, place, merge, tube, mesh } from '../models/kit.js';
 import { makeRng } from '../../shared/rng.js';
-import { SWAMP_ARENA } from '../../shared/swampArena.js';
+import { SWAMP_ARENA, gateOffset } from '../../shared/swampArena.js';
 import { deadMangroveGeometry } from './veg/trees.js';
 import { LEAF_MAT, instanced, finishInstanced } from './veg/shapes.js';
 
@@ -42,13 +43,24 @@ function signGeometry() {
   return place(merge(parts), [0, 0, 0], [0.05, 0, -0.04]);
 }
 
-/** Tangled roots filling the wall between the big trees (one merged geometry, world space). */
+/** Tangled roots filling the walls between the big trees (one merged geometry, world space). */
 function rootTangle(a, terrain, rng) {
   const parts = [];
   const gateHalf = SWAMP_ARENA.gateW / 2 + 0.6;
+  // the waist walls: arches along x = a.x, out to where the sea gets deep
+  for (const w of a.waist || []) {
+    const len = Math.abs(w.z1 - w.z0);
+    for (let d = 0; d < len; d += 1.6) {
+      for (let k = 0; k < 2; k++) {
+        const z0 = w.z0 + w.side * (d - rng.range(0.2, 0.9)), z1 = w.z0 + w.side * (d + rng.range(0.7, 1.6));
+        const at = (z, y) => { const x = a.x + rng.range(-0.8, 0.8); return V(x, Math.max(terrain.heightAt(x, z), -1.5) + y, z); };
+        parts.push(tube([at(z0, -0.3), at((z0 + z1) / 2, rng.range(1.6, 3.6)), at(z1, -0.3)],
+          (t) => 0.17 - 0.05 * Math.abs(t - 0.5), { radial: 5, color: () => ROOT[Math.floor(rng() * ROOT.length)], capStart: false, capEnd: false }));
+      }
+    }
+  }
   for (let ang = 0; ang < TAU; ang += 0.075) {
-    const off = Math.abs(Math.atan2(Math.sin(ang - a.gateAngle), Math.cos(ang - a.gateAngle))) * a.r;
-    if (off < gateHalf) continue;
+    if (gateOffset(a, a.x + Math.cos(ang) * a.r, a.z + Math.sin(ang) * a.r) < gateHalf) continue;
     // two or three arches crossing the wall line at slightly different radii
     for (let k = 0; k < 2 + (rng() < 0.4 ? 1 : 0); k++) {
       const r0 = a.r + rng.range(-0.9, 0.9), span = rng.range(0.25, 0.45), h = rng.range(1.4, 3.4);
@@ -91,7 +103,7 @@ export function buildSwampArena(terrain, layout) {
   group.add(mesh(rootTangle(a, terrain, rng), MAT.standard));
   // the sign, bones
   const solid = [];
-  if (a.sign) solid.push(place(signGeometry(), [a.sign.x, a.sign.y, a.sign.z], [0, -a.gateAngle + Math.PI / 2, 0]));
+  if (a.sign) solid.push(place(signGeometry(), [a.sign.x, a.sign.y, a.sign.z], [0, -a.sign.angle + Math.PI / 2, 0]));
   for (const b of a.bones) solid.push(place(boneGeometry(b.kind), [b.x, b.y - 0.05, b.z], [0, b.rot, 0], b.s));
   if (solid.length) group.add(mesh(merge(solid), MAT.standard));
   return { group, update() {} };
