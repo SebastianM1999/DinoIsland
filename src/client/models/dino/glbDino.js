@@ -86,11 +86,12 @@ export function buildGLBDino(type) {
   root.updateMatrixWorld(true);
   // Radii are metres, independent of the source asset's units/nonuniform fit.
   const add = (zone, bone, radius) => { if (bone) rig.hitZones.push({ zone, joint: bone, offset: new THREE.Vector3(), radius }); };
-  add('head', rig.head, spec.height * .13);
-  for (const b of rig.neck) add('neck', b, spec.height * .12);
-  for (const b of list(spec.bones.spine)) add('body', b, spec.height * .22);
-  for (const b of list(spec.bones.legs)) add('leg', b, spec.height * .10);
-  for (const b of rig.tail) add('tail', b, spec.height * .09);
+  const hitHeight = spec.hitHeight ?? spec.height;
+  add('head', rig.head, hitHeight * .13);
+  for (const b of rig.neck) add('neck', b, hitHeight * .12);
+  for (const b of list(spec.bones.spine)) add('body', b, hitHeight * .22);
+  for (const b of list(spec.bones.legs)) add('leg', b, hitHeight * .10);
+  for (const b of rig.tail) add('tail', b, hitHeight * .09);
   // Cover the volume between joint origins, including long necks and tails.
   const original = [...rig.hitZones];
   const a = new THREE.Vector3(), b = new THREE.Vector3();
@@ -144,7 +145,8 @@ export class GLBDinoAnimator {
     this.state = null; this.phase = Math.random(); this.dead = 0; this.trapped = 0;
     this.lastY = null; this.vy = 0; this.bank = 0;
     this.c = {}; this.time = 0; this.tailAngle = 0; this.tailVelocity = 0;
-    this.layerBones = [...new Set([...rig.neck, rig.head, rig.jaw, ...rig.tail].filter(Boolean))];
+    this.layerBones = [...new Set([...rig.neck, rig.head, rig.jaw, ...rig.tail,
+      ...(rig.spec.terrainLegs ? (rig.legChains || []).flatMap(leg => [leg.upper, leg.lower, leg.foot]) : [])].filter(Boolean))];
     this.bases = new Map();
     this.v = new THREE.Vector3(); this.q = new THREE.Quaternion();
     this.axis = new THREE.Vector3();
@@ -222,6 +224,7 @@ export class GLBDinoAnimator {
       base.q.copy(bone.quaternion); base.p.copy(bone.position);
     }
     const live = 1 - this.dead;
+    const authoredPose = spec.authoredPoseClips?.includes(next);
     if (spec.flyer) {
       // Nose follows the flight path (climb up, dive down); bank into turns. Level once dead.
       const flying = airborne && !dead;
@@ -231,7 +234,7 @@ export class GLBDinoAnimator {
       r.body.rotation.z = Math.sin(this.time * 22) * .035 * hurt * live;
       r.tilt.rotation.z = this.bank;
     } else {
-      r.body.rotation.x = damp(r.body.rotation.x, clamp(groundPitch, -.35, .35) * live, dt);
+      r.body.rotation.x = damp(r.body.rotation.x, clamp(groundPitch, -(spec.groundPitchLimit ?? .35), spec.groundPitchLimit ?? .35) * live, dt);
       r.body.rotation.z = Math.sin(this.time * 22) * .035 * hurt * live;
       r.tilt.rotation.z = Math.sin(this.time * 8) * .06 * this.trapped;
     }
@@ -239,8 +242,8 @@ export class GLBDinoAnimator {
     r.root.updateMatrixWorld(true);
     r.root.getWorldQuaternion(this.rootQuaternion);
     const pitch = (-.38 * this.c.headDown + .16 * this.c.neckRaise + .10 * this.c.roar) * live;
-    for (const bone of r.neck) this.bend(bone, RIGHT, pitch);
-    if (r.head) {
+    if (!authoredPose) for (const bone of r.neck) this.bend(bone, RIGHT, pitch);
+    if (r.head && !authoredPose) {
       let look = 0;
       if (lookTarget) {
         this.v.copy(lookTarget); r.root.worldToLocal(this.v);
@@ -260,12 +263,46 @@ export class GLBDinoAnimator {
       this.tailVelocity += (55 * (target - this.tailAngle) - 12 * this.tailVelocity) * h;
       this.tailAngle += this.tailVelocity * h;
     }
-    r.tail.forEach((bone, i) => this.bend(bone, UP,
+    if (!authoredPose) r.tail.forEach((bone, i) => this.bend(bone, UP,
       (this.tailAngle + Math.sin(this.time * 1.8 - i * .5) * .018 * live) / r.tail.length));
-    // These clips already contain the source IK result. Their root-parented
-    // foot targets are not knee children; solving that chain again twists legs.
-    // Ground pitch follows the terrain through the body above, retaining the
-    // baked foot poses rather than applying an incompatible second IK solver.
+    if (spec.terrainLegs && groundAt && !dead && !trapped && next !== 'swim') this.conformFeet(groundAt);
+    // Ground adaptation is opt-in. Other species keep their baked leg poses;
+    // the Sarcosuchus connected two-bone chains receive bounded target corrections.
+  }
+  /** Add small bank height differences to the authored stride, preserving its knee bend plane. */
+  conformFeet(groundAt) {
+    const r = this.rig, limit = r.spec.maxFootAdjustment ?? .45;
+    r.root.updateMatrixWorld(true);
+    const a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3();
+    const target = new THREE.Vector3(), axis = new THREE.Vector3(), bend = new THREE.Vector3(), knee = new THREE.Vector3();
+    const from = new THREE.Vector3(), to = new THREE.Vector3();
+    const originalFoot = new THREE.Quaternion(), parentQ = new THREE.Quaternion(), worldQ = new THREE.Quaternion(), deltaQ = new THREE.Quaternion();
+    const aim = (joint, fromDir, toDir) => {
+      deltaQ.setFromUnitVectors(fromDir.normalize(), toDir.normalize());
+      joint.getWorldQuaternion(worldQ); joint.parent.getWorldQuaternion(parentQ).invert();
+      joint.quaternion.copy(parentQ.multiply(deltaQ.multiply(worldQ)));
+      joint.updateWorldMatrix(false, true);
+    };
+    for (const { upper, lower, foot } of r.legChains) {
+      upper.getWorldPosition(a); lower.getWorldPosition(b); foot.getWorldPosition(c);
+      const offset = clamp(groundAt(c.x, c.z) - r.root.position.y, -limit, limit);
+      if (Math.abs(offset) < .001) continue; // Exact baked animation on level ground.
+      foot.getWorldQuaternion(originalFoot);
+      target.copy(c); target.y += offset;
+      const l1 = a.distanceTo(b), l2 = b.distanceTo(c);
+      axis.copy(target).sub(a);
+      const d = clamp(axis.length(), Math.abs(l1 - l2) + .001, l1 + l2 - .001);
+      axis.normalize(); target.copy(a).addScaledVector(axis, d);
+      const along = (l1 * l1 - l2 * l2 + d * d) / (2 * d);
+      bend.copy(b).sub(a).addScaledVector(axis, -from.copy(b).sub(a).dot(axis));
+      if (bend.lengthSq() < 1e-6) bend.set(1, 0, 0).addScaledVector(axis, -axis.x);
+      bend.normalize(); knee.copy(a).addScaledVector(axis, along).addScaledVector(bend, Math.sqrt(Math.max(0, l1 * l1 - along * along)));
+      aim(upper, from.copy(b).sub(a), to.copy(knee).sub(a));
+      lower.getWorldPosition(b); foot.getWorldPosition(c);
+      aim(lower, from.copy(c).sub(b), to.copy(target).sub(b));
+      foot.parent.getWorldQuaternion(parentQ).invert(); foot.quaternion.copy(parentQ.multiply(originalFoot));
+      foot.updateWorldMatrix(false, true);
+    }
   }
   /**
    * Clip for a flyer. Alive in the air: dive when diving, otherwise flap while climbing, glide while

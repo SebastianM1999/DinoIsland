@@ -3,7 +3,7 @@ import { Rig } from './rig.js';
 import { blob, mesh, spike, place } from '../kit.js';
 
 export const SARCO_ANIM = { gait: 'quad', walkSpeed: 3, runSpeed: 8.5,
-  walkStride: 1.866, runStride: 3.775, bob: .05, stepHeight: .18 };
+  walkStride: 1.866 * .9, runStride: 3.775 * .9, bob: .05, stepHeight: .18 };
 
 /** Low, long crocodile silhouette keeps missing art playable without a wrong species. */
 export function buildSarcoFallback() {
@@ -42,5 +42,6 @@ export function buildSarcoFallback() {
     r.legs.push({ hip, knee, foot, l1: .7, l2: .65, kneeDir: front ? 1 : -1,
       offset: front === (side > 0) ? 0 : .5, front });
   }
+  r.body.scale.set(1, .9, .9); r.body.position.y *= .9;
   return r.finalize();
 }

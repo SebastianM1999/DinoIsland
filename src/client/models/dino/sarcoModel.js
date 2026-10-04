@@ -2,8 +2,10 @@
 export const SARCO_TYPE = 'alpha-sarcosuchus';
 export const SARCO_MODEL = {
   url: '/assets/models/dinos/alpha-sarcosuchus.glb', source: 'AlphaSarcosuchus',
-  height: 3.812, length: 18, yaw: Math.PI,
-  walkStride: 1.866, runStride: 3.775, runThreshold: 3, maxCadence: 2.3,
+  height: 3.4308, length: 16.2, width: 4.427790898814507, yaw: Math.PI,
+  hitHeight: 3.812, groundPitchLimit: 0, terrainLegs: true, maxFootAdjustment: .45,
+  authoredPoseClips: ['attack', 'bite', 'shove', 'tailsweep', 'pivot', 'retreat', 'ambush', 'recovery', 'swim'],
+  walkStride: 1.866 * .9, runStride: 3.775 * .9, runThreshold: 3, maxCadence: 2.55,
   bones: {
     head: 'Head', jaw: 'Jaw', body: 'Body', spine: ['Body', 'Shoulders'],
     neck: ['Neck1', 'Neck2'], tail: Array.from({ length: 8 }, (_, i) => `Tail${i + 1}`),
@@ -36,3 +38,6 @@ export const SARCO_MODEL = {
     })),
   ],
 };
+// Runtime fit reduces only height and length; lateral armor, stance and hit widths stay the same.
+SARCO_MODEL.extraHitZones = SARCO_MODEL.extraHitZones.map(zone => ({ ...zone,
+  at: [zone.at[0], zone.at[1] * .9, zone.at[2] * .9] }));

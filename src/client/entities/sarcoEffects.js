@@ -33,7 +33,7 @@ export class SarcoEffects {
     this.group.visible = v.alive && water !== null && this.effect > 0;
     if (!this.group.visible) return;
     this.group.position.set(v.pos.x, water + .06, v.pos.z); this.group.rotation.y = v.yaw;
-    this.eyes.forEach((m, i) => { m.visible = this.warning > 0; m.position.set(i ? -1.08 : 1.08, .03, -4.26); m.material.opacity = .65 + .35 * Math.sin(this.time * 9) ** 2; });
+    this.eyes.forEach((m, i) => { m.visible = this.warning > 0; m.position.set(i ? -1.08 : 1.08, .03, -4.26 * .9); m.material.opacity = .65 + .35 * Math.sin(this.time * 9) ** 2; });
     const progress = 1 - this.effect / this.total;
     this.mudMat.opacity = .55 * (1 - progress);
     this.mud.forEach((m, i) => {

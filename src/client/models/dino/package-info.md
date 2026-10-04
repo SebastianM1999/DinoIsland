@@ -3,7 +3,8 @@
 
 ## Files
 - `glbCatalog.js` — `GLB_DINOS`: per species the GLB URL (`/assets/models/dinos/<type>.glb`), fitted size, strides, bone aliases, clip names (`<Source>_<Clip>`), flyer flags and extra hit zones.
-- `sarcoModel.js` — Alpha Sarcosuchus gameplay and preview GLB contract: fourteen clips, fitted dimensions, bone aliases and measured hit zones; registered by `glbCatalog.js` and preloaded with the other species.
+- `sarcoModel.js` — Alpha Sarcosuchus gameplay fit (length/height reduced 10%, width preserved), attack clip contract, stabilized torso and bounded leg terrain adaptation.
+- `sarcoFallback.js` — procedural crocodile fallback with the same directional fit.
 - `glbDino.js` — `preloadDinoModels()` (fetch + parse, 20 s timeout, warn and fall back on failure), `registerDinoGLTF()`, `buildGLBDino(type)` (clone, fit, bones, hit zones; `null` if not loaded) and `GLBDinoAnimator` (AnimationMixer clips plus procedural layers).
 - `rig.js` — `Rig` (joint hierarchy + meshes) and `DinoAnimator` for procedural rigs: distance-driven gait, 2-bone leg IK on terrain, bob/sway, neck/tail follow-through, breathing, blinking, look, jaw, death, trap struggle.
 - `skin.js` — `loft`, `SkinBuilder`, `restPoint`/`restMatrix`: lofted soft bodies bound to joints as a `SkinnedMesh`.
