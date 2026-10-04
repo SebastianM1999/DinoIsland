@@ -33,13 +33,55 @@ for key,j in A_LEGJ.items():
             ws={body.vertex_groups[g.group].name:g.weight*(1-blend) for g in v.groups}
             ws[bn]=ws.get(bn,0)+blend;set_weights(body,v,ws)
 spine=segs(rig,A_CORE)
-for name in ['AlphaArmor','AlphaRidges','AlphaPebbles']:
-    rigid_islands(bpy.data.objects[name],rig,lambda c:nearest(c,spine))
+# Project plate weights from the fused skin, including the shoulder/hip fade. A
+# nearest-spine assignment leaves flank scutes suspended when the legs swing.
+from mathutils.bvhtree import BVHTree
+limit_influences(body)
+body.data.calc_loop_triangles()
+skin_tri=[tuple(t.vertices) for t in body.data.loop_triangles]
+skin_bvh=BVHTree.FromPolygons([v.co for v in body.data.vertices],skin_tri,all_triangles=True)
+leg_names={k[:-1]+n+k[-1] for k in A_LEGJ for n in ['UpLeg','LowLeg','Foot']}
+def a_skin_weights(p):
+    q,normal,idx,d=skin_bvh.find_nearest(p)
+    ids=skin_tri[idx];a,b,c=[body.data.vertices[i].co for i in ids]
+    u=b-a;v=c-a;w=q-a;uu=u.dot(u);uv=u.dot(v);vv=v.dot(v)
+    den=uu*vv-uv*uv
+    wb=(vv*w.dot(u)-uv*w.dot(v))/den if abs(den)>1e-12 else 0
+    wc=(uu*w.dot(v)-uv*w.dot(u))/den if abs(den)>1e-12 else 0
+    factors=[max(0,1-wb-wc),max(0,wb),max(0,wc)];ws={}
+    for vi,f in zip(ids,factors):
+        for g in body.data.vertices[vi].groups:
+            bn=body.vertex_groups[g.group].name;ws[bn]=ws.get(bn,0)+g.weight*f
+    ws=dict(sorted(ws.items(),key=lambda x:x[1],reverse=True)[:4]);total=sum(ws.values())
+    return {n:w/total for n,w in ws.items()}
+
+# Remove complete leg-area islands from the body armor and consolidate them in
+# the limb mesh. Preserve their geometry, scale colors and scar coloration.
+legscales=bpy.data.objects['AlphaLegScales'];moved=0
+for name in ['AlphaArmor','AlphaPebbles']:
+    ob=bpy.data.objects[name];selected=set()
+    for isl in _islands(ob.data):
+        ctr=sum((ob.data.vertices[i].co for i in isl),V())/len(isl)
+        if sum(w for n,w in a_skin_weights(ctr).items() if n in leg_names)>.05:selected.update(isl)
+    if not selected:continue
+    moved+=len(selected)//19
+    for o in bpy.context.selected_objects:o.select_set(False)
+    ob.select_set(True);bpy.context.view_layer.objects.active=ob
+    for v in ob.data.vertices:v.select=v.index in selected
+    before=set(bpy.data.objects)
+    bpy.ops.object.mode_set(mode='EDIT');bpy.ops.mesh.separate(type='SELECTED');bpy.ops.object.mode_set(mode='OBJECT')
+    part=next(o for o in bpy.data.objects if o not in before)
+    for o in bpy.context.selected_objects:o.select_set(False)
+    part.select_set(True);legscales.select_set(True);bpy.context.view_layer.objects.active=legscales;bpy.ops.object.join()
+for name in ['AlphaArmor','AlphaPebbles','AlphaLegScales']:
+    ob=bpy.data.objects[name];ob.vertex_groups.clear()
+    for v in ob.data.vertices:set_weights(ob,v,a_skin_weights(v.co))
+    ob.parent=rig;am=ob.modifiers.new('Armature','ARMATURE');am.object=rig
+print('leg-area plates transferred',moved)
+rigid_islands(bpy.data.objects['AlphaRidges'],rig,lambda c:nearest(c,spine))
 for name in ['AlphaEyes','AlphaLids','AlphaGlints','AlphaPupils','AlphaHeadPlates','AlphaNostrils']:
     rigid_islands(bpy.data.objects[name],rig,lambda c:'Head')
 rigid_islands(bpy.data.objects['AlphaHeadScales'],rig,lambda c:'Head')
-legbones=segs(rig,[k[:-1]+n+k[-1] for k in A_LEGJ for n in ['UpLeg','LowLeg','Foot']])
-rigid_islands(bpy.data.objects['AlphaLegScales'],rig,lambda c:nearest(c,legbones))
 rigid_islands(bpy.data.objects['AlphaTongue'],rig,lambda c:'Jaw')
 # Teeth alternate between the upper and lower rows; choose by their root region, not centroid.
 teeth=bpy.data.objects['AlphaTeeth'];teeth.vertex_groups.clear()
