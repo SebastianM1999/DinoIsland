@@ -123,10 +123,11 @@ test('bogs are many, shallow and wadeable; hut, boat, relics and plots stay dry'
     let bog = 0, land = 0;
     for (let x = -plan.A; x <= plan.A; x += 2) {
       for (let z = -plan.B; z <= plan.B; z += 2) {
-        if (terrain.heightAt(x, z) <= 0) continue;
+        if (terrain.heightAt(x, z) <= 0 && !(insideSwampArena(plan.swampArena, x, z) && terrain.bogAt(x, z) > .5)) continue;
         land++;
         if (terrain.bogAt(x, z) > 0.5) {
           bog++;
+          if (insideSwampArena(plan.swampArena, x, z)) continue; // boss hollows are deliberately swimmable
           assert.ok(terrain.waterDepthAt(x, z) <= BOG.maxDepth + 1e-6, `v${variant}: bog at ${x},${z} is ${terrain.waterDepthAt(x, z).toFixed(2)} m deep`);
           assert.ok(terrain.isWalkable(x, z, 0.35), `v${variant}: dinosaurs walk through the bog at ${x},${z}`);
         }
