@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { ServerWorld } from '../src/sim/world.js';
 import { CONFIG } from '../src/shared/config.js';
 import { DS, EV } from '../src/shared/protocol.js';
-import { sarcosuchusBrain as brain, SARCO_TIMING as T, sarcoTailSweep } from '../src/sim/ai/sarcosuchus.js';
+import { sarcosuchusBrain as brain, SARCO_TIMING as T, sarcoTailSweep, sarcoGroundHeight } from '../src/sim/ai/sarcosuchus.js';
 
 const DT = 1 / CONFIG.net.tickRate, C = CONFIG.dinos['alpha-sarcosuchus'];
 let shared;
@@ -19,7 +19,7 @@ function fixture(mode = 'hunt') {
   const { d, p, world, events } = shared;
   Object.assign(d, { x: 0, z: 0, y: world.terrain.heightAt(0, 0), yaw: 0, strikeYaw: 0, spd: 0,
     hp: d.maxHp, alive: true, st: DS.IDLE, fl: 1, targetId: p.id, mode, modeT: 0, attacks: 1,
-    swimOffset: 0, hitAttack: false, combo: false, pivotTail: false, victims: new Set(), route: null, approach: null });
+    swimOffset: 0, submergence: 0, hitAttack: false, combo: false, pivotTail: false, victims: new Set(), route: null, approach: null });
   d.phase = null; d.phaseSeq = 0;
   Object.assign(p, { x: 0, z: -6.5, y: d.y, alive: true, hp: 100, invulnUntil: 0, downed: false });
   events.length = 0;
@@ -154,6 +154,40 @@ test('water ambush warns before erupting, and no attack damages players in their
   f.world.safeZone = () => ({ x: f.p.x, z: f.p.z, r: 5 });
   try { advance(f, T.ambushStrike + 0.1); assert.equal(f.p.hp, 100); }
   finally { f.world.safeZone = realSafe; }
+});
+
+test('water support is absolute, so reaching a higher bank does not double-add the terrain rise', () => {
+  const d = { x: 0, z: 0, submergence: 0.5 };
+  let ground = 6;
+  const terrain = { heightAt: () => ground, waterLevelAt: () => 10 };
+  const heightScale = C.bodyHeightScale ?? 1;
+  const waterRoot = 10 - (0.35 + 2.75 * 0.5) * heightScale;
+  assert.equal(sarcoGroundHeight(d, terrain), waterRoot);
+  ground = 9;
+  assert.equal(sarcoGroundHeight(d, terrain), 9, 'bank supports the root without retaining old floor offset');
+  ground = 6;
+  d.submergence = 1;
+  assert.equal(sarcoGroundHeight(d, terrain), Math.max(ground, 10 - 3.1 * heightScale));
+});
+
+test('water emergence preserves the low wind-up and never floats above the new shoreline support', () => {
+  const world = new ServerWorld({ send() {} }, { level: 1, variant: 4 });
+  const d = world.dinos.list.find(d => d.boss), p = world.players.get(world.join('Bank dodger').id);
+  world.dinos.list = [d];
+  Object.assign(p, { x: 0, z: 0, y: world.terrain.heightAt(0, 0), creative: true });
+  Object.assign(d, { mode: 'ambush', modeT: 0, strikeYaw: 0, yaw: 0, targetId: p.id, victims: new Set() });
+  const low = d.y;
+  let surfaced = false;
+  for (let i = 0; i < Math.ceil((T.ambushWindup + T.ambushStrike) / DT); i++) {
+    world.now += DT; world.dinos.update(DT);
+    const floor = world.terrain.heightAt(d.x, d.z), water = world.terrain.waterLevelAt(d.x, d.z);
+    if (d.mode === 'ambush' && d.modeT <= T.ambushWindup) assert.ok(Math.abs(d.y - low) < 1e-8, 'no vertical lift during warning');
+    const surface = water === null ? floor : Math.max(floor, water - 0.35 * (C.bodyHeightScale ?? 1));
+    assert.ok(d.y >= floor - 1e-8);
+    assert.ok(d.y <= surface + 1e-8, 'movement never adds an old underwater offset to a new bank');
+    if (d.modeT > T.ambushWindup && d.y > low + 0.2) surfaced = true;
+  }
+  assert.ok(surfaced, 'the committed surge actually emerges');
 });
 
 test('submerged bosses target grounded players on raised banks across fifteen swamp variants', () => {
