@@ -3,6 +3,7 @@
 
 ## Files
 - `dinoViews.js` — `SPECIES` table and `DinoView`/`DinoViews`: interpolated, animated dinosaurs with hit spheres, health bars, spotting, raycast and minimap markers.
+- `sarcoEffects.js` � server-triggered water ambush warning eye glints, silt burst and swimming wakes.
 - `gunEffects.js` — `GunEffects`: short-lived bullet tracer lines plus the shot sound, from `EV.SHOT` events.
 - `items.js` — `Items`: loot, dropped/lodged arrows and spears, firearms, fruit and traps on the ground (`EV.ITEM_*`, `EV.TRAP_*`).
 - `projectiles.js` — `Projectiles`: arrows and thrown spears in flight; own shots simulated locally, remote shots replayed from `EV.FIRE`.

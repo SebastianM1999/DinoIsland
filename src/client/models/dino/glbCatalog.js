@@ -1,3 +1,4 @@
+import { SARCO_MODEL, SARCO_TYPE } from './sarcoModel.js';
 // Replace files, semantic clips and bone aliases here when changing asset providers.
 const bones = {
   head: 'Head', jaw: null, neck: ['Neck'], body: 'Body', spine: ['Hips', 'Torso', 'Shoulders'],
@@ -18,6 +19,7 @@ function model(species, source, height, length, walkStride, runStride, quadruped
   };
 }
 export const GLB_DINOS = {
+  [SARCO_TYPE]: SARCO_MODEL,
   // Median grounded foot velocity × clip duration; see measure-dino-strides.mjs.
   raptor: model('raptor', 'Velociraptor', 1.675, 3.037, 1.818, 4.09),
   trex: model('trex', 'TRex', 5.919, 11, 4.819, 8.095),

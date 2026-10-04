@@ -1,5 +1,5 @@
 # audio
-> All game sound on the client via Web Audio: recorded effects and footsteps, synthesized fallback/UI cues, positional 3D audio, water and shore ambience, and adaptive island/menu/boss music.
+> All game sound on the client via Web Audio: recorded effects and footsteps, synthesized fallback/UI cues, positional 3D audio (including distinct Sarcosuchus attack wind-up cues), water and shore ambience, and adaptive island/menu/boss music.
 
 ## Files
 - `audio.js` — `GameAudio`: the audio graph (master, sfx, music, ambience buses), `play(name, opts)` (synthesized fallbacks, and the volcano's own: `rumble`, `eruption`, `bombWhistle`, `bombImpact`, `crustCrack`, `crustBreak`), listener updates, ambience and water loops, music control; follows volume settings.
@@ -8,7 +8,7 @@
 - `samples.js` — `SampleBank` (deduplicated fetch + decode, failures remembered for the session) and `SamplePicker` (variation picking).
 - `steps.js` — `StepCadence`: distance-driven footstep trigger (silent when blocked or airborne; no bursts after teleports).
 - `surface.js` — `footstepSurface()` picks the footstep surface (wood, rock, water, sand, mud – also in swamp bogs –, dirt, gravel, leaves, grass); `woodSupports()` filters standable log colliders.
-- `region.js` — `inBossMusicArea()`: whether the player is in the boss arena or on its causeway, with an exit margin.
+- `region.js` — `inBossMusicArea()`: whether the player is in a boss arena (jungle lava islet or swamp kettle) or on the jungle causeway, with an exit margin.
 
 ## Entry points
 - `main.js` creates a `GameAudio` for the menu (unlocked on a user gesture) and passes it to `Game` for reuse; `core/game.js` creates one if none is given and calls `play`, `setIsland`, `setListener`, `update(dt, { coast, water, danger, bossArea })`, `startMusic`/`stopMusic`, `resume`.

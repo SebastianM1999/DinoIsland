@@ -136,7 +136,7 @@ export class GLBDinoAnimator {
     this.mixer = new THREE.AnimationMixer(rig.model);
     this.actions = Object.fromEntries(Object.entries(rig.clips).map(([state, clip]) => {
       const action = this.mixer.clipAction(clip);
-      if (state === 'death' || state === 'attack' || state === 'hurt') {
+      if (['death', 'attack', 'hurt', 'bite', 'shove', 'tailsweep', 'pivot', 'retreat', 'ambush', 'recovery'].includes(state)) {
         action.setLoop(THREE.LoopOnce, 1); action.clampWhenFinished = true;
       }
       return [state, action];
@@ -179,9 +179,15 @@ export class GLBDinoAnimator {
       else if (pose.roar && this.actions.roar) next = 'roar';
       else if (pose.headDown && this.actions.eat) next = 'eat';
     }
+    // Boss clip and timing are driven by the authoritative attack phase.
+    if (!dead && !trapped && pose.clip && this.actions[pose.clip]) next = pose.clip;
     // Complete each triggered attack even when the server's short pulse ends.
     const currentAttack = this.actions.attack;
-    if (!dead && !trapped && this.state === 'attack' && currentAttack.time < currentAttack.getClip().duration) next = 'attack';
+    if (!dead && !trapped && !pose.clip && this.state === 'attack' && currentAttack.time < currentAttack.getClip().duration) next = 'attack';
+    if (pose.clip && pose.clipId !== undefined && this.clipId !== pose.clipId) {
+      this.clipId = pose.clipId;
+      this.actions[next].reset();
+    }
     if (next !== this.state) {
       const previous = this.actions[this.state], action = this.actions[next];
       action.reset().setEffectiveWeight(1).setEffectiveTimeScale(1).play();
@@ -197,6 +203,8 @@ export class GLBDinoAnimator {
       action.setEffectiveTimeScale(cadence * action.getClip().duration);
       this.phase += cadence * dt;
     }
+    if (pose.clip && pose.clipDuration > 0 && this.actions[next])
+      this.actions[next].setEffectiveTimeScale(this.actions[next].getClip().duration / pose.clipDuration);
     this.mixer.update(dt);
     for (const bone of this.layerBones) {
       let base = this.bases.get(bone);
@@ -231,7 +239,7 @@ export class GLBDinoAnimator {
       this.bend(r.head, UP, (look + .025 * Math.sin(this.time * 2) * this.c.alert) * live);
       this.bend(r.head, RIGHT, -.08 * Math.sin(this.time * 9) * this.c.roar * live);
     }
-    if (r.jaw) r.jaw.rotateX(-.52 * Math.max(this.c.jaw, this.c.roar, this.c.attack) * live);
+    if (r.jaw && !pose.clip) r.jaw.rotateX(-.52 * Math.max(this.c.jaw, this.c.roar, this.c.attack) * live);
     const blinkPhase = this.time % 4.7;
     const blink = blinkPhase > 4.5 ? Math.sin((blinkPhase - 4.5) / .2 * Math.PI) : 0;
     for (const lid of r.eyelids) lid.scale.y = .12 + .88 * Math.max(this.dead, blink);

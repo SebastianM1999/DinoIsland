@@ -1,4 +1,4 @@
-// Review-only asset contract. Boss stats, spawning and AI are separate work.
+// Game and preview asset contract for the Drowned Hollow boss.
 export const SARCO_TYPE = 'alpha-sarcosuchus';
 export const SARCO_MODEL = {
   url: '/assets/models/dinos/alpha-sarcosuchus.glb', source: 'AlphaSarcosuchus',
@@ -11,7 +11,7 @@ export const SARCO_MODEL = {
     knees: ['BackLowLegR', 'BackLowLegL', 'FrontLowLegR', 'FrontLowLegL'],
     feet: ['BackFootR', 'BackFootL', 'FrontFootR', 'FrontFootL'],
   },
-  clips: Object.fromEntries(['Idle', 'Walk', 'Run', 'Attack', 'Death', 'Roar', 'Swim', 'TailSweep'].map(
+  clips: Object.fromEntries(['Idle', 'Walk', 'Run', 'Attack', 'Death', 'Roar', 'Swim', 'TailSweep', 'Bite', 'Shove', 'Pivot', 'Retreat', 'Ambush', 'Recovery'].map(
     name => [name.toLowerCase(), `AlphaSarcosuchus_${name}`])),
   extraHitZones: [
     ...[4.3, 5.4, 6.5, 7.5].map(f => ({ zone: 'head', bone: 'Head', at: [0, 2.45, f], radius: 1 })),

@@ -16,11 +16,14 @@ import { buildStego, STEGO_ANIM, stegoExtraUpdate } from '../models/dino/stego.j
 import { buildRaptor, RAPTOR_ANIM, raptorExtraUpdate } from '../models/dino/raptor.js';
 import { buildPtera, PTERA_ANIM, pteraExtraUpdate } from '../models/dino/ptera.js';
 import { buildTrex, TREX_ANIM, trexExtraUpdate } from '../models/dino/trex.js';
+import { buildSarcoFallback, SARCO_ANIM } from '../models/dino/sarcoFallback.js';
+import { SarcoEffects } from './sarcoEffects.js';
 import { buildGLBDino } from '../models/dino/glbDino.js';
 import { disposeIslandScenes } from '../core/resources.js';
 
 /** Every server species needs a visible model and its animation tuning. */
 export const SPECIES = {
+  'alpha-sarcosuchus': { build: buildSarcoFallback, anim: SARCO_ANIM, barHeight: 4.4, heavy: true },
   brachio: { build: buildBrachio, anim: BRACHIO_ANIM, extraUpdate: brachioExtraUpdate, barHeight: 13.8, heavy: true },
   stego: { build: buildStego, anim: STEGO_ANIM, extraUpdate: stegoExtraUpdate, barHeight: 4.2, heavy: true },
   raptor: { build: buildRaptor, anim: RAPTOR_ANIM, extraUpdate: raptorExtraUpdate, barHeight: 1.8 },
@@ -86,6 +89,7 @@ export class DinoView {
   }
 
   dispose() {
+    this.effects?.dispose();
     this.anim.dispose?.();
     this.rig.dispose?.();
     // Cached GLB resources are retained; procedural rigs belong to this view.
@@ -171,6 +175,7 @@ export class DinoView {
   }
 
   grounded() {
+    if (this.type === 'alpha-sarcosuchus' && (this.st === DS.SWIM || this.st === DS.SUBMERGED || this.fl & 8)) return false;
     if (this.type === 'ptera') {
       return this.pos.y <= this.ctx.terrain.heightAt(this.pos.x, this.pos.z) + 0.2;
     }
@@ -180,6 +185,14 @@ export class DinoView {
   /** Map the server state to animation pose targets. */
   pose() {
     const p = {};
+    if (this.type === 'alpha-sarcosuchus') {
+      const clips = { [DS.SWIM]: 'swim', [DS.SUBMERGED]: 'swim', [DS.LUNGE]: 'attack',
+        [DS.BITE]: 'bite', [DS.SHOVE]: 'shove', [DS.TAIL]: 'tailsweep',
+        [DS.REPOSITION]: 'pivot', [DS.RETREAT]: 'retreat', [DS.RECOVER]: 'recovery' };
+      p.clip = this.attackT > 0 ? this.attackClip : clips[this.st];
+      p.clipDuration = this.attackT > 0 ? this.attackDuration : null;
+      p.clipId = this.attackSeq;
+    }
     switch (this.st) {
       case DS.GRAZE: case DS.EAT: p.headDown = 1; break;
       case DS.ALERT: p.alert = 1; p.neckRaise = 1; break;
@@ -255,7 +268,22 @@ export class DinoViews {
       if (v) { v.alive = false; v.st = DS.DEAD; v.bar.hidden = true; }
     });
     net.on(`ev:${EV.BUTCHERED}`, (m) => { const v = this.map.get(m.id); if (v) v.butchered = true; });
-    net.on(`ev:${EV.ATTACK}`, (m) => { const v = this.map.get(m.id); if (v) { v.attackT = 0.45; game.onDinoAttack?.(v); } });
+    net.on(`ev:${EV.ATTACK}`, (m) => {
+      const v = this.map.get(m.id);
+      if (!v) return;
+      if (v.type === 'alpha-sarcosuchus' && m.kind === 'enrage') {
+        game.audio?.play('sarco_enrage', { pos: v.pos });
+        return;
+      }
+      v.attackT = m.duration || .45; v.attackDuration = m.duration;
+      v.attackSeq = (v.attackSeq || 0) + 1;
+      v.attackClip = { lunge: 'attack', bite: 'bite', shove: 'shove', tail: 'tailsweep',
+        pivot: 'pivot', reposition: 'pivot', retreat: 'retreat', ambush: 'ambush', recovery: 'recovery', enrage: 'roar' }[m.kind];
+      if (v.type === 'alpha-sarcosuchus') {
+        v.effects?.cue(m.kind, m.duration);
+        game.audio?.play(`sarco_${m.kind}`, { pos: v.pos });
+      } else game.onDinoAttack?.(v);
+    });
     net.on(`ev:${EV.ROAR}`, (m) => { const v = this.map.get(m.id); if (v) { v.roarT = 1.6; game.onRoar?.(v); } });
     net.on(`ev:${EV.SPOT}`, (m) => {
       if (this.spotted.has(m.id)) return;
@@ -279,7 +307,9 @@ export class DinoViews {
 
   add(desc) {
     if (this.map.has(desc.id) || !SPECIES[desc.type]) return;
-    this.map.set(desc.id, new DinoView(desc, this.ctx));
+    const view = new DinoView(desc, this.ctx);
+    if (desc.type === 'alpha-sarcosuchus') view.effects = new SarcoEffects(this.game, view);
+    this.map.set(desc.id, view);
   }
 
   remove(id) {
@@ -308,6 +338,7 @@ export class DinoViews {
     const hide = this.game.gfx.scene.fog?.far ?? Infinity;
     for (const v of this.map.values()) {
       v.samplePose(dt, renderTime);
+      v.effects?.update(dt);
       const d2 = v.pos.distanceToSquared(cam);
       _sphere.center.copy(v.pos);
       _sphere.radius = v.sp.barHeight * 1.6 * v.scale + 2;

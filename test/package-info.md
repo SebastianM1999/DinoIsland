@@ -50,6 +50,7 @@ Grouped by the module area they mainly cover. Many simulation tests also check t
 ### Client (headless)
 - `tracking-minimap.test.js` — dinosaur discovery by sustained sighting, server sighting checks, minimap does not reveal the boss arena.
 - `dino-visibility.test.js` — every server-spawned dinosaur type has an animated client model; damage events name the attacker.
+- `sarco-client.test.js` � boss state/clip selection, retrigger timing, missing-asset crocodile fallback and deep ambush hollows with dry causeway across 15 variants.
 - `dino-glb.test.js` — GLB dinosaur loading, fallback and retry, clips and animation (`src/client/models/dino/*`).
 - `dino-skin.test.js` — procedural skin loft faces outward.
 - `audio.test.js` — audio catalog/samples, music transitions and boss-area music, footstep surfaces and cadence; HTTP serving of audio files.
