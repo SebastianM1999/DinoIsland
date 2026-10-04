@@ -71,4 +71,3 @@ for (const state of ['walk', 'run']) {
 let tris = 0, noColor = 0;
 rig.root.traverse(o => { if (o.isMesh) { tris += (o.geometry.index?.count ?? o.geometry.attributes.position.count) / 3; if (!o.geometry.attributes.color) noColor++; } });
 console.log('tris    ', tris, tris <= 60000 ? 'ok' : 'OVER 60k BUDGET', noColor ? `(${noColor} meshes without vertex colours!)` : '');
-
