@@ -155,6 +155,65 @@ test('water ambush warns before erupting, and no attack damages players in their
   finally { f.world.safeZone = realSafe; }
 });
 
+test('submerged bosses target grounded players on raised banks across fifteen swamp variants', () => {
+  let highBanks = 0;
+  for (let variant = 1; variant <= 15; variant++) {
+    const world = new ServerWorld({ send() {} }, { level: 1, variant });
+    const d = world.dinos.list.find(d => d.boss), p = world.players.get(world.join('Bank runner').id);
+    // The causeway is above the deep pocket; eligibility is based on the player's
+    // own ground, rather than the distant boss's underwater floor.
+    let bank = { x: 0, z: 0, y: -Infinity };
+    for (const x of [-20, -10, 0, 10, 20]) for (const z of [-4, 0, 4]) {
+      const y = world.terrain.heightAt(x, z);
+      if (y > bank.y) bank = { x, z, y };
+    }
+    Object.assign(p, bank, { alive: true });
+    if (p.y - world.terrain.heightAt(d.x, d.z) >= 4) highBanks++;
+    d.yaw = Math.atan2(-(p.x - d.x), -(p.z - d.z)); d.modeT = 1.3;
+    brain.update(d, world.dinos, DT);
+    assert.equal(d.mode, 'ambush', `variant ${variant} targets the bank`);
+    assert.equal(d.st, DS.AMBUSH);
+    d.mode = 'submerged'; d.modeT = 1.3; d.targetId = null;
+    p.y += 5;
+    brain.update(d, world.dinos, DT);
+    assert.equal(d.mode, 'submerged', `variant ${variant} does not attack a flying player`);
+  }
+  assert.ok(highBanks > 0, 'covers banks higher than the old boss-floor targeting allowance');
+});
+
+test('underwater and surfaced boss deaths preserve root continuity and float without burial', () => {
+  for (const submerged of [true, false]) {
+    const world = new ServerWorld({ send() {} }, { level: 1, variant: 4 });
+    const d = world.dinos.list.find(d => d.boss), p = world.players.get(world.join('Croc hunter').id);
+    world.dinos.list = [d];
+    const ground = world.terrain.heightAt(d.x, d.z), water = world.terrain.waterLevelAt(d.x, d.z);
+    p.x = 0; p.z = 0; p.y = world.terrain.heightAt(0, 0);
+    d.y = Math.max(ground, water - (submerged ? 3.1 : 0.35));
+    d.swimOffset = d.y - ground;
+    const atDeath = d.y;
+    world.dinos.kill(d, p.id);
+    assert.equal(d.y, atDeath, 'lethal hit preserves the current vertical pose');
+    world.dinos.update(DT);
+    assert.ok(Math.abs(d.y - atDeath) <= 0.45 * DT + 1e-9, 'first death tick moves centimetres, not metres');
+    for (let i = 0; i < 200; i++) {
+      const y = d.y; world.dinos.update(DT);
+      assert.ok(d.y >= ground);
+      assert.ok(Math.abs(d.y - y) <= 0.45 * DT + 1e-9);
+    }
+    assert.ok(Math.abs(d.y - Math.max(ground, water - 0.8)) < 1e-7);
+  }
+});
+
+test('retreat backsteps move toward water while keeping the enemy in front', () => {
+  const f = fixture('retreat'); f.d.waterGoal = { x: 0, z: 12.6 };
+  f.p.x = 0; f.p.z = -8; f.d.yaw = 0;
+  const z = f.d.z;
+  brain.update(f.d, f.sys, DT);
+  assert.equal(f.d.st, DS.RETREAT);
+  assert.equal(f.d.yaw, 0, 'continues facing the enemy');
+  assert.ok(f.d.z > z, 'travels backwards toward the water');
+});
+
 test('arena boundary blocks attacks from outside, death rewards once and never respawns the boss', () => {
   const f = fixture(); const hp = f.d.hp;
   f.p.x = 35; f.p.z = 0;
