@@ -144,7 +144,7 @@ export class DinoView {
     const t = this.ctx.terrain;
     const fx = -Math.sin(this.yaw), fz = -Math.cos(this.yaw);
     const reach = 2.5 * this.root.scale.x;
-    const groundPitch = this.type === 'ptera' && !this.grounded() ? 0
+    const groundPitch = !this.grounded() ? 0
       : Math.atan2(t.heightAt(this.pos.x + fx * reach, this.pos.z + fz * reach) - t.heightAt(this.pos.x - fx * reach, this.pos.z - fz * reach), reach * 2);
 
     const pose = this.pose();
@@ -187,7 +187,7 @@ export class DinoView {
     const p = {};
     if (this.type === 'alpha-sarcosuchus') {
       const clips = { [DS.SWIM]: 'swim', [DS.SUBMERGED]: 'swim', [DS.LUNGE]: 'attack',
-        [DS.BITE]: 'bite', [DS.SHOVE]: 'shove', [DS.TAIL]: 'tailsweep',
+        [DS.AMBUSH]: 'ambush', [DS.BITE]: 'bite', [DS.SHOVE]: 'shove', [DS.TAIL]: 'tailsweep',
         [DS.REPOSITION]: 'pivot', [DS.RETREAT]: 'retreat', [DS.RECOVER]: 'recovery' };
       p.clip = this.attackT > 0 ? this.attackClip : clips[this.st];
       p.clipDuration = this.attackT > 0 ? this.attackDuration : null;

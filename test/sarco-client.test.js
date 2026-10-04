@@ -12,7 +12,7 @@ import { inBossMusicArea } from '../src/client/audio/region.js';
 
 test('boss snapshots select the corresponding authored clip, including recovery and swim', () => {
   const expected = new Map([[DS.SWIM, 'swim'], [DS.SUBMERGED, 'swim'], [DS.LUNGE, 'attack'],
-    [DS.BITE, 'bite'], [DS.SHOVE, 'shove'], [DS.TAIL, 'tailsweep'], [DS.REPOSITION, 'pivot'],
+    [DS.AMBUSH, 'ambush'], [DS.BITE, 'bite'], [DS.SHOVE, 'shove'], [DS.TAIL, 'tailsweep'], [DS.REPOSITION, 'pivot'],
     [DS.RETREAT, 'retreat'], [DS.RECOVER, 'recovery']]);
   for (const [st, clip] of expected) {
     const pose = DinoView.prototype.pose.call({ type: 'alpha-sarcosuchus', st });
@@ -77,4 +77,22 @@ test('15 swamp variants have real deep ambush pockets and a dry walkable causewa
     assert.ok(inBossMusicArea({ swampArena: a }, { x: 0, z: 0 }));
     assert.equal(inBossMusicArea({ swampArena: a }, { x: 50, z: 0 }), false);
   }
+});
+
+
+test('a swimming boss stays level over a sloping basin floor', () => {
+  let received;
+  const view = {
+    type: 'alpha-sarcosuchus', alive: true, st: DS.SWIM, fl: 8, scale: 1,
+    pos: new THREE.Vector3(0, 1, 0), yaw: 0, root: new THREE.Group(),
+    ctx: { terrain: { heightAt: (x, z) => z * 2 } },
+    grounded: DinoView.prototype.grounded,
+    pose: DinoView.prototype.pose,
+    anim: { update: (dt, input) => received = input },
+    rig: { isGLB: true }, sp: {}, updateBar() {},
+  };
+  DinoView.prototype.update.call(view, .1, 0, true);
+  assert.equal(Math.abs(received.groundPitch), 0);
+  assert.equal(received.groundAt, null);
+  assert.equal(received.pose.clip, 'swim');
 });
