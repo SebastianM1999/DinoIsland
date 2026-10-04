@@ -6,6 +6,8 @@ import { angleDiff, clamp } from '../../shared/rng.js';
 import { insideSwampArena } from '../../shared/swampArena.js';
 
 const C = () => CONFIG.dinos['alpha-sarcosuchus'];
+const lengthScale = () => C().bodyLengthScale ?? 1;
+const heightScale = () => C().bodyHeightScale ?? 1;
 // Seconds, synchronized with AlphaSarcosuchus_{Attack,Bite,Shove,TailSweep,Ambush}.
 export const SARCO_TIMING = {
   lungeWindup: 0.6, lungeStrike: 0.75,
@@ -69,8 +71,8 @@ function hit(d, sys, p, damage, knock, origin = null) {
   if (d.victims.has(p.id) || !vulnerable(p, d, sys) || !sys.canReach(d, p, origin)) return;
   // Acquisition can see a bank from a deep pocket. A strike still needs its
   // actual jaw/shoulder/tail volume to overlap the player's vertical capsule.
-  const tail = d.mode === 'tail', centre = d.y + (tail ? 1.5 : d.mode === 'shove' ? 1.9 : 2.3);
-  const halfHeight = tail ? 0.75 : d.mode === 'shove' ? 1 : 0.9;
+  const tail = d.mode === 'tail', centre = d.y + (tail ? 1.5 : d.mode === 'shove' ? 1.9 : 2.3) * heightScale();
+  const halfHeight = (tail ? 0.75 : d.mode === 'shove' ? 1 : 0.9) * heightScale();
   if (p.y > centre + halfHeight || p.y + CONFIG.player.height < centre - halfHeight) return;
   d.victims.add(p.id); d.hitAttack = true;
   sys.hitPlayer(d, p, damage, knock, 0.65, origin);
@@ -78,11 +80,13 @@ function hit(d, sys, p, damage, knock, origin = null) {
 /** Swept mouth capsule: a fast committed lunge cannot skip a player between ticks. */
 export function sarcoMouthHit(d, p, from, reach = C().biteRange) {
   const fx = -Math.sin(d.strikeYaw), fz = -Math.cos(d.strikeYaw);
-  const ax = from.x + fx * (reach - 1.5), az = from.z + fz * (reach - 1.5);
-  const bx = d.x + fx * (reach - 1.5), bz = d.z + fz * (reach - 1.5);
+  const ax = from.x + fx * (reach - 1.5 * lengthScale()), az = from.z + fz * (reach - 1.5 * lengthScale());
+  const bx = d.x + fx * (reach - 1.5 * lengthScale()), bz = d.z + fz * (reach - 1.5 * lengthScale());
   const sx = bx - ax, sz = bz - az;
   const t = clamp(((p.x - ax) * sx + (p.z - az) * sz) / (sx * sx + sz * sz || 1), 0, 1);
-  return Math.hypot(p.x - ax - sx * t, p.z - az - sz * t) <= 2.1;
+  const dx = p.x - ax - sx * t, dz = p.z - az - sz * t;
+  const side = dx * fz - dz * fx, front = dx * fx + dz * fz;
+  return (side / 2.1) ** 2 + (front / (2.1 * lengthScale())) ** 2 <= 1;
 }
 /** Strike angle relative to the rear hip; tick intervals cover the moving arc. */
 export function sarcoTailSweep(from, to) {
@@ -110,12 +114,22 @@ function waterGoal(d, sys, p) {
   }
   return best ?? d.home;
 }
+/** Absolute water support, resolved AFTER horizontal movement at the new position. */
+export function sarcoGroundHeight(d, terrain) {
+  const ground = terrain.heightAt(d.x, d.z), water = terrain.waterLevelAt(d.x, d.z);
+  if (water === null) return ground;
+  const depth = (0.35 + (3.1 - 0.35) * clamp(d.submergence ?? 0, 0, 1)) * heightScale();
+  return Math.max(ground, water - depth);
+}
 function immersion(d, sys, dt, submerged) {
-  const ground = sys.terrain.heightAt(d.x, d.z), water = sys.terrain.waterLevelAt(d.x, d.z);
-  const wanted = water !== null && water - ground > 1.2 ? Math.max(0, water - ground - (submerged ? 3.1 : 0.35)) : 0;
-  // A deep pocket lets the whole hull sit under real water without clipping below its floor.
-  d.swimOffset += clamp(wanted - d.swimOffset, -4 * dt, 4 * dt);
-  if (submerged) d.fl |= 8; else d.fl &= ~8;
+  if (d.mode === 'ambush') {
+    const u = clamp((d.modeT - SARCO_TIMING.ambushWindup) / SARCO_TIMING.ambushStrike, 0, 1);
+    // Hold the whole harmless wind-up low, then rise with the actual committed
+    // bank surge. Zero velocity at both ends prevents a vertical pop.
+    d.submergence = 1 - u * u * (3 - 2 * u);
+  } else d.submergence = clamp((d.submergence ?? (submerged ? 1 : 0)) +
+    clamp((submerged ? 1 : 0) - (d.submergence ?? 0), -2.5 * dt, 2.5 * dt), 0, 1);
+  if (d.submergence > 0.05) d.fl |= 8; else d.fl &= ~8;
 }
 function complete(d, sys, p) {
   if (d.mode === 'bite' && p && d.combo) { start(d, sys, 'pivot', p); return; }
@@ -132,10 +146,9 @@ export const sarcosuchusBrain = {
       leash: { kind: 'swamp', x: a.x, z: a.z, r: a.r - 9, bound: a.r - 1 } });
   },
   init(d, sys) {
-    Object.assign(d, { mode: 'submerged', modeT: 0, swimOffset: 0, attacks: 0, hitAttack: false, combo: false });
-    const ground = sys.terrain.heightAt(d.x, d.z), water = sys.terrain.waterLevelAt(d.x, d.z);
-    d.swimOffset = water === null ? 0 : Math.max(0, water - ground - 3.1);
-    d.y = ground + d.swimOffset; d.st = DS.SUBMERGED; d.fl |= 8;
+    Object.assign(d, { mode: 'submerged', modeT: 0, swimOffset: 0, submergence: 1, attacks: 0, hitAttack: false, combo: false });
+    const ground = sys.terrain.heightAt(d.x, d.z);
+    d.y = sarcoGroundHeight(d, sys.terrain); d.swimOffset = d.y - ground; d.st = DS.SUBMERGED; d.fl |= 8;
     phase(d, sys, 'swim', 1.6);
   },
   onHurt(d, sys, byId) {
@@ -234,6 +247,7 @@ export const sarcosuchusBrain = {
         const from = { x: d.x, z: d.z }; d.yaw = d.strikeYaw;
         sys.move(d, c.lungeSpeed, dt, 25, true);
         d.yaw = d.strikeYaw;
+        d.y = sarcoGroundHeight(d, sys.terrain);
         for (const q of sys.players()) if (sarcoMouthHit(d, q, from)) hit(d, sys, q, c.biteDamage, c.knockback);
       }
       if (d.modeT >= duration(d.mode)) { d.attacks += ambush ? 1 : 0; complete(d, sys, p); }

@@ -16,7 +16,7 @@ import { stegoBrain } from './ai/stego.js';
 import { raptorBrain } from './ai/raptor.js';
 import { pteraBrain } from './ai/ptera.js';
 import { trexBrain } from './ai/trex.js';
-import { sarcosuchusBrain } from './ai/sarcosuchus.js';
+import { sarcosuchusBrain, sarcoGroundHeight } from './ai/sarcosuchus.js';
 import { raiderStep } from './raids.js';
 import { findPath } from './pathfind.js';
 
@@ -680,7 +680,10 @@ export class DinoSystem {
         }
       }
 
-      if (d.type !== 'ptera' || d.grounded) d.y = this.terrain.heightAt(d.x, d.z) + (d.swimOffset ?? 0);
+      if (d.type === 'alpha-sarcosuchus') {
+        d.y = sarcoGroundHeight(d, this.terrain);
+        d.swimOffset = d.y - this.terrain.heightAt(d.x, d.z);
+      } else if (d.type !== 'ptera' || d.grounded) d.y = this.terrain.heightAt(d.x, d.z);
 
       // footprints
       const sp = TRACK_SPACING[d.type];

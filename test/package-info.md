@@ -22,7 +22,7 @@ Grouped by the module area they mainly cover. Many simulation tests also check t
 - `movement.test.js` — `resolveCircle`/`penetration`, player controller, server movement correction, unstuck (`src/sim/unstuck.js`), dinosaur spawn spots.
 
 ### Simulation: dinosaurs and combat (src/sim)
-- `sarcosuchus-boss.test.js` — central island 2 boss spawn, harmless telegraphs, committed lunge dodges and miss recovery, shoulder shove, swept tail knockback, low-health chains, safe-zone exclusion, arena damage boundaries and no respawn; bank targeting across fifteen variants, backwards retreats, floating corpse continuity, late-join phase synchronization and vertical strike avoidance.
+- `sarcosuchus-boss.test.js` — central island 2 boss spawn, harmless telegraphs, committed lunge dodges and miss recovery, shoulder shove, swept tail knockback, low-health chains, safe-zone exclusion, arena damage boundaries and no respawn; bank targeting across fifteen variants, backwards retreats, floating corpse continuity, late-join phase synchronization, vertical strike avoidance and emergence without shore-height pops.
 - `dino-slopes.test.js` — dinosaurs run down steep slopes to players, climbing stays limited (`findPath`, `climbSlope`) over seeded island variants.
 - `dino-contact.test.js` — player-vs-dinosaur body contact (`resolveDinoContact`) and contact damage events.
 - `raptor-fear.test.js` — raptor retreat/hesitation behaviour and raid raiders (`raptorBrain`, `raiderStep`).
