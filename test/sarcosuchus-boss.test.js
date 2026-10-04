@@ -6,6 +6,7 @@ import { DS, EV } from '../src/shared/protocol.js';
 import { sarcosuchusBrain as brain, SARCO_TIMING as T, sarcoTailSweep, sarcoGroundHeight } from '../src/sim/ai/sarcosuchus.js';
 
 const DT = 1 / CONFIG.net.tickRate, C = CONFIG.dinos['alpha-sarcosuchus'];
+const TAIL_HIP = 1.5696;
 let shared;
 function fixture(mode = 'hunt') {
   if (!shared) {
@@ -87,7 +88,7 @@ test('a bite has harmless preparation, hits once, then follows with a telegraphe
 test('tail arc is harmless until wind-up completes, sweeps sides and rear once, and leaves front safe', () => {
   assert.equal(sarcoTailSweep(0, T.tailWindup), null);
   for (const angle of [-1, 0, 1.2]) {
-    const f = fixture('tail'); f.p.x = Math.sin(angle) * 6.5; f.p.z = 1.744 + Math.cos(angle) * 6.5;
+    const f = fixture('tail'); f.p.x = Math.sin(angle) * 6.5; f.p.z = TAIL_HIP + Math.cos(angle) * 6.5;
     advance(f, T.tailWindup - DT);
     assert.equal(f.p.hp, 100);
     advance(f, T.tailStrike + T.tailSettle + 0.1);
@@ -97,9 +98,21 @@ test('tail arc is harmless until wind-up completes, sweeps sides and rear once, 
   const f = fixture('tail');
   advance(f, T.tailWindup + T.tailStrike + T.tailSettle);
   assert.equal(f.p.hp, 100);
-  const outside = fixture('tail'); outside.p.x = 0; outside.p.z = 1.744 + 9.5;
+  const outside = fixture('tail'); outside.p.x = 0; outside.p.z = TAIL_HIP + 9.5;
   advance(outside, T.tailWindup + T.tailStrike + T.tailSettle);
   assert.equal(outside.p.hp, 100, 'outside the actual baked tail reach stays safe');
+});
+
+test('tail hit envelopes match fitted width-preserving geometry instead of a uniform scale', () => {
+  const [, peakAngle, peakRadius] = sarcoTailSweep(0.99, 1);
+  assert.ok(Math.abs(peakAngle - 1.423) < 1e-9);
+  assert.ok(peakRadius < 7, 'folded tail has less reach than its extended pose');
+  const [, , extendedRadius] = sarcoTailSweep(0.85, 13 / 15);
+  assert.ok(Math.abs(extendedRadius - 7.523) < 1e-9);
+  assert.ok(extendedRadius > peakRadius);
+  assert.ok(Math.abs(C.biteRange - 7.2) < 1e-9);
+  assert.ok(Math.abs(C.bodyHeightScale - .9) < 1e-9);
+  assert.equal(C.body[0][1], 1.8, 'body width remains unchanged');
 });
 
 test('lateral repositioning keeps its facing and respects arena limits', () => {
@@ -275,7 +288,7 @@ test('late join descriptions and snapshots retain the active strike phase and se
 test('jumping above the actual bite, shoulder or tail volume avoids strike damage', () => {
   for (const mode of ['bite', 'shove', 'tail']) {
     const f = fixture(mode);
-    if (mode === 'tail') { f.p.x = 0; f.p.z = 1.744 + 6.5; }
+    if (mode === 'tail') { f.p.x = 0; f.p.z = TAIL_HIP + 6.5; }
     if (mode === 'shove') { f.p.x = 3; f.p.z = -3; }
     f.p.y = f.d.y + 3.5;
     // The target remains below the 4 m flying-exclusion threshold, so this
