@@ -2,6 +2,7 @@
 > Per-species behaviour "brains" for the server-side dinosaurs: when to wander, graze, chase, attack, defend, flee or rest.
 
 ## Files
+- `sarcosuchus.js` — `sarcosuchusBrain`: one Alpha Sarcosuchus in island 2's central Drowned Hollow; submerged warnings, committed lunges with miss recovery, bite/shove pressure, swept tail hits, bounded pivots and lateral steps, water retreats and low-health bite/pivot/tail chains. Exports `SARCO_TIMING`, `sarcoMouthHit`, `sarcoTailSweep` for clip synchronization and combat tests.
 - `brachio.js` — `brachioBrain`: peaceful herds that wander and graze, flee together, and defend with a telegraphed rear-up stomp when a player gets close or attacks; also spawns the oversized titan leashed inside the giant's pen (`layout.grove`, `shared/grove.js`).
 - `stego.js` — `stegoBrain`: territorial grazer that gets angry, charges in bursts and whips its spiked tail (swept-arc hitbox taken from the baked Attack clip); counters hits from the front. Exports `tailSweep`, `tailRelative` (tail geometry helpers, also used by tests).
 - `raptor.js` — `raptorBrain`: pack hunter (packs stored in `sys.groups`; sight shortened in the volcano's ash rain, `world.sightMul`) that spots, chases, flanks and does hit-and-run bites; hits frighten it briefly. Exports `updateRaptorFear`, shared with raiders.
@@ -25,7 +26,7 @@
 - Brains set the network-visible state `d.st` from `DS` and flag bit `d.fl & 1` for "aggressive/defending"; `towers.js` `hostile()` reads both.
 - Player damage goes through `DinoSystem.hitPlayer` / `attackPlayer` (reach check past trees, knockback, then `world.hurtPlayer`); brains never set player HP directly. Respecting the base safe zone is each brain's job (`sys.inSafeZone`). Exception to keep in mind: the pteranodon takes stolen meat straight from `p.inv.loot.meat`.
 - Ground movement goes through `sys.steer` / `sys.move` (collision, walkability, slopes, grove/boss-arena exclusion); only the pteranodon moves itself in the air.
-- The grove titan is a "herd of one" with a `leash`; `DinoSystem.walkable` keeps it inside the pen and everyone else out.
+- The grove titan is a "herd of one" with a `leash`; `DinoSystem.walkable` keeps it inside the pen and everyone else out. The Alpha Sarcosuchus has a `leash.kind: 'swamp'` in Drowned Hollow and may enter its deep inland ambush pockets; combat outside that arena is blocked. Attack event `kind` and `duration` start the corresponding clip and cue at wind-up. The submerged and enraged flags use bits 8 and 16 respectively.
 
 ## Not here
 - Shared movement, collision, traps, tracks, damage, death/loot and respawn scheduling: `src/sim/dinos.js`.
