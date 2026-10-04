@@ -37,6 +37,7 @@ Where each feature lives in each layer. Paths are relative to `src/` unless they
 | Netcode, lag comp | protocol.js, config.js (net) | world.js (`receive`, `hitPose`), dinos.js (pose history), hitCheck.js | net/net.js, net/interp.js | netcode, ordering, world-authority |
 | Dinos (all) | dinoContact.js | dinos.js, pathfind.js, ai/*.js | entities/dinoViews.js, models/dino/ | dino-visibility, dino-glb, dino-skin, dino-slopes, dino-contact |
 | Raptor / stego / trex / ptera / brachio | | ai/raptor.js, stego.js, trex.js, ptera.js, brachio.js | models/dino/ (GLB + procedural fallback) | raptor-fear, stego-tail, ptera-flight, grove |
+| Alpha Sarcosuchus (island 2 boss) | config.js, protocol.js, swampArena.js (deep ambush pockets) | ai/sarcosuchus.js, dinos.js (unique spawn, swimming and committed movement) | models/dino/sarcoModel.js, sarcoFallback.js, entities/sarcoEffects.js, audio/audio.js | sarcosuchus-boss, sarco-client, sarco-model |
 | Spear, bow, melee, knife | config.js (weapons) | world.js (`ACT.MELEE/FIRE/LAND`, knife) | player/actions.js, spearThrow.js, viewmodel.js, entities/projectiles.js, models/weapons.js | weapons, projectile-recovery, butcher |
 | Firearms | gunshots.js | firearms.js | models/firearms/, entities/gunEffects.js, player/actions.js | firearms |
 | Traps | crafting.js (recipe) | dinos.js (trigger), world.js (`ACT.TRAP`) | player/actions.js, entities/items.js | weapons, inventory-drop |

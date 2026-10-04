@@ -2,7 +2,7 @@
 > Automated tests for shared rules, the authoritative simulation, headless client logic, the server and the Steam session, run with Node's built-in test runner (`npm test` = `node --test`).
 
 ## Files
-`sarco-model.test.js` validates the review-only Alpha Sarcosuchus GLB: normalized skin weights, jaw deformation, eight clips, loop closure and sampled ground clearance. It does not register a gameplay species.
+`sarco-model.test.js` validates the Alpha Sarcosuchus boss GLB: near-black green skin, bright red scars, red/yellow emissive eyes, normalized weights, jaw deformation, fourteen clips, loop closure and ground clearance.
 Grouped by the module area they mainly cover. Many simulation tests also check the matching client code.
 
 ### World generation, terrain and collision (src/shared)
