@@ -127,7 +127,8 @@ export function findPath(sys, d, fx, fz, tx, tz, reach = 8, maxNodes = MAX_NODES
       if (di && dj && (!walk(n.i, n.j, n.i + di, n.j) || !walk(n.i, n.j, n.i, n.j + dj))) continue;
       const k = key(i, j);
       // bogs (swamp) are slow going: weigh them by the time they take, so the dry paths win
-      const cost = gn + (di && dj ? Math.SQRT2 : 1) / (sys.terrain.swampSpeedAt?.(i * CELL, j * CELL) ?? 1);
+      // ... and hot ground (volcano) is avoided where there is another way
+      const cost = gn + (di && dj ? Math.SQRT2 : 1) / (sys.terrain.swampSpeedAt?.(i * CELL, j * CELL) ?? 1) * (1 + 3 * (sys.terrain.heatAt?.(i * CELL, j * CELL) ?? 0));
       if (cost >= (g.get(k) ?? Infinity)) continue;
       g.set(k, cost);
       from.set(k, nk);

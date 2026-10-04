@@ -63,7 +63,7 @@ export const trexBrain = {
       case 'patrol': {
         d.fl &= ~1;
         if (d.rest <= 0) {
-          const p = sys.nearestPlayer(d, C.sightRadius, (q) => !sys.inSafeZone(q));
+          const p = sys.nearestPlayer(d, C.sightRadius * sys.world.sightMul(), (q) => !sys.inSafeZone(q));
           if (p) {
             d.targetId = p.id;
             d.mode = 'roar';

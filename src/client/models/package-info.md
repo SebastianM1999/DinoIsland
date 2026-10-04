@@ -6,7 +6,7 @@
 - `playerModel.js` — `PlayerModel`: rigged, procedurally animated co-op explorer with outfit slots (hats, tops, pants from `shared/outfits.js`) and held weapons/tools/firearms.
 - `weapons.js` — cached spear, bow (+ string), arrow, trap (open/sprung), meat and knife geometry; `BOW_REST`, `ARROW_TIP_Y`; `make*` mesh helpers.
 - `hands.js` — `handGeometry`: grip-centred first-person hands.
-- `fruit.js` — fruit geometry/material per type (`berry`, `mango`, `dragon`), `FRUIT_GLOW`, `makeFruitMesh`.
+- `fruit.js` — fruit geometry/material per type (`berry`, `mango`, `dragon`; swamp `marshberry`, `swampfig`, `glowlotus`; volcano `emberchili`, `ashplum`, `obsidianfig`), `FRUIT_GLOW`, `makeFruitMesh`.
 - `dino/` — dinosaur models and animation (own `package-info.md`).
 - `firearms/` — pistol and rifle models (own `package-info.md`).
 

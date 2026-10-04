@@ -137,6 +137,20 @@ export const CONFIG = {
     wing: 1.0,
   },
 
+  // Ashfall Isle (sim/volcano.js): hot ground, crust plates, the eruption cycle
+  volcano: {
+    // heat 0..1 (shared/terrain.js heatAt): stamina drains up to (1 + staminaMul) times faster and
+    // refills up to regenCut slower (client); from dmgFrom on the ground burns (server)
+    heat: { dmgFrom: 0.6, dps: 3, staminaMul: 1, regenCut: 0.6 },
+    // a plate cracks after `warn` s under someone, breaks after `hold` s, is lava for `broken` s
+    crust: { warn: 0.5, hold: 1.5, broken: 20 },
+    // seconds: the first rumble, calm between eruptions, the warning, the eruption, the ash rain after
+    cycle: { first: 150, calmMin: 180, calmMax: 300, rumble: 8, erupt: 20, ashMin: 60, ashMax: 90 },
+    // lava bombs: a wave every `wave` s, each announced `warn` s ahead; one lands `near` m from
+    // each player; dinosaurs see `ashSight` as far in the ash rain
+    bomb: { wave: 2.5, warn: 2.5, near: [10, 40], radius: 4, damage: 35, dinoDamage: 60, knock: 9, ashSight: 0.6 },
+  },
+
   fruit: {
     maxCarried: 5,
     eatTime: 1.1,
@@ -151,12 +165,19 @@ export const CONFIG = {
       marshberry: { name: 'Marsh Berries', role: 'bush',  heal: 10, hot: 0,  hotTime: 0, regrow: 45,  color: '#8c1f3a', buff: 'mudwalker' },
       swampfig:   { name: 'Swamp Fig',     role: 'tree',  heal: 25, hot: 0,  hotTime: 0, regrow: 90,  color: '#6b3a6e', buff: 'secondwind' },
       glowlotus:  { name: 'Glow Lotus',    role: 'plant', heal: 40, hot: 30, hotTime: 8, regrow: 180, color: '#5ff0d8', buff: 'lotusskin' },
+      // Ashfall Isle
+      emberchili:  { name: 'Ember Chili',   role: 'bush',  heal: 10, hot: 0,  hotTime: 0, regrow: 45,  color: '#e2401c', buff: 'heatproof' },
+      ashplum:     { name: 'Ash Plum',      role: 'tree',  heal: 25, hot: 0,  hotTime: 0, regrow: 90,  color: '#5a4a8e', buff: 'quickfoot' },
+      obsidianfig: { name: 'Obsidian Fig',  role: 'plant', heal: 40, hot: 30, hotTime: 8, regrow: 180, color: '#2a1f36', buff: 'sharpedge' },
     },
     // fruit effects beyond healing (server: duration, damage; client: movement and stamina)
     buffs: {
       mudwalker:  { name: 'Mud Walker',  time: 30, text: 'No swamp slowdown' },
       secondwind: { name: 'Second Wind', time: 25, text: 'Stamina refills twice as fast, sprinting costs less', regenMul: 2, drainMul: 0.6 },
       lotusskin:  { name: 'Lotus Skin',  time: 20, text: 'Takes 25 % less damage', damageMul: 0.75 },
+      heatproof:  { name: 'Fireproof',   time: 30, text: 'No heat damage or heat exhaustion, crust holds twice as long', crustMul: 2 },
+      quickfoot:  { name: 'Quickfoot',   time: 25, text: 'Moves 15 % faster', speedMul: 1.15 },
+      sharpedge:  { name: 'Sharp Edge',  time: 20, text: 'Deals 25 % more damage to dinosaurs', dinoDamageMul: 1.25 },
     },
   },
 

@@ -117,6 +117,25 @@ export const ICONS = {
     <circle cx="12.5" cy="12" r="1.6" fill="#7ffff0"/><circle cx="16" cy="11.4" r="1.6" fill="#7ffff0"/><circle cx="19.5" cy="12" r="1.6" fill="#7ffff0"/>
     <circle cx="16" cy="12" r="7" fill="#7ffff0" opacity=".18"/>`),
 
+  emberchili: svg(`<path d="M19 6c0-2 .8-3.4 2.6-4.2" stroke="#4a6a2a" stroke-width="1.8" stroke-linecap="round" fill="none"/>
+    <path d="M15.5 7.5h7l-1 3h-5z" fill="#5f8a34" stroke="${OUT}" stroke-width=".8" stroke-linejoin="round"/>
+    <path d="M16.5 10.5c-1 6-4 12-10.5 18.5 9.5-1.5 15-8 15.5-18.5z" fill="#e2401c" stroke="${OUT}" stroke-width="1" stroke-linejoin="round"/>
+    <path d="M18.6 12.5c-.5 4.5-2.4 8.6-5.6 11.6" stroke="#ffb04a" stroke-width="1.4" stroke-linecap="round" fill="none"/>`),
+
+  ashplum: svg(`<path d="M16 8c0-2.6.8-4.4 2.6-5.6" stroke="#4a3c2e" stroke-width="1.8" stroke-linecap="round" fill="none"/>
+    <path d="M17.5 5.5c2.4-2.2 5.6-2.4 7.6-.8-2.4 2-5 2.4-7.6.8z" fill="#7a8a5a" stroke="${OUT}" stroke-width=".8"/>
+    <ellipse cx="16" cy="18.5" rx="9.5" ry="10" fill="#5a4a8e" stroke="${OUT}" stroke-width="1"/>
+    <path d="M16 9.5c-1.4 3-1.4 15 0 18" stroke="#3e3266" stroke-width="1.2" fill="none"/>
+    <ellipse cx="11.5" cy="15" rx="2.6" ry="3.6" fill="#b8b0c8" opacity=".55"/>`),
+
+  obsidianfig: svg(`<path d="M16 8c0-2.4.6-4.1 2-5.2" stroke="#3a5a2a" stroke-width="1.8" stroke-linecap="round" fill="none"/>
+    <path d="M16 7.5c-2.5 2.5-4.5 5-6.5 8-3 4.5-1.5 13.5 6.5 13.5s9.5-9 6.5-13.5c-2-3-4-5.5-6.5-8z" fill="#2a1f36" stroke="${OUT}" stroke-width="1"/>
+    <path d="M11.5 15.5l3 3-2 5M20 14l-2.5 4 3 4.5" stroke="#ff7a2a" stroke-width="1.3" stroke-linecap="round" fill="none"/>
+    <path d="M12.5 13c-1 1.4-1.6 3-1.6 4.6" stroke="#8a7ab8" stroke-width="1.4" stroke-linecap="round" fill="none"/>`),
+
+  flame: svg(`<path d="M16 2c1 5.5 8.5 8.5 8.5 17A8.5 8.5 0 0 1 7.5 19c0-4.5 2.5-6.8 4-9.5.4 2.8 1.6 4 3 4.5C14 10 14.5 5.5 16 2z" fill="#ff6a1c" stroke="#b8320c" stroke-width="1.2" stroke-linejoin="round"/>
+    <path d="M16 14c.6 3 4.5 4.6 4.5 8.6a4.5 4.5 0 0 1-9 0c0-2.4 1.6-3.6 2.4-5.2.5 1.4 1.2 2 2 2.2-.4-2.2-.3-3.8.1-5.6z" fill="#ffd23a"/>`),
+
   fruit: svg(`<path d="M16 9c0-3 1-5 3-6" stroke="#6b3f1e" stroke-width="1.8" stroke-linecap="round" fill="none"/>
     <path d="M17 6c3-3 7-3 9-1-3 2.5-6.5 2.8-9 1z" fill="#6fbf45" stroke="${OUT}" stroke-width=".8"/>
     <path d="M16 10c-3-2-11-2-11 7 0 7 5 12 8 12 1.3 0 2-.6 3-.6s1.7.6 3 .6c3 0 8-5 8-12 0-9-8-9-11-7z" fill="#e8323c" stroke="${OUT}" stroke-width="1"/>

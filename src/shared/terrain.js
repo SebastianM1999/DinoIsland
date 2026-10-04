@@ -4,7 +4,15 @@
 // rendered triangles.
 
 import { CONFIG } from './config.js';
-import { WORLD, HUT_GROUND, planIsland, islandHeight, riverQuery, poolAt, bogSample } from './island.js';
+import { WORLD, HUT_GROUND, planIsland, islandHeight, riverQuery, poolAt, bogSample, bridgeAt, crustAt } from './island.js';
+import { smoothstep } from './rng.js';
+
+/**
+ * Heat (volcano): the ground near lava and fumaroles is hot – 1 right at the
+ * lava, fading out over `reach` m (`fumarole` m round a fumarole). Effects in
+ * CONFIG.volcano.heat (players) and sim/pathfind.js (dinosaurs).
+ */
+export const HEAT = { reach: 12, fumarole: 7 };
 
 export class Terrain {
   /** @param {ReturnType<typeof planIsland>} [plan] defaults to level 1 */
@@ -38,6 +46,58 @@ export class Terrain {
         }
       }
     }
+    // heat (volcano): distance from every grid vertex to the nearest lava (two-pass chamfer)
+    this.heatMask = null;
+    if (plan.volcano) {
+      const N = n1 * n1, dist = new Float32Array(N).fill(1e9);
+      for (let j = 0; j <= segments; j++) {
+        for (let i = 0; i <= segments; i++) {
+          if (this.lavaLevelAt(-this.half + i * this.cell, -this.half + j * this.cell) !== null) dist[j * n1 + i] = 0;
+        }
+      }
+      const c1 = this.cell, c2 = this.cell * Math.SQRT2;
+      const relax = (k, kk, w) => { if (dist[kk] + w < dist[k]) dist[k] = dist[kk] + w; };
+      for (let j = 0; j <= segments; j++) {
+        for (let i = 0; i <= segments; i++) {
+          const k = j * n1 + i;
+          if (i > 0) relax(k, k - 1, c1);
+          if (j > 0) { relax(k, k - n1, c1); if (i > 0) relax(k, k - n1 - 1, c2); if (i < segments) relax(k, k - n1 + 1, c2); }
+        }
+      }
+      for (let j = segments; j >= 0; j--) {
+        for (let i = segments; i >= 0; i--) {
+          const k = j * n1 + i;
+          if (i < segments) relax(k, k + 1, c1);
+          if (j < segments) { relax(k, k + n1, c1); if (i < segments) relax(k, k + n1 + 1, c2); if (i > 0) relax(k, k + n1 - 1, c2); }
+        }
+      }
+      this.heatMask = new Float32Array(N);
+      for (let j = 0; j <= segments; j++) {
+        for (let i = 0; i <= segments; i++) {
+          const x = -this.half + i * this.cell, z = -this.half + j * this.cell;
+          let h = 1 - smoothstep(0, HEAT.reach, dist[j * n1 + i]);
+          for (const f of plan.fumaroles || []) h = Math.max(h, 0.85 * (1 - smoothstep(0.5, HEAT.fumarole, Math.hypot(x - f.x, z - f.z))));
+          this.heatMask[j * n1 + i] = h;
+        }
+      }
+    }
+  }
+
+  /** Heat of the ground at (x, z): 0 (cool) .. 1 (right at the lava). See HEAT. */
+  heatAt(x, z) {
+    const m = this.heatMask;
+    if (!m) return 0;
+    const gx = (x + this.half) / this.cell, gz = (z + this.half) / this.cell;
+    const i = Math.floor(gx), j = Math.floor(gz);
+    if (i < 0 || j < 0 || i >= this.n || j >= this.n) return 0;
+    const fx = gx - i, fz = gz - j, n1 = this.n + 1;
+    const a = m[j * n1 + i], b = m[j * n1 + i + 1], c = m[(j + 1) * n1 + i], d = m[(j + 1) * n1 + i + 1];
+    return (a * (1 - fx) + b * fx) * (1 - fz) + (c * (1 - fx) + d * fx) * fz;
+  }
+
+  /** The crust plate (volcano) at (x, z), or null: { id, x, z, r, y } (see island.js crustAt). */
+  crustAt(x, z) {
+    return this.plan.crusts?.length ? crustAt(this.plan, x, z) : null;
   }
 
   /**
@@ -112,9 +172,9 @@ export class Terrain {
   #flowLevelAt(x, z, g, kind) {
     const pool = poolAt(this.plan, x, z, kind);
     if (pool && g < pool.level) return pool.level;
-    const rv = this.plan.river;
-    if (rv && rv.kind === kind) {
-      const q = riverQuery(this.plan, x, z, 12);
+    // (the lava runs under the basalt bridges and the crust plates)
+    if (!(kind === 'lava' && (this.plan.crusts?.length || this.plan.bridges?.length) && (bridgeAt(this.plan, x, z) || crustAt(this.plan, x, z)))) {
+      const q = riverQuery(this.plan, x, z, 12, kind);
       if (q && q.d < q.width / 2 + 1.5 && g < q.surface) return q.surface;
     }
     if (kind === 'water' && this.bogMask) {

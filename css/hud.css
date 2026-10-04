@@ -526,6 +526,14 @@
   font-size: 0.9em;
 }
 .hud-slow svg { width: 1em; height: 1em; }
+/* hot ground on the volcano island */
+.hud-hot {
+  display: inline-flex; align-items: center; gap: 0.25em;
+  color: var(--orange);
+  font-size: 0.9em;
+}
+.hud-hot svg { width: 1em; height: 1em; }
+.hud-heat.is-burn .hud-hot { color: #ff5a3a; font-weight: 600; }
 /* fruit buffs running (Mud Walker, Second Wind, Lotus Skin) */
 .hud-buffs { gap: 0.6em; }
 .hud-buff {

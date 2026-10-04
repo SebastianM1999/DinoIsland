@@ -48,20 +48,30 @@ export const BIOMES = {
     music: 'calm',
   },
 
+  // Ashfall Isle: a round island round one huge caldera (shared/island.js
+  // volcanoHeight). Lava flows run from vents on its flanks to the beach, the
+  // paths cross them on basalt bridges; crust plates over the lava break under
+  // anyone who lingers, the ground near lava and fumaroles is hot, and the
+  // volcano erupts now and then (sim/volcano.js). The crater floor on top is
+  // the arena (shared/volcanoArena.js).
   volcano: {
     id: 'volcano',
     name: 'Volcano',
     sites: ['peak', 'nest', 'ruins', 'lava'],
     river: 'lava',
+    shape: 'round',
     vegetation: {
-      treeDensity: 0.55,
-      maxTrees: 420,
-      trees: { pine: 0.45, dead: 0.4, palm: 0.1, kapok: 0.05 },
-      beachTrees: ['palm', 'dead'],
-      bushes: { shrub: 0.6, fern: 0.4 },
-      maxBushes: 500,
-      grass: 0.35,
-      flowers: 0.1,
+      treeDensity: 0.62,
+      maxTrees: 560,
+      // charred trunks everywhere; pines and ferns gather in the cooler green pockets (layout.js)
+      trees: { charred: 0.42, dead: 0.2, pine: 0.3, kapok: 0.08 },
+      beachTrees: ['palm', 'charred'],
+      bushes: { shrub: 0.55, fern: 0.45 },
+      maxBushes: 620,
+      // greens muted toward ash grey (client/world/vegetation.js)
+      tints: { pine: '#a3ac8e', kapok: '#9aa087', palm: '#b5ae94', fern: '#a8aa8a', shrub: '#b0a68e' },
+      grass: 0.3,
+      flowers: 0.06,
     },
     // basalt, red scoria, obsidian, pale pumice (see the jungle biome)
     rocks: { colors: ['#4a4452', '#3a3540', '#5a5058'], moss: '#6b7a4a', mossChance: 0.15, count: 1.6,
@@ -76,13 +86,16 @@ export const BIOMES = {
       riverbed: '#2a2226',
       ash: '#6f686c', scorch: '#2e2629',
     },
+    // dark and glowing: a smoky red-brown sky over a hot horizon
     sky: {
-      background: '#6b5a5e', fog: '#8a6f68', fogNear: 55, fogFar: 230,
-      top: '#3a3440', horizon: '#b0785c', cloud: '#8a7f86',
-      sun: '#ffb27a', sunIntensity: 2.0, hemiSky: '#a09aae', hemiGround: '#7a4a36', hemiIntensity: 1.35,
-      exposure: 1.0,
+      background: '#4e3a3a', fog: '#6e4c44', fogNear: 40, fogFar: 200,
+      top: '#2a2228', horizon: '#c0583a', cloud: '#5e4e50',
+      sun: '#ff9a5e', sunIntensity: 1.6, hemiSky: '#8e7e8a', hemiGround: '#8a3e26', hemiIntensity: 1.2,
+      exposure: 0.9,
     },
-    water: { shallow: '#4fb7ad', mid: '#1d7690', deep: '#123f63', foam: '#dde6ea', sky: '#9a8a90' },
+    water: { shallow: '#4a9a92', mid: '#1d5e72', deep: '#12324e', foam: '#cfd4d6', sky: '#7a5e5c' },
+    // its own fruit, one per role (config.js fruit.types): chilis on warm ground, plums, rare obsidian figs
+    fruit: { bush: 'emberchili', tree: 'ashplum', plant: 'obsidianfig' },
     dinos: { brachio: 1, stego: 1, raptor: 3, ptera: 4, trex: 1 },
     music: 'calm',
   },
@@ -147,8 +160,9 @@ export const LEVELS = [
   // twice the land area of the first island (incl. its boss islet); the swamp
   // arena in the waist waits for its boss (shared/swampArena.js)
   { name: 'Misty Swamp', biome: 'swamp', scale: 0.86, swampArena: true, seedIndex: 2 },
-  // keeps the seeds it had as the second island: same islands as before
-  { name: 'Ashfall Isle', biome: 'volcano', seedIndex: 1 },
+  // round, about 1.3 times the swamp's land area; the crater arena on top waits
+  // for its boss (shared/volcanoArena.js)
+  { name: 'Ashfall Isle', biome: 'volcano', scale: 0.65, seedIndex: 1 },
 ];
 
 export const LEVEL_COUNT = LEVELS.length;

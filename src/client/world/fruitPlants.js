@@ -1,8 +1,9 @@
 // Fruit plants: the fruit on the island's plants, per kind (config.js
 // fruit.types): bushes with their berry clusters (red berries in the jungle,
-// marsh berries on the swamp's bog shores), fruit hanging in fruit trees
-// (mangos, swamp figs; the trees themselves come from vegetation.js) and rare
-// glowing plants with sparkles (dragon fruit, glow lotus). Fruit can be
+// marsh berries on the swamp's bog shores, ember chilis on the volcano's warm
+// ground), fruit hanging in fruit trees (mangos, swamp figs, ash plums; the
+// trees themselves come from vegetation.js) and rare glowing plants with
+// sparkles (dragon fruit, glow lotus, obsidian figs on their cacti). Fruit can be
 // hidden/shown per spot (setCount) with a pop-in animation.
 
 import * as THREE from 'three';
@@ -10,8 +11,9 @@ import { CONFIG } from '../../shared/config.js';
 import { makeRng } from '../../shared/rng.js';
 import { MAT } from '../models/kit.js';
 import { fruitGeometry, fruitMaterial, FRUIT_GLOW } from '../models/fruit.js';
-import { treeMatrix, MANGO_FRUIT_LOCAL, SWAMPFIG_FRUIT_LOCAL } from './veg/trees.js';
-import { berryBushGeometry, dragonPlantGeometry, BERRY_SPOTS_LOCAL, DRAGON_FRUIT_LOCAL, marshBushGeometry, MARSH_SPOTS_LOCAL, lotusPlantGeometry, LOTUS_FRUIT_LOCAL } from './veg/plants.js';
+import { treeMatrix, MANGO_FRUIT_LOCAL, SWAMPFIG_FRUIT_LOCAL, ASHPLUM_FRUIT_LOCAL } from './veg/trees.js';
+import { berryBushGeometry, dragonPlantGeometry, BERRY_SPOTS_LOCAL, DRAGON_FRUIT_LOCAL, marshBushGeometry, MARSH_SPOTS_LOCAL, lotusPlantGeometry, LOTUS_FRUIT_LOCAL,
+  chiliBushGeometry, CHILI_SPOTS_LOCAL, cactusPlantGeometry, CACTUS_FRUIT_LOCAL } from './veg/plants.js';
 import { LEAF_MAT, instanced, finishInstanced } from './veg/shapes.js';
 
 const TAU = Math.PI * 2;
@@ -31,6 +33,9 @@ const KINDS = {
   marshberry: { host: marshBushGeometry, hostMat: () => LEAF_MAT, hostName: 'marshberry-bushes', spots: MARSH_SPOTS_LOCAL, name: 'fruit-marshberries', scale: 1.7 },
   swampfig: { spots: SWAMPFIG_FRUIT_LOCAL, name: 'fruit-swampfigs', scale: 2.0, cast: true },
   glowlotus: { host: lotusPlantGeometry, hostMat: () => LEAF_MAT, hostName: 'lotus-plants', local: LOTUS_FRUIT_LOCAL, name: 'fruit-glowlotus', scale: 1.5, hostScale: 1.15 },
+  emberchili: { host: chiliBushGeometry, hostMat: () => LEAF_MAT, hostName: 'chili-bushes', spots: CHILI_SPOTS_LOCAL, name: 'fruit-emberchilis', scale: 1.8 },
+  ashplum: { spots: ASHPLUM_FRUIT_LOCAL, name: 'fruit-ashplums', scale: 2.0, cast: true },
+  obsidianfig: { host: cactusPlantGeometry, hostMat: () => MAT.standard, hostName: 'cactus-plants', local: CACTUS_FRUIT_LOCAL, name: 'fruit-obsidianfigs', scale: 1.5, hostScale: 1.2 },
 };
 /** Visual scale of fruit on the plants (fruit models are ~0.25 m; bigger = easier to spot). */
 export const FRUIT_PLANT_SCALE = Object.fromEntries(Object.entries(KINDS).map(([k, v]) => [k, v.scale]));

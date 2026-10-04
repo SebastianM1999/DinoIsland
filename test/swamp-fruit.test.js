@@ -36,7 +36,8 @@ test('the swamp grows its own three fruit, each where it belongs; other islands 
     }
     for (const s of layout.fruitSpots) assert.equal(terrain.waterDepthAt(s.x, s.z), 0, `v${variant}: ${s.type} on dry ground`);
   }
-  for (const level of [0, 2]) {
+  // (the volcano island has its own too: test/volcano-fruit.test.js)
+  for (const level of [0]) {
     const layout = buildLayout(new Terrain(planIsland(level, 1)));
     for (const s of layout.fruitSpots) assert.ok(['berry', 'mango', 'dragon'].includes(s.type), `island ${level + 1} keeps the jungle fruit (${s.type})`);
   }

@@ -19,7 +19,7 @@ const ROOT = ['#5a554d', '#4a463f', '#625c52'];
 const BONE = '#cfc4ab';
 
 /** Skull or a rib cage lying in the mud (local, ground at y = 0). */
-function boneGeometry(kind) {
+export function boneGeometry(kind) {
   if (kind === 'skull') {
     return merge([
       paint(new THREE.SphereGeometry(0.45, 10, 7).scale(1.4, 0.8, 0.9), BONE),
@@ -34,7 +34,7 @@ function boneGeometry(kind) {
 }
 
 /** The warning sign by the gate: a crooked post, a board with a red cross, a skull on top. */
-function signGeometry() {
+export function signGeometry() {
   const parts = [
     paint(new THREE.CylinderGeometry(0.11, 0.14, 2.6, 7).translate(0, 1.3, 0), '#4a3c2e'),
     place(paint(new THREE.BoxGeometry(1.3, 0.75, 0.08), (c) => (Math.abs(Math.abs(c.x) - Math.abs(c.y) * 1.4) < 0.12 ? '#8a1c14' : '#6b5a44')), [0, 1.85, 0.12], [0, 0, 0.06]),

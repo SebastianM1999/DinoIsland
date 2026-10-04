@@ -94,7 +94,7 @@ export const raptorBrain = {
       target = null;
     }
     if (!target) {
-      const seen = sys.nearestPlayer(d, C.sightRadius, (p) => !sys.inSafeZone(p));
+      const seen = sys.nearestPlayer(d, C.sightRadius * sys.world.sightMul(), (p) => !sys.inSafeZone(p));
       if (seen) {
         pack.target = seen.id;
         target = seen;
