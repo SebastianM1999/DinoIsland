@@ -48,7 +48,7 @@ function start(d, sys, mode, p = null) {
 }
 function vulnerable(p, d, sys) {
   return p.alive && !sys.inSafeZone(p) && insideSwampArena(sys.world.layout, p.x, p.z, 2) &&
-    Math.abs(p.y - sys.terrain.heightAt(d.x, d.z)) < 4;
+    Math.abs(p.y - sys.terrain.heightAt(p.x, p.z)) < 4;
 }
 function local(d, p, rear = 0) {
   const fx = -Math.sin(d.strikeYaw), fz = -Math.cos(d.strikeYaw);
@@ -152,7 +152,14 @@ export const sarcosuchusBrain = {
       const q = d.waterGoal ??= waterGoal(d, sys, p);
       const deep = sys.terrain.waterDepthAt(d.x, d.z) > 2;
       d.st = deep ? DS.SWIM : DS.RETREAT; d.mode = deep ? 'swim' : 'retreat';
-      const left = sys.steer(d, q.x, q.z, deep ? c.runSpeed : c.walkSpeed * 1.7, dt, c.turnRate);
+      const left = sys.distTo(d, q.x, q.z);
+      if (deep) sys.steer(d, q.x, q.z, c.runSpeed, dt, c.turnRate);
+      else {
+        // Back/side steps toward the water while watching the opponent. A forward
+        // retreat clip would otherwise run backwards visually against the travel.
+        if (p) sys.turnTo(d, toYaw(d, p), dt, c.turnRate);
+        sys.strafe(d, q.x - d.x, q.z - d.z, c.walkSpeed * 1.7, dt);
+      }
       if (left < 2 && deep) { d.waterGoal = null; d.mode = 'submerged'; d.modeT = 0; }
       else if (d.modeT > 6) { d.waterGoal = null; d.mode = 'hunt'; d.modeT = 0; }
       return;

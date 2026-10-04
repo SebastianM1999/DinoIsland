@@ -623,6 +623,14 @@ export class DinoSystem {
     for (let i = this.list.length - 1; i >= 0; i--) {
       const d = this.list[i];
       if (!d.alive) {
+        if (d.type === 'alpha-sarcosuchus') {
+          const ground = this.terrain.heightAt(d.x, d.z), water = this.terrain.waterLevelAt(d.x, d.z);
+          const surface = water === null ? ground : Math.max(ground, water - 0.8);
+          // Preserve the lethal-hit pose and settle slowly: no snap into the mud
+          // when a surfaced or submerged boss becomes a floating carcass.
+          d.y = Math.max(ground, d.y + clamp(surface - d.y, -0.45 * dt, 0.45 * dt));
+          d.swimOffset = d.y - ground;
+        }
         if (d.type === 'ptera' && !d.grounded) {
           d.x += d.vx * dt;
           d.z += d.vz * dt;
@@ -668,7 +676,7 @@ export class DinoSystem {
         }
       }
 
-      if (d.type !== 'ptera' || d.grounded) d.y = this.terrain.heightAt(d.x, d.z) + (d.alive ? d.swimOffset ?? 0 : 0);
+      if (d.type !== 'ptera' || d.grounded) d.y = this.terrain.heightAt(d.x, d.z) + (d.swimOffset ?? 0);
 
       // footprints
       const sp = TRACK_SPACING[d.type];
