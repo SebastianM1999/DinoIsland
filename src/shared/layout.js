@@ -485,13 +485,27 @@ export function buildLayout(terrain) {
   if (plan.bogs?.length && TRUNKS.mangrove) {
     const rm = makeRng(S ^ 0x3a9e);
     let placed = 0;
-    for (let i = 0; i < 14000 && placed < 320; i++) {
+    // the swamp arena: a few big mangroves in its basin to dodge and kite the boss round
+    // (off the causeway, clear of the boss's spawn)
+    const sa = layout.swampArena;
+    if (sa) {
+      for (const [deg, k] of [[35, 0.55], [145, 0.55], [215, 0.58], [325, 0.58], [270, 0.5], [90, 0.75], [180, 0.3], [0, 0.3]]) {
+        const a = (deg + rm.range(-10, 10)) * Math.PI / 180, rr = sa.r * k;
+        const x = sa.x + Math.cos(a) * rr, z = sa.z + Math.sin(a) * rr;
+        if (Math.abs(z - sa.z) < 6 && Math.abs(deg % 180) < 1) continue;   // the causeway runs along z = sa.z
+        if (Math.hypot(x - sa.spawn.x, z - sa.spawn.z) < 7 || distToPath(x, z) < 4.5) continue;
+        addTree('mangrove', x, z, rm.range(1.35, 1.7), 0.6);
+      }
+    }
+    for (let i = 0; i < 24000 && placed < 540; i++) {
       const x = rm.range(-plan.A, plan.A), z = rm.range(-plan.B, plan.B);
       const b = terrain.bogAt(x, z);
       if (b < 0.12 || b > 0.9 || terrain.waterDepthAt(x, z) > 0.3) continue;
+      // thickets and thinner stretches along the shores
+      if (rm() > 0.3 + 0.7 * (fbm(x * 0.02 + 7, z * 0.02, 2, S + 47) * 0.5 + 0.5)) continue;
       if (nearHut(x, z, 4) || !clearOfSites(x, z, 1) || !outsideGrove(x, z, 4) || terrain.slopeAt(x, z) > 0.5) continue;
-      if (!free(x, z, 2.4)) continue;
-      addTree('mangrove', x, z, rm.range(0.85, 1.25), 0.6);
+      if (!free(x, z, 2.1)) continue;
+      addTree('mangrove', x, z, rm.range(0.85, 1.25), 0.5);
       placed++;
     }
   }
@@ -631,50 +645,62 @@ export function buildLayout(terrain) {
   const addFruit = (type, x, z, host) => {
     layout.fruitSpots.push({ id: fruitId++, type, x, z, y: terrain.heightAt(x, z), host });
   };
+  // which fruit grows here: one kind per role (config.js fruit.types, levels.js biome.fruit)
+  const FRUIT = { bush: 'berry', tree: 'mango', plant: 'dragon', ...(biome.fruit || {}) };
   const fruitCounts = volcanic ? { berry: 12, mango: 3, dragon: 2 } : { berry: 20, mango: 9, dragon: 3 };
-  // Red berry bushes: along the trail and jungle edges (common).
+  // shore of a bog (swamp): dry ground with bog within a few metres
+  const bogShore = (x, z) => [[4, 0], [-4, 0], [0, 4], [0, -4]].some(([dx, dz]) => terrain.bogAt(x + dx, z + dz) > 0.2);
+  // Bushes (common): along the trail and jungle edges – on the swamp, along the bog shores.
   {
     let placed = 0;
     for (let i = 0; i < 6000 && placed < fruitCounts.berry; i++) {
       const x = rng.range(-plan.A * 0.9, plan.A * 0.9), z = rng.range(-plan.B * 0.9, plan.B * 0.9);
-      if (!dry(x, z, 1.5) || nearHut(x, z, 3) || terrain.slopeAt(x, z) > 0.45) continue;
+      if (!dry(x, z, lowGround ? 1.0 : 1.5) || nearHut(x, z, 3) || terrain.slopeAt(x, z) > 0.45) continue;
       const pd = distToPath(x, z);
       const j = jungle(x, z);
-      const edge = (pd > 3 && pd < 10) || (j > 0.45 && j < 0.8);
+      const edge = lowGround ? pd > 3 && bogShore(x, z) && outsideGrove(x, z, 4) : (pd > 3 && pd < 10) || (j > 0.45 && j < 0.8);
       if (!edge || !free(x, z, 2.2)) continue;
       reserve(x, z, 1.2);
       circles.push({ x, z, r: 0.7, top: terrain.heightAt(x, z) + 1.6 });
-      addFruit('berry', x, z, 'bush');
+      addFruit(FRUIT.bush, x, z, 'bush');
       placed++;
     }
   }
-  // Sun mango trees: inside the jungle (medium).
+  // Fruit trees (medium): inside the jungle – on the swamp, figs in the dry groves.
   {
     let placed = 0;
     for (let i = 0; i < 6000 && placed < fruitCounts.mango; i++) {
       const x = rng.range(-plan.A * 0.8, plan.A * 0.8), z = rng.range(-plan.B * 0.8, plan.B * 0.8);
-      if (!dry(x, z, 2.2) || nearHut(x, z, 8) || terrain.slopeAt(x, z) > 0.4 || terrain.heightAt(x, z) > 20) continue;
-      if (jungle(x, z) < (volcanic ? 0.3 : 0.62) || !free(x, z, 4) || !clearOfSites(x, z, 2)) continue;
-      const t = addTree('mango', x, z, rng.range(1.0, 1.15), 0.5);
-      addFruit('mango', x, z, 'tree:' + t.id);
+      if (!dry(x, z, lowGround ? 1.3 : 2.2) || nearHut(x, z, 8) || terrain.slopeAt(x, z) > 0.4 || terrain.heightAt(x, z) > 20) continue;
+      if (jungle(x, z) < (volcanic ? 0.3 : lowGround ? 0.4 : 0.62) || !free(x, z, 4) || !clearOfSites(x, z, 2) || (lowGround && !outsideGrove(x, z, 4))) continue;
+      const t = addTree(FRUIT.tree, x, z, rng.range(1.0, 1.15), 0.5);
+      addFruit(FRUIT.tree, x, z, 'tree:' + t.id);
       placed++;
     }
   }
-  // Blue dragon fruit: rare, hidden (waterfall basin, cave mouths, the ruins).
+  // Rare plants, hidden (waterfall basin, cave mouths, the ruins; on the swamp the
+  // ruins, the moor hill and lonely bog shores far from any path).
   {
     const candidates = [];
     const wf = layout.waterfall;
     if (wf) candidates.push([wf.bottom.x + wf.dirZ * 9, wf.bottom.z - wf.dirX * 9]);
     for (const c of layout.caves) candidates.push([c.mouth.x + 3, c.mouth.z + 3]);
     if (layout.ruins) candidates.push([layout.ruins.x + 9, layout.ruins.z - 9]);
+    if (lowGround) {
+      if (plan.sites.peak) candidates.push([plan.sites.peak.x + 6, plan.sites.peak.z - 4]);
+      for (let i = 0; i < 4000 && candidates.length < fruitCounts.dragon + 1; i++) {
+        const x = rng.range(-plan.A * 0.85, plan.A * 0.85), z = rng.range(-plan.B * 0.85, plan.B * 0.85);
+        if (dry(x, z, 1.0) && bogShore(x, z) && distToPath(x, z) > 16 && outsideGrove(x, z, 8) && !nearHut(x, z, 20)) candidates.push([x, z]);
+      }
+    }
     for (const [cx, cz] of candidates.slice(0, fruitCounts.dragon)) {
       // search a dry flat spot near the candidate
       for (let k = 0; k < 200; k++) {
         const a = rng() * TAU, r = k * 0.12;
         const x = cx + Math.cos(a) * r, z = cz + Math.sin(a) * r;
-        if (dry(x, z, 1) && terrain.slopeAt(x, z) < 0.5 && free(x, z, 1.2)) {
+        if (dry(x, z, 1) && terrain.slopeAt(x, z) < 0.5 && free(x, z, 1.2) && (!lowGround || outsideGrove(x, z, 2))) {
           reserve(x, z, 1.2);
-          addFruit('dragon', x, z, 'plant');
+          addFruit(FRUIT.plant, x, z, 'plant');
           break;
         }
       }

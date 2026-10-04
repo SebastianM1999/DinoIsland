@@ -29,9 +29,14 @@ export const VEG_TUNING = {
 };
 
 export function buildVegetation(terrain, layout) {
+  // per-biome tints for plant kinds whose own palette is too bright for the island (swamp: olive, grey)
+  const tints = Object.fromEntries(Object.entries(layout.biome.vegetation?.tints || {}).map(([k, v]) => [k, C(v)]));
+  const tinted = (kind, c) => (tints[kind] ? c.multiply(tints[kind]) : c);
   const group = new THREE.Group();
   group.name = 'vegetation';
   const spatial = new SpatialInstances(group);
+  // nothing is seen past the fog: skip those chunks (the swamp's thick fog makes its dense forest affordable)
+  spatial.setCullDistance((layout.biome.sky?.fogFar ?? Infinity) + 35);
   const m4 = new THREE.Matrix4();
   const q = new THREE.Quaternion();
   const e = new THREE.Euler();
@@ -61,7 +66,7 @@ export function buildVegetation(terrain, layout) {
       treeMatrix(t, m4);
       trunk.setMatrixAt(i, m4);
       leaves.setMatrixAt(i, m4);
-      leaves.setColorAt(i, foliageTint(t.hue, col));
+      leaves.setColorAt(i, tinted(type, foliageTint(t.hue, col)));
       const b = 0.88 + 0.12 * ((t.hue * 7.3) % 1);
       trunk.setColorAt(i, col.setRGB(b, b * 0.98, b * 0.96));
     });
@@ -79,7 +84,7 @@ export function buildVegetation(terrain, layout) {
       p.set(b.x, b.y - 0.06, b.z);
       s.set(b.scale, b.scale * (0.85 + 0.3 * b.hue), b.scale);
       m.setMatrixAt(i, m4.compose(p, q, s));
-      m.setColorAt(i, foliageTint(b.hue, col));
+      m.setColorAt(i, tinted(name.slice(7), foliageTint(b.hue, col)));
     });
     spatial.add(m, { geometries, wind: windParams });
   };

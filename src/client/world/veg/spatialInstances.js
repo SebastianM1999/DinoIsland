@@ -52,6 +52,9 @@ export class SpatialInstances {
 
   setQuality(quality = {}) { this.quality = quality; }
 
+  /** Hide whole chunks farther than `d` metres (past the fog everything is fog colour anyway). */
+  setCullDistance(d = Infinity) { this.cullDistance = d; }
+
   setDensity(fraction) {
     const share = THREE.MathUtils.clamp(fraction, 0, 1);
     for (const c of this.chunks) if (c.density) c.mesh.count = Math.round(c.count * share);
@@ -65,6 +68,7 @@ export class SpatialInstances {
       const first = near * (c.lod === 0 ? 1.1 : 0.9);
       const second = near * 2 * (c.lod < 2 ? 1.1 : 0.9);
       const lod = Math.min(c.geometries.length - 1, distance < first ? 0 : distance < second ? 1 : 2);
+      c.mesh.visible = distance < (this.cullDistance ?? Infinity);
       if (lod !== c.lod) { c.lod = lod; c.mesh.geometry = c.geometries[lod]; }
       // Keep off-screen casters. The generous projection allowance covers tall
       // trees casting into the sun frustum; native shadow culling tightens it.

@@ -4,6 +4,7 @@
 import { CONFIG } from '../../shared/config.js';
 
 const F = CONFIG.fruit.types;
+const B = CONFIG.fruit.buffs;
 const L = CONFIG.loot;
 const W = CONFIG.weapons;
 
@@ -39,6 +40,21 @@ export const ITEM_INFO = {
   dragon: {
     name: F.dragon.name, kind: 'Rare fruit',
     text: `A rare glowing fruit from hidden spots (waterfall, hilltops). Heals ${F.dragon.heal} HP plus ${F.dragon.hot} HP over ${F.dragon.hotTime} s.`,
+    use: 'F to eat · G to give to a teammate',
+  },
+  marshberry: {
+    name: F.marshberry.name, kind: 'Fruit',
+    text: `Tart bog berries from the shrubs on the swamp's shores. Heals ${F.marshberry.heal} HP – and for ${B.mudwalker.time} s you wade through the bogs at full speed (${B.mudwalker.name}).`,
+    use: 'F to eat · G to give to a teammate',
+  },
+  swampfig: {
+    name: F.swampfig.name, kind: 'Fruit',
+    text: `A sweet fig from the strangler figs on the swamp's dry ground. Heals ${F.swampfig.heal} HP – and for ${B.secondwind.time} s your stamina refills twice as fast and sprinting costs less (${B.secondwind.name}).`,
+    use: 'F to eat · G to give to a teammate',
+  },
+  glowlotus: {
+    name: F.glowlotus.name, kind: 'Rare fruit',
+    text: `A glowing lotus pod from lonely bog shores. Heals ${F.glowlotus.heal} HP plus ${F.glowlotus.hot} HP over ${F.glowlotus.hotTime} s – and for ${B.lotusskin.time} s you take ${Math.round((1 - B.lotusskin.damageMul) * 100)} % less damage (${B.lotusskin.name}).`,
     use: 'F to eat · G to give to a teammate',
   },
   meat: {

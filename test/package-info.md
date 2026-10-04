@@ -6,6 +6,7 @@ Grouped by the module area they mainly cover. Many simulation tests also check t
 
 ### World generation, terrain and collision (src/shared)
 - `map-rules.test.js` — map design rules over many generated islands of all three levels (planIsland, Terrain, buildLayout, tree trunks).
+- `swamp-fruit.test.js` — the swamp's own fruit: placement by role, eating effects and buffs on the server (Mud Walker, Second Wind, Lotus Skin), the buffs on the client, fruit plant meshes.
 - `swamp.test.js` — the Misty Swamp: hourglass outline and area, the arena as the only way through the waist (ring and waist walls, both gates open, trail through them), dry paths, shallow bogs, mangroves only at the bogs, dry hut/boat/relics/plots, -20 % for players and dinosaurs in bogs.
 - `levels.test.js` — island structure per level (hut beach, boat beach, reachable relic spots), boat repair and sailing to the next island, lava damage, winning on the last island.
 - `boss-arena.test.js` — boss arena islet, causeway and fixed boss spawn; walking the causeway with the player controller.

@@ -526,6 +526,14 @@
   font-size: 0.9em;
 }
 .hud-slow svg { width: 1em; height: 1em; }
+/* fruit buffs running (Mud Walker, Second Wind, Lotus Skin) */
+.hud-buffs { gap: 0.6em; }
+.hud-buff {
+  display: inline-flex; align-items: center; gap: 0.3em;
+  color: var(--green, #8fd650);
+  font-size: 0.9em;
+}
+.hud-buff b { color: #fff; font-weight: 600; }
 
 /* ------------------------------------------------------------ bottom-right */
 .hud-br {

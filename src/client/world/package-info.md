@@ -7,17 +7,17 @@
 - `sky.js` — `buildSky`: gradient dome, sun, drifting clouds, distant islands; `mood()` for darker air.
 - `water.js` — `buildWater`: one shared shader for sea, pools, rivers and the swamp's bogs (`bogGeometry`: murky, dull sheet per field level; depth from a terrain height texture, foam, rapids, waterfall plunge) and lava; `ripple()` / `splash()`.
 - `rivers.js` — geometry helpers for water surfaces: `riverGeometry`, `discGeometry`, `withSheetAttrs` (common `aFlow`/`aRiver` attributes).
-- `vegetation.js` — `buildVegetation`: instanced trees, bushes, ferns, grass and flowers per biome with wind; `setQuality`/`setDensity`; `VEG_TUNING`.
+- `vegetation.js` — `buildVegetation`: instanced trees, bushes, ferns, grass and flowers per biome with wind, per-kind biome tints (`biome.vegetation.tints`), chunks past the fog culled; `setQuality`/`setDensity`; `VEG_TUNING`.
 - `rocks.js` — `buildRocks` / `rockGeo`: boulders from `shared/rockShapes.js` tables (stone kind per rock from `biome.rocks.kinds`, clustered by region) and sea stacks (with palms on green islands).
 - `logs.js` — `buildLogs`: fallen trunks from `layout.logs`, merged into one mesh.
-- `fruitPlants.js` — `buildFruitPlants`: berry bushes, mangos in mango trees, dragon-fruit plants; `setCount(spotId, n)` with pop-in.
+- `fruitPlants.js` — `buildFruitPlants`: the fruit of every kind by its role (`KINDS`: bush, tree, glowing plant – berry/mango/dragon, swamp marshberry/swampfig/glowlotus); `setCount(spotId, n)` with pop-in.
 - `hut.js` — `buildHut`: hunting hut (cabin, drop-off, workbench, mission board, wardrobe, flag, campfire, camp ground from `hutFloor`) or the small landing camp on islands 2+.
 - `base.js` — `buildBaseView`: the team base on islands 2+ (plot stakes, scaffolding, camp/lodge/fort stages, towers, raid damage); `setBase`, `shoot`; `stakePoint`.
 - `baseGround.js` — `flagstones` (irregular laid slabs with joints, optional gaps for stepping stones) and `campClutter` (a few varied stones, sticks, firewood) used by `hutFloor` (hunting hut / landing camp) and `baseFloor` (base yard and paths that grow with the stage, plank porch before the cabin; decoration, no collider) and `stoneWall` (the volcanic fort wall: coursed blocks, pillars, merlons, gate towers inside the palisade colliders); stone pieces use the `rock` detail material.
 - `sites.js` — `buildSites`: places boat, caves, spring cave, ruins, nest and volcano FX from `models/props/`.
 - `bossArena.js` — `buildBossArena`: lava islet look (spires, rune gate, basalt, embers, ritual circle) from `layout.bossArena`.
 - `swampArena.js` — `buildSwampArena`: the swamp arena's ring and waist walls of giant dead mangroves and root tangles, the sign at the entrance gate, bones (`layout.swampArena`).
-- `swampFx.js` — `buildSwampFx`: mist banks and blinking fireflies over the bogs near the camera; count follows the graphics tier (none on Low).
+- `swampFx.js` — `buildSwampFx`: mist over the whole swamp, thicker in places (`mistiness`); the fog draws in where it is thick (`thickSky`, blended through `onFog`), mist banks and fireflies near the camera by graphics tier.
 - `grove.js` — `buildGrove`: shimmering red barrier cylinder around the giant's pen; `strike(pt)` and `flash()`.
 
 ### hut/
@@ -27,11 +27,11 @@
 - `hut/fx.js` — animated parts: waving flag, campfire flames and light, pooled smoke, arrow stock.
 
 ### veg/
-- `veg/trees.js` — procedural tree types (palm ... dead; swamp: mangrove, snag, nipa; `deadMangroveGeometry` for the arena wall) as cached `{ trunk, foliage }`; crown variants (`CROWN_TYPES`, `CROWN_VARIANTS`) reshape and recolour only the foliage, the trunk stays; `treeMatrix`, `TREE_WIND`, `TREE_VARIANTS`, `MANGO_FRUIT_LOCAL`.
-- `veg/plants.js` — small plants (bush, fern, big leaf, shrub, reed with cattails, grass, flower, berry bush, dragon plant); `BUSH_TYPES`.
+- `veg/trees.js` — procedural tree types (palm ... dead; swamp: mangrove, snag, nipa, swampfig; `deadMangroveGeometry` for the arena wall) as cached `{ trunk, foliage }`; crown variants (`CROWN_TYPES`, `CROWN_VARIANTS`) reshape and recolour only the foliage, the trunk stays; `treeMatrix`, `TREE_WIND`, `TREE_VARIANTS`, `MANGO_FRUIT_LOCAL`, `SWAMPFIG_FRUIT_LOCAL`.
+- `veg/plants.js` — small plants (bush, fern, big leaf, shrub, reed with cattails, grass, flower, berry bush, dragon plant, swamp marsh shrub and glow lotus); `BUSH_TYPES`.
 - `veg/swampDecor.js` — `buildSwampDecor`: lily pads and duckweed on the bogs, breathing-root fields on their mud shores (instanced, handed to `SpatialInstances`).
 - `veg/shapes.js` — shared vegetation helpers (`clump`, `leafStrip`, `arcPath`, `LEAF_MAT`, `windPair`, `glowMaterial`, `instanced`, `foliageTint`, geometry-detail scope).
-- `veg/spatialInstances.js` — `SpatialInstances`: splits instances into 80 m chunks so each batch is culled separately; quality/density control.
+- `veg/spatialInstances.js` — `SpatialInstances`: splits instances into 80 m chunks so each batch is culled separately (and hidden past `setCullDistance`); quality/density control.
 
 ## Entry points
 - `core/game.js` `#buildWorld()` calls every `build*` here with `(terrain, layout)` (`buildSky(gfx, layout)`, `buildWater(..., sunDir)`), adds each `.group` to the scene and calls `update(dt, time, cam)` on all but logs each frame (`worldUpdaters`). It also calls `water.ripple/splash`, `sky.mood`, `fruitPlants.setCount`, `baseView.setBase/shoot`, `grove.strike/flash`, `sites.boat.setRepaired/setParts`, `vegetation/rocks.setQuality`.

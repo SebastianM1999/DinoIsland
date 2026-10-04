@@ -99,13 +99,15 @@ export const BIOMES = {
     shape: 'hourglass',
     vegetation: {
       treeDensity: 0.85,              // open clearings between the dry-land groves
-      maxTrees: 640,
+      maxTrees: 1050,
       minTreeHeight: 1.2,           // the lowland is low: trees grow on any dry ground
       // dry land only: the mangroves grow in and along the bogs (layout.js, their own pass)
       trees: { kapok: 0.35, tall: 0.2, snag: 0.25, nipa: 0.2 },
       beachTrees: ['nipa'],
       bushes: { reed: 0.55, fern: 0.45 },
-      maxBushes: 850,
+      maxBushes: 1600,
+      // jungle palettes muted toward the swamp's olive greys (client/world/vegetation.js)
+      tints: { kapok: '#93a07e', tall: '#909e80', mangrove: '#c9cdb8', nipa: '#b4b99e', snag: '#d0d0c4', fern: '#a2ab8c', reed: '#c8c6a8' },
       grass: 0.8,
       flowers: 0.25,
     },
@@ -129,6 +131,8 @@ export const BIOMES = {
       exposure: 0.85,
     },
     water: { shallow: '#5a6a3c', mid: '#3c4a2c', deep: '#26301e', foam: '#b8bfa2', sky: '#7e8a78' },
+    // its own fruit, one per role (config.js fruit.types): bog-shore shrubs, figs, hidden lotus
+    fruit: { bush: 'marshberry', tree: 'swampfig', plant: 'glowlotus' },
     dinos: { brachio: 1, stego: 1, raptor: 3, ptera: 3, trex: 0 },
     music: 'calm',
   },

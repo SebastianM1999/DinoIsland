@@ -9,7 +9,7 @@ const V = (x, y, z) => new THREE.Vector3(x, y, z);
 const TAU = Math.PI * 2;
 
 /** Emissive strength per fruit type (dragon fruit glows the most). */
-export const FRUIT_GLOW = { berry: 0.45, mango: 0.4, dragon: 0.85 };
+export const FRUIT_GLOW = { berry: 0.45, mango: 0.4, dragon: 0.85, marshberry: 0.5, swampfig: 0.4, glowlotus: 1.0 };
 
 /** Pointed leaf, lying along +X from the origin. */
 function leaf(len, width, top = '#5fc23f', bottom = '#3a8f2d') {
@@ -96,12 +96,57 @@ function dragon() {
   return center(merge(parts));
 }
 
+/** Marsh berries (swamp): a little cluster of glossy dark-red bog berries on a red stem. */
+function marshberry() {
+  const parts = [];
+  const spots = [[0, 0, 0], [0.085, 0.03, 0.04], [-0.05, 0.035, 0.07], [0.02, 0.06, -0.075]];
+  spots.forEach(([x, y, z], k) => {
+    let b = new THREE.SphereGeometry(1, 8, 6);
+    b = deform(b, (v) => v.multiplyScalar(0.06 + (k % 2) * 0.01));
+    parts.push(place(paint(b, (c, n) => (n.y > 0.6 ? '#d0526a' : jitter(c, 1, 7 + k) > 0.3 ? '#8c1f3a' : '#a42a46')), [x, y, z]));
+  });
+  parts.push(tube([V(0.01, 0.07, 0), V(0.0, 0.14, 0.01), V(-0.02, 0.19, 0)], () => 0.01, { radial: 4, color: () => '#7a2e2a', capStart: false }));
+  parts.push(place(leaf(0.09, 0.035, '#6f8a46', '#46602f'), [0, 0.17, 0], [0.2, 0.9, 0.4]));
+  return center(merge(parts));
+}
+
+/** Swamp fig: a plump purple-brown teardrop with a pale eye and a short stalk. */
+function swampfig() {
+  let g = new THREE.SphereGeometry(1, 10, 8);
+  g = deform(g, (v) => {
+    const y = v.y, w = y > 0 ? 1 - y * 0.45 : 1;
+    v.set(v.x * 0.1 * w, y * 0.12, v.z * 0.1 * w);
+  });
+  g = paint(g, (c, n) => {
+    if (c.y < -0.105) return '#d8c0a0';                   // the eye at the bottom
+    if (n.y > 0.5) return '#7a4a6a';
+    return jitter(c, 1, 4) > 0.3 ? '#5e2f58' : '#6b3a6e';
+  });
+  const parts = [g];
+  parts.push(tube([V(0, 0.1, 0), V(0.01, 0.15, 0), V(0.03, 0.18, 0)], () => 0.012, { radial: 4, color: () => '#5a4a30', capStart: false }));
+  return center(merge(parts));
+}
+
+/** Glow lotus pod: a flat-topped seed head with glowing cyan seeds in its face. */
+function glowlotus() {
+  let g = new THREE.CylinderGeometry(0.11, 0.06, 0.12, 12, 1);
+  g = paint(g, (c, n) => (n.y > 0.8 ? '#3f8a6a' : '#5f9a58'));
+  const parts = [g];
+  for (let k = 0; k < 7; k++) {
+    const a = (k / 7) * TAU, r = k ? 0.06 : 0;
+    const x = k ? Math.cos(a) * r : 0, z = k ? Math.sin(a) * r : 0;
+    parts.push(place(paint(new THREE.SphereGeometry(0.022, 6, 4), '#7ffff0'), [x, 0.062, z]));
+  }
+  return center(merge(parts));
+}
+
+const BUILDERS = { berry, mango, dragon, marshberry, swampfig, glowlotus };
 const geoCache = new Map();
 /** Shared fruit geometry (centered at the origin). */
 export function fruitGeometry(type) {
   let g = geoCache.get(type);
   if (!g) {
-    g = type === 'mango' ? mango() : type === 'dragon' ? dragon() : berry();
+    g = (BUILDERS[type] || berry)();
     retainResource(g); geoCache.set(type, g);
   }
   return g;

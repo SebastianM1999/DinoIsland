@@ -70,6 +70,8 @@ export class PlayerController {
     this.swimming = false;              // afloat in a river or lake
     this.creative = false;             // invincible (server) + may fly
     this.flying = false;
+    /** Fruit buffs running: { kind: seconds left } (config.js fruit.buffs, from the server's inventory). */
+    this.buffs = {};
     this.clock = 0;
     this.lastJumpTap = -Infinity;
     this.prevJump = false;
@@ -129,8 +131,19 @@ export class PlayerController {
    * @param {number} dt
    * @param {{forward:boolean, back:boolean, left:boolean, right:boolean, jump:boolean, sprint:boolean}} intent
    */
+  /** The server's fruit buffs ({ kind: seconds left }); counted down here between updates. */
+  setBuffs(buffs = {}) {
+    this.buffs = { ...buffs };
+  }
+
+  /** A fruit buff's multiplier `key` while it runs, else 1. */
+  #buffMul(kind, key) {
+    return this.buffs[kind] > 0 ? CONFIG.fruit.buffs[kind]?.[key] ?? 1 : 1;
+  }
+
   update(dt, intent) {
     const t = this.terrain;
+    for (const k in this.buffs) if ((this.buffs[k] -= dt) <= 0) delete this.buffs[k];
     if (this.knockTimer > 0) this.knockTimer -= dt;
     const controllable = !this.frozen && this.knockTimer <= 0;
     const mods = this.mods;
@@ -183,12 +196,12 @@ export class PlayerController {
 
     const max = this.maxStamina;
     if (this.sprinting) {
-      if (!free) this.stamina -= P.staminaDrain * mods.sprintDrainMul * dt;
+      if (!free) this.stamina -= P.staminaDrain * mods.sprintDrainMul * this.#buffMul('secondwind', 'drainMul') * dt;
       this.staminaDelay = P.staminaRegenDelay * mods.regenDelayMul;
     } else if (this.staminaDelay > 0) {
       this.staminaDelay -= dt;
     } else {
-      this.stamina += P.staminaRegen * mods.staminaRegenMul * dt;
+      this.stamina += P.staminaRegen * mods.staminaRegenMul * this.#buffMul('secondwind', 'regenMul') * dt;
     }
     this.stamina = this.creative ? max : Math.max(0, Math.min(max, this.stamina));
 
@@ -214,9 +227,11 @@ export class PlayerController {
       this.onDash?.();
     }
     // wading slows you; in a bog (swamp) its own factor replaces that, so it is exactly -20 %
-    const bog = t.swampSpeedAt?.(this.pos.x, this.pos.z) ?? 1;
+    // (marsh berries' Mud Walker lifts it)
+    const bogMul = t.swampSpeedAt?.(this.pos.x, this.pos.z) ?? 1;
+    const bog = bogMul < 1 && this.buffs.mudwalker > 0 ? 1 : bogMul;
     this.inBog = bog < 1;
-    const waterSlow = bog < 1 ? bog : depth > 0.2 ? Math.max(0.55, 1 - depth * 0.35) : 1;
+    const waterSlow = bogMul < 1 ? bog : depth > 0.2 ? Math.max(0.55, 1 - depth * 0.35) : 1;
     let speed = flying ? C.flySpeed
       : this.swimming ? SW.speed * this.speedFactor
       : (this.sprinting ? P.sprintSpeed : P.walkSpeed) * this.speedFactor * waterSlow;

@@ -19,6 +19,12 @@ import { Viewmodel } from './viewmodel.js';
 import { mesh } from '../models/kit.js';
 import { trapGeometry } from '../models/weapons.js';
 
+/** What to look for when the fruit pouch is empty: this island's own fruit (config.js fruit.types). */
+function noFruitHint(layout) {
+  const names = [...new Set((layout?.fruitSpots || []).map((s) => s.type))].map((k) => CONFIG.fruit.types[k]?.name).filter(Boolean);
+  return names.length ? `No fruit – look for ${names.join(', ')}` : 'No fruit';
+}
+
 const W = CONFIG.weapons;
 const P = CONFIG.player;
 /** Warn about dinosaurs (all but the Brachiosaurus) closer than this (m). */
@@ -343,7 +349,7 @@ export class PlayerActions {
 
   eat() {
     if (this.eatingT > 0 || !this.inv.fruit.length) {
-      if (!this.inv.fruit.length) this.game.hud.toast('No fruit – look for berry bushes, mango trees and dragon fruit', 'fruit');
+      if (!this.inv.fruit.length) this.game.hud.toast(noFruitHint(this.game.layout), 'fruit');
       return;
     }
     this.game.net.act(ACT.EAT, { fruit: this.bestFruit() });
@@ -522,7 +528,7 @@ export class PlayerActions {
     // 1. ripe fruit
     let best = null, bd = Infinity;
     for (const s of g.layout.fruitSpots) {
-      const r = s.type === 'mango' ? 3.4 : P.interactRange;
+      const r = CONFIG.fruit.types[s.type]?.role === 'tree' ? 3.4 : P.interactRange;   // fruit up in a tree
       const d = Math.hypot(s.x - pos.x, s.z - pos.z);
       if (d < r && d < bd && g.fruitCounts[s.id] > 0) { bd = d; best = s; }
     }

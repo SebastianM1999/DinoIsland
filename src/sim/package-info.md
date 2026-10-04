@@ -24,6 +24,7 @@
 - messages: `receive` -> `onState` (movement validation: move budget, collision, sea, grove barrier, epoch/sequence), `receiveAction` (validates the bundled state, replays against state history for overtaken packets), `onAct` (one `case ACT.*` per action: creative, spot, shot/reload, melee, fire/land, pickup, harvest, eat, give, trap, drop, deposit, outfit, repair, unstuck, butcher, refill, craft, base, skill, revive, dash, respawn).
 - `craft`, `validMeleeHit`, `validProjectileLanding`, `canSpotDino`, `groveBlocks`, `unstuck`.
 - items: `spawnItem`, `removeItem`, `dropInventoryItem`, `dropLoot`, `addTrack`.
+- fruit: `applyFruit` (heal, heal over time, fruit buffs in `p.buffs`, e.g. Lotus Skin's lower damage in `hurtPlayer`), `buffsLeft` (sent with every inventory), `bestFruitIndex`.
 - tick: `step(dt)` (player upkeep, eating/regen/aura, lava, relic pickup, campfire healing, fruit regrowth, item/projectile/track expiry, then dinos, towers, raids, dino history, player-dino contact, mission), `snapshotDue`, `hitPose`, `snapshot`, `fullState`.
 
 ## Entry points

@@ -39,7 +39,16 @@ export const TREE_WIND = {
   mangrove: { strength: 0.006, pivotY: 3.4, frequency: 1.1, heightScale: 0.2 },
   snag: { strength: 0.005, pivotY: 3.0, frequency: 0.9, heightScale: 0.25 },
   nipa: { strength: 0.02, pivotY: 0.3, frequency: 1.4, heightScale: 0.3 },
+  swampfig: { strength: 0.008, pivotY: 3.4, frequency: 1.2, heightScale: 0.22 },
 };
+
+/** Where the figs hang in the swamp fig's crown (local space, before instance transform). */
+export const SWAMPFIG_FRUIT_LOCAL = [
+  [2.0, 4.25, 0.6],
+  [-1.5, 4.2, 1.5],
+  [-0.6, 4.3, -2.0],
+  [1.2, 4.2, -1.7],
+];
 
 /** Where mangos hang on the mango tree (local space, before instance transform). */
 export const MANGO_FRUIT_LOCAL = [
@@ -690,6 +699,48 @@ function buildSnag(variant) {
   return { trunk: merge(parts), foliage: merge(twigs), height: top.y + 1 };
 }
 
+// ------------------------------------------------------------- swamp fig
+const FIG_COL = [
+  { top: '#7a9a52', mid: '#4f7240', mid2: '#46683a', bottom: '#355230' },
+  { top: '#6f9450', mid: '#486c3e', mid2: '#405f38', bottom: '#30492b' },
+];
+/** The swamp's fruit tree: a strangler fig – fused twisting roots for a trunk, a broad dark crown. */
+function buildSwampFig() {
+  const s = 1500;
+  const rng = makeRng(s);
+  const shape = TRUNKS.swampfig[0];
+  const pts = trunkPts(shape);
+  const top = pts[pts.length - 1];
+  const wood = { base: '#7d725f', dark: '#504838', seed: s, moss: '#4f6e34', mossAmt: 0.45, lichen: '#a8ab90', lichenAmt: 0.35 };
+  const parts = [trunkTube(shape, wood, { radial: 9, grooves: 9, ridge: 0.09 })];
+  // the strangling roots: thin strands spiralling down the trunk into the ground
+  for (let k = 0; k < 6; k++) {
+    const a0 = (k / 6) * TAU + rng() * 0.4, turn = (rng() < 0.5 ? -1 : 1) * rng.range(0.6, 1.2);
+    const rp = [];
+    for (let i = 0; i <= 5; i++) {
+      const t = i / 5, y = top.y * (1 - t) * 0.92, c = axisAt(pts, y), a = a0 + turn * t;
+      const rr = shape.r(y / top.y) + 0.06 + t * t * 0.9;
+      rp.push(V(c.x + Math.cos(a) * rr, y - (t > 0.95 ? 0.2 : 0), c.z + Math.sin(a) * rr));
+    }
+    parts.push(tube(rp, (t) => 0.07 + 0.05 * t, { radial: 5, color: bark({ ...wood, seed: s + k, mossAmt: 0.3 }), capStart: false }));
+  }
+  const leaves = [];
+  const cy = top.y + 0.8;
+  leaves.push(place(clump(2.5, { seed: s, ...FIG_COL[0], squash: 0.5, flatBottom: 0.35, maxDetail: 3 }), [top.x, cy, top.z]));
+  for (let k = 0; k < 6; k++) {
+    const a = (k / 6) * TAU + 0.3;
+    const rr = 2.2 + rng() * 0.4;
+    const p = [top.x + Math.cos(a) * rr, cy - 0.45 + rng() * 0.3, top.z + Math.sin(a) * rr];
+    leaves.push(place(clump(1.55 + rng() * 0.25, { seed: s + k + 1, ...FIG_COL[k % 2], squash: 0.55, flatBottom: 0.4 }), p, [0, a, 0]));
+    if (k % 2 === 0) parts.push(branch(V(top.x * 0.7, top.y - 1.0, top.z * 0.7), V(p[0] * 0.8, p[1] - 0.3, p[2] * 0.8), 0.14, 0.06, wood.base, wood.dark, s + k));
+  }
+  // twigs down to where the figs hang
+  for (const [x, y, z] of SWAMPFIG_FRUIT_LOCAL) {
+    parts.push(branch(V(x * 0.55, y + 0.9, z * 0.55), V(x, y + 0.25, z), 0.06, 0.03, wood.base, wood.dark, s + 50));
+  }
+  return { trunk: merge(parts), foliage: merge(leaves), height: cy + 1.6 };
+}
+
 // ------------------------------------------------------------ nipa palm
 function buildNipa(variant) {
   const s = 1400 + variant * 11;
@@ -719,7 +770,7 @@ function buildNipa(variant) {
 const BUILD = {
   palm: buildPalm, round: buildRound, tall: buildTall, jungle: buildJungle, mango: buildMango,
   bamboo: buildBamboo, giant: buildGiant, kapok: buildKapok, banana: buildBanana, pine: buildPine, dead: buildDead,
-  mangrove: buildMangrove, snag: buildSnag, nipa: buildNipa,
+  mangrove: buildMangrove, snag: buildSnag, nipa: buildNipa, swampfig: buildSwampFig,
 };
 const cache = new Map();
 /**
@@ -783,4 +834,4 @@ function crownVariant(foliage, c) {
 }
 
 /** How many geometry variants each type has (must match TRUNKS[type].length). */
-export const TREE_VARIANTS = { palm: 2, round: 2, tall: 1, jungle: 1, mango: 1, bamboo: 2, giant: 2, kapok: 2, banana: 2, pine: 2, dead: 2, mangrove: 2, snag: 2, nipa: 2 };
+export const TREE_VARIANTS = { palm: 2, round: 2, tall: 1, jungle: 1, mango: 1, bamboo: 2, giant: 2, kapok: 2, banana: 2, pine: 2, dead: 2, mangrove: 2, snag: 2, nipa: 2, swampfig: 1 };

@@ -37,7 +37,7 @@ const fmtTime = (s) => {
 };
 
 const LOOT_KEYS = Object.keys(CONFIG.loot);   // meat, hide, teeth, plates, claws, bones, skull
-const FRUIT_KEYS = ['berry', 'mango', 'dragon'];
+const FRUIT_KEYS = Object.keys(CONFIG.fruit.types);
 const lootName = (k) => CONFIG.loot?.[k]?.name || k;
 const fruitName = (k) => CONFIG.fruit?.types?.[k]?.name || k;
 
@@ -192,7 +192,11 @@ export class Hud {
     this.$swamp.setAttribute('role', 'status');
     this.$swamp.innerHTML = `<span class="hud-slow">${icon('weight')}Swamp: slowed</span>`;
     this.$swamp.hidden = true;
-    this.$carry.append(this.$quiver, this.$fruitRow, this.$loot, this.$swamp);
+    // fruit buffs running (Mud Walker, Second Wind, Lotus Skin) with their seconds left
+    this.$buffs = el('div', 'hud-pill hud-buffs brush');
+    this.$buffs.setAttribute('role', 'status');
+    this.$buffs.hidden = true;
+    this.$carry.append(this.$quiver, this.$fruitRow, this.$loot, this.$swamp, this.$buffs);
     this.$hotbar = el('ol', 'hud-hotbar brush');
     this.$hotbar.setAttribute('aria-label', 'Equipment');
     this._slots = [];
@@ -392,6 +396,16 @@ export class Hud {
 
   setHealth(hp, max) { this._bar(this.$hp, 'hp', hp, max); }
   setStamina(value, max) { this._bar(this.$st, 'st', value, max); }
+
+  /** Fruit buffs running on the local player: { kind: seconds left } (config.js fruit.buffs). */
+  setBuffs(buffs = {}) {
+    const list = Object.entries(buffs).filter(([k, s]) => s > 0 && CONFIG.fruit.buffs[k]);
+    const sig = list.map(([k, s]) => `${k}${Math.ceil(s)}`).join(',');
+    if (this._c.buffs === sig) return;
+    this._c.buffs = sig;
+    this.$buffs.hidden = !list.length;
+    this.$buffs.innerHTML = list.map(([k, s]) => `<span class="hud-buff" title="${esc(CONFIG.fruit.buffs[k].text)}">${esc(CONFIG.fruit.buffs[k].name)} <b>${Math.ceil(s)}s</b></span>`).join('');
+  }
 
   /** Show the "Swamp: slowed" tag while the local player wades through a bog. */
   setSwamp(on) {
