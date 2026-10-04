@@ -111,6 +111,7 @@ export class DinoSystem {
     if (d.scale) desc.sc = d.scale;       // oversized animal (the grove's titan)
     if (d.title) desc.name = d.title;
     if (d.butchered) desc.bu = 1;          // carved up with the knife
+    if (d.type === 'alpha-sarcosuchus') desc.phase = d.phase ? { ...d.phase } : null;
     return desc;
   }
 
@@ -121,7 +122,9 @@ export class DinoSystem {
     const rows = [];
     for (const d of this.list) {
       if (include && !include(d)) continue;
-      rows.push([d.id, r2(d.x), r2(d.y), r2(d.z), r3(d.yaw), d.st, Math.ceil(d.hp), r2(d.spd), d.fl]);
+      const row = [d.id, r2(d.x), r2(d.y), r2(d.z), r3(d.yaw), d.st, Math.ceil(d.hp), r2(d.spd), d.fl];
+      if (d.type === 'alpha-sarcosuchus') row.push(d.phase?.clip ?? null, d.phase?.started ?? null, d.phase?.duration ?? null, d.phaseSeq ?? 0);
+      rows.push(row);
     }
     return rows;
   }
@@ -587,6 +590,7 @@ export class DinoSystem {
     d.alive = false;
     d.hp = 0;
     d.st = DS.DEAD;
+    if (d.type === 'alpha-sarcosuchus') { d.phase = null; d.phaseSeq = (d.phaseSeq ?? 0) + 1; }
     d.spd = 0;
     d.deadT = CARCASS_TIME;
     if (d.type === 'ptera') {
