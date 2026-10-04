@@ -19,14 +19,16 @@ export const SARCO_TIMING = {
 };
 const ACTIVE = new Set(['lunge', 'bite', 'shove', 'tail', 'pivot', 'ambush', 'recover']);
 // Baked TailSweep vertex envelopes in game metres, relative to the rear hip.
-// [clip seconds, low angle, high angle, outer radius], hip 1.744 m behind root.
-const TAIL_HIP = 1.744;
-const TAIL = [[.6, -1.104, .137, 7.181], [2 / 3, -1.114, .149, 7.11],
-  [11 / 15, -.853, .366, 7.154], [.8, -.301, .662, 7.617],
-  [13 / 15, -.095, .921, 8.08], [14 / 15, .009, 1.184, 7.605],
-  [1, -.029, 1.407, 6.686], [16 / 15, -.091, 1.351, 6.395],
-  [17 / 15, -.123, 1.235, 6.648], [1.2, -.153, 1.143, 6.917],
-  [19 / 15, -.216, 1.027, 7.099]];
+// [clip seconds, low angle, high angle, outer radius], hip 1.5696 m behind root.
+// Measured from 1792 skin vertices with combined Tail1..8 weight > .5 and
+// original 18 m-fit radius > 2 m. Fitted length/height are .9; width stays unchanged.
+const TAIL_HIP = 1.5696;
+const TAIL = [[.6, -1.145, .067, 7.04], [2 / 3, -1.155, .08, 6.976],
+  [11 / 15, -.905, .329, 6.851], [.8, -.385, .723, 6.895],
+  [13 / 15, -.027, 1.034, 7.523], [14 / 15, .103, 1.219, 7.501],
+  [1, .06, 1.423, 6.669], [16 / 15, -.012, 1.372, 6.365],
+  [17 / 15, -.051, 1.267, 6.577], [1.2, -.085, 1.181, 6.802],
+  [19 / 15, -.157, 1.073, 6.914]];
 const toYaw = (d, p) => Math.atan2(-(p.x - d.x), -(p.z - d.z));
 const duration = (mode) => {
   const T = SARCO_TIMING;
