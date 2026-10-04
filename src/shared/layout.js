@@ -566,6 +566,8 @@ export function buildLayout(terrain) {
         const x = sa.x + Math.cos(a) * rr, z = sa.z + Math.sin(a) * rr;
         if (Math.abs(z - sa.z) < 6 && Math.abs(deg % 180) < 1) continue;   // the causeway runs along z = sa.z
         if (Math.hypot(x - sa.spawn.x, z - sa.spawn.z) < 7 || distToPath(x, z) < 4.5) continue;
+        // Arena obstacles belong on shallow banks, outside the boss's deep ambush hollows.
+        if (terrain.waterDepthAt(x, z) > 0.3) continue;
         addTree('mangrove', x, z, rm.range(1.35, 1.7), 0.6);
       }
     }
