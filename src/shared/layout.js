@@ -14,8 +14,9 @@ import { insideGrove } from './grove.js';
 import { standTop } from './collision.js';
 import { causewayQuery, insideBossArena } from './bossArena.js';
 import { insideSwampArena, arenaWallColliders, waistWalls, waistWallColliders, gateOffset, SWAMP_ARENA } from './swampArena.js';
+import { insideVolcanoArena, entranceOffset, VOLCANO_ARENA } from './volcanoArena.js';
 import { CONFIG } from './config.js';
-import { insideOutline, halfWidthAt } from './island.js';
+import { insideOutline, halfWidthAt, flowsOf } from './island.js';
 import { SPRING_LIP_OFFSET, SPRING_FLOOR, springColliders } from './springShape.js';
 
 const TAU = Math.PI * 2;
@@ -74,6 +75,7 @@ export function buildLayout(terrain) {
     grove: null,
     bossArena: null,        // the lava islet beside the boat (first island), see shared/bossArena.js
     swampArena: null,       // the root-walled kettle in the swamp's waist, see shared/swampArena.js
+    volcanoArena: null,     // the crater floor on top of the volcano, see shared/volcanoArena.js
     logs: [],               // fallen trees: { x, z, rot, len, r, yA, yB, roots, dead }
   };
   const circles = layout.colliders.circles;
@@ -142,7 +144,10 @@ export function buildLayout(terrain) {
   if (plan.volcano) {
     const v = plan.volcano;
     const crater = plan.pools.find((p) => p.kind === 'lava' && Math.hypot(p.x - v.x, p.z - v.z) < 1);
-    layout.volcano = { x: v.x, z: v.z, craterY: crater ? crater.level : v.height * 0.7, craterR: v.craterR };
+    // (the caldera: its smoke rises from a vent on the rim across from the notch – the crater floor is the arena)
+    layout.volcano = v.rimH != null
+      ? { x: v.x - Math.cos(v.notchAngle) * v.craterR, z: v.z - Math.sin(v.notchAngle) * v.craterR, craterY: v.rimY + 1, craterR: 12 }
+      : { x: v.x, z: v.z, craterY: crater ? crater.level : v.height * 0.7, craterR: v.craterR };
   }
 
   // ------------------------------------------------------------- paths
@@ -174,17 +179,19 @@ export function buildLayout(terrain) {
   const nearHut = (x, z, pad = 0) => Math.hypot(x - hf.x, z - (hf.z + 2)) < hf.radius + pad
     || layout.basePlots.some((p) => Math.hypot(x - p.x, z - p.z) < p.r + 2 + Math.min(pad, 12));
   const nearBoat = (x, z, pad = 0) => Math.hypot(x - plan.boat.x, z - plan.boat.z) < 10 + pad;
-  const dry = (x, z, min = 0.4) => terrain.waterLevelAt(x, z) === null && terrain.lavaLevelAt(x, z) === null && terrain.heightAt(x, z) > min;
+  // (a volcano's crust plates are not dry ground either: nothing stands on them)
+  const dry = (x, z, min = 0.4) => terrain.waterLevelAt(x, z) === null && terrain.lavaLevelAt(x, z) === null && terrain.heightAt(x, z) > min && !terrain.crustAt(x, z);
   const inside = (x, z, k) => insideOutline(plan, x, z, k);
+  // (every flow: the river, or the volcano's lava flows and crater moat)
   const riverDist = (x, z) => {
-    const rv = plan.river;
-    if (!rv) return Infinity;
     let best = Infinity;
-    for (let i = 0; i < rv.pts.length - 1; i++) {
-      const a = rv.pts[i], b = rv.pts[i + 1];
-      const vx = b.x - a.x, vz = b.z - a.z;
-      const t = Math.max(0, Math.min(1, ((x - a.x) * vx + (z - a.z) * vz) / (vx * vx + vz * vz || 1)));
-      best = Math.min(best, Math.hypot(a.x + vx * t - x, a.z + vz * t - z) - (a.w + b.w) / 4);
+    for (const rv of flowsOf(plan)) {
+      for (let i = 0; i < rv.pts.length - 1; i++) {
+        const a = rv.pts[i], b = rv.pts[i + 1];
+        const vx = b.x - a.x, vz = b.z - a.z;
+        const t = Math.max(0, Math.min(1, ((x - a.x) * vx + (z - a.z) * vz) / (vx * vx + vz * vz || 1)));
+        best = Math.min(best, Math.hypot(a.x + vx * t - x, a.z + vz * t - z) - (a.w + b.w) / 4);
+      }
     }
     return best;
   };
@@ -241,8 +248,8 @@ export function buildLayout(terrain) {
     const gv = plan.sites.grove;
     layout.grove = { x: gv.x, z: gv.z, r: gv.r, y: terrain.heightAt(gv.x, gv.z) };
   }
-  // (the swamp arena is kept just as free: nothing grows, lies or spawns in it)
-  const outsideGrove = (x, z, pad = 0) => !insideGrove(layout, x, z, pad) && !insideSwampArena(plan.swampArena, x, z, pad);
+  // (the swamp arena and the crater are kept just as free: nothing grows, lies or spawns in them)
+  const outsideGrove = (x, z, pad = 0) => !insideGrove(layout, x, z, pad) && !insideSwampArena(plan.swampArena, x, z, pad) && !insideVolcanoArena(plan.volcanoArena, x, z, pad);
 
   // -------------------------------------------------------- swamp arena
   // The kettle in the swamp's waist (shared/swampArena.js): a wall of huge dead
@@ -300,6 +307,63 @@ export function buildLayout(terrain) {
       arena.bones.push({ x, z, y: groundAt(x, z), rot: ra() * TAU, kind: ra() < 0.3 ? 'skull' : 'rib', s: ra.range(0.9, 1.6) });
     }
   }
+
+  // ------------------------------------------------------- volcano arena
+  // The crater floor on top of the volcano (shared/volcanoArena.js): clusters of
+  // basalt columns to dodge and kite round, a warning sign at the notch, bones on
+  // the floor. Its boss comes later and spawns at arena.spawn.
+  if (plan.volcanoArena) {
+    const va = plan.volcanoArena;
+    const ra = makeRng(S ^ 0x7ca1);
+    const groundAt = (x, z) => terrain.heightAt(x, z);
+    const arena = {
+      ...va,
+      y: groundAt(va.x, va.z),
+      spawn: { ...va.spawn, y: groundAt(va.spawn.x, va.spawn.z) },
+      gates: va.gates.map((g) => ({ ...g, y: groundAt(g.x, g.z) })),
+      sign: null, columns: [], bones: [],
+    };
+    layout.volcanoArena = arena;
+    reserve(va.x, va.z, va.craterR + 2);
+    // one cluster of 3-5 hexagonal columns per sector round the floor, off the path and the boss's spawn
+    const n = VOLCANO_ARENA.columns;
+    for (let k = 0; k < n; k++) {
+      const a = va.gates[0].angle + ((k + 0.5) / n) * TAU + ra.range(-0.15, 0.15);
+      const rr = va.r * ra.range(0.42, 0.72);
+      const cx = va.x + Math.cos(a) * rr, cz = va.z + Math.sin(a) * rr;
+      if (distToPath(cx, cz) < 5.5 || Math.hypot(cx - va.spawn.x, cz - va.spawn.z) < 7) continue;
+      const cluster = { x: cx, z: cz, y: groundAt(cx, cz), parts: [] };
+      for (let i = 0, m = ra.int(3, 5); i < m; i++) {
+        const pa = ra() * TAU, pr = i ? ra.range(1.0, 1.7) : 0;
+        const x = cx + Math.cos(pa) * pr, z = cz + Math.sin(pa) * pr;
+        if (cluster.parts.some((p) => Math.hypot(p.x - x, p.z - z) < 1.1)) continue;
+        const r = ra.range(0.55, 0.85), h = ra.range(3.4, 6.5) * (i ? ra.range(0.5, 0.85) : 1);
+        const y = groundAt(x, z);
+        cluster.parts.push({ x, z, y, r, h, rot: ra() * TAU, tilt: ra.range(-0.06, 0.06) });
+        circles.push({ x, z, r: r * 0.95, top: y + h, kind: 'arena' });
+      }
+      arena.columns.push(cluster);
+    }
+    // warning sign beside the path at the notch
+    {
+      const a = va.gates[0].angle + 0.13, rr = va.craterR + 8;
+      const sx = va.x + Math.cos(a) * rr, sz = va.z + Math.sin(a) * rr;
+      arena.sign = { x: sx, z: sz, y: groundAt(sx, sz), angle: va.gates[0].angle };
+      circles.push({ x: sx, z: sz, r: 0.35, top: arena.sign.y + 2.4, kind: 'arena' });
+    }
+    // bones and skulls on the floor (visual only)
+    for (let i = 0; i < 16; i++) {
+      const a = ra() * TAU, rr = ra.range(3, va.r - 3);
+      const x = va.x + Math.cos(a) * rr, z = va.z + Math.sin(a) * rr;
+      arena.bones.push({ x, z, y: groundAt(x, z), rot: ra() * TAU, kind: ra() < 0.3 ? 'skull' : 'rib', s: ra.range(0.9, 1.6) });
+    }
+  }
+  // the volcano's crust plates, basalt bridges and fumaroles (shared/island.js): nothing grows on them
+  layout.crusts = (plan.crusts || []).map((c) => ({ ...c }));
+  layout.bridges = (plan.bridges || []).map((b) => ({ ...b }));
+  layout.fumaroles = (plan.fumaroles || []).map((f) => ({ ...f, y: terrain.heightAt(f.x, f.z) }));
+  for (const f of layout.fumaroles) reserve(f.x, f.z, 3.5);
+  for (const b of layout.bridges) reserve(b.x, b.z, b.r);
 
   // --------------------------------------------------------- boss arena
   // The lava islet beside the boat (shared/bossArena.js): obsidian spires on the
@@ -412,7 +476,8 @@ export function buildLayout(terrain) {
         const rv = plan.river;
         if (!rv) return null;
         const p = rv.pts[Math.floor(rv.pts.length * 0.55)];
-        return findDryNear(p.x, p.z, 16, (x, z) => riverDist(x, z) > 2.5 && riverDist(x, z) < 8);
+        // (beside a lava flow: on ground that is warm, not burning)
+        return findDryNear(p.x, p.z, 16, (x, z) => riverDist(x, z) > 2.5 && riverDist(x, z) < 8 && terrain.heatAt(x, z) < 0.5);
       }
       default: return null;
     }
@@ -432,11 +497,17 @@ export function buildLayout(terrain) {
     for (const m of plan.meadows) d = Math.max(d, 1 - smoothstep(m.r * 0.5, m.r * 1.1, Math.hypot(x - m.x, z - m.z)));
     return d;
   };
+  // volcano: the few green pockets (cool ground away from the lava, 0..1)
+  const greenPocket = (x, z) => volcanic
+    ? smoothstep(0.08, 0.32, fbm(x * 0.018 + 11, z * 0.018 - 4, 3, S + 44)) * (1 - smoothstep(0, 0.1, terrain.heatAt(x, z))) : 0;
+  layout.greenPocket = greenPocket;
   const jungle = (x, z) => {
     const n = fbm(x * 0.012 + 5, z * 0.012 - 3, 3, S + 40) * 0.5 + 0.5;
     let d = (n * 0.9 + 0.25) * veg.treeDensity;
     d -= 0.8 * meadowCut(x, z);
     if (plan.volcano) d -= 0.9 * (1 - smoothstep(plan.volcano.radius * 0.35, plan.volcano.radius * 0.7, Math.hypot(x - plan.volcano.x, z - plan.volcano.z)));
+    // nothing green grows on hot ground; the cooler green pockets are thick with pines
+    if (volcanic) d += 0.45 * greenPocket(x, z) - 1.2 * terrain.heatAt(x, z);
     return d;
   };
   layout.jungleDensity = jungle;
@@ -524,6 +595,8 @@ export function buildLayout(terrain) {
     if (!free(x, z, high ? 2.6 : 2.3)) continue;
     let type = weighted(rng, treeTypes);
     if (type === 'jungle' && dens < 0.55) type = 'round';
+    // the volcano: pines (and a few kapoks) in the cooler green pockets, burnt trunks elsewhere
+    if (volcanic) type = greenPocket(x, z) > 0.5 ? (type === 'kapok' ? 'kapok' : 'pine') : (type === 'dead' ? 'dead' : 'charred');
     // giants are already huge (~27 m) – keep them near scale 1 and give them room
     const scale = type === 'giant' ? rng.range(0.85, 1.1) : rng.range(0.9, 1.45);
     const spacing = type === 'giant' ? 1.8 : type === 'palm' || type === 'dead' || type === 'banana' ? 0.35 : type === 'bamboo' ? 0.6 : 0.55;
@@ -555,6 +628,8 @@ export function buildLayout(terrain) {
         pts.push({ x: px, z: pz, t, g: terrain.heightAt(px, pz) });
       }
       if (!ok) continue;
+      // (the volcano's flanks are steep: there the ground beside the trunk must be walkable too)
+      if (volcanic && pts.some((p) => [-3, 3].some((s) => terrain.slopeAt(p.x - dz * s, p.z + dx * s) > 0.55))) continue;
       // root plate end: room for the torn-up disc of roots too
       const roots = rl() < 0.6;
       if (roots && !free(x - dx * (len / 2 + r * 0.3), z - dz * (len / 2 + r * 0.3), r * 2.2)) continue;
@@ -647,7 +722,9 @@ export function buildLayout(terrain) {
   };
   // which fruit grows here: one kind per role (config.js fruit.types, levels.js biome.fruit)
   const FRUIT = { bush: 'berry', tree: 'mango', plant: 'dragon', ...(biome.fruit || {}) };
-  const fruitCounts = volcanic ? { berry: 12, mango: 3, dragon: 2 } : { berry: 20, mango: 9, dragon: 3 };
+  const fruitCounts = volcanic ? { berry: 14, mango: 5, dragon: 3 } : { berry: 20, mango: 9, dragon: 3 };
+  // warm ground (volcano): near lava or a fumarole, but not hot
+  const warm = (x, z) => { const h = terrain.heatAt(x, z); return h > 0.15 && h < 0.45; };
   // shore of a bog (swamp): dry ground with bog within a few metres
   const bogShore = (x, z) => [[4, 0], [-4, 0], [0, 4], [0, -4]].some(([dx, dz]) => terrain.bogAt(x + dx, z + dz) > 0.2);
   // Bushes (common): along the trail and jungle edges – on the swamp, along the bog shores.
@@ -658,7 +735,8 @@ export function buildLayout(terrain) {
       if (!dry(x, z, lowGround ? 1.0 : 1.5) || nearHut(x, z, 3) || terrain.slopeAt(x, z) > 0.45) continue;
       const pd = distToPath(x, z);
       const j = jungle(x, z);
-      const edge = lowGround ? pd > 3 && bogShore(x, z) && outsideGrove(x, z, 4) : (pd > 3 && pd < 10) || (j > 0.45 && j < 0.8);
+      const edge = lowGround ? pd > 3 && bogShore(x, z) && outsideGrove(x, z, 4)
+        : volcanic ? pd > 3 && warm(x, z) && outsideGrove(x, z, 4) : (pd > 3 && pd < 10) || (j > 0.45 && j < 0.8);
       if (!edge || !free(x, z, 2.2)) continue;
       reserve(x, z, 1.2);
       circles.push({ x, z, r: 0.7, top: terrain.heightAt(x, z) + 1.6 });
@@ -669,10 +747,11 @@ export function buildLayout(terrain) {
   // Fruit trees (medium): inside the jungle – on the swamp, figs in the dry groves.
   {
     let placed = 0;
-    for (let i = 0; i < 6000 && placed < fruitCounts.mango; i++) {
+    for (let i = 0; i < (volcanic ? 9000 : 6000) && placed < fruitCounts.mango; i++) {
       const x = rng.range(-plan.A * 0.8, plan.A * 0.8), z = rng.range(-plan.B * 0.8, plan.B * 0.8);
       if (!dry(x, z, lowGround ? 1.3 : 2.2) || nearHut(x, z, 8) || terrain.slopeAt(x, z) > 0.4 || terrain.heightAt(x, z) > 20) continue;
-      if (jungle(x, z) < (volcanic ? 0.3 : lowGround ? 0.4 : 0.62) || !free(x, z, 4) || !clearOfSites(x, z, 2) || (lowGround && !outsideGrove(x, z, 4))) continue;
+      // (the volcano: in the green pockets; if they are too few, on any cool ground)
+      if ((volcanic ? greenPocket(x, z) < (i < 6000 ? 0.3 : 0) || terrain.heatAt(x, z) > 0.05 : jungle(x, z) < (lowGround ? 0.4 : 0.62)) || !free(x, z, 4) || !clearOfSites(x, z, 2) || ((lowGround || volcanic) && !outsideGrove(x, z, 4))) continue;
       const t = addTree(FRUIT.tree, x, z, rng.range(1.0, 1.15), 0.5);
       addFruit(FRUIT.tree, x, z, 'tree:' + t.id);
       placed++;
@@ -686,6 +765,8 @@ export function buildLayout(terrain) {
     if (wf) candidates.push([wf.bottom.x + wf.dirZ * 9, wf.bottom.z - wf.dirX * 9]);
     for (const c of layout.caves) candidates.push([c.mouth.x + 3, c.mouth.z + 3]);
     if (layout.ruins) candidates.push([layout.ruins.x + 9, layout.ruins.z - 9]);
+    // the volcano: the obsidian fig's cacti grow at the foot of the lonely basalt spires
+    if (volcanic) for (const h of plan.hills.filter((f) => f.radius < 12)) candidates.push([h.x + h.radius * 1.1, h.z + h.radius * 0.4]);
     if (lowGround) {
       if (plan.sites.peak) candidates.push([plan.sites.peak.x + 6, plan.sites.peak.z - 4]);
       for (let i = 0; i < 4000 && candidates.length < fruitCounts.dragon + 1; i++) {
@@ -698,7 +779,7 @@ export function buildLayout(terrain) {
       for (let k = 0; k < 200; k++) {
         const a = rng() * TAU, r = k * 0.12;
         const x = cx + Math.cos(a) * r, z = cz + Math.sin(a) * r;
-        if (dry(x, z, 1) && terrain.slopeAt(x, z) < 0.5 && free(x, z, 1.2) && (!lowGround || outsideGrove(x, z, 2))) {
+        if (dry(x, z, 1) && terrain.slopeAt(x, z) < 0.5 && free(x, z, 1.2) && (!lowGround || outsideGrove(x, z, 2)) && (!volcanic || (terrain.heatAt(x, z) < 0.4 && outsideGrove(x, z, 2)))) {
           reserve(x, z, 1.2);
           addFruit(FRUIT.plant, x, z, 'plant');
           break;
@@ -713,14 +794,14 @@ export function buildLayout(terrain) {
     for (let k = 0; k < 500 && pts.length < n; k++) {
       const a = rng() * TAU, r = Math.sqrt(rng()) * radius;
       const x = cx + Math.cos(a) * r, z = cz + Math.sin(a) * r;
-      if (dry(x, z, 1.2) && terrain.slopeAt(x, z) < 0.5 && !nearHut(x, z, 40) && outsideGrove(x, z, 6)) pts.push({ x, z });
+      if (dry(x, z, 1.2) && terrain.slopeAt(x, z) < 0.5 && !nearHut(x, z, 40) && outsideGrove(x, z, 6) && terrain.heatAt(x, z) < 0.3) pts.push({ x, z });
     }
     return pts;
   };
   const randomZoneCenter = (minHut = 90, pred = () => true) => {
     for (let i = 0; i < 800; i++) {
       const x = rng.range(-plan.A * 0.75, plan.A * 0.75), z = rng.range(-plan.B * 0.7, plan.B * 0.7);
-      if (!inside(x, z, 0.8) || !dry(x, z, lowGround ? 1.2 : 2) || terrain.slopeAt(x, z) > 0.45) continue;
+      if (!inside(x, z, 0.8) || !dry(x, z, lowGround ? 1.2 : 2) || terrain.slopeAt(x, z) > 0.45 || terrain.heatAt(x, z) > 0.2) continue;
       if (Math.hypot(x - hf.x, z - hf.z) < minHut || nearBoat(x, z, 25) || !outsideGrove(x, z, 25) || !pred(x, z)) continue;
       return { x, z };
     }
@@ -767,7 +848,8 @@ export function buildLayout(terrain) {
     const rr = plan.volcano ? plan.volcano.radius * 0.95 : plan.A * 0.45;
     for (let k = 0; k < 9; k++) {
       const a = (k / 9) * TAU;
-      let x = cx + Math.cos(a) * rr * 1.4, z = cz + Math.sin(a) * rr * 0.75;
+      const [sx, sz] = plan.shape === 'round' ? [1.1, 1.1] : [1.4, 0.75];
+      let x = cx + Math.cos(a) * rr * sx, z = cz + Math.sin(a) * rr * sz;
       for (let n = 0; n < 60 && !(dry(x, z, 1) && terrain.slopeAt(x, z) < 0.6 && inside(x, z, 0.85)); n++) {
         x = cx + (x - cx) * 0.97; z = cz + (z - cz) * 0.97;
       }

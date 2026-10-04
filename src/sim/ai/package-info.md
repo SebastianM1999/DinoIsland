@@ -4,8 +4,8 @@
 ## Files
 - `brachio.js` — `brachioBrain`: peaceful herds that wander and graze, flee together, and defend with a telegraphed rear-up stomp when a player gets close or attacks; also spawns the oversized titan leashed inside the giant's pen (`layout.grove`, `shared/grove.js`).
 - `stego.js` — `stegoBrain`: territorial grazer that gets angry, charges in bursts and whips its spiked tail (swept-arc hitbox taken from the baked Attack clip); counters hits from the front. Exports `tailSweep`, `tailRelative` (tail geometry helpers, also used by tests).
-- `raptor.js` — `raptorBrain`: pack hunter (packs stored in `sys.groups`) that spots, chases, flanks and does hit-and-run bites; hits frighten it briefly. Exports `updateRaptorFear`, shared with raiders.
-- `trex.js` — `trexBrain`: rare apex predator patrolling `layout.trexPatrol`, roars, chases for a limited time, bites hard (wind-up), then rests.
+- `raptor.js` — `raptorBrain`: pack hunter (packs stored in `sys.groups`; sight shortened in the volcano's ash rain, `world.sightMul`) that spots, chases, flanks and does hit-and-run bites; hits frighten it briefly. Exports `updateRaptorFear`, shared with raiders.
+- `trex.js` — `trexBrain`: rare apex predator patrolling `layout.trexPatrol` (sight shortened in the ash rain), roars, chases for a limited time, bites hard (wind-up), then rests.
 - `ptera.js` — `pteraBrain`: nests on cliffs, circles areas of the island, dives at players (prefers lone, injured or meat-carrying ones), knocks them down, steals carried meat and flies off; does its own 3D flight (`flyTo`).
 
 ## Entry points

@@ -72,6 +72,8 @@ export class PlayerController {
     this.flying = false;
     /** Fruit buffs running: { kind: seconds left } (config.js fruit.buffs, from the server's inventory). */
     this.buffs = {};
+    /** Heat of the ground underfoot (volcano, Terrain.heatAt), for the HUD. */
+    this.heat = 0;
     this.clock = 0;
     this.lastJumpTap = -Infinity;
     this.prevJump = false;
@@ -195,13 +197,17 @@ export class PlayerController {
     this.sprinting = wantsSprint && canSprint && this.onGround ? true : this.sprinting && wantsSprint && canSprint;
 
     const max = this.maxStamina;
+    // hot ground (volcano): sprinting drains faster, stamina refills slower (ember chili's Fireproof: not at all)
+    const H = CONFIG.volcano.heat;
+    this.heat = flying || this.creative ? 0 : t.heatAt?.(this.pos.x, this.pos.z) ?? 0;
+    const heat = this.buffs.heatproof > 0 ? 0 : this.heat;
     if (this.sprinting) {
-      if (!free) this.stamina -= P.staminaDrain * mods.sprintDrainMul * this.#buffMul('secondwind', 'drainMul') * dt;
+      if (!free) this.stamina -= P.staminaDrain * mods.sprintDrainMul * this.#buffMul('secondwind', 'drainMul') * (1 + H.staminaMul * heat) * dt;
       this.staminaDelay = P.staminaRegenDelay * mods.regenDelayMul;
     } else if (this.staminaDelay > 0) {
       this.staminaDelay -= dt;
     } else {
-      this.stamina += P.staminaRegen * mods.staminaRegenMul * this.#buffMul('secondwind', 'regenMul') * dt;
+      this.stamina += P.staminaRegen * mods.staminaRegenMul * this.#buffMul('secondwind', 'regenMul') * (1 - H.regenCut * heat) * dt;
     }
     this.stamina = this.creative ? max : Math.max(0, Math.min(max, this.stamina));
 
@@ -234,7 +240,7 @@ export class PlayerController {
     const waterSlow = bogMul < 1 ? bog : depth > 0.2 ? Math.max(0.55, 1 - depth * 0.35) : 1;
     let speed = flying ? C.flySpeed
       : this.swimming ? SW.speed * this.speedFactor
-      : (this.sprinting ? P.sprintSpeed : P.walkSpeed) * this.speedFactor * waterSlow;
+      : (this.sprinting ? P.sprintSpeed : P.walkSpeed) * this.speedFactor * waterSlow * this.#buffMul('quickfoot', 'speedMul');
 
     let wx = 0, wz = 0;
     if (moving) {
@@ -292,7 +298,8 @@ export class PlayerController {
       this.dashEnding = false;
       if (this.onGround) { this.vel.x = wx; this.vel.z = wz; } else {
         const sp = Math.hypot(this.vel.x, this.vel.z);
-        if (sp > P.sprintSpeed) { this.vel.x *= P.sprintSpeed / sp; this.vel.z *= P.sprintSpeed / sp; }
+        const cap = P.sprintSpeed * this.#buffMul('quickfoot', 'speedMul');
+        if (sp > cap) { this.vel.x *= cap / sp; this.vel.z *= cap / sp; }
       }
     }
     ds.active = this.dashT > 0;

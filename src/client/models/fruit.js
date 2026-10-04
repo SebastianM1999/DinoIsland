@@ -9,7 +9,7 @@ const V = (x, y, z) => new THREE.Vector3(x, y, z);
 const TAU = Math.PI * 2;
 
 /** Emissive strength per fruit type (dragon fruit glows the most). */
-export const FRUIT_GLOW = { berry: 0.45, mango: 0.4, dragon: 0.85, marshberry: 0.5, swampfig: 0.4, glowlotus: 1.0 };
+export const FRUIT_GLOW = { berry: 0.45, mango: 0.4, dragon: 0.85, marshberry: 0.5, swampfig: 0.4, glowlotus: 1.0, emberchili: 0.7, ashplum: 0.35, obsidianfig: 0.9 };
 
 /** Pointed leaf, lying along +X from the origin. */
 function leaf(len, width, top = '#5fc23f', bottom = '#3a8f2d') {
@@ -140,7 +140,54 @@ function glowlotus() {
   return center(merge(parts));
 }
 
-const BUILDERS = { berry, mango, dragon, marshberry, swampfig, glowlotus };
+/** Ember chili (volcano): a curved glossy red pepper with a green cap and stalk. */
+function emberchili() {
+  let g = new THREE.CylinderGeometry(1, 1, 1, 9, 8);
+  g = deform(g, (v) => {
+    const t = 0.5 - v.y;                               // 0 at the cap .. 1 at the tip
+    const r = 0.045 * (1 - t * 0.85);
+    const bend = t * t * 0.09;
+    v.set(v.x * r + bend, -t * 0.2, v.z * r);
+  });
+  g = paint(g, (c, n) => (n.y > 0.4 || c.x > 0.02 ? '#ff6a3a' : jitter(c, 1, 9) > 0.3 ? '#e2401c' : '#c8301a'));
+  const parts = [g];
+  parts.push(place(paint(new THREE.CylinderGeometry(0.05, 0.045, 0.025, 8), '#4f7a2c'), [0, 0.012, 0]));
+  parts.push(tube([V(0, 0.02, 0), V(0.005, 0.06, 0), V(0.025, 0.09, 0)], () => 0.009, { radial: 4, color: () => '#4a6a2a', capStart: false }));
+  return center(merge(parts));
+}
+
+/** Ash plum (volcano): a round dusky-purple plum with a pale bloom and a groove. */
+function ashplum() {
+  let g = new THREE.SphereGeometry(1, 10, 8);
+  g = deform(g, (v) => {
+    const groove = 1 - 0.06 * Math.exp(-(v.x * v.x) * 30);
+    v.set(v.x * 0.09 * groove, v.y * 0.095, v.z * 0.088);
+  });
+  g = paint(g, (c, n) => (n.y > 0.6 ? '#9a90b8' : jitter(c, 1, 11) > 0.45 ? '#6a5a9e' : '#5a4a8e'));
+  const parts = [g];
+  parts.push(tube([V(0, 0.085, 0), V(0.01, 0.13, 0), V(0.03, 0.16, 0)], () => 0.01, { radial: 4, color: () => '#4a3c2e', capStart: false }));
+  parts.push(place(leaf(0.1, 0.04, '#7a8a5a', '#55623e'), [0.02, 0.15, 0], [0.2, 0.7, 0.4]));
+  return center(merge(parts));
+}
+
+/** Obsidian fig (volcano): a black glassy fig with glowing orange veins. */
+function obsidianfig() {
+  let g = new THREE.SphereGeometry(1, 10, 8);
+  g = deform(g, (v) => {
+    const y = v.y, w = y > 0 ? 1 - y * 0.4 : 1;
+    v.set(v.x * 0.1 * w, y * 0.115, v.z * 0.1 * w);
+  });
+  g = paint(g, (c, n) => {
+    const vein = Math.abs(Math.sin(Math.atan2(c.z, c.x) * 3 + c.y * 25)) < 0.12;
+    if (vein) return '#ff7a2a';
+    return n.y > 0.55 ? '#5a4a78' : jitter(c, 1, 13) > 0.3 ? '#1e1628' : '#2a1f36';
+  });
+  const parts = [g];
+  parts.push(tube([V(0, 0.1, 0), V(0.008, 0.14, 0), V(0.02, 0.17, 0)], () => 0.011, { radial: 4, color: () => '#3a5a2a', capStart: false }));
+  return center(merge(parts));
+}
+
+const BUILDERS = { berry, mango, dragon, marshberry, swampfig, glowlotus, emberchili, ashplum, obsidianfig };
 const geoCache = new Map();
 /** Shared fruit geometry (centered at the origin). */
 export function fruitGeometry(type) {

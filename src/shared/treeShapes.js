@@ -100,6 +100,18 @@ export const TRUNKS = {
     pts: [[0, 0, 0], [0, 0.5, 0], [variant ? 0.08 : 0, 0.9, 0]],
     r: () => 0.38,
   })),
+  // volcano: a tall burnt trunk, black and split, a few stubs of branches (glowing cracks)
+  charred: [0, 1].map((variant) => ({
+    pts: variant
+      ? [[0, 0, 0], [0.15, 2.4, 0.05], [-0.1, 4.8, 0.2], [0.25, 7.0, 0.1]]
+      : [[0, 0, 0], [-0.1, 2.2, 0.1], [0.12, 4.4, -0.1], [0.05, 5.8, 0.05]],
+    r: (t) => 0.42 - 0.24 * t + (t < 0.05 ? 0.14 : 0),
+  })),
+  // volcano: the ash plum (the island's fruit tree), short and gnarled, leaning out of the ash
+  ashplum: [{
+    pts: [[0, 0, 0], [0.18, 1.2, 0.05], [0.05, 2.3, 0.15], [0.2, 3.2, 0.05]],
+    r: (t) => 0.3 - 0.1 * t + (t < 0.06 ? 0.12 : 0),
+  }],
   dead: [0, 1].map((variant) => ({
     pts: variant
       ? [[0, 0, 0], [0.3, 1.8, 0.1], [-0.1, 3.4, 0.4], [0.4, 5.0, 0.2], [0.2, 6.1, -0.2]]

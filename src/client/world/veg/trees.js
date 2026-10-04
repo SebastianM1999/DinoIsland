@@ -7,7 +7,8 @@
 // giant (huge jungle emergent), kapok (umbrella crown), banana (paddle
 // leaves), pine (ashy conifer), dead (charred snag with ember cracks); swamp:
 // mangrove (stilt roots, low dark crown, hanging moss), snag (dead grey trunk,
-// no embers), nipa (fronds straight out of the mud).
+// no embers), nipa (fronds straight out of the mud); volcano: charred (tall
+// burnt trunk, glowing cracks), ashplum (the gnarled fruit tree).
 // Bark is vertex-painted with grooves, moss patches and lichen spots; leaf
 // masses mix 2–3 greens plus yellow-green / teal accents.
 
@@ -40,7 +41,17 @@ export const TREE_WIND = {
   snag: { strength: 0.005, pivotY: 3.0, frequency: 0.9, heightScale: 0.25 },
   nipa: { strength: 0.02, pivotY: 0.3, frequency: 1.4, heightScale: 0.3 },
   swampfig: { strength: 0.008, pivotY: 3.4, frequency: 1.2, heightScale: 0.22 },
+  charred: { strength: 0.003, pivotY: 3.5, frequency: 0.9, heightScale: 0.2 },
+  ashplum: { strength: 0.01, pivotY: 2.4, frequency: 1.4, heightScale: 0.25 },
 };
+
+/** Where the ash plums hang in the ash plum's crown (local space, before instance transform). */
+export const ASHPLUM_FRUIT_LOCAL = [
+  [1.5, 3.05, 0.5],
+  [-1.15, 3.0, 1.15],
+  [-0.5, 3.1, -1.45],
+  [1.0, 3.0, -1.2],
+];
 
 /** Where the figs hang in the swamp fig's crown (local space, before instance transform). */
 export const SWAMPFIG_FRUIT_LOCAL = [
@@ -742,6 +753,59 @@ function buildSwampFig() {
 }
 
 // ------------------------------------------------------------ nipa palm
+// --------------------------------------------- volcano: charred trunk, ash plum
+/** A tall burnt trunk: black, split, glowing cracks low down, a few broken branch stubs. */
+function buildCharred(variant) {
+  const s = 1700 + variant * 17;
+  const rng = makeRng(s);
+  const shape = TRUNKS.charred[variant];
+  const pts = trunkPts(shape);
+  const top = pts[pts.length - 1];
+  const opts = { base: '#2a2426', dark: '#120f10', seed: s, mossAmt: 0, lichen: '#4a4446', lichenAmt: 0.2, ember: 0.45 };
+  const parts = [trunkTube(shape, opts, { radial: 9, grooves: 9, ridge: 0.12 })];
+  const stubs = [];
+  for (let b = 0; b < 3 + variant; b++) {
+    const t = 0.4 + (b / (3 + variant)) * 0.5;
+    const i = Math.min(pts.length - 2, Math.floor(t * (pts.length - 1)));
+    const from = pts[i].clone().lerp(pts[i + 1], t * (pts.length - 1) - i);
+    const a = b * 2.4 + variant + rng() * 0.5, len = 0.6 + rng() * 1.1;
+    const e = V(from.x + Math.cos(a) * len, from.y + len * (0.4 + rng() * 0.4), from.z + Math.sin(a) * len);
+    parts.push(tube([from, from.clone().lerp(e, 0.5), e], (tt) => 0.13 * (1 - tt * 0.6), { radial: 5, color: bark({ ...opts, ember: 0 }), capStart: false }));
+  }
+  // the snapped-off top: a jagged split crown
+  stubs.push(place(spike(0.16, 0.9, '#1e1a1b', '#3a3234', 4), [top.x, top.y - 0.1, top.z], [0.25, 0, -0.2]));
+  stubs.push(place(spike(0.1, 0.6, '#1e1a1b', '#3a3234', 4), [top.x + 0.08, top.y - 0.25, top.z - 0.05], [-0.4, 0, 0.35]));
+  return { trunk: merge(parts), foliage: merge(stubs), height: top.y + 0.9 };
+}
+
+const PLUM_COL = [
+  { top: '#8a9064', mid: '#5f6a44', mid2: '#56603e', bottom: '#3e4530' },
+  { top: '#7e865c', mid: '#57623f', mid2: '#4e5838', bottom: '#384029' },
+];
+/** The volcano's fruit tree: a short gnarled ash plum leaning out of the ash, a dusty olive crown. */
+function buildAshplum() {
+  const s = 1800;
+  const rng = makeRng(s);
+  const shape = TRUNKS.ashplum[0];
+  const pts = trunkPts(shape);
+  const top = pts[pts.length - 1];
+  const wood = { base: '#5a4e48', dark: '#33292a', seed: s, mossAmt: 0, lichen: '#9a948a', lichenAmt: 0.4 };
+  const parts = [trunkTube(shape, wood, { radial: 8, grooves: 8, ridge: 0.1 })];
+  const leaves = [];
+  const cy = top.y + 0.5;
+  leaves.push(place(clump(1.7, { seed: s, ...PLUM_COL[0], squash: 0.55, flatBottom: 0.35, maxDetail: 3 }), [top.x, cy, top.z]));
+  for (let k = 0; k < 5; k++) {
+    const a = (k / 5) * TAU + 0.4, rr = 1.5 + rng() * 0.3;
+    const p = [top.x + Math.cos(a) * rr, cy - 0.35 + rng() * 0.3, top.z + Math.sin(a) * rr];
+    leaves.push(place(clump(1.05 + rng() * 0.2, { seed: s + k + 1, ...PLUM_COL[k % 2], squash: 0.6, flatBottom: 0.4 }), p, [0, a, 0]));
+    parts.push(branch(V(top.x * 0.7, top.y - 0.6, top.z * 0.7), V(p[0] * 0.8, p[1] - 0.3, p[2] * 0.8), 0.11, 0.05, wood.base, wood.dark, s + k));
+  }
+  for (const [x, y, z] of ASHPLUM_FRUIT_LOCAL) {
+    parts.push(branch(V(x * 0.55, y + 0.7, z * 0.55), V(x, y + 0.2, z), 0.05, 0.025, wood.base, wood.dark, s + 50));
+  }
+  return { trunk: merge(parts), foliage: merge(leaves), height: cy + 1.2 };
+}
+
 function buildNipa(variant) {
   const s = 1400 + variant * 11;
   const rng = makeRng(s);
@@ -771,6 +835,7 @@ const BUILD = {
   palm: buildPalm, round: buildRound, tall: buildTall, jungle: buildJungle, mango: buildMango,
   bamboo: buildBamboo, giant: buildGiant, kapok: buildKapok, banana: buildBanana, pine: buildPine, dead: buildDead,
   mangrove: buildMangrove, snag: buildSnag, nipa: buildNipa, swampfig: buildSwampFig,
+  charred: buildCharred, ashplum: buildAshplum,
 };
 const cache = new Map();
 /**
@@ -834,4 +899,4 @@ function crownVariant(foliage, c) {
 }
 
 /** How many geometry variants each type has (must match TRUNKS[type].length). */
-export const TREE_VARIANTS = { palm: 2, round: 2, tall: 1, jungle: 1, mango: 1, bamboo: 2, giant: 2, kapok: 2, banana: 2, pine: 2, dead: 2, mangrove: 2, snag: 2, nipa: 2, swampfig: 1 };
+export const TREE_VARIANTS = { palm: 2, round: 2, tall: 1, jungle: 1, mango: 1, bamboo: 2, giant: 2, kapok: 2, banana: 2, pine: 2, dead: 2, mangrove: 2, snag: 2, nipa: 2, swampfig: 1, charred: 2, ashplum: 1 };

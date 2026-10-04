@@ -56,6 +56,8 @@ import { mayEnterGrove, GROVE_STONE_REACH } from '../../shared/grove.js';
 import { buildBossArena } from '../world/bossArena.js';
 import { buildSwampArena } from '../world/swampArena.js';
 import { buildSwampFx, thickSky } from '../world/swampFx.js';
+import { buildVolcanoArena } from '../world/volcanoArena.js';
+import { buildVolcanoFx, ashSky } from '../world/volcanoFx.js';
 import { BIOMES } from '../../shared/levels.js';
 import { disposeIslandScenes } from './resources.js';
 
@@ -183,6 +185,7 @@ export class Game {
       this.rocks.setQuality(g);
       setSurfaceQuality(g);
       this.swampFx.setQuality(g);
+      this.volcanoFx.setQuality(g);
       this.vegetation.setDensity(g.grass);
     });
     this.remotes = new RemotePlayers(this.gfx.scene, this.gfx.camera, this.overlay);
@@ -280,8 +283,16 @@ export class Game {
     // the swamp's fog draws in where the mist is thick (swampFx.js mistiness)
     const swampSky = this.layout.biome.sky, swampThick = thickSky(swampSky || {});
     this.swampFx = buildSwampFx(this.terrain, this.layout, this.gfx.camera, (k) => this.gfx.blendBiome(swampSky, swampThick, k));
-    scene.add(this.sky.group, this.water.group, this.vegetation.group, this.rocks.group, this.fruitPlants.group, this.hut.group, this.baseView.group, this.sites.group, this.grove.group, this.logs.group, this.bossArena.group, this.swampArena.group, this.swampFx.group);
-    this.worldUpdaters = [this.sky, this.water, this.vegetation, this.rocks, this.fruitPlants, this.hut, this.baseView, this.sites, this.grove, this.bossArena, this.swampArena, this.swampFx];
+    this.volcanoArena = buildVolcanoArena(this.terrain, this.layout);
+    // the volcano: ash rain thickens the air; a lava bomb landing nearby shakes the view
+    const ashBase = this.layout.biome.sky, ashThick = ashSky(ashBase || {});
+    this.volcanoFx = buildVolcanoFx(this.terrain, this.layout, this.gfx.camera, {
+      onFog: (k) => this.gfx.blendBiome(ashBase, ashThick, k),
+      onImpact: (x, y, z) => this.#bombImpact(x, y, z),
+    });
+    scene.add(this.sky.group, this.water.group, this.vegetation.group, this.rocks.group, this.fruitPlants.group, this.hut.group, this.baseView.group, this.sites.group, this.grove.group, this.logs.group, this.bossArena.group, this.swampArena.group, this.swampFx.group, this.volcanoArena.group, this.volcanoFx.group);
+    this.worldUpdaters = [this.sky, this.water, this.vegetation, this.rocks, this.fruitPlants, this.hut, this.baseView, this.sites, this.grove, this.bossArena, this.swampArena, this.swampFx, this.volcanoArena, this.volcanoFx];
+    this.shake = 0;
     this.moodK = 0;
 
     // Debug view of colliders (F3).
@@ -322,6 +333,7 @@ export class Game {
     }
     this.setBase(world.base || freshBase());
     this.raid = world.raid || { phase: 'idle' };
+    this.volcanoFx.setState(world.volcano);
     this.fruitCounts = world.fruit.slice();
     world.fruit.forEach((count, id) => this.fruitPlants.setCount(id, count));
     this.hud.setPlayer({ name: this.me.name, slot: this.me.slot });
@@ -504,6 +516,26 @@ export class Game {
       this.raid = m.raid;
       if (m.raid.phase === 'warn') this.audio.play('roar_raptor', { pos: this.#raidPoint(60) });
     });
+    // the volcano (sim/volcano.js)
+    net.on(`ev:${EV.VOLCANO}`, (m) => {
+      this.volcanoFx.setPhase(m.phase, m.left);
+      const v = this.layout.volcano;
+      const pos = v ? { x: v.x, y: v.craterY, z: v.z } : undefined;
+      if (m.phase === 'rumble') { this.audio.play('rumble'); this.shake = Math.max(this.shake, 0.6); this.hud.toast('The volcano rumbles – an eruption is coming!', 'flame'); }
+      if (m.phase === 'erupt') { this.audio.play('eruption', { pos, vol: 2 }); this.shake = Math.max(this.shake, 1); this.hud.toast('Eruption! Watch the red circles – lava bombs land there', 'flame'); }
+      if (m.phase === 'ash') this.hud.toast('Ash rain – the dinosaurs can barely see you', 'info');
+    });
+    net.on(`ev:${EV.BOMB}`, (m) => {
+      this.volcanoFx.bomb(m);
+      if (Math.hypot(m.x - this.player.pos.x, m.z - this.player.pos.z) < 45) this.audio.play('bombWhistle', { pos: { x: m.x, y: m.y + 10, z: m.z } });
+    });
+    net.on(`ev:${EV.CRUST}`, (m) => {
+      this.volcanoFx.crust(m.id, m.state, m.left);
+      const c = this.layout.crusts?.[m.id];
+      const pos = c ? { x: c.x, y: c.y, z: c.z } : undefined;
+      if (m.state === 'crack') this.audio.play('crustCrack', { pos });
+      if (m.state === 'broken') this.audio.play('crustBreak', { pos });
+    });
     net.on(`ev:${EV.TOWER_SHOT}`, (m) => {
       this.baseView.shoot(m);
       this.audio.play(m.kind === 'arrow' ? 'bow' : 'throw', { pos: { x: m.o[0], y: m.o[1], z: m.o[2] } });
@@ -514,7 +546,7 @@ export class Game {
         this.lastHurtAt = this.time;
         this.hud.damageFlash(m.dmg);
         if (m.src) {
-          const name = CONFIG.dinos[m.src]?.name || (m.src === 'lava' ? 'Lava' : 'Dinosaur');
+          const name = CONFIG.dinos[m.src]?.name || { lava: 'Lava', heat: 'Heat', bomb: 'Lava bomb' }[m.src] || 'Dinosaur';
           let direction = 'nearby';
           if (m.from) {
             const dx = m.from.x - this.player.pos.x, dz = m.from.z - this.player.pos.z;
@@ -941,6 +973,7 @@ export class Game {
     hud.setHealth(this.me.hp, this.maxHp);
     hud.setStamina(p.stamina, p.maxStamina);
     hud.setSwamp(p.inBog && !p.flying);
+    hud.setHeat(this.me.alive ? p.heat : 0, p.buffs.heatproof > 0);
     hud.setBuffs(p.buffs);
     hud.setCompass(p.yaw, this.compassMarkers());
     const team = [{ id: this.me.id, name: this.me.name, slot: this.me.slot, hp: this.me.hp, mhp: this.maxHp, alive: this.me.alive, downed: !!this.downed, isYou: true }];
@@ -1003,6 +1036,13 @@ export class Game {
     return out;
   }
 
+  /** A lava bomb landed at (x, y, z): its boom, and the view shakes when it was close. */
+  #bombImpact(x, y, z) {
+    this.audio.play('bombImpact', { pos: { x, y, z }, vol: 1.6 });
+    const d = Math.hypot(x - this.player.pos.x, z - this.player.pos.z);
+    if (d < 30) this.shake = Math.max(this.shake, 0.9 * (1 - d / 30));
+  }
+
   #updateCamera(dt) {
     const p = this.player;
     const cam = this.gfx.camera;
@@ -1026,7 +1066,11 @@ export class Game {
       p.pos.z + o.z - Math.sin(p.yaw) * bobX,
     );
     const roll = this.me.alive ? (p.knockTimer > 0 ? Math.sin(this.time * 20) * 0.05 : 0) + this.downBlend * 0.35 : 0.5;
-    cam.rotation.set(p.pitch, p.yaw, roll, 'YXZ');
+    // the ground shakes (volcano: rumbling, eruptions, bombs landing close)
+    this.shake = Math.max(0, this.shake - dt * 0.45);
+    const sh = this.shake * this.shake * 0.12;
+    if (sh > 0) cam.position.add({ x: Math.sin(this.time * 37) * sh, y: Math.sin(this.time * 53) * sh * 0.6, z: Math.cos(this.time * 41) * sh });
+    cam.rotation.set(p.pitch + (sh ? Math.sin(this.time * 29) * sh * 0.08 : 0), p.yaw, roll, 'YXZ');
     const targetFov = settings.fov + (p.sprinting ? 6 : 0) + (p.dash.active ? 5 : 0);
     cam.fov += (targetFov - cam.fov) * Math.min(1, dt * 6);
     cam.updateProjectionMatrix();

@@ -3,8 +3,8 @@
 
 ## Files
 - `hud.js` — `Hud`: the in-game HUD (~1080 lines, see below).
-- `minimap.js` — `buildMapBase` paints the island once to an offscreen canvas (swamp bogs and the swamp arena ring included); `drawMap` blits a region plus markers each frame.
-- `icons.js` — `ICONS`, `icon(id)`, `portraitSvg()`: inline 32x32 SVG item/HUD icons.
+- `minimap.js` — `buildMapBase` paints the island once to an offscreen canvas (swamp bogs and the swamp arena ring, the volcano's crust plates and crater rim included); `drawMap` blits a region plus markers each frame.
+- `icons.js` — `ICONS`, `icon(id)`, `portraitSvg()`: inline 32x32 SVG item/HUD icons (every fruit kind, `flame` for heat and the volcano's warnings).
 - `itemInfo.js` — `ITEM_INFO`: names and tooltip texts for inventory items, numbers taken from `CONFIG`.
 - `craftingPanel.js` — `CraftingPanel`: hut workbench dialog (supplies tab and team upgrades tab, refill).
 - `basePanel.js` — `BasePanel`: base dialog on islands 2+ (pick plot, upgrade stage, build/upgrade towers, repair).
@@ -24,7 +24,7 @@
 ### hud.js areas of responsibility
 - Layout built once in `_build()`: portrait with XP ring, level badge and HP/stamina bars; perk chips (dash, adrenaline); compass and hint bubble; minimap and big map; crosshair, hit marker, eat ring, interaction prompt, revive/medic prompt; key hints; hotbar and carry/load info; team list.
 - Overlays: death, downed, mission complete, damage flash/source, toasts and alerts.
-- Fruit buffs running (`setBuffs`), the swamp tag (`setSwamp`).
+- Fruit buffs running (`setBuffs`), the swamp tag (`setSwamp`), hot ground (`setHeat`).
 - Inventory (loot, fruit, items with `ITEM_INFO` tooltips), the mission board (`shared/missions.js` contracts, relics) and XP gain popups.
 - Panel manager: `addPanel/togglePanel/isPanelOpen` host dialogs owned by other modules (wardrobe, boat, crafting, base, skills, grove), so only one panel is open at a time.
 

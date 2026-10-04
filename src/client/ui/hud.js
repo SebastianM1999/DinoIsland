@@ -196,7 +196,11 @@ export class Hud {
     this.$buffs = el('div', 'hud-pill hud-buffs brush');
     this.$buffs.setAttribute('role', 'status');
     this.$buffs.hidden = true;
-    this.$carry.append(this.$quiver, this.$fruitRow, this.$loot, this.$swamp, this.$buffs);
+    // hot ground (volcano): stamina drains faster; very hot ground burns
+    this.$heat = el('div', 'hud-pill hud-heat brush');
+    this.$heat.setAttribute('role', 'status');
+    this.$heat.hidden = true;
+    this.$carry.append(this.$quiver, this.$fruitRow, this.$loot, this.$swamp, this.$heat, this.$buffs);
     this.$hotbar = el('ol', 'hud-hotbar brush');
     this.$hotbar.setAttribute('aria-label', 'Equipment');
     this._slots = [];
@@ -412,6 +416,17 @@ export class Hud {
     if (this._c.swamp === !!on) return;
     this._c.swamp = !!on;
     this.$swamp.hidden = !on;
+  }
+
+  /** Heat underfoot (volcano, 0..1): a warning while it is hot, red where it burns; `proof` = Fireproof running. */
+  setHeat(heat, proof = false) {
+    const state = heat < 0.25 ? '' : proof ? 'proof' : heat >= CONFIG.volcano.heat.dmgFrom ? 'burn' : 'hot';
+    if (this._c.heat === state) return;
+    this._c.heat = state;
+    this.$heat.hidden = !state;
+    this.$heat.classList.toggle('is-burn', state === 'burn');
+    const text = { hot: 'Hot ground: stamina drains', burn: 'Burning!', proof: 'Hot ground: Fireproof' }[state] || '';
+    this.$heat.innerHTML = state ? `<span class="hud-hot">${icon('flame')}${text}</span>` : '';
   }
 
   _bar(b, key, v, max) {

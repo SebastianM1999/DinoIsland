@@ -20,7 +20,9 @@ test('every island has a hut beach, a boat beach and three reachable relic spots
   }
   // the starter island is small, the swamp and volcano islands bigger and each harder; there are three
   assert.ok(planIsland(0, 1).A < planIsland(1, 1).A * 0.7);
-  assert.ok(planIsland(0, 1).A < planIsland(2, 1).A * 0.7);
+  // (the volcano island is round: compare the outline's area)
+  const area = (p) => p.A * p.B;
+  assert.ok(area(planIsland(0, 1)) < area(planIsland(2, 1)) * 0.5);
   assert.ok(levelDef(1).difficulty > levelDef(0).difficulty);
   assert.ok(levelDef(2).difficulty > levelDef(1).difficulty);
   assert.deepEqual([0, 1, 2].map((i) => levelDef(i).biome.id), ['jungle', 'swamp', 'volcano']);

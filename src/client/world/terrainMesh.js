@@ -74,6 +74,8 @@ export function buildTerrainMesh(terrain, layout) {
       const patch = smoothstep(0.35, 0.7, fbm(x * 0.025 + 7, z * 0.025, 3, S + 97) * 0.5 + 0.5);
       let ash = patch * 0.85;
       if (v) ash = Math.max(ash, 1 - smoothstep(v.radius * 0.55, v.radius * 0.95, Math.hypot(x - v.x, z - v.z)));
+      // the cooler green pockets (layout.greenPocket) keep some grass
+      ash *= 1 - 0.8 * (layout.greenPocket?.(x, z) ?? 0);
       base.lerp(P.ash, ash);
       surf.ash = ash;
     }
@@ -126,11 +128,25 @@ export function buildTerrainMesh(terrain, layout) {
       const k = (1 - smoothstep(wf.width * 0.5, wf.width * 0.5 + 2.2, d)) * (y > wf.impact.y - 0.2 && y < wf.top.y + 0.6 ? 1 : 0);
       if (k > 0) color.lerp(WET_ROCK, k * 0.7).lerp(WET_MOSS, k * 0.25 * smoothstep(0.3, 0.8, noise));
     }
-    // Scorched ground next to lava.
+    // Scorched ground round the lava and the fumaroles (Terrain.heatAt), with
+    // glowing cracks right at the lava; the crater floor dark basalt; the
+    // basalt bridges over the flows a lighter grey so the way across stands out.
     if (lava === null && volcanic) {
-      const hot = terrain.lavaLevelAt(x + 3, z) !== null || terrain.lavaLevelAt(x - 3, z) !== null
-        || terrain.lavaLevelAt(x, z + 3) !== null || terrain.lavaLevelAt(x, z - 3) !== null;
-      if (hot) { color.lerp(P.scorch || P.rockDark, 0.75); surf.ash = Math.max(surf.ash, 0.75); }
+      const heat = terrain.heatAt(x, z);
+      if (heat > 0.05) {
+        color.lerp(P.scorch || P.rockDark, smoothstep(0.05, 0.7, heat) * 0.8);
+        const crack = smoothstep(0.55, 0.85, Math.abs(fbm(x * 0.35, z * 0.35, 2, S + 87)) * 2.2);
+        color.lerp(EMBER, smoothstep(0.6, 0.95, heat) * crack * 0.7);
+        surf.ash = Math.max(surf.ash, smoothstep(0.05, 0.5, heat));
+      }
+      if (v && Math.hypot(x - v.x, z - v.z) < v.craterR) {
+        color.lerp(base.copy(VOLCANO.rock).lerp(VOLCANO.rockDark, noise), 0.7);
+        surf.ash = Math.max(surf.ash, 0.6);
+      }
+      for (const b of layout.bridges || []) {
+        const k = 1 - smoothstep(b.r - 1.5, b.r + 1, Math.hypot(x - b.x, z - b.z));
+        if (k > 0) color.lerp(base.copy(CAUSEWAY).lerp(VOLCANO.ash, 0.2 + noise * 0.3), k * 0.85);
+      }
     }
 
     const pd = layout.distToPath(x, z);

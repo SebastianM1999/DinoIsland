@@ -53,7 +53,8 @@ function rimCases(world, type, rnd, want) {
     }
     if (!ok || !steep) continue;
     const spot = sys.findFreeSpot(probe, ax, az, { maxDist: 0.5 });
-    if (spot) out.push({ ax: spot.x, az: spot.z, ha, bx, bz, hb, yaw: Math.atan2(-(bx - spot.x), -(bz - spot.z)) });
+    // (B must be a place to stand too: not inside a boulder)
+    if (spot && sys.findFreeSpot(probe, bx, bz, { maxDist: 0.5 })) out.push({ ax: spot.x, az: spot.z, ha, bx, bz, hb, yaw: Math.atan2(-(bx - spot.x), -(bz - spot.z)) });
   }
   return out;
 }
@@ -139,7 +140,9 @@ test('downhill may be steep, uphill may not; water, lava, the grove, the boss is
         const x = (rnd() * 2 - 1) * 350, z = (rnd() * 2 - 1) * 350;
         const wet = t.waterDepthAt(x, z) > 1.2 || t.lavaLevelAt(x, z) !== null;
         const zone = world.safeZone();
-        const banned = insideGrove(L, x, z, 3) || insideBossArena(L, x, z, 4) || (zone && Math.hypot(x - zone.x, z - zone.z) < zone.r + 10);
+        const banned = insideGrove(L, x, z, 3) || insideBossArena(L, x, z, 4) || (zone && Math.hypot(x - zone.x, z - zone.z) < zone.r + 10)
+          // the volcano's crust plates
+          || !!t.crustAt(x, z);
         if (wet || banned) {
           assert.ok(!sys.walkable(x, z, d, true), `island ${level + 1}/${variant} ${type}: ${x.toFixed(1)},${z.toFixed(1)} stays closed going down`);
           closed++;

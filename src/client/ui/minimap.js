@@ -24,6 +24,7 @@ const C = {
   lava: [255, 120, 30],
   ash: [120, 112, 116],
   bog: [96, 104, 62],
+  crust: [58, 40, 44],
   mud: [104, 88, 62],
   arena: [58, 52, 44],
 };
@@ -66,6 +67,9 @@ export function buildMapBase(terrain, layout, res = 640) {
       const bog = terrain.bogAt?.(x, z) ?? 0;
       if (terrain.lavaLevelAt?.(x, z) != null) {
         col = C.lava;
+      } else if (terrain.crustAt?.(x, z)) {
+        // crust plates (volcano): dark cooled lava over the flow
+        col = C.crust;
       } else if (bog > 0.3) {
         // bogs (swamp): murky olive water over dark mud
         col = w !== null && w - h > 0.03 ? C.bog : C.mud;
@@ -129,6 +133,18 @@ export function buildMapBase(terrain, layout, res = 640) {
       ctx.lineTo((sa.x + half) / mpp, (w.z1 + half) / mpp);
       ctx.stroke();
     }
+  }
+
+  // The crater arena (volcano): the rim as a dark ring, open at the notch.
+  const va = layout?.volcanoArena;
+  if (va) {
+    ctx.strokeStyle = `rgb(${C.arena.join(',')})`;
+    ctx.lineWidth = Math.max(2, 2.4 / mpp);
+    ctx.lineCap = 'butt';
+    const g = va.gates[0].angle, gap = 9 / va.craterR;
+    ctx.beginPath();
+    ctx.arc((va.x + half) / mpp, (va.z + half) / mpp, va.craterR / mpp, g + gap, g + TAU - gap);
+    ctx.stroke();
   }
 
   // Big rocks as small grey blobs, like the stones on the reference minimap.

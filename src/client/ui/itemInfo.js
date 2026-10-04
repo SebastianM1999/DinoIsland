@@ -57,6 +57,21 @@ export const ITEM_INFO = {
     text: `A glowing lotus pod from lonely bog shores. Heals ${F.glowlotus.heal} HP plus ${F.glowlotus.hot} HP over ${F.glowlotus.hotTime} s – and for ${B.lotusskin.time} s you take ${Math.round((1 - B.lotusskin.damageMul) * 100)} % less damage (${B.lotusskin.name}).`,
     use: 'F to eat · G to give to a teammate',
   },
+  emberchili: {
+    name: F.emberchili.name, kind: 'Fruit',
+    text: `A fiery chili from the shrubs on the volcano's warm ground. Heals ${F.emberchili.heal} HP – and for ${B.heatproof.time} s hot ground neither burns nor tires you, and crust plates hold twice as long under you (${B.heatproof.name}).`,
+    use: 'F to eat · G to give to a teammate',
+  },
+  ashplum: {
+    name: F.ashplum.name, kind: 'Fruit',
+    text: `A dusky plum from the gnarled trees in the volcano's few green pockets. Heals ${F.ashplum.heal} HP – and for ${B.quickfoot.time} s you move ${Math.round((B.quickfoot.speedMul - 1) * 100)} % faster (${B.quickfoot.name}).`,
+    use: 'F to eat · G to give to a teammate',
+  },
+  obsidianfig: {
+    name: F.obsidianfig.name, kind: 'Rare fruit',
+    text: `A black, glassy fig from the cacti at the foot of the basalt spires. Heals ${F.obsidianfig.heal} HP plus ${F.obsidianfig.hot} HP over ${F.obsidianfig.hotTime} s – and for ${B.sharpedge.time} s you deal ${Math.round((B.sharpedge.dinoDamageMul - 1) * 100)} % more damage to dinosaurs (${B.sharpedge.name}).`,
+    use: 'F to eat · G to give to a teammate',
+  },
   meat: {
     name: L.meat.name, kind: 'Loot',
     text: `Heavy dinosaur meat (weight ${L.meat.weight}). Needed for the expedition – bring it to the hut drop-off. Pteranodons try to steal it!`,

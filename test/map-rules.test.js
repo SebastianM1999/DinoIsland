@@ -2,7 +2,7 @@
 // many generated islands of both levels.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { planIsland, CAVES_ENABLED } from '../src/shared/island.js';
+import { planIsland, CAVES_ENABLED, riverQuery } from '../src/shared/island.js';
 import { Terrain } from '../src/shared/terrain.js';
 import { buildLayout } from '../src/shared/layout.js';
 import { TRUNKS } from '../src/shared/treeShapes.js';
@@ -18,7 +18,9 @@ for (const level of [0, 1, 2]) {
 
 test('rivers flow downhill and always have higher ground on both sides', () => {
   for (const { plan, terrain, level, variant } of islands) {
-    const pts = plan.river.pts;
+   // every flow (the volcano has several lava flows; its crater moat is a ring at one level)
+   for (const flow of plan.flows.filter((f) => !f.ring)) {
+    const pts = flow.pts;
     for (let i = 1; i < pts.length - 1; i++) {
       assert.ok(pts[i].y <= pts[i - 1].y + 1e-6, `L${level} v${variant}: river rises at ${i}`);
       if (pts[i].y < 0.4) continue;                       // the mouth at sea level
@@ -31,10 +33,18 @@ test('rivers flow downhill and always have higher ground on both sides', () => {
           assert.ok(terrain.inlandWaterLevelAt(x, z) !== null, 'lake reaches the river outlet');
           continue;
         }
+        // (under a basalt bridge or a crust plate the lava runs covered)
+        if ((plan.bridges || []).some((b) => Math.hypot(b.x - x, b.z - z) < b.r + 5) || (plan.crusts || []).some((c) => Math.hypot(c.x - x, c.z - z) < c.r * 1.6)) continue;
         const g = terrain.heightAt(x, z);
-        assert.ok(g > pts[i].y, `L${level} v${variant}: bank below water at ${i}`);
+        // (a lava flow drops steeply down the volcano's flank: its bank is measured
+        // against the lava right beside it, lower than this point's own surface – and
+        // beside such a narrow, steep channel the 2.7 m terrain grid dips a little toward its bed)
+        const lava = flow.kind === 'lava';
+        const beside = lava ? riverQuery(plan, x, z, 12, 'lava')?.surface ?? pts[i].y : pts[i].y;
+        assert.ok(g > Math.min(pts[i].y, beside) - (lava ? 0.35 : 0), `L${level} v${variant}: bank below water at ${i}`);
       }
     }
+   }
   }
 });
 

@@ -29,6 +29,7 @@ import { nearDino, plausibleZone } from './hitCheck.js';
 import { freshBase, campStations, safeZone as baseSafeZone, hasBasePlots, PLOT_REACH, MAX_STAGE, stageCost, BUILD_TIME, BASE_STAGES, applyBaseColliders, baseSpawnPoints, TOWERS, TOWER_SLOTS, towerCost, repairCost } from '../shared/base.js';
 import { updateTowers } from './towers.js';
 import { Raids } from './raids.js';
+import { Volcano } from './volcano.js';
 import { insideGrove, mayEnterGrove } from '../shared/grove.js';
 import { RECIPE_BY_ID, upgradeMods, unlockIsland, canAfford } from '../shared/crafting.js';
 
@@ -92,6 +93,7 @@ export class ServerWorld {
     this.base = freshBase();          // the team's own base (islands 2+, see shared/base.js)
     this._safe = undefined;
     this.raids = new Raids(this);     // raids on the base (sim/raids.js)
+    this.volcano = new Volcano(this); // heat, crust plates, eruptions (sim/volcano.js; idle off the volcano)
     this.dinos = new DinoSystem(this);
     this.log(`island ${level + 1} "${levelDef(level).name}" variant ${variant}`);
   }
@@ -525,6 +527,8 @@ export class ServerWorld {
     if (m.executionerBonus && d.hp <= m.executionerBelow * d.maxHp) mul *= 1 + m.executionerBonus;
     if (m.sprintStrike && p.sprintArmed && this.now - p.lastSprintAt <= SPRINT_STRIKE_WINDOW) { mul *= 2; p.sprintArmed = false; }
     if (this.now < p.bloodlustUntil) mul *= 1 + m.bloodlustDmg;
+    // Sharp Edge (obsidian fig)
+    if (p.buffs?.sharpedge > this.now) mul *= CONFIG.fruit.buffs.sharpedge.dinoDamageMul;
     return mul;
   }
 
@@ -534,6 +538,9 @@ export class ServerWorld {
     this.healPlayer(p, p.mods.bloodlustHeal * p.maxHp);
     p.bloodlustUntil = this.now + p.mods.bloodlustTime;
   }
+
+  /** Dinosaurs see this much of their usual range (the volcano's ash rain). */
+  sightMul() { return this.volcano?.sightMul() ?? 1; }
 
   /** Restore HP (capped at max HP). */
   healPlayer(p, amount) { p.hp = Math.min(p.maxHp, p.hp + amount); }
@@ -762,7 +769,7 @@ export class ServerWorld {
     // a dash briefly lifts the cap by its distance (grantDash)
     const cap = creative ? 10 : at < p.dashUntil ? MOVE_RESERVE + DASH.distance + 1 : at < p.knockBudgetUntil ? 7 : MOVE_RESERVE;
     p.moveBudget = Math.min(cap,
-      p.moveBudget + Math.max(0, at - p.lastMoveAt) * (creative ? P.creative.flySpeed + 4 : 11));
+      p.moveBudget + Math.max(0, at - p.lastMoveAt) * (creative ? P.creative.flySpeed + 4 : 11 * (p.buffs?.quickfoot > at ? CONFIG.fruit.buffs.quickfoot.speedMul : 1)));
     p.lastMoveAt = at;
     const distance = Math.hypot(x - p.x, z - p.z);
     const lim = CONFIG.world.size / 2 - 5;
@@ -1432,8 +1439,8 @@ export class ServerWorld {
         }
         if (rate > 0) this.healPlayer(p, rate * dt);
       }
-      // lava burns (and sets you back on your feet only if you get out)
-      const lava = this.terrain.lavaLevelAt(p.x, p.z);
+      // lava burns (and sets you back on your feet only if you get out) – a broken crust plate too
+      const lava = this.terrain.lavaLevelAt(p.x, p.z) ?? this.volcano.lavaAt(p.x, p.z);
       if (lava !== null && p.y < lava + 0.6 && !p.creative) {
         p.lavaT = (p.lavaT ?? 0.4) + dt;
         if (p.lavaT >= 0.4) {
@@ -1479,6 +1486,7 @@ export class ServerWorld {
     this.dinos.update(dt);
     updateTowers(this, dt);
     this.raids.update(dt);
+    this.volcano.update(dt);
     this.dinos.recordHistory(this.now);
     for (const p of this.players.values()) this.resolvePlayerDinos(p);
     this.mission.update(dt);
@@ -1540,6 +1548,7 @@ export class ServerWorld {
       boat: { repaired: this.mission.phase !== 'search' },
       base: this.publicBase(),
       raid: this.raids.public(),
+      volcano: this.volcano.public(),
     };
   }
 }

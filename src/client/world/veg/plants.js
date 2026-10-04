@@ -344,3 +344,45 @@ export const BUSH_TYPES = {
   shrub: { geometry: shrubGeometry, wind: { strength: 0.018, pivotY: 0.1, frequency: 2.1, heightScale: 0.6 } },
   reed: { geometry: reedGeometry, wind: { strength: 0.04, pivotY: 0.05, frequency: 1.7, heightScale: 0.8 } },
 };
+
+// ------------------------------------------------------------ volcano fruit plants
+
+/** Ember chili shrub (volcano): a low, wiry dark-green bush on warm ground. */
+export function chiliBushGeometry() {
+  return cached('chilibush', () => {
+    const col = { top: '#6f7a3c', mid: '#4f5a2c', mid2: '#46512a', bottom: '#333a22' };
+    const parts = [place(clump(0.5, { seed: 501, ...col, squash: 0.75 }), [0, 0.5, 0])];
+    for (let k = 0; k < 5; k++) {
+      const a = (k / 5) * TAU + 0.5;
+      parts.push(place(clump(0.34, { seed: 502 + k, ...col, detail: 1, squash: 0.7 }), [Math.cos(a) * 0.48, 0.38 + 0.1 * Math.sin(k * 1.7), Math.sin(a) * 0.48], [0, a, 0]));
+      // thin dark stems
+      parts.push(tube([V(0, 0.02, 0), V(Math.cos(a) * 0.25, 0.4, Math.sin(a) * 0.25), V(Math.cos(a) * 0.55, 0.62, Math.sin(a) * 0.55)], (t) => 0.022 - 0.01 * t, { radial: 4, color: () => '#3e3a24', capStart: false }));
+    }
+    return merge(parts);
+  });
+}
+export const CHILI_SPOTS_LOCAL = [
+  [0.5, 0.55, 0.25], [-0.42, 0.5, 0.4], [0.08, 0.5, -0.6], [0.05, 0.95, 0.2],
+];
+
+/** Obsidian fig cactus (volcano): a squat ribbed barrel with two arms, ash-grey green. */
+export function cactusPlantGeometry() {
+  return cached('cactusplant', () => {
+    const rib = (c, n) => (Math.sin(Math.atan2(c.z, c.x) * 8) > 0.6 ? '#7a8a6a' : n.y > 0.7 ? '#8a9a78' : '#5e6e52');
+    const body = paint(new THREE.CylinderGeometry(0.32, 0.38, 1.0, 16, 4).translate(0, 0.5, 0), rib);
+    const cap = paint(new THREE.SphereGeometry(0.32, 16, 6, 0, TAU, 0, Math.PI / 2).translate(0, 1.0, 0), rib);
+    const parts = [body, cap];
+    for (const [a, h, len] of [[0.4, 0.45, 0.42], [3.4, 0.6, 0.34]]) {
+      const dx = Math.cos(a), dz = Math.sin(a);
+      parts.push(tube([V(dx * 0.25, h, dz * 0.25), V(dx * 0.55, h + 0.05, dz * 0.55), V(dx * 0.6, h + len, dz * 0.6)], () => 0.13, { radial: 8, color: () => '#66765a' }));
+    }
+    // spines: little pale ticks
+    for (let k = 0; k < 18; k++) {
+      const a = (k / 18) * TAU, y = 0.2 + (k % 6) * 0.15;
+      parts.push(place(spike(0.012, 0.07, '#d8d0b8', null, 3), [Math.cos(a) * 0.36, y, Math.sin(a) * 0.36], [0, -a, -Math.PI / 2]));
+    }
+    return merge(parts);
+  });
+}
+/** Where the obsidian figs sit on the cactus: round its top. */
+export const CACTUS_FRUIT_LOCAL = [0, 1.18, 0];
