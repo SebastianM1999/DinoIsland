@@ -213,7 +213,10 @@ export class PlayerController {
       if (!free) { this.stamina = Math.max(0, this.stamina - DASH.cost); this.staminaDelay = P.staminaRegenDelay * mods.regenDelayMul; }
       this.onDash?.();
     }
-    const waterSlow = depth > 0.2 ? Math.max(0.55, 1 - depth * 0.35) : 1;
+    // wading slows you; in a bog (swamp) its own factor replaces that, so it is exactly -20 %
+    const bog = t.swampSpeedAt?.(this.pos.x, this.pos.z) ?? 1;
+    this.inBog = bog < 1;
+    const waterSlow = bog < 1 ? bog : depth > 0.2 ? Math.max(0.55, 1 - depth * 0.35) : 1;
     let speed = flying ? C.flySpeed
       : this.swimming ? SW.speed * this.speedFactor
       : (this.sprinting ? P.sprintSpeed : P.walkSpeed) * this.speedFactor * waterSlow;

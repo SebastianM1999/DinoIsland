@@ -33,6 +33,11 @@ const STYLE = {
     log: ['#5e4636', '#56402f', '#664c3a', '#4f3a2b'], cloth: '#8d8478', clothDark: '#6e665c', pennant: '#ff7a3a',
     palisade: 'stone', stone: ['#4b4452', '#3a3540', '#5a5058'], post: '#4f3a2b',
   },
+  // swamp: dark wet timber, olive canvas, a wooden palisade
+  swamp: {
+    log: ['#5a4a3a', '#4f4033', '#615040', '#47392d'], cloth: '#7d7a52', clothDark: '#5f5d3e', pennant: '#d8c34a',
+    palisade: 'wood', post: '#4a3a2c',
+  },
 };
 
 const at = (key, y = 0) => [BASE_LOCAL[key][0], y, BASE_LOCAL[key][1]];

@@ -187,7 +187,12 @@ export class Hud {
     this.$fruitRow.setAttribute('aria-label', 'Fruit carried');
     this.$loot = el('div', 'hud-pill hud-lootline brush');
     this.$loot.hidden = true;
-    this.$carry.append(this.$quiver, this.$fruitRow, this.$loot);
+    // wading through a bog (swamp island): everyone is 20 % slower there
+    this.$swamp = el('div', 'hud-pill hud-swamp brush');
+    this.$swamp.setAttribute('role', 'status');
+    this.$swamp.innerHTML = `<span class="hud-slow">${icon('weight')}Swamp: slowed</span>`;
+    this.$swamp.hidden = true;
+    this.$carry.append(this.$quiver, this.$fruitRow, this.$loot, this.$swamp);
     this.$hotbar = el('ol', 'hud-hotbar brush');
     this.$hotbar.setAttribute('aria-label', 'Equipment');
     this._slots = [];
@@ -387,6 +392,13 @@ export class Hud {
 
   setHealth(hp, max) { this._bar(this.$hp, 'hp', hp, max); }
   setStamina(value, max) { this._bar(this.$st, 'st', value, max); }
+
+  /** Show the "Swamp: slowed" tag while the local player wades through a bog. */
+  setSwamp(on) {
+    if (this._c.swamp === !!on) return;
+    this._c.swamp = !!on;
+    this.$swamp.hidden = !on;
+  }
 
   _bar(b, key, v, max) {
     const f = max > 0 ? Math.max(0, Math.min(1, v / max)) : 0;

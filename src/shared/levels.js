@@ -86,6 +86,51 @@ export const BIOMES = {
     dinos: { brachio: 1, stego: 1, raptor: 3, ptera: 4, trex: 1 },
     music: 'calm',
   },
+
+  // The Misty Swamp: a gloomy mangrove forest – many shallow bogs (planBogs in
+  // shared/island.js: wading through them slows everyone, CONFIG.player.swampSpeedMul)
+  // crossed by dry dirt causeways. The island is an hourglass with the swamp
+  // arena (shared/swampArena.js) in its waist.
+  swamp: {
+    id: 'swamp',
+    name: 'Swamp',
+    sites: ['ruins', 'nest', 'river', 'peak'],
+    river: 'water',
+    shape: 'hourglass',
+    vegetation: {
+      treeDensity: 1.25,
+      maxTrees: 640,
+      minTreeHeight: 1.2,           // the lowland is low: trees grow on any dry ground
+      trees: { mangrove: 0.56, snag: 0.14, nipa: 0.12, kapok: 0.18 },
+      beachTrees: ['mangrove', 'nipa'],
+      bushes: { reed: 0.55, fern: 0.45 },
+      maxBushes: 850,
+      grass: 0.8,
+      flowers: 0.25,
+    },
+    // wet dark stone, lots of moss (stone kinds as in the jungle)
+    rocks: { colors: ['#6c6a64', '#5e5c58', '#77716a'], moss: '#4f6e34', mossChance: 0.85, count: 0.7,
+      kinds: [[0.98, 0.98, 1.0], [1.2, 1.0, 0.8], [0.66, 0.66, 0.72], [1.16, 1.14, 1.1]] },
+    terrain: {
+      sandDry: '#b9a678', sand: '#a89468', sandWet: '#857350',
+      seabed: '#8a7a58', seabedDeep: '#5e5440',
+      grass: '#5d7c3a', grassLight: '#6c8a40', grassDark: '#46622e',
+      floor: '#3e5428', high: '#647a3e',
+      rock: '#77716a', rockDark: '#5a5650', rockWarm: '#7c6a58',
+      dirt: '#7a6446', dirtDark: '#5e4c36',
+      riverbed: '#4e4232',
+      mud: '#4a3d2c', bog: '#3c3424',
+    },
+    sky: {
+      background: '#5f6b5c', fog: '#6f7c69', fogNear: 25, fogFar: 150,
+      top: '#4d5a52', horizon: '#8a9682', cloud: '#a3aa9c',
+      sun: '#e8e2c4', sunIntensity: 1.3, hemiSky: '#a5b4a0', hemiGround: '#5a5038', hemiIntensity: 1.25,
+      exposure: 0.85,
+    },
+    water: { shallow: '#5a6a3c', mid: '#3c4a2c', deep: '#26301e', foam: '#b8bfa2', sky: '#7e8a78' },
+    dinos: { brachio: 1, stego: 1, raptor: 3, ptera: 3, trex: 0 },
+    music: 'calm',
+  },
 };
 
 /** The islands, in order. Sailing away from the last one wins the game. */
@@ -94,7 +139,11 @@ export const LEVELS = [
   // away in the Primeval Grove (shared/grove.js), a teaser for later islands –
   // and the Boss Arena, a lava islet beside the boat (shared/bossArena.js)
   { name: 'Emerald Jungle', biome: 'jungle', dinos: { brachio: 0, stego: 0, raptor: 4 }, grove: true, bossArena: true },
-  { name: 'Ashfall Isle', biome: 'volcano' },
+  // twice the land area of the first island (incl. its boss islet); the swamp
+  // arena in the waist waits for its boss (shared/swampArena.js)
+  { name: 'Misty Swamp', biome: 'swamp', scale: 0.86, swampArena: true, seedIndex: 2 },
+  // keeps the seeds it had as the second island: same islands as before
+  { name: 'Ashfall Isle', biome: 'volcano', seedIndex: 1 },
 ];
 
 export const LEVEL_COUNT = LEVELS.length;
@@ -117,6 +166,11 @@ export function levelDef(index) {
     relicCount: 3,
     grove: !!base.grove,
     bossArena: !!base.bossArena,
+    swampArena: !!base.swampArena,
+    // which seed family the island's variants come from (shared/island.js islandSeed)
+    seedIndex: base.seedIndex ?? i,
+    // island size: the first island is a small tutorial island, later ones full size
+    scale: base.scale ?? (i === 0 ? 0.52 : 0.87),
     last: i === LEVEL_COUNT - 1,
   };
 }

@@ -5,7 +5,8 @@
 Grouped by the module area they mainly cover. Many simulation tests also check the matching client code.
 
 ### World generation, terrain and collision (src/shared)
-- `map-rules.test.js` — map design rules over many generated islands of both levels (planIsland, Terrain, buildLayout, tree trunks).
+- `map-rules.test.js` — map design rules over many generated islands of all three levels (planIsland, Terrain, buildLayout, tree trunks).
+- `swamp.test.js` — the Misty Swamp: hourglass outline and area, arena wall and gate, dry paths, shallow bogs, dry hut/boat/relics/plots, -20 % for players and dinosaurs in bogs.
 - `levels.test.js` — island structure per level (hut beach, boat beach, reachable relic spots), boat repair and sailing to the next island, lava damage, winning on the last island.
 - `boss-arena.test.js` — boss arena islet, causeway and fixed boss spawn; walking the causeway with the player controller.
 - `grove.test.js` — giant's pen barrier: entry tests, shots stopped by `shotEnd`, titan only hurtable from inside.

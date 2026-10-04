@@ -261,7 +261,8 @@ export class DinoSystem {
   move(d, want, dt, accel = 4) {
     d.spd += clamp(want - d.spd, -accel * 2 * dt, accel * dt);
     if (d.spd < 0.01) { d.spd = 0; return; }
-    const step = d.spd * dt;
+    // wading through a bog (swamp) slows walkers like players (fliers never touch it)
+    const step = d.spd * dt * (d.type === 'ptera' ? 1 : this.terrain.swampSpeedAt?.(d.x, d.z) ?? 1);
     let fx = -Math.sin(d.yaw), fz = -Math.cos(d.yaw);
     const look = Math.max(2, d.radius * 1.5);
     // downhill may be steep (see walkable). Judged over the look-ahead, not the tiny step: the

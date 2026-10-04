@@ -47,6 +47,7 @@ Where each feature lives in each layer. Paths are relative to `src/` unless they
 | Base, towers, raids | base.js | world.js (base), towers.js, raids.js | world/base.js, ui/basePanel.js | base, raids, raptor-fear |
 | Missions, relics, boat | missions.js, relics.js, boatShape.js | mission.js, world.js (relic pickup, `ACT.REPAIR`) | ui/hud.js (board), ui/boatPanel.js, entities/relics.js, models/props/boat.js | levels, props (no missions test) |
 | Boss arena / grove (one feature, two names) | bossArena.js, grove.js | ai/brachio.js (titan), world.js (`groveBlocks`) | world/bossArena.js, world/grove.js, ui/grovePrompt.js | boss-arena, grove |
+| Swamp (island 2): bogs, swamp arena, -20 % | island.js (`bogs`, hourglass), terrain.js (`bogAt`, `swampSpeedAt`), swampArena.js, levels.js | dinos.js (`move`), pathfind.js | player/controller.js, world/water.js, world/swampArena.js, world/swampFx.js, veg/swampDecor.js, ui/hud.js (`setSwamp`), ui/minimap.js | swamp |
 | Visibility, minimap, tracking | visibility.js | world.js (`canSpotDino`, tracks), dinos.js | ui/minimap.js, entities/tracks.js, entities/dinoViews.js | tracking-minimap, dino-visibility |
 | Water, swim, lava | terrain.js, springShape.js | world.js (sea check, lava) | world/water.js, world/rivers.js, player/controller.js | swim, water |
 | Outfits | outfits.js | world.js (`ACT.OUTFIT`) | ui/wardrobe.js, models/playerModel.js | outfits |

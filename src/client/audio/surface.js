@@ -13,12 +13,15 @@ export function footstepSurface(player, terrain, layout, woodColliders) {
   // Other elevated stand supports (ruins/boss stones) are hard surfaces.
   const support = standTop(layout.playerColliders, x, z, CONFIG.player.radius, y + 0.1);
   if (support > ground + 0.05 && Math.abs(y - support) < 0.15) return 'rock';
+  // a bog (swamp): squelching mud, wet or not (the wading loop still plays in its water)
+  if (!player.swimming && terrain.bogAt?.(x, z) > 0.5) return 'mud';
   if (player.inWater > 0.06 || player.swimming) return 'water';
   const arena = layout.bossArena;
   if (arena && Math.hypot(x - arena.center.x, z - arena.center.z) < arena.outerR) return 'rock';
   if (ground > 2.5 && terrain.slopeAt(x, z) > 0.75) return 'rock';
   const seed = layout.plan.seed;
-  const beachLine = 1.9 + fbm(x * 0.05, z * 0.05, 2, seed + 90) * 0.6;
+  // (the swamp's whole lowland lies low: only its real beach is sand)
+  const beachLine = layout.biome.id === 'swamp' ? 1.0 : 1.9 + fbm(x * 0.05, z * 0.05, 2, seed + 90) * 0.6;
   if (ground < beachLine) return 'sand';
   const nearWater = [[2.5, 0], [-2.5, 0], [0, 2.5], [0, -2.5]].some(([dx, dz]) => terrain.waterLevelAt(x + dx, z + dz) !== null);
   if (nearWater && ground > 1.5) return 'mud';

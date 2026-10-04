@@ -7,12 +7,14 @@ import * as THREE from 'three';
 import { CONFIG } from '../../shared/config.js';
 import { makeRng, fbm, smoothstep } from '../../shared/rng.js';
 import { insideBossArena } from '../../shared/bossArena.js';
+import { insideSwampArena } from '../../shared/swampArena.js';
 import { MAT } from '../models/kit.js';
 import { treeGeometry, treeMatrix, TREE_WIND, TREE_VARIANTS, CROWN_TYPES, CROWN_VARIANTS } from './veg/trees.js';
 import * as plants from './veg/plants.js';
 import { windPair, LEAF_MAT, instanced, foliageTint, withGeometryDetail } from './veg/shapes.js';
 import { SpatialInstances } from './veg/spatialInstances.js';
 import { detailMaterial } from './surfaceDetail.js';
+import { buildSwampDecor } from './veg/swampDecor.js';
 
 const TAU = Math.PI * 2;
 const C = (h) => new THREE.Color(h);
@@ -94,6 +96,9 @@ export function buildVegetation(terrain, layout) {
   }
   for (const [t, list] of byType) addSmall([0, 1, 2].map(detail => withGeometryDetail(detail, types[t].geometry)), list, types[t].wind || VEG_TUNING.bushWind, `bushes-${t}`);
 
+  // swamp: lily pads, duckweed and breathing roots around the bogs
+  for (const m of buildSwampDecor(terrain, layout)) spatial.add(m);
+
   // --------------------------------------------------- grass + flowers
   const plan = layout.plan;
   const S = plan.seed;
@@ -104,6 +109,8 @@ export function buildVegetation(terrain, layout) {
   };
   const rng = makeRng(S ^ 0x6a55e1);
   const camp = layout.hut.campfire;
+  // where grass starts above the beach (the swamp's lowland lies low)
+  const lowland = (layout.biome.vegetation.minTreeHeight ?? 2.2) < 2 ? 1.0 : 1.3;
   const grassCount = Math.round((CONFIG.render.grassCount | 0) * layout.biome.vegetation.grass);
   const flowerCount = Math.round((CONFIG.render.grassCount | 0) * VEG_TUNING.flowerRatio * layout.biome.vegetation.flowers);
   // random point in the island ellipse
@@ -116,8 +123,10 @@ export function buildVegetation(terrain, layout) {
   const spotOk = (x, z) => {
     if (terrain.waterLevelAt(x, z) !== null || terrain.lavaLevelAt(x, z) !== null) return null;
     const h = terrain.heightAt(x, z);
-    if (h < 1.3) return null;
-    if (h < 2.3 && rng() > 0.15 + (h - 1.3) * 0.25) return null;      // sparse on the beach
+    if (h < lowland) return null;
+    if (h < lowland + 1 && rng() > 0.15 + (h - lowland) * 0.25) return null;      // sparse on the beach
+    if (terrain.bogAt?.(x, z) > 0.3) return null;                      // bare mud in the bogs
+    if (insideSwampArena(layout.swampArena, x, z, 2)) return null;
     if (Math.hypot(x - camp.x, z - camp.z) < 10) return null;
     for (const c of layout.caves) if (Math.hypot(x - c.x, z - c.z) < 7.5) return null;
     if (layout.ruins && Math.hypot(x - layout.ruins.x, z - layout.ruins.z) < 6) return null;
@@ -131,7 +140,7 @@ export function buildVegetation(terrain, layout) {
     out.copy(PAL.grass).lerp(PAL.grassLight, smoothstep(0.45, 0.8, g)).lerp(PAL.grassDark, smoothstep(0.5, 0.25, g) * 0.6);
     out.lerp(PAL.jungle, smoothstep(0.55, 1.0, layout.jungleDensity(x, z)) * 0.75);
     if (h > 18) out.lerp(PAL.mesaTop, 0.6);
-    if (h < 2.6) out.lerp(PAL.dry, 0.45);
+    if (h < lowland + 1.3) out.lerp(PAL.dry, 0.45);
     return out;
   };
 

@@ -3,11 +3,11 @@
 
 ## Files
 - `audio.js` — `GameAudio`: the audio graph (master, sfx, music, ambience buses), `play(name, opts)`, listener updates, ambience and water loops, music control; follows volume settings.
-- `catalog.js` — sample file catalog: `FOOTSTEPS` per surface, `EFFECTS` per sound name, `ISLAND_MUSIC` (jungle/volcano calm+danger), `MENU_MUSIC`, `BOSS_MUSIC`, `musicLoopStart`, `effectGroup()`.
+- `catalog.js` — sample file catalog: `FOOTSTEPS` per surface, `EFFECTS` per sound name, `ISLAND_MUSIC` (jungle/volcano calm+danger; the swamp borrows the volcano's), `MENU_MUSIC`, `BOSS_MUSIC`, `musicLoopStart`, `effectGroup()`.
 - `music.js` — `IslandMusic`: owns music sources across Game instances, crossfades calm/danger/boss/menu tracks (`MUSIC_FADE`, `DANGER_HOLD`).
 - `samples.js` — `SampleBank` (deduplicated fetch + decode, failures remembered for the session) and `SamplePicker` (variation picking).
 - `steps.js` — `StepCadence`: distance-driven footstep trigger (silent when blocked or airborne; no bursts after teleports).
-- `surface.js` — `footstepSurface()` picks the footstep surface (wood, rock, water, sand, mud, dirt, gravel, leaves, grass); `woodSupports()` filters standable log colliders.
+- `surface.js` — `footstepSurface()` picks the footstep surface (wood, rock, water, sand, mud – also in swamp bogs –, dirt, gravel, leaves, grass); `woodSupports()` filters standable log colliders.
 - `region.js` — `inBossMusicArea()`: whether the player is in the boss arena or on its causeway, with an exit margin.
 
 ## Entry points

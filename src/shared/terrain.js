@@ -4,7 +4,7 @@
 // rendered triangles.
 
 import { CONFIG } from './config.js';
-import { WORLD, HUT_GROUND, planIsland, islandHeight, riverQuery, poolAt } from './island.js';
+import { WORLD, HUT_GROUND, planIsland, islandHeight, riverQuery, poolAt, bogSample } from './island.js';
 
 export class Terrain {
   /** @param {ReturnType<typeof planIsland>} [plan] defaults to level 1 */
@@ -23,6 +23,57 @@ export class Terrain {
       }
     }
     this.hutGround = HUT_GROUND;
+    // bogs (swamp): how much bog each grid vertex lies in (0..1) and its water level (NaN = none)
+    this.bogMask = null;
+    this.bogLevel = null;
+    if (plan.bogs?.length) {
+      this.bogMask = new Float32Array(n1 * n1);
+      this.bogLevel = new Float32Array(n1 * n1).fill(NaN);
+      for (let j = 0; j <= segments; j++) {
+        for (let i = 0; i <= segments; i++) {
+          const s = bogSample(plan, -this.half + i * this.cell, -this.half + j * this.cell);
+          if (!s || s.mask <= 0.001) continue;
+          this.bogMask[j * n1 + i] = s.mask;
+          this.bogLevel[j * n1 + i] = s.bog.level;
+        }
+      }
+    }
+  }
+
+  /**
+   * How much of a bog (swamp) lies at (x, z): 0 on dry ground and on the
+   * causeways, 1 in the middle of a bog. Wading through more than half is slow.
+   */
+  bogAt(x, z) {
+    const m = this.bogMask;
+    if (!m) return 0;
+    const gx = (x + this.half) / this.cell, gz = (z + this.half) / this.cell;
+    const i = Math.floor(gx), j = Math.floor(gz);
+    if (i < 0 || j < 0 || i >= this.n || j >= this.n) return 0;
+    const fx = gx - i, fz = gz - j, n1 = this.n + 1;
+    const a = m[j * n1 + i], b = m[j * n1 + i + 1], c = m[(j + 1) * n1 + i], d = m[(j + 1) * n1 + i + 1];
+    return (a * (1 - fx) + b * fx) * (1 - fz) + (c * (1 - fx) + d * fx) * fz;
+  }
+
+  /**
+   * Walking speed factor at (x, z): CONFIG.player.swampSpeedMul in a bog (more than half
+   * bog, so not on the causeways), else 1. The same rule slows players and dinosaurs.
+   */
+  swampSpeedAt(x, z) {
+    return this.bogMask && this.bogAt(x, z) > 0.5 ? CONFIG.player.swampSpeedMul : 1;
+  }
+
+  /** Water level of the bog at (x, z), or null (the highest level among the cell's bog corners). */
+  bogLevelAt(x, z) {
+    const L = this.bogLevel;
+    if (!L) return null;
+    const gx = (x + this.half) / this.cell, gz = (z + this.half) / this.cell;
+    const i = Math.floor(gx), j = Math.floor(gz);
+    if (i < 0 || j < 0 || i >= this.n || j >= this.n) return null;
+    const n1 = this.n + 1;
+    let best = -Infinity;
+    for (const k of [j * n1 + i, j * n1 + i + 1, (j + 1) * n1 + i, (j + 1) * n1 + i + 1]) if (L[k] > best) best = L[k];
+    return best > -Infinity ? best : null;
   }
 
   /** Height of grid vertex (i, j). */
@@ -65,6 +116,10 @@ export class Terrain {
     if (rv && rv.kind === kind) {
       const q = riverQuery(this.plan, x, z, 12);
       if (q && q.d < q.width / 2 + 1.5 && g < q.surface) return q.surface;
+    }
+    if (kind === 'water' && this.bogMask) {
+      const bl = this.bogLevelAt(x, z);
+      if (bl !== null && g < bl && this.bogAt(x, z) > 0.02) return bl;
     }
     return null;
   }

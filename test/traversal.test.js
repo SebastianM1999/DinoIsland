@@ -35,7 +35,7 @@ test('falling into a trunk height slice resolves the body before sending its pos
 });
 
 const islands = [];
-for (const [level, variant] of [[0, 1], [0, 2], [1, 1], [1, 2]]) {
+for (const [level, variant] of [[0, 1], [0, 2], [1, 1], [1, 2], [2, 1], [2, 2]]) {
   const terrain = new Terrain(planIsland(level, variant));
   islands.push({ name: `island ${level + 1}/${variant}`, terrain, layout: buildLayout(terrain) });
 }

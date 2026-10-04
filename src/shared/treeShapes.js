@@ -72,6 +72,27 @@ export const TRUNKS = {
       r: (t) => 0.3 - 0.18 * t + (t < 0.05 ? 0.12 : 0),
     };
   }),
+  // swamp mangrove: the trunk rises out of a cage of arched stilt roots (the
+  // base rings are that cage: solid up to ~1.5 m, a little inside the outermost arches)
+  mangrove: [0, 1].map((variant) => ({
+    pts: variant
+      ? [[0, 0, 0], [0.1, 1.5, 0.05], [-0.15, 3.2, 0.2], [0.2, 4.8, 0.1]]
+      : [[0, 0, 0], [-0.05, 1.6, 0.1], [0.12, 3.6, -0.1], [-0.1, 5.4, 0.05]],
+    r: (t) => 0.3 - 0.12 * t,
+    base: [[1.5, 1.15], [0.6, 1.4]],
+  })),
+  // swamp snag: a dead grey trunk, no embers (same bends as the volcanic 'dead')
+  snag: [0, 1].map((variant) => ({
+    pts: variant
+      ? [[0, 0, 0], [0.3, 1.8, 0.1], [-0.1, 3.4, 0.4], [0.4, 5.0, 0.2], [0.2, 6.1, -0.2]]
+      : [[0, 0, 0], [-0.2, 1.6, 0.2], [0.25, 3.2, 0.1], [0.1, 4.7, -0.3]],
+    r: (t) => 0.34 - 0.2 * t + (t < 0.05 ? 0.12 : 0),
+  })),
+  // nipa palm: fronds straight out of a short stump in the mud
+  nipa: [0, 1].map((variant) => ({
+    pts: [[0, 0, 0], [0, 0.5, 0], [variant ? 0.08 : 0, 0.9, 0]],
+    r: () => 0.38,
+  })),
   dead: [0, 1].map((variant) => ({
     pts: variant
       ? [[0, 0, 0], [0.3, 1.8, 0.1], [-0.1, 3.4, 0.4], [0.4, 5.0, 0.2], [0.2, 6.1, -0.2]]

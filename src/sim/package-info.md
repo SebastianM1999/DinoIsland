@@ -3,9 +3,9 @@
 
 ## Files
 - `world.js` — `ServerWorld`: island loading, players, actions, inventory, combat validation, base, skills, tick and snapshots (see map below).
-- `dinos.js` — `DinoSystem`: spawning, steering and local avoidance, stuck nudges, footprints (tracks), traps, damage, death, carcass loot, respawn, pose history; delegates behaviour to the brains in `ai/`.
+- `dinos.js` — `DinoSystem`: spawning, steering (20 % slower through swamp bogs, `Terrain.swampSpeedAt`) and local avoidance, stuck nudges, footprints (tracks), traps, damage, death, carcass loot, respawn, pose history; delegates behaviour to the brains in `ai/`.
 - `ai/` — one behaviour "brain" per species (see `ai/package-info.md`).
-- `pathfind.js` — `findPath`: coarse A* over walkable ground (4 m cells) for detours and raiders.
+- `pathfind.js` — `findPath`: coarse A* over walkable ground (4 m cells, bog cells weighted by their slower going) for detours and raiders.
 - `hitCheck.js` — `nearDino`, `plausibleZone`: plausibility checks for client-reported dinosaur hits.
 - `firearms.js` — pistol/rifle: `gunInventory`, `gunAction` (validated hitscan shot and reload), `updateGunReload`.
 - `mission.js` — `Mission`: boat-parts main quest per island (search -> repaired -> sailing) and the team contracts from the mission board.

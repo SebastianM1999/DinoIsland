@@ -54,6 +54,8 @@ import { buildLogs } from '../world/logs.js';
 import { GrovePrompt } from '../ui/grovePrompt.js';
 import { mayEnterGrove, GROVE_STONE_REACH } from '../../shared/grove.js';
 import { buildBossArena } from '../world/bossArena.js';
+import { buildSwampArena } from '../world/swampArena.js';
+import { buildSwampFx } from '../world/swampFx.js';
 import { BIOMES } from '../../shared/levels.js';
 import { disposeIslandScenes } from './resources.js';
 
@@ -180,6 +182,7 @@ export class Game {
       this.vegetation.setQuality(g);
       this.rocks.setQuality(g);
       setSurfaceQuality(g);
+      this.swampFx.setQuality(g);
       this.vegetation.setDensity(g.grass);
     });
     this.remotes = new RemotePlayers(this.gfx.scene, this.gfx.camera, this.overlay);
@@ -273,8 +276,10 @@ export class Game {
     this.grove = buildGrove(this.terrain, this.layout);
     this.logs = buildLogs(this.terrain, this.layout);
     this.bossArena = buildBossArena(this.terrain, this.layout);
-    scene.add(this.sky.group, this.water.group, this.vegetation.group, this.rocks.group, this.fruitPlants.group, this.hut.group, this.baseView.group, this.sites.group, this.grove.group, this.logs.group, this.bossArena.group);
-    this.worldUpdaters = [this.sky, this.water, this.vegetation, this.rocks, this.fruitPlants, this.hut, this.baseView, this.sites, this.grove, this.bossArena];
+    this.swampArena = buildSwampArena(this.terrain, this.layout);
+    this.swampFx = buildSwampFx(this.terrain, this.layout, this.gfx.camera);
+    scene.add(this.sky.group, this.water.group, this.vegetation.group, this.rocks.group, this.fruitPlants.group, this.hut.group, this.baseView.group, this.sites.group, this.grove.group, this.logs.group, this.bossArena.group, this.swampArena.group, this.swampFx.group);
+    this.worldUpdaters = [this.sky, this.water, this.vegetation, this.rocks, this.fruitPlants, this.hut, this.baseView, this.sites, this.grove, this.bossArena, this.swampArena, this.swampFx];
     this.moodK = 0;
 
     // Debug view of colliders (F3).
@@ -933,6 +938,7 @@ export class Game {
     const p = this.player;
     hud.setHealth(this.me.hp, this.maxHp);
     hud.setStamina(p.stamina, p.maxStamina);
+    hud.setSwamp(p.inBog && !p.flying);
     hud.setCompass(p.yaw, this.compassMarkers());
     const team = [{ id: this.me.id, name: this.me.name, slot: this.me.slot, hp: this.me.hp, mhp: this.maxHp, alive: this.me.alive, downed: !!this.downed, isYou: true }];
     for (const rp of this.remotes.map.values()) team.push({ id: rp.id, name: rp.name, slot: rp.slot, hp: rp.hp, mhp: rp.mhp, alive: rp.alive, downed: (rp.fl & PF.DOWNED) !== 0, isYou: false });

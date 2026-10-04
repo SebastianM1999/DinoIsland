@@ -23,7 +23,7 @@ function lcg(seed) {
 /** Island variants: half first islands (jungle), half second (volcanic). */
 const VARIANTS = (() => {
   const rnd = lcg(20261002);
-  return Array.from({ length: ISLANDS }, (_, k) => ({ level: k % 2, variant: 1 + Math.floor(rnd() * 1e6) }));
+  return Array.from({ length: ISLANDS }, (_, k) => ({ level: k % 2 ? 2 : 0, variant: 1 + Math.floor(rnd() * 1e6) }));
 })();
 
 /**

@@ -29,6 +29,8 @@ export const EFFECTS = {
 export const ISLAND_MUSIC = {
   jungle: { calm: '/assets/audio/music/jungle-calm.ogg', danger: '/assets/audio/music/jungle-danger.ogg' },
   volcano: { calm: '/assets/audio/music/volcano-calm.ogg', danger: '/assets/audio/music/volcano-danger.ogg' },
+  // the swamp borrows the volcano's darker tracks until it has its own
+  swamp: { calm: '/assets/audio/music/volcano-calm.ogg', danger: '/assets/audio/music/volcano-danger.ogg' },
 };
 
 export const MENU_MUSIC = '/assets/audio/music/menu.ogg';

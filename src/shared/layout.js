@@ -13,6 +13,8 @@ import { boatColliders, boatInteractPoint } from './boatShape.js';
 import { insideGrove } from './grove.js';
 import { standTop } from './collision.js';
 import { causewayQuery, insideBossArena } from './bossArena.js';
+import { insideSwampArena, arenaWallColliders, SWAMP_ARENA } from './swampArena.js';
+import { insideOutline, halfWidthAt } from './island.js';
 import { SPRING_LIP_OFFSET, SPRING_FLOOR, springColliders } from './springShape.js';
 
 const TAU = Math.PI * 2;
@@ -38,6 +40,7 @@ export function buildLayout(terrain) {
   const plan = terrain.plan;
   const biome = plan.biome;
   const veg = biome.vegetation;
+  const lowGround = (veg.minTreeHeight ?? 2.2) < 2;   // the swamp's lowland lies low
   const volcanic = biome.id === 'volcano';
   const S = plan.seed;
   const rng = makeRng(S ^ 0x51f15e);
@@ -69,6 +72,7 @@ export function buildLayout(terrain) {
     seaStacks: [],
     grove: null,
     bossArena: null,        // the lava islet beside the boat (first island), see shared/bossArena.js
+    swampArena: null,       // the root-walled kettle in the swamp's waist, see shared/swampArena.js
     logs: [],               // fallen trees: { x, z, rot, len, r, yA, yB, roots, dead }
   };
   const circles = layout.colliders.circles;
@@ -142,7 +146,8 @@ export function buildLayout(terrain) {
 
   // ------------------------------------------------------------- paths
   // the trail from the hut to the boat, plus the mountain paths (dirt, kept free of trees and rocks)
-  layout.path = [plan.trail.map((p) => [p.x, p.z]), ...plan.ramps.map((r) => r.pts.map((p) => [p.x, p.z]))];
+  layout.path = [plan.trail.map((p) => [p.x, p.z]), ...plan.ramps.map((r) => r.pts.map((p) => [p.x, p.z])),
+    ...(plan.paths || []).map((line) => line.map((p) => [p.x, p.z]))];
   const distToPath = (x, z) => {
     let best = Infinity;
     for (const line of layout.path) {
@@ -169,7 +174,7 @@ export function buildLayout(terrain) {
     || layout.basePlots.some((p) => Math.hypot(x - p.x, z - p.z) < p.r + 2 + Math.min(pad, 12));
   const nearBoat = (x, z, pad = 0) => Math.hypot(x - plan.boat.x, z - plan.boat.z) < 10 + pad;
   const dry = (x, z, min = 0.4) => terrain.waterLevelAt(x, z) === null && terrain.lavaLevelAt(x, z) === null && terrain.heightAt(x, z) > min;
-  const inside = (x, z, k) => (x / plan.A) ** 2 + (z / plan.B) ** 2 < k * k;
+  const inside = (x, z, k) => insideOutline(plan, x, z, k);
   const riverDist = (x, z) => {
     const rv = plan.river;
     if (!rv) return Infinity;
@@ -235,7 +240,55 @@ export function buildLayout(terrain) {
     const gv = plan.sites.grove;
     layout.grove = { x: gv.x, z: gv.z, r: gv.r, y: terrain.heightAt(gv.x, gv.z) };
   }
-  const outsideGrove = (x, z, pad = 0) => !insideGrove(layout, x, z, pad);
+  // (the swamp arena is kept just as free: nothing grows, lies or spawns in it)
+  const outsideGrove = (x, z, pad = 0) => !insideGrove(layout, x, z, pad) && !insideSwampArena(plan.swampArena, x, z, pad);
+
+  // -------------------------------------------------------- swamp arena
+  // The kettle in the swamp's waist (shared/swampArena.js): a wall of huge dead
+  // stilt-root mangroves rings it, open only at the gate (a warning sign beside
+  // it); bones lie in the mud. Its boss comes later and spawns at arena.spawn.
+  if (plan.swampArena) {
+    const sa = plan.swampArena;
+    const ra = makeRng(S ^ 0x5a3a);
+    const groundAt = (x, z) => terrain.heightAt(x, z);
+    let wallY = Infinity;
+    for (let k = 0; k < 24; k++) {
+      const a = (k / 24) * TAU;
+      wallY = Math.min(wallY, groundAt(sa.x + Math.cos(a) * sa.r, sa.z + Math.sin(a) * sa.r));
+    }
+    const arena = {
+      ...sa,
+      y: wallY,
+      spawn: { ...sa.spawn, y: groundAt(sa.spawn.x, sa.spawn.z) },
+      gate: { ...sa.gate, y: groundAt(sa.gate.x, sa.gate.z), rot: Math.atan2(Math.cos(sa.gateAngle), Math.sin(sa.gateAngle)) },
+      sign: null, roots: [], bones: [],
+    };
+    layout.swampArena = arena;
+    boxes.push(...arenaWallColliders(sa, wallY));
+    reserve(sa.x, sa.z, sa.r + 3);
+    // warning sign beside the gate, on the corridor side
+    {
+      const a = sa.gateAngle + 0.32, rr = sa.r + 3.2;
+      const sx = sa.x + Math.cos(a) * rr, sz = sa.z + Math.sin(a) * rr;
+      arena.sign = { x: sx, z: sz, y: groundAt(sx, sz), rot: arena.gate.rot };
+      circles.push({ x: sx, z: sz, r: 0.35, top: arena.sign.y + 2.4, kind: 'arena' });
+    }
+    // the wall: giant dead mangroves standing on arched stilt roots (visual; the boxes block)
+    const n = 26;
+    for (let k = 0; k < n; k++) {
+      const a = (k / n) * TAU + ra.range(-0.04, 0.04);
+      const off = Math.abs(Math.atan2(Math.sin(a - sa.gateAngle), Math.cos(a - sa.gateAngle))) * sa.r;
+      if (off < SWAMP_ARENA.gateW / 2 + 1.2) continue;
+      const x = sa.x + Math.cos(a) * sa.r, z = sa.z + Math.sin(a) * sa.r;
+      arena.roots.push({ x, z, y: groundAt(x, z), rot: a + ra.range(-0.3, 0.3), scale: ra.range(1.25, 1.7), tall: ra() < 0.4, seed: ra.int(1, 999) });
+    }
+    // bones in the mud (visual only)
+    for (let i = 0; i < 18; i++) {
+      const a = ra() * TAU, rr = ra.range(3, sa.r - 5);
+      const x = sa.x + Math.cos(a) * rr, z = sa.z + Math.sin(a) * rr;
+      arena.bones.push({ x, z, y: groundAt(x, z), rot: ra() * TAU, kind: ra() < 0.3 ? 'skull' : 'rib', s: ra.range(0.9, 1.6) });
+    }
+  }
 
   // --------------------------------------------------------- boss arena
   // The lava islet beside the boat (shared/bossArena.js): obsidian spires on the
@@ -408,7 +461,7 @@ export function buildLayout(terrain) {
   if (beachTypes.length) {
     for (let i = 0; i < 2600 && layout.trees.length < (volcanic ? 50 : 120); i++) {
       const a = rng() * TAU, k = rng.range(0.82, 1.0);
-      const x = Math.cos(a) * plan.A * k, z = Math.sin(a) * plan.B * k;
+      const x = Math.cos(a) * plan.A * k, z = Math.sin(a) * halfWidthAt(plan, x) * k;
       const h = terrain.heightAt(x, z);
       if (h < 0.7 || h > 3.2 || !dry(x, z) || nearHut(x, z, 6) || nearBoat(x, z, 10) || terrain.slopeAt(x, z) > 0.5 || distToPath(x, z) < 3) continue;
       if (!free(x, z, 2.5)) continue;
@@ -416,12 +469,29 @@ export function buildLayout(terrain) {
     }
   }
 
+  // Swamp: mangroves stand in the shallow bog water along the shores (their own
+  // random stream, so the dry-ground trees below keep their places).
+  if (plan.bogs?.length && TRUNKS.mangrove) {
+    const rm = makeRng(S ^ 0x3a9e);
+    let placed = 0;
+    for (let i = 0; i < 9000 && placed < 170; i++) {
+      const x = rm.range(-plan.A, plan.A), z = rm.range(-plan.B, plan.B);
+      const b = terrain.bogAt(x, z);
+      if (b < 0.12 || b > 0.9 || terrain.waterDepthAt(x, z) > 0.3) continue;
+      if (nearHut(x, z, 4) || !clearOfSites(x, z, 1) || !outsideGrove(x, z, 4) || terrain.slopeAt(x, z) > 0.5) continue;
+      if (!free(x, z, 2.4)) continue;
+      addTree('mangrove', x, z, rm.range(0.85, 1.25), 0.6);
+      placed++;
+    }
+  }
+
   // Inland trees.
+  const minTreeH = veg.minTreeHeight ?? 2.2;
   for (let i = 0; i < 30000 && layout.trees.length < veg.maxTrees; i++) {
     const x = rng.range(-plan.A, plan.A), z = rng.range(-plan.B, plan.B);
     if (!inside(x, z, 0.95)) continue;
     const h = terrain.heightAt(x, z);
-    if (!dry(x, z, 2.2) || nearHut(x, z, 4) || !clearOfSites(x, z, 0.5)) continue;
+    if (!dry(x, z, minTreeH) || nearHut(x, z, 4) || !clearOfSites(x, z, 0.5) || !outsideGrove(x, z, 3)) continue;
     if (terrain.slopeAt(x, z) > 0.6) continue;
     const dens = jungle(x, z);
     if (rng() > Math.min(1, dens * dens * 1.4 + 0.04)) continue;
@@ -613,7 +683,7 @@ export function buildLayout(terrain) {
   const randomZoneCenter = (minHut = 90, pred = () => true) => {
     for (let i = 0; i < 800; i++) {
       const x = rng.range(-plan.A * 0.75, plan.A * 0.75), z = rng.range(-plan.B * 0.7, plan.B * 0.7);
-      if (!inside(x, z, 0.8) || !dry(x, z, 2) || terrain.slopeAt(x, z) > 0.45) continue;
+      if (!inside(x, z, 0.8) || !dry(x, z, lowGround ? 1.2 : 2) || terrain.slopeAt(x, z) > 0.45) continue;
       if (Math.hypot(x - hf.x, z - hf.z) < minHut || nearBoat(x, z, 25) || !outsideGrove(x, z, 25) || !pred(x, z)) continue;
       return { x, z };
     }

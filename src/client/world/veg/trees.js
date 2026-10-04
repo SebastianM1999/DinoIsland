@@ -5,7 +5,9 @@
 //
 // Types: palm, round, tall, jungle, mango (classic island), bamboo (cluster),
 // giant (huge jungle emergent), kapok (umbrella crown), banana (paddle
-// leaves), pine (ashy conifer), dead (charred snag with ember cracks).
+// leaves), pine (ashy conifer), dead (charred snag with ember cracks); swamp:
+// mangrove (stilt roots, low dark crown, hanging moss), snag (dead grey trunk,
+// no embers), nipa (fronds straight out of the mud).
 // Bark is vertex-painted with grooves, moss patches and lichen spots; leaf
 // masses mix 2–3 greens plus yellow-green / teal accents.
 
@@ -34,6 +36,9 @@ export const TREE_WIND = {
   banana: { strength: 0.02, pivotY: 1.4, frequency: 1.5, heightScale: 0.35 },
   pine: { strength: 0.009, pivotY: 2.5, frequency: 1.2, heightScale: 0.22 },
   dead: { strength: 0.004, pivotY: 3.0, frequency: 1.0, heightScale: 0.2 },
+  mangrove: { strength: 0.006, pivotY: 3.4, frequency: 1.1, heightScale: 0.2 },
+  snag: { strength: 0.005, pivotY: 3.0, frequency: 0.9, heightScale: 0.25 },
+  nipa: { strength: 0.02, pivotY: 0.3, frequency: 1.4, heightScale: 0.3 },
 };
 
 /** Where mangos hang on the mango tree (local space, before instance transform). */
@@ -567,10 +572,154 @@ function buildDead(variant) {
   return { trunk: merge(parts), foliage: merge(twigs), height: top.y + 1 };
 }
 
+// ------------------------------------------------------------- mangrove
+// swamp greens: dark, a little blue-grey
+const MANGROVE_COL = [
+  { top: '#6a9448', mid: '#456f34', mid2: '#3d6530', bottom: '#2f5226' },
+  { top: '#5d8a4a', mid: '#3f6a3a', mid2: '#375e33', bottom: '#2a4a28' },
+];
+const MOSS_STRAND = (t) => (t > 0.85 ? '#8f9a78' : t > 0.4 ? '#7a8666' : '#66704f');
+
+/** Hanging moss: a few thin strands from (x, y, z) down to `len`. */
+function mossStrands(out, x, y, z, len, seed, n = 3) {
+  const rng = makeRng(seed);
+  for (let k = 0; k < n; k++) {
+    const ox = (rng() - 0.5) * 0.5, oz = (rng() - 0.5) * 0.5, l = len * (0.6 + rng() * 0.5);
+    out.push(tube([V(x + ox, y, z + oz), V(x + ox + 0.05, y - l * 0.5, z + oz - 0.04), V(x + ox, y - l, z + oz + 0.03)],
+      (t) => 0.035 - 0.02 * t, { radial: 3, color: MOSS_STRAND, capStart: false }));
+  }
+}
+
+/**
+ * The swamp's mangrove: a trunk standing on a cage of arched stilt roots
+ * (shared/treeShapes.js base rings), a low, wide, closed dark crown, hanging moss.
+ * `dead`: the bare grey giants of the swamp arena's wall – roots, trunk, snags, moss.
+ */
+function buildMangrove(variant, { dead = false } = {}) {
+  const s = 1200 + variant * 19 + (dead ? 7 : 0);
+  const rng = makeRng(s);
+  const shape = TRUNKS.mangrove[variant];
+  const pts = trunkPts(shape);
+  const top = pts[pts.length - 1];
+  const wood = dead
+    ? { base: '#6f6a62', dark: '#4a4640', seed: s, moss: '#56663e', mossAmt: 0.3, lichen: '#9da08a', lichenAmt: 0.4 }
+    : { base: '#5e4c3c', dark: '#3c2f25', seed: s, moss: '#4f6e34', mossAmt: 0.55, lichen: '#a7ab8c', lichenAmt: 0.35 };
+  const parts = [trunkTube(shape, wood, { radial: 9, grooves: 6, ridge: 0.05 })];
+  // stilt roots: arches from the trunk out and down into the mud
+  const nr = variant ? 7 : 6;
+  for (let k = 0; k < nr; k++) {
+    const a = (k / nr) * TAU + rng.range(-0.2, 0.2);
+    const ca = Math.cos(a), sa = Math.sin(a);
+    const y0 = rng.range(0.9, 1.8), R = rng.range(1.25, 1.85);
+    const c0 = axisAt(pts, y0);
+    const p0 = V(c0.x + ca * 0.18, y0, c0.z + sa * 0.18);
+    const rp = [p0, V(ca * R * 0.55, y0 + 0.2, sa * R * 0.55), V(ca * R, -0.25, sa * R)];
+    parts.push(tube(rp, (t) => 0.11 - 0.05 * t, { radial: 5, color: bark({ ...wood, seed: s + k, mossAmt: wood.mossAmt * 0.6, foot: '#3a3024' }), capStart: false }));
+    // a second, thinner root branching off some arches
+    if (k % 3 === 0) {
+      const b0 = rp[1].clone().lerp(rp[2], 0.3);
+      const R2 = R * rng.range(0.55, 0.75), a2 = a + rng.range(0.35, 0.6);
+      parts.push(tube([b0, V(Math.cos(a2) * R2 * 0.9, b0.y * 0.5, Math.sin(a2) * R2 * 0.9), V(Math.cos(a2) * R2, -0.2, Math.sin(a2) * R2)],
+        (t) => 0.06 - 0.03 * t, { radial: 4, color: bark({ ...wood, seed: s + 40 + k, mossAmt: 0.2 }), capStart: false }));
+    }
+  }
+  const leaves = [];
+  if (!dead) {
+    // low, wide, closed crown
+    const pal = MANGROVE_COL[variant % 2];
+    const cy = top.y + 0.6;
+    leaves.push(place(clump(2.4, { seed: s, ...pal, squash: 0.42, flatBottom: 0.35, maxDetail: 3 }), [top.x, cy, top.z]));
+    for (let k = 0; k < 6; k++) {
+      const a = (k / 6) * TAU + variant * 0.5;
+      const rr = 2.3 + rng() * 0.5;
+      const p = [top.x + Math.cos(a) * rr, cy - 0.5 + rng() * 0.4, top.z + Math.sin(a) * rr];
+      leaves.push(place(clump(1.55 + rng() * 0.3, { seed: s + k + 1, ...MANGROVE_COL[(k + variant) % 2], squash: 0.5, flatBottom: 0.35 }), p, [0, a, 0]));
+      if (k % 2 === 0) parts.push(branch(V(top.x * 0.7, top.y - 1.4, top.z * 0.7), V(p[0] * 0.8, p[1] - 0.3, p[2] * 0.8), 0.12, 0.05, wood.base, wood.dark, s + k));
+      if (k % 2 === 1) mossStrands(leaves, p[0] * 0.85, p[1] - 0.7, p[2] * 0.85, 1.3, s + 60 + k, 2);
+    }
+  } else {
+    // bare grey snags with moss in place of a crown
+    for (let k = 0; k < 4; k++) {
+      const a = (k / 4) * TAU + rng() * 0.6;
+      const y = top.y - 1.2 + k * 0.35, len = 1.4 + rng() * 1.3;
+      const from = axisAt(pts, y).clone();
+      const to = V(from.x + Math.cos(a) * len, y + len * 0.55, from.z + Math.sin(a) * len);
+      parts.push(tube([from, from.clone().lerp(to, 0.5).add(V(0, 0.15, 0)), to], (t) => 0.13 * (1 - t * 0.7), { radial: 5, color: bark({ ...wood, seed: s + 80 + k }), capStart: false }));
+      mossStrands(leaves, to.x * 0.8 + from.x * 0.2, to.y - 0.1, to.z * 0.8 + from.z * 0.2, 1.6, s + 90 + k, 3);
+    }
+    parts.push(place(spike(0.16, 0.8, wood.dark, wood.base, 5), [top.x, top.y - 0.05, top.z], [0.25, 0, 0.15]));
+  }
+  return { trunk: merge(parts), foliage: merge(leaves), height: top.y + 2 };
+}
+
+const deadMangroveCache = new Map();
+/** A bare dead mangrove of the swamp arena's wall (variant 0 or 1), cached. */
+export function deadMangroveGeometry(variant = 0) {
+  let g = deadMangroveCache.get(variant);
+  if (!g) {
+    g = buildMangrove(variant % 2, { dead: true });
+    g.trunk.userData.sharedResource = true;
+    g.foliage.userData.sharedResource = true;
+    deadMangroveCache.set(variant, g);
+  }
+  return g;
+}
+
+// ------------------------------------------------- swamp snag (no embers)
+function buildSnag(variant) {
+  const s = 1300 + variant * 13;
+  const rng = makeRng(s);
+  const shape = TRUNKS.snag[variant];
+  const pts = trunkPts(shape);
+  const top = pts[pts.length - 1];
+  const opts = { base: '#6b6258', dark: '#433c35', seed: s, moss: '#56703c', mossAmt: 0.4, lichen: '#a2a58c', lichenAmt: 0.45 };
+  const parts = [trunkTube(shape, opts, { radial: 9, grooves: 7, ridge: 0.08 })];
+  const twigs = [];
+  const nb = variant ? 5 : 4;
+  for (let b = 0; b < nb; b++) {
+    const t = 0.45 + (b / nb) * 0.5;
+    const i = Math.min(pts.length - 2, Math.floor(t * (pts.length - 1)));
+    const from = pts[i].clone().lerp(pts[i + 1], t * (pts.length - 1) - i);
+    const a = b * 2.3 + variant + rng() * 0.6;
+    const len = 1.4 + rng() * 1.5;
+    const end = V(from.x + Math.cos(a) * len, from.y + len * (0.4 + rng() * 0.3), from.z + Math.sin(a) * len);
+    parts.push(tube([from, from.clone().lerp(end, 0.5).add(V(0, 0.2, 0)), end], (tt) => 0.13 * (1 - tt * 0.75), { radial: 5, color: bark(opts), capStart: false }));
+    mossStrands(twigs, end.x * 0.7 + from.x * 0.3, end.y - 0.1, end.z * 0.7 + from.z * 0.3, 1.5, s + b, 2 + (b % 2));
+  }
+  twigs.push(place(spike(0.1, 0.6, '#4a423a', '#5a5248', 4), [top.x, top.y - 0.05, top.z], [0.3, 0, 0.2]));
+  return { trunk: merge(parts), foliage: merge(twigs), height: top.y + 1 };
+}
+
+// ------------------------------------------------------------ nipa palm
+function buildNipa(variant) {
+  const s = 1400 + variant * 11;
+  const rng = makeRng(s);
+  const shape = TRUNKS.nipa[variant];
+  const pts = trunkPts(shape);
+  const trunk = [tube(pts, (t) => 0.32 - 0.12 * t, { radial: 7, color: (t, a, p) => (noise3(p.x * 4, p.y * 4, p.z * 4, s) > 0.2 ? '#5a4a34' : '#6b5a3c') })];
+  // a cluster of brown fruit heads low in the middle
+  trunk.push(place(blob(0.32, 0.28, 0.32, (c, n) => (n.y > 0.3 ? '#7a5a34' : '#5a4026'), { w: 8, h: 6 }), [0.15, 0.55, 0.1]));
+  const fronds = [];
+  const n = variant ? 10 : 12;
+  for (let k = 0; k < n; k++) {
+    const a = (k / n) * TAU + rng() * 0.3;
+    const dx = Math.cos(a), dz = Math.sin(a);
+    const L = 3.4 + rng() * 1.2;
+    const from = V(dx * 0.15, 0.4 + rng() * 0.3, dz * 0.15);
+    const path = arcPath(from, dx, dz, L, 1.9 + rng() * 0.4, 1.0, 9);
+    fronds.push(leafStrip(path, (t) => (t >= 1 ? 0.02 : 0.42 * Math.pow(Math.sin(Math.PI * (0.06 + 0.9 * t)), 0.7)), {
+      side: V(-dz, 0, dx), ridge: 0.3, serrate: 0.45,
+      color: (t, h) => (t < 0.1 ? '#5f6a34' : t > 0.8 ? (h ? '#7da848' : '#5a8a3a') : h ? '#5f9440' : '#3e6e30'),
+    }));
+  }
+  return { trunk: merge(trunk), foliage: twoSided(merge(fronds)), height: 4.5 };
+}
+
 // ------------------------------------------------------------------ cache
 const BUILD = {
   palm: buildPalm, round: buildRound, tall: buildTall, jungle: buildJungle, mango: buildMango,
   bamboo: buildBamboo, giant: buildGiant, kapok: buildKapok, banana: buildBanana, pine: buildPine, dead: buildDead,
+  mangrove: buildMangrove, snag: buildSnag, nipa: buildNipa,
 };
 const cache = new Map();
 /**
@@ -634,4 +783,4 @@ function crownVariant(foliage, c) {
 }
 
 /** How many geometry variants each type has (must match TRUNKS[type].length). */
-export const TREE_VARIANTS = { palm: 2, round: 2, tall: 1, jungle: 1, mango: 1, bamboo: 2, giant: 2, kapok: 2, banana: 2, pine: 2, dead: 2 };
+export const TREE_VARIANTS = { palm: 2, round: 2, tall: 1, jungle: 1, mango: 1, bamboo: 2, giant: 2, kapok: 2, banana: 2, pine: 2, dead: 2, mangrove: 2, snag: 2, nipa: 2 };

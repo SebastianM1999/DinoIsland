@@ -155,6 +155,8 @@ export function stoneWall(pal) {
 const FLOOR = {
   jungle: { stone: ['#8f8577', '#857b6f', '#9a8e7c', '#7d756c', '#948a7a', '#8a8a80'], deck: COL.plank, beam: COL.log[3], rock: ['#9c93a8', '#8a8199', '#a79c9a'] },
   volcano: { stone: ['#857b80', '#776e74', '#8e8488', '#6f676d', '#7d7378'], deck: ['#6b5240', '#5e4636', '#735944', '#634a39'], beam: '#4f3a2b', rock: ['#5a5058', '#4b4452', '#625761'] },
+  // swamp: wet mossy flags, dark planks
+  swamp: { stone: ['#6f6b60', '#646156', '#77725f', '#5d5a50', '#6a6b5a'], deck: ['#5a4a3a', '#4f4033', '#615040', '#47392d'], beam: '#47392d', rock: ['#6c6a64', '#5e5c58', '#77716a'] },
 };
 
 /** Distance from p to the segment a-b (2D). */
@@ -339,7 +341,7 @@ function keepClear(stage) {
  * Flagstone yard, paths, porch and camp clutter for a base stage (1..3): the
  * camp loosely laid with earth between the slabs, the lodge closer, the fort
  * fully paved.
- * @param {'jungle'|'volcano'} biome
+ * @param {'jungle'|'volcano'|'swamp'} biome
  * @param {number} stage
  * @param {(lx:number, lz:number)=>number} ground ground height in the plot frame
  * @returns {THREE.BufferGeometry[]}
@@ -398,7 +400,7 @@ export function baseFloor(biome, stage, ground) {
  * and a little clutter. `at` holds local [x, z] points; door, board and
  * wardrobe are null at the landing camp.
  * @param {{ fire: number[], door: number[]|null, bench: number[], drop: number[], board: number[]|null, wardrobe: number[]|null, flag: number[] }} at
- * @param {'jungle'|'volcano'} biome
+ * @param {'jungle'|'volcano'|'swamp'} biome
  * @param {(lx:number, lz:number)=>number} ground ground height in the hut frame
  */
 export function hutFloor(at, biome, ground) {

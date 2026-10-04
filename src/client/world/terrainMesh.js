@@ -33,6 +33,7 @@ export function buildTerrainMesh(terrain, layout) {
   const plan = layout.plan;
   const S = plan.seed;
   const volcanic = layout.biome.id === 'volcano';
+  const swamp = layout.biome.id === 'swamp';
   const P = Object.fromEntries(Object.entries({ ...JUNGLE, ...layout.biome.terrain }).map(([k, v]) => [k, new THREE.Color(v)]));
   const hut = layout.hut;
   const v = plan.volcano;
@@ -51,6 +52,11 @@ export function buildTerrainMesh(terrain, layout) {
     const lava = terrain.lavaLevelAt(x, z);
     const water = terrain.waterLevelAt(x, z);
     if (water !== null && y < water) {
+      // bog water (swamp): dark mud with leaf litter under a hand's breadth of water
+      if (swamp && terrain.bogAt(x, z) > 0.02) {
+        surf.wet = 1; surf.path = 0.7; surf.forest = 0.35;
+        return color.copy(P.mud).lerp(P.bog, smoothstep(0.04, 0.26, water - y));
+      }
       surf.sand = 1; surf.wet = 1;
       color.copy(water > 0.3 ? P.riverbed : P.seabed).lerp(P.seabedDeep, smoothstep(0.5, 8, water - y));
       return color;
@@ -76,7 +82,8 @@ export function buildTerrainMesh(terrain, layout) {
     const hueN = fbm(x * 0.018 + 11, z * 0.018 - 4, 3, S + 98);
     base.offsetHSL(hueN * 0.035, fbm(x * 0.05, z * 0.05, 2, S + 99) * 0.08, 0);
 
-    const beachLine = 1.9 + fbm(x * 0.05, z * 0.05, 2, S + 90) * 0.6;
+    // (the swamp's lowland lies low: only a narrow strip at the sea is beach)
+    const beachLine = swamp ? 0.95 + fbm(x * 0.05, z * 0.05, 2, S + 90) * 0.35 : 1.9 + fbm(x * 0.05, z * 0.05, 2, S + 90) * 0.6;
     sand.copy(P.sandWet).lerp(P.sandDry, smoothstep(0.35, 1.65, y));
     sand.lerp(P.sand, 0.25 + noise * 0.3);
     const grassK = smoothstep(beachLine - 0.7, beachLine + 0.9, y);
@@ -137,6 +144,17 @@ export function buildTerrainMesh(terrain, layout) {
     const camp = (1 - smoothstep(6, 13, hd)) * 0.9;
     color.lerp(base, camp);
     surf.path = Math.min(1, Math.max(trail, camp) * 1.3) * (1 - surf.rock);
+    // bog shores and mud islands (swamp): dark wet mud, packed and glossy
+    if (swamp) {
+      const bog = terrain.bogAt(x, z);
+      if (bog > 0.01) {
+        const k = smoothstep(0.01, 0.45, bog);
+        color.lerp(base.copy(P.mud).lerp(P.bog, noise * 0.4), k * 0.85);
+        surf.wet = Math.max(surf.wet, k);
+        surf.path = Math.max(surf.path, k * 0.6);
+        surf.sand *= 1 - k;
+      }
+    }
     // the boss arena: dark basalt and ash like the volcano island, glowing-hot
     // scorch along the lava, a dark causeway – fading into the beach outside
     if (arena) {
