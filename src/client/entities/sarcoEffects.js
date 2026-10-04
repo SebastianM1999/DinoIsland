@@ -4,7 +4,7 @@ import { DS } from '../../shared/protocol.js';
 /** Server-triggered warning glints, silt and wakes. No damage decisions here. */
 export class SarcoEffects {
   constructor(game, view) {
-    this.game = game; this.view = view; this.time = 0; this.warning = 0; this.wake = 0;
+    this.game = game; this.view = view; this.time = 0; this.warning = 0; this.effect = 0; this.wake = 0;
     this.group = new THREE.Group(); game.gfx.scene.add(this.group);
     this.geo = new THREE.SphereGeometry(1, 10, 8);
     this.materials = [0xff2414, 0xffd127].map(color => new THREE.MeshBasicMaterial({ color, transparent: true, depthWrite: false }));
@@ -14,20 +14,27 @@ export class SarcoEffects {
     this.group.visible = false;
   }
   cue(kind, duration = 1) {
-    if (kind === 'ambush') { this.warning = Math.max(.5, duration); this.total = this.warning; }
+    if (kind === 'ambush') { this.total = this.effect = duration; this.warning = duration * .85 / 1.6; }
   }
   update(dt) {
     const v = this.view, water = this.game.terrain.waterLevelAt(v.pos.x, v.pos.z);
-    this.time += dt; this.warning = Math.max(0, this.warning - dt); this.wake -= dt;
+    this.time += dt; this.warning = Math.max(0, this.warning - dt);
+    this.effect = Math.max(0, this.effect - dt); this.wake -= dt;
+    const phase = v.animationPhase;
+    if (phase?.clip === 'ambush') {
+      const elapsed = Math.max(0, v.phaseRenderTime - phase.started);
+      this.total = phase.duration; this.effect = Math.max(0, phase.duration - elapsed);
+      this.warning = Math.max(0, phase.duration * .85 / 1.6 - elapsed);
+    }
     const swimming = v.st === DS.SWIM || v.st === DS.SUBMERGED;
     if (v.alive && water !== null && (swimming || this.warning > 0) && this.wake <= 0) {
       this.game.water?.ripple(v.pos.x, v.pos.z, this.warning > 0 ? 1.4 : .7); this.wake = .35;
     }
-    this.group.visible = v.alive && water !== null && this.warning > 0;
+    this.group.visible = v.alive && water !== null && this.effect > 0;
     if (!this.group.visible) return;
     this.group.position.set(v.pos.x, water + .06, v.pos.z); this.group.rotation.y = v.yaw;
-    this.eyes.forEach((m, i) => { m.position.set(i ? .7 : -.7, .03, -3.2); m.material.opacity = .65 + .35 * Math.sin(this.time * 9) ** 2; });
-    const progress = 1 - this.warning / this.total;
+    this.eyes.forEach((m, i) => { m.visible = this.warning > 0; m.position.set(i ? -1.08 : 1.08, .03, -4.26); m.material.opacity = .65 + .35 * Math.sin(this.time * 9) ** 2; });
+    const progress = 1 - this.effect / this.total;
     this.mudMat.opacity = .55 * (1 - progress);
     this.mud.forEach((m, i) => {
       const a = i * 2.4, burst = Math.max(0, progress - .65) / .35;

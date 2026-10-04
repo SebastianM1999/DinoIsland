@@ -122,8 +122,10 @@ export const EV = {
 
 /** Player snapshot tuple layout. */
 export const PLAYER_FIELDS = ['id', 'x', 'y', 'z', 'yaw', 'pitch', 'spd', 'eq', 'fl', 'hp', 'alive', 'carry', 'mhp'];   // mhp = max HP (Thick Skin raises it)
-/** Dinosaur snapshot tuple layout. */
-export const DINO_FIELDS = ['id', 'x', 'y', 'z', 'yaw', 'st', 'hp', 'spd', 'fl'];
+/** Dinosaur snapshot tuple layout. Boss rows append phase clip/start (server seconds)/duration/sequence;
+ * ordinary rows retain the original nine fields. Boss descriptors and attack events include
+ * phase: { clip, started, duration, seq }. The client seeks at its interpolated render time. */
+export const DINO_FIELDS = ['id', 'x', 'y', 'z', 'yaw', 'st', 'hp', 'spd', 'fl', 'phaseClip', 'phaseStarted', 'phaseDuration', 'phaseSeq'];
 
 /** Player state flags (bit field in `fl`). */
 export const PF = {

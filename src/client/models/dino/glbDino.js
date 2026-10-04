@@ -183,7 +183,7 @@ export class GLBDinoAnimator {
     if (!dead && !trapped && pose.clip && this.actions[pose.clip]) next = pose.clip;
     // Complete each triggered attack even when the server's short pulse ends.
     const currentAttack = this.actions.attack;
-    if (!dead && !trapped && !pose.clip && this.state === 'attack' && currentAttack.time < currentAttack.getClip().duration) next = 'attack';
+    if (!dead && !trapped && !pose.clip && !pose.phaseSynced && this.state === 'attack' && currentAttack.time < currentAttack.getClip().duration) next = 'attack';
     if (pose.clip && pose.clipId !== undefined && this.clipId !== pose.clipId) {
       this.clipId = pose.clipId;
       this.actions[next].reset();
@@ -193,7 +193,10 @@ export class GLBDinoAnimator {
       action.reset().setEffectiveWeight(1).setEffectiveTimeScale(1).play();
       if (previous && ['walk', 'run'].includes(next) && ['walk', 'run'].includes(this.state))
         action.time = previous.time / previous.getClip().duration * action.getClip().duration;
-      if (previous) { previous.fadeOut(.18); action.fadeIn(.18); }
+      if (previous) {
+        if (pose.phaseElapsed !== undefined) { previous.stop(); action.stopFading(); }
+        else { previous.fadeOut(.18); action.fadeIn(.18); }
+      }
       this.state = next;
     }
     if (!spec.flyer && (next === 'walk' || next === 'run')) {
@@ -206,6 +209,13 @@ export class GLBDinoAnimator {
     if (pose.clip && pose.clipDuration > 0 && this.actions[next])
       this.actions[next].setEffectiveTimeScale(this.actions[next].getClip().duration / pose.clipDuration);
     this.mixer.update(dt);
+    if (pose.phaseElapsed !== undefined && this.actions[next] && pose.clipDuration > 0 && !dead) {
+      // Seek after the bounded mixer step: low FPS and late joins must show the server's strike.
+      const action = this.actions[next], duration = action.getClip().duration;
+      const elapsed = pose.phaseElapsed * duration / pose.clipDuration;
+      action.time = next === 'swim' ? elapsed % duration : clamp(elapsed, 0, duration);
+      this.mixer.update(0);
+    }
     for (const bone of this.layerBones) {
       let base = this.bases.get(bone);
       if (!base) this.bases.set(bone, base = { q: new THREE.Quaternion(), p: new THREE.Vector3() });
@@ -239,7 +249,7 @@ export class GLBDinoAnimator {
       this.bend(r.head, UP, (look + .025 * Math.sin(this.time * 2) * this.c.alert) * live);
       this.bend(r.head, RIGHT, -.08 * Math.sin(this.time * 9) * this.c.roar * live);
     }
-    if (r.jaw && !pose.clip) r.jaw.rotateX(-.52 * Math.max(this.c.jaw, this.c.roar, this.c.attack) * live);
+    if (r.jaw && !pose.clip && !spec.authoredJawClips?.includes(next)) r.jaw.rotateX(-.52 * Math.max(this.c.jaw, this.c.roar, this.c.attack) * live);
     const blinkPhase = this.time % 4.7;
     const blink = blinkPhase > 4.5 ? Math.sin((blinkPhase - 4.5) / .2 * Math.PI) : 0;
     for (const lid of r.eyelids) lid.scale.y = .12 + .88 * Math.max(this.dead, blink);

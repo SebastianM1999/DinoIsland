@@ -67,6 +67,8 @@ export class DinoView {
     this.fl = desc.fl || 0;
     this.butchered = !!desc.bu;   // carved up with the knife: sinks into the ground
     this.sink = 0;
+    this.phaseFrames = desc.phase ? [{ at: desc.phase.started, phase: desc.phase }] : [];
+    this.animationPhase = desc.phase || null;
     this.attackT = 0;
     this.roarT = 0;
     this.flinch = 0;
@@ -98,15 +100,31 @@ export class DinoView {
     this.bar.remove();
   }
 
+  onPhase(at, phase) {
+    const frames = this.phaseFrames;
+    const last = frames.at(-1);
+    if (last && last.phase?.seq === phase?.seq && last.phase?.clip === phase?.clip) return;
+    frames.push({ at, phase }); frames.sort((a, b) => a.at - b.at);
+    while (frames.length > 30) frames.shift();
+  }
+
   onRow(t, row) {
     this.buf.push(t, [row[1], row[2], row[3], row[4], row[7]]);
     this.st = row[5];
     this.hp = row[6];
     this.fl = row[8];
     this.alive = this.st !== DS.DEAD;
+    if (this.type === 'alpha-sarcosuchus') this.onPhase(row[9] ? row[10] : t, row[9] ? {
+      clip: row[9], started: row[10], duration: row[11], seq: row[12],
+    } : null);
   }
 
   samplePose(dt, renderTime) {
+    if (this.type === 'alpha-sarcosuchus') {
+      const frame = [...this.phaseFrames].reverse().find(f => f.at <= renderTime);
+      this.animationPhase = frame?.phase || null;
+      this.phaseRenderTime = renderTime;
+    }
     const prevX = this.pos.x, prevZ = this.pos.z, prevYaw = this.yaw;
     if (this.buf.sample(renderTime, this.tmp)) {
       this.pos.set(this.tmp[X], this.tmp[Y], this.tmp[Z]);
@@ -192,6 +210,16 @@ export class DinoView {
       p.clip = this.attackT > 0 ? this.attackClip : clips[this.st];
       p.clipDuration = this.attackT > 0 ? this.attackDuration : null;
       p.clipId = this.attackSeq;
+      p.phaseSynced = !!this.phaseFrames?.length;
+      if (this.animationPhase) {
+        const phase = this.animationPhase;
+        p.clip = phase.clip; p.clipDuration = phase.duration; p.clipId = phase.seq;
+        p.phaseElapsed = Math.max(0, (this.phaseRenderTime ?? phase.started) - phase.started);
+      } else if (this.phaseFrames?.length) {
+        // A snapshot explicitly ended the committed phase; old event timers cannot replay it.
+        p.clip = undefined; p.clipDuration = null; p.clipId = undefined;
+        p.attack = 0; p.tailSwing = 0;
+      }
     }
     switch (this.st) {
       case DS.GRAZE: case DS.EAT: p.headDown = 1; break;
@@ -204,7 +232,8 @@ export class DinoView {
       case DS.TRAPPED: p.jaw = 0.6; break;
       case DS.DIVE: p.dive = 1; break;
     }
-    if (this.attackT > 0) { p.attack = 1; p.jaw = 1; }
+    if (p.phaseSynced && !this.animationPhase) p.tailSwing = 0;
+    if (this.attackT > 0 && !(this.type === 'alpha-sarcosuchus' && this.phaseFrames?.length)) { p.attack = 1; p.jaw = 1; }
     if (this.roarT > 0) { p.roar = 1; p.jaw = 1; }
     return p;
   }
@@ -275,6 +304,7 @@ export class DinoViews {
         game.audio?.play('sarco_enrage', { pos: v.pos });
         return;
       }
+      if (m.phase && v.type === 'alpha-sarcosuchus') v.onPhase(m.phase.started, m.phase);
       v.attackT = m.duration || .45; v.attackDuration = m.duration;
       v.attackSeq = (v.attackSeq || 0) + 1;
       v.attackClip = { lunge: 'attack', bite: 'bite', shove: 'shove', tail: 'tailsweep',
