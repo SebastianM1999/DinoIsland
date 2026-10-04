@@ -16,7 +16,7 @@
 - `baseGround.js` — `flagstones` (irregular laid slabs with joints, optional gaps for stepping stones) and `campClutter` (a few varied stones, sticks, firewood) used by `hutFloor` (hunting hut / landing camp) and `baseFloor` (base yard and paths that grow with the stage, plank porch before the cabin; decoration, no collider) and `stoneWall` (the volcanic fort wall: coursed blocks, pillars, merlons, gate towers inside the palisade colliders); stone pieces use the `rock` detail material.
 - `sites.js` — `buildSites`: places boat, caves, spring cave, ruins, nest and volcano FX from `models/props/`.
 - `bossArena.js` — `buildBossArena`: lava islet look (spires, rune gate, basalt, embers, ritual circle) from `layout.bossArena`.
-- `swampArena.js` — `buildSwampArena`: the swamp arena's wall of giant dead mangroves and root tangles, gate sign, bones (`layout.swampArena`).
+- `swampArena.js` — `buildSwampArena`: the swamp arena's ring and waist walls of giant dead mangroves and root tangles, the sign at the entrance gate, bones (`layout.swampArena`).
 - `swampFx.js` — `buildSwampFx`: mist banks and blinking fireflies over the bogs near the camera; count follows the graphics tier (none on Low).
 - `grove.js` — `buildGrove`: shimmering red barrier cylinder around the giant's pen; `strike(pt)` and `flash()`.
 

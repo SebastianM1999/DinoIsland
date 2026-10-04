@@ -109,15 +109,26 @@ export function buildMapBase(terrain, layout, res = 640) {
     }
   }
 
-  // The swamp arena: its root wall as a dark ring, open at the gate.
+  // The swamp arena: its root wall as a dark ring, open at the west and east
+  // gates, and the walls closing the waist north and south of it.
   const sa = layout?.swampArena;
   if (sa) {
     ctx.strokeStyle = `rgb(${C.arena.join(',')})`;
     ctx.lineWidth = Math.max(2, 2.4 / mpp);
+    ctx.lineCap = 'butt';
     const gap = (SWAMP_ARENA.gateW / 2 + 0.5) / sa.r;
-    ctx.beginPath();
-    ctx.arc((sa.x + half) / mpp, (sa.z + half) / mpp, sa.r / mpp, sa.gateAngle + gap, sa.gateAngle + TAU - gap);
-    ctx.stroke();
+    const [g0, g1] = sa.gates.map((g) => g.angle);
+    for (const [from, to] of [[g0 + gap, g1 + TAU - gap], [g1 + gap, g0 - gap]]) {
+      ctx.beginPath();
+      ctx.arc((sa.x + half) / mpp, (sa.z + half) / mpp, sa.r / mpp, from, to);
+      ctx.stroke();
+    }
+    for (const w of sa.waist || []) {
+      ctx.beginPath();
+      ctx.moveTo((sa.x + half) / mpp, (w.z0 + half) / mpp);
+      ctx.lineTo((sa.x + half) / mpp, (w.z1 + half) / mpp);
+      ctx.stroke();
+    }
   }
 
   // Big rocks as small grey blobs, like the stones on the reference minimap.

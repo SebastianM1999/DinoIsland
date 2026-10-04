@@ -98,11 +98,12 @@ export const BIOMES = {
     river: 'water',
     shape: 'hourglass',
     vegetation: {
-      treeDensity: 1.25,
+      treeDensity: 0.85,              // open clearings between the dry-land groves
       maxTrees: 640,
       minTreeHeight: 1.2,           // the lowland is low: trees grow on any dry ground
-      trees: { mangrove: 0.56, snag: 0.14, nipa: 0.12, kapok: 0.18 },
-      beachTrees: ['mangrove', 'nipa'],
+      // dry land only: the mangroves grow in and along the bogs (layout.js, their own pass)
+      trees: { kapok: 0.35, tall: 0.2, snag: 0.25, nipa: 0.2 },
+      beachTrees: ['nipa'],
       bushes: { reed: 0.55, fern: 0.45 },
       maxBushes: 850,
       grass: 0.8,
@@ -122,7 +123,7 @@ export const BIOMES = {
       mud: '#4a3d2c', bog: '#3c3424',
     },
     sky: {
-      background: '#5f6b5c', fog: '#6f7c69', fogNear: 25, fogFar: 150,
+      background: '#76806f', fog: '#7f8a78', fogNear: 12, fogFar: 95,
       top: '#4d5a52', horizon: '#8a9682', cloud: '#a3aa9c',
       sun: '#e8e2c4', sunIntensity: 1.3, hemiSky: '#a5b4a0', hemiGround: '#5a5038', hemiIntensity: 1.25,
       exposure: 0.85,
