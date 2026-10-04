@@ -20,8 +20,9 @@ than creating another PR. After pulling these instructions, restart existing
 sessions or explicitly ask them to reread AGENTS.md.
 
 Opening the finished feature's PR requires explicit push authorization under the
-shared Git rule. Once authorized, the agent must submit the PR and mark it
-`ready-to-merge`; a local commit alone is not a submitted feature. A platform that
+shared Git rule. Once authorized, the agent must submit the PR. The controller adds
+`ready-to-merge` automatically after successful current-head PR CI for eligible
+non-draft collaborator PRs; a local commit alone is not a submitted feature. A platform that
 already creates a task PR should reuse it. Follow-up fixes remain in that one PR.
 
 ## Start and submit a task
@@ -43,7 +44,6 @@ the task, run `npm test`, and make focused commits. After the user authorizes pu
 ```powershell
 git push -u origin claude/task-name
 gh pr create --base main --title "Describe resulting behavior" --body-file pr-body.md
-gh pr edit --add-label ready-to-merge
 ```
 
 Use an untracked temporary body file outside the checkout. Agents should attach
@@ -82,6 +82,15 @@ Standard public-repository hosted runners are free under GitHub's current billin
 AI subscription limits still apply. There are no paid API fallbacks in this setup.
 
 ## How the controller works
+
+When automatic integration is enabled, the controller enrolls open, non-draft PRs
+targeting main from the same repository, authored by collaborators with write access,
+after their latest current-head PR CI succeeds. It rechecks the head and eligibility
+before adding `ready-to-merge` and continues immediately without relying on a bot
+label event. Blocked PRs stay blocked; failed, pending, stale or unrelated CI cannot
+enroll a PR. Ready-for-review transitions wake the controller after draft CI passes.
+Manual dispatch also sweeps existing eligible PRs. Manual readiness labeling remains
+available, but all existing exact merge-candidate and protection checks still apply.
 
 The ready-to-merge label, CI/rebase/repair completion, and manual dispatch wake a
 single controller. Ready labels persist the queue; Actions concurrency only prevents

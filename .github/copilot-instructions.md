@@ -15,8 +15,9 @@ The required workflow is:
   share it with another writer or discard someone else's changes.
 - Run `npm test` and `git diff --check`. Keep focused commits.
 - Never push unless the user explicitly authorizes it. With authorization, push
-  the feature branch, create or update exactly one PR targeting `main`, and add
-  `ready-to-merge` when complete. Reuse a platform-created PR. Keep all follow-up
+  the feature branch and create or update exactly one PR targeting `main` after
+  local checks pass. The controller adds `ready-to-merge` automatically after
+  eligible current-head PR CI succeeds. Reuse a platform-created PR. Keep all follow-up
   fixes on that same branch/PR. Report the PR URL and integration status.
 - Let the integration controller rebase feature branches onto main, test and land
   ordinary feature PRs with GitHub Rebase and merge. Never merge main into a feature

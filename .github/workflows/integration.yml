@@ -2,7 +2,7 @@ name: Integration queue
 
 on:
   pull_request_target:
-    types: [labeled]
+    types: [labeled, ready_for_review]
     branches: [main]
   workflow_run:
     workflows: [CI]
@@ -23,7 +23,7 @@ jobs:
       cancel-in-progress: false
     if: >-
       vars.AUTOMERGE_ENABLED == 'true' &&
-      (github.event_name != 'pull_request_target' || github.event.label.name == 'ready-to-merge') &&
+      (github.event_name != 'pull_request_target' || github.event.action == 'ready_for_review' || github.event.label.name == 'ready-to-merge') &&
       (github.event_name != 'workflow_run' || github.event.workflow_run.event != 'push')
     runs-on: ubuntu-latest
     timeout-minutes: 5
