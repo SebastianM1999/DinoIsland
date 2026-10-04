@@ -198,11 +198,12 @@ export const CONFIG = {
   dinos: {
     'alpha-sarcosuchus': {
       name: 'Alpha Sarcosuchus', health: 1800, radius: 2.2,
+      bodyLengthScale: .9, bodyHeightScale: .9,
       walkSpeed: 3, runSpeed: 8.5, lungeSpeed: 15, turnRate: 2.1,
-      sightRadius: 44, biteRange: 8, biteDamage: 32, biteCooldown: 1.8,
-      shoveDamage: 18, tailRange: 11, tailDamage: 30, knockback: 12,
-      body: [[0, 1.8], [2, 1.6], [4, 1], [6, .8], [7.5, .55],
-        [-2, 1.3], [-4, 1], [-6, .75], [-8, .45]],
+      sightRadius: 44, biteRange: 7.2, biteDamage: 32, biteCooldown: 1.8,
+      shoveDamage: 18, tailRange: 9.9, tailDamage: 30, knockback: 12,
+      body: [[0, 1.8], [1.8, 1.6], [3.6, 1], [5.4, .8], [6.75, .55],
+        [-1.8, 1.3], [-3.6, 1], [-5.4, .75], [-7.2, .45]],
       loot: { meat: 8, hide: 6, teeth: 6 },
       butcher: { time: 10, loot: { bones: 10, skull: 1, plates: 6 } },
       respawn: 0, // The arena boss is unique and stays defeated.
