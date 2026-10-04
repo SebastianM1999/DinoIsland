@@ -4,9 +4,8 @@
 // entrance facing west (the hut) and the exit facing east (the boat). Root
 // walls run from the ring north and south out into the deep sea, so nobody
 // walks or wades round it. Inside, the ground drops into a sunken basin of mud
-// and bog water; the trail crosses it on a causeway. Its boss (a giant alpha
-// Sarcosuchus) comes later: then the exit gate (gates[1].locked) only opens
-// once it is beaten. For now both gates are open.
+// and bog water; the trail crosses it on a causeway. The Alpha Sarcosuchus
+// guards the exit; the authoritative boss lifecycle controls its gate.
 //
 // Planned from the island's outline alone (no rng draws), shared by client
 // (look, minimap) and server (terrain, colliders, AI).
@@ -127,4 +126,15 @@ export function waistWallColliders(a, walls, groundAt) {
 export function arenaBasin(a, x, z) {
   const d = Math.hypot(x - a.x, z - a.z);
   return 1 - smoothstep(a.r - 7, a.r - 2, d);
+}
+
+/** Deep ambush hollows beside the dry causeway, with gently sloping banks. */
+export function ambushPocket(a, x, z) {
+  if (!a) return 0;
+  let depth = 0;
+  for (const side of [-1, 1]) {
+    const d = Math.hypot((x - a.x) / 1.2, z - a.z - side * a.r * .45);
+    depth = Math.max(depth, 1 - smoothstep(3, 9, d));
+  }
+  return depth;
 }

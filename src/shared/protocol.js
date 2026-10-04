@@ -99,7 +99,7 @@ export const EV = {
   STORE: 'store',           // { store }                         hut storage totals
   STEAL: 'steal',           // { dino, player }
   EAT: 'eat',               // { id, fruit }                     someone is eating (animation)
-  ATTACK: 'attack',         // { id, kind }                      dinosaur attack animation cue
+  ATTACK: 'attack',         // { id, kind, duration? }           attack wind-up cue; duration is seconds
   SPOT: 'spot',             // { id, type, by }                  share discovery with the team
   FULL: 'full',             // { text, icon }                    your inventory can't take an item
   OUTFIT: 'outfit',         // { id, outfit }                    a player changed clothes
@@ -158,6 +158,14 @@ export const DS = {
   LANDED: 13,
   ROAR: 14,
   GRAZE: 15,
+  SWIM: 16,
+  SUBMERGED: 17,
+  LUNGE: 18,
+  SHOVE: 19,
+  REPOSITION: 20,
+  RECOVER: 21,
+  BITE: 22,
+  RETREAT: 23,
 };
 
-export const DINO_TYPES = ['brachio', 'stego', 'raptor', 'ptera', 'trex'];
+export const DINO_TYPES = ['brachio', 'stego', 'raptor', 'ptera', 'trex', 'alpha-sarcosuchus'];
