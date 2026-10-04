@@ -15,7 +15,7 @@
 - `stego.js` — procedural Stegosaurus (`buildStego`, `STEGO_ANIM`, `stegoExtraUpdate`).
 - `ptera.js` — procedural Pteranodon with dynamic wing membrane (`buildPtera`, `PTERA_ANIM`, `pteraExtraUpdate`).
 - `skinStyle.js` — `DINO_PALETTES` and `paintSkinDetails()` vertex-colour markings (used by `ptera.js` and build scripts).
-- `preview.html` — standalone dev page that loads `SPECIES` and the GLBs and shows one dino per `?type=&state=&view=` (driven by `scripts/check-dino-preview.mjs`).
+- `preview.html` — standalone dev page that loads `SPECIES` and the GLBs and shows one dino per `?type=&state=&view=` (driven by `scripts/check-dino-preview.mjs`). Review-only Sarcosuchus additionally supports `swim` and `tail-sweep` direct clip playback.
 
 ## Entry points
 - `entities/dinoViews.js` `SPECIES`: for each type `build = () => buildGLBDino(type) || <procedural build>()`, `createAnimator = rig.createAnimator?.() || new DinoAnimator(rig, ANIM)`; procedural `*ExtraUpdate` runs only when `!rig.isGLB`.

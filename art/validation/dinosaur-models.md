@@ -35,6 +35,7 @@ Branch: `codex/animated-dinosaur-models`. Local commits only; no push.
 | Stego | Project Stegosaurus from `art/sources/stego/stego.blend` (fused head+jaw+neck, IK-baked clips, tail-swing attack, living eyes, jaw with mouth trough + tongue) | 54,588 | 3.76 × 7.9 m |
 | Brachio | Project Brachiosaurus from `art/sources/brachio/brachio.blend` (opening jaw with mouth trough + tongue, living eyes, IK-baked clips, rear-up stomp) | 58,628 | 13.0 × 18.5 m |
 | Ptera | Project Pteranodon from `art/sources/ptera/ptera.blend` (fused head+beak+neck, membrane wings, Fly/Glide/Dive/Attack, Fall + impact Death, living eyes, lower beak with mouth trough + tongue) | 49,351 | 1.86 × 2.56 m, 6.5 m span |
+| Alpha Sarcosuchus (review only) | Project source in `art/sources/alpha-sarcosuchus/alpha-sarcosuchus.blend`: continuous skinned body/jaw, dark green plated hide, irregular skin scars, eight clips | 58,575 | 3.812 × 18 m |
 
 Original Quaternius assets remain CC0. Project additions retain the project's
 license. Source Blend files are retained; Apatosaurus is now unused. Regeneration

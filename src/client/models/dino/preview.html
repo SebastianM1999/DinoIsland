@@ -109,7 +109,7 @@
     let R = cameraRadius();
     const _fp = new THREE.Vector3();
 
-    const STATES = ['idle', 'walk', 'run', 'attack', 'roar', 'graze', 'alert', 'charge', 'tail', 'trapped', 'dead', 'fall', 'fly', 'dive', 'landed'];
+    const STATES = ['idle', 'walk', 'run', 'attack', 'roar', 'graze', 'alert', 'charge', 'tail', 'trapped', 'dead', 'fall', 'fly', 'dive', 'landed', 'swim', 'tail-sweep'];
     let state = qs.get('state') || 'walk';
     let view = qs.get('view') || 'side';
     let orbit = qs.get('orbit') === '1';
@@ -197,6 +197,23 @@
       updateInfo(); syncURL();
     }
     const DSMAP = { idle: 0, walk: 1, run: 2, alert: 4, attack: 5, charge: 6, tail: 7, trapped: 9, dead: 10, fall: 10, fly: 11, dive: 12, landed: 13, roar: 14, graze: 15 };
+    // Preview extra authored clips without assigning them gameplay states.
+    function updatePreviewAnimator(actor, input, dt) {
+      const key = state === 'tail-sweep' ? 'tailsweep' : state === 'swim' ? 'swim' : null;
+      const direct = key && actor.actions?.[key];
+      if (direct) {
+        if (actor.previewClip !== key) {
+          for (const [bone, base] of actor.bases) { bone.quaternion.copy(base.q); bone.position.copy(base.p); }
+          actor.bases.clear(); actor.mixer.stopAllAction();
+          actor.state = null; actor.previewClip = key;
+          direct.reset().setEffectiveWeight(1).setEffectiveTimeScale(1).play();
+        }
+        actor.mixer.update(dt);
+      } else {
+        if (actor.previewClip) { actor.mixer.stopAllAction(); actor.previewClip = null; actor.state = null; }
+        actor.update(dt, input);
+      }
+    }
     function loop() {
       requestAnimationFrame(loop);
       const rawDelta = clock.getDelta();
@@ -217,13 +234,13 @@
       const airborne = state === 'fly' || state === 'dive' || (state === 'fall' && (t % 4) < 2);
       if (state === 'fall') rig.root.position.y = airborne ? 3 * (1 - ((t % 4) / 2) ** 2) : 0;
       else if (rig.root.position.y) rig.root.position.y = 0;
-      anim.update(dt, { speed, dist: speed * dt, yawRate: 0, dead: state === 'dead' || state === 'fall', trapped: state === 'trapped', groundAt: () => 0, groundPitch: 0, pose, airborne });
+      updatePreviewAnimator(anim, { speed, dist: speed * dt, yawRate: 0, dead: state === 'dead' || state === 'fall', trapped: state === 'trapped', groundAt: () => 0, groundPitch: 0, pose, airborne }, dt);
       fakeView.st = DSMAP[state] ?? 0;
       fakeView.spd = speed;
       fakeView.time = t;
       extra?.(fakeView, dt);
       for (const copy of copies) {
-        copy.anim.update(dt, { speed, dist: speed * dt, yawRate: 0, dead: state === 'dead' || state === 'fall', trapped: state === 'trapped', groundAt: () => 0, groundPitch: 0, pose, airborne });
+        updatePreviewAnimator(copy.anim, { speed, dist: speed * dt, yawRate: 0, dead: state === 'dead' || state === 'fall', trapped: state === 'trapped', groundAt: () => 0, groundPitch: 0, pose, airborne }, dt);
         copy.st = fakeView.st; copy.spd = speed;
         extra?.(copy, dt);
       }

@@ -34,6 +34,13 @@
       "source": "Project-authored Brachiosaurus; art/sources/brachio/brachio.blend (build scripts in its text blocks)",
       "license": "Project source",
       "triangles": 58628
+    },
+    {
+      "id": "dino-alpha-sarcosuchus",
+      "file": "assets/models/dinos/alpha-sarcosuchus.glb",
+      "source": "Project-authored Alpha Sarcosuchus; art/sources/alpha-sarcosuchus/alpha-sarcosuchus.blend (rebuildable scripts in text blocks)",
+      "license": "Project source",
+      "triangles": 58575
     }
   ]
 }
