@@ -146,7 +146,7 @@ export function buildLayout(terrain) {
     const crater = plan.pools.find((p) => p.kind === 'lava' && Math.hypot(p.x - v.x, p.z - v.z) < 1);
     // (the caldera: its smoke rises from a vent on the rim across from the notch – the crater floor is the arena)
     layout.volcano = v.rimH != null
-      ? { x: v.x - Math.cos(v.notchAngle) * v.craterR, z: v.z - Math.sin(v.notchAngle) * v.craterR, craterY: v.rimY + 1, craterR: 12 }
+      ? { x: v.x - Math.cos(v.notchAngle) * v.craterR, z: v.z - Math.sin(v.notchAngle) * v.craterR, craterY: v.rimY + 1, craterR: 6 }
       : { x: v.x, z: v.z, craterY: crater ? crater.level : v.height * 0.7, craterR: v.craterR };
   }
 
