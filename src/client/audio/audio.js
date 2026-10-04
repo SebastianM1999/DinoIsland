@@ -228,6 +228,7 @@ export class GameAudio {
   /** Species calls. Small animals get short chirps/screeches, big ones deep roars. */
   #creature(type, t, out) {
     switch (type) {
+      case 'alpha-sarcosuchus':
       case 'trex':
         this.#voice(t, out, { pitch: [62, 92, 80, 55], dur: 1.9, vol: 1.15, formants: [320, 820], lowpass: 1400, vibrato: [4, 0.02], rough: [27, 0.05], breath: 0.25, attack: 0.18 });
         break;
@@ -278,6 +279,34 @@ export class GameAudio {
       }
     }
     switch (name) {
+      case 'sarco_lunge':
+        this.#voice(t, out, { pitch: [45, 76, 52], dur: .7, vol: .9, formants: [220, 650], lowpass: 1000, breath: .3 });
+        break;
+      case 'sarco_bite':
+        this.#osc('triangle', 170, 55, t, .22, out, .65);
+        this.#noise(t, .16, out, { vol: .35, f0: 900, f1: 220 });
+        break;
+      case 'sarco_shove':
+        this.#osc('sine', 90, 35, t, .5, out, .8);
+        this.#noise(t, .35, out, { vol: .25, f0: 300, f1: 700 });
+        break;
+      case 'sarco_tail':
+        this.#noise(t, .7, out, { vol: .4, f0: 350, f1: 2300, a: .15 });
+        this.#osc('sine', 60, 35, t, .6, out, .5);
+        break;
+      case 'sarco_ambush':
+        this.#noise(t, .9, out, { vol: .4, type: 'lowpass', f0: 250, f1: 1600, a: .2 });
+        this.#osc('sine', 45, 90, t, .8, out, .45);
+        break;
+      case 'sarco_pivot': case 'sarco_reposition': case 'sarco_retreat':
+        this.#noise(t, .4, out, { vol: .2, f0: 450, f1: 180 });
+        break;
+      case 'sarco_recovery':
+        this.#noise(t, .6, out, { vol: .15, f0: 230, f1: 100 });
+        break;
+      case 'sarco_enrage': case 'roar_alpha-sarcosuchus':
+        this.#creature('alpha-sarcosuchus', t, out);
+        break;
       case 'pistol':
       case 'rifle':
         this.#noise(t, 0.10, out, { vol: 0.35, type: 'lowpass', f0: 5500, f1: 400, q: 0.7 });
