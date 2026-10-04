@@ -63,7 +63,8 @@ export function buildLayout(terrain) {
     trexPatrol: [],
     path: [],
     pools: plan.pools.map((p) => ({ x: p.x, z: p.z, r: p.r, level: p.level, kind: p.kind, disc: p.disc })),
-    rivers: plan.river ? [{ kind: plan.river.kind, pts: plan.river.pts.map((p) => ({ ...p })) }] : [],
+    // every flow: the river, or the volcano's lava flows and its crater moat (`ring`)
+    rivers: flowsOf(plan).map((f) => ({ kind: f.kind, ring: !!f.ring, pts: f.pts.map((p) => ({ ...p })) })),
     waterfalls: [],
     waterfall: null,
     volcano: null,
