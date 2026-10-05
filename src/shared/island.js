@@ -1311,7 +1311,14 @@ function lavaFields(plan, rng) {
     const line = [];
     for (let a = a0 - FIELDS.dam - 4; a <= a1 + FIELDS.dam + 4; a += 1.5) line.push({ ...at(a), a });
     const c = at((a0 + a1) / 2);
-    plan.fields.push({ a0, a1, line, cx: c.x, cz: c.z, reach: FIELDS.length / 2 + FIELDS.dam + 14 });
+    // a basalt curb along its lower edge (shared/layout.js: a wall one cannot stand on)
+    const curb = [];
+    for (let a = a0 - 1; a <= a1 + 1; a += 2) {
+      const p = at(a), q = at(a + 2), l = Math.hypot(q.x - p.x, q.z - p.z) || 1;
+      const off = FIELDS.from - FIELDS.curb.w / 2 + 0.25;
+      curb.push({ x: (p.x + q.x) / 2 + p.nx * off, z: (p.z + q.z) / 2 + p.nz * off, len: l + 0.15, rot: Math.atan2(q.z - p.z, q.x - p.x), top: Math.max(p.y, q.y) - FIELDS.below + FIELDS.curb.h });
+    }
+    plan.fields.push({ a0, a1, line, curb, cx: c.x, cz: c.z, reach: FIELDS.length / 2 + FIELDS.dam + 14 });
     // the columns: from the walkway's edge at the bottom end to the one at the top
     columnRun(plan, rng, { at, a0, a1, from: FIELDS.from, to: FIELDS.to, surf: (a) => at(a).y - FIELDS.below });
   }
@@ -1380,9 +1387,9 @@ function columnRun(plan, rng, { at, a0, a1, from, to, surf, jump = FIELDS.jump }
     plan.steps.push(st);
     prev = { a, s, r, top: st.top, x: st.x, z: st.z };
   }
-  // every third or fourth column (never the first or the last) sinks under whoever stands on it
+  // every other column (never the first or the last) sinks under whoever stands on it
   const run = plan.steps.slice(first);
-  for (let k = 2 + Math.floor(rng() * 2); k < run.length - 1; k += 3 + Math.floor(rng() * 2)) run[k].sink = true;
+  for (let k = 1 + Math.floor(rng() * 2); k < run.length - 1; k += 2) run[k].sink = true;
 }
 /**
  * The ridge path's lava fields:  }
@@ -1392,9 +1399,10 @@ function columnRun(plan, rng, { at, a0, a1, from, to, surf, jump = FIELDS.jump }
  * how far the lava lies below the walkway, across what (sideways from the
  * walkway's middle, up the volcano positive: the drop's edge to the ditch's
  * wall), how far the ditch is dammed beyond each end, the jumps (edge to edge, m) and
- * how far up one may lead.
+ * how far up one may lead, the lip below it and the basalt curb on it (height over the
+ * lava, width).
  */
-const FIELDS = { at: [0.36, 0.72], length: 32, below: 0.6, from: -RIDGE.width / 2 - 1, to: RIDGE.width / 2 + RIDGE.ditch + 1.3, dam: 6, jump: [1, 2.3], rise: 0.75, above: 0.8, flatten: 25 };
+const FIELDS = { at: [0.36, 0.72], length: 32, below: 0.6, from: -RIDGE.width / 2 - 1, to: RIDGE.width / 2 + RIDGE.ditch + 1.3, dam: 6, jump: [1, 2.3], rise: 0.75, above: 0.8, flatten: 25, lip: 0.5, curb: { h: 0.65, w: 0.7 } };
 
 /**
  * A lava field's bed: below its lava from the drop's edge to the ditch's wall,
@@ -1415,7 +1423,11 @@ function fieldEffect(plan, x, z, h) {
     if (best > 12) continue;
     const surface = y - FIELDS.below;
     // the lip along the drop, a little past either end too
-    if (s <= FIELDS.from && a > fd.a0 - 4 && a < fd.a1 + 4) h = Math.max(h, lerp(surface + 0.7, h, smoothstep(6, 9, FIELDS.from - s)));
+    // (a narrow lip, then straight down: too steep to walk along – no way round the field)
+    if (s <= FIELDS.from && a > fd.a0 - 4 && a < fd.a1 + 4) {
+      const e = FIELDS.from - s;
+      h = Math.max(h, e < FIELDS.lip ? surface + 0.5 : surface + 0.5 - (e - FIELDS.lip) * RIDGE.drop);
+    }
     if (a >= fd.a0 && a <= fd.a1) {
       if (s > FIELDS.from && s < FIELDS.to) h = Math.min(h, surface - 0.9);
     } else if ((a < fd.a0 ? fd.a0 - a : a - fd.a1) < FIELDS.dam && s > RIDGE.width / 2 && s < FIELDS.to + 2) {

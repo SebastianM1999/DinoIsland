@@ -74,6 +74,9 @@ test('one path winds up the volcano and in through the notch onto the crater flo
 /** On one of the mountain path's lava fields (the jump and runs), where its walkway is lava. */
 const atFord = (plan, x, z) => plan.fields.some((fd) => fd.line.some((q) => q.a > fd.a0 - 2 && q.a < fd.a1 + 2 && Math.hypot(q.x - x, q.z - z) < 9));
 
+/** Half the ridge path's walkway (shared/island.js RIDGE.width / 2). */
+const RIDGE_HALF = 2.5;
+
 /** The path's points with the sideways unit vector up the volcano. */
 const pathSides = (plan) => {
   const pts = plan.ramps.find((r) => r.caldera).pts, v = plan.volcano;
@@ -133,6 +136,28 @@ test('two jump and runs on the mountain path: long lava fields, no way round, va
           if (plan.steps.some((st) => Math.hypot(st.x - x, st.z - z) < st.r + 0.3)) continue;
           assert.notEqual(terrain.lavaLevelAt(x, z), null, `v${variant}: lava across the field (${o} m)`);
         }
+      }
+      // nor round its sides: below it a narrow lip, then too steep to walk along; above it the ditch's wall
+      const along = fd.line.filter((l) => l.a > fd.a0 + 2 && l.a < fd.a1 - 2);
+      const from = -RIDGE_HALF - 1;
+      for (let o = 1.2; o <= 6; o += 0.6) {
+        let walk = 0;
+        for (const q of along) {
+          const x = q.x - q.nx * (-from + o), z = q.z - q.nz * (-from + o);
+          // (a walkable strip at the walkway's height; the flank far below leads nowhere: the ridge is too steep to climb back)
+          if (terrain.lavaLevelAt(x, z) === null && terrain.slopeAt(x, z) < CONFIG.player.maxWalkSlope && terrain.heightAt(x, z) > q.y - 2.5) walk++;
+        }
+        assert.ok(walk < along.length * 0.35, `v${variant}: a way round below the field, ${o.toFixed(1)} m out (${walk}/${along.length})`);
+      }
+      // (a basalt curb runs along its lower edge – over the lava, nothing to stand on)
+      assert.ok(fd.curb.length >= 15, 'a curb along it');
+      for (const q of along) {
+        const x = q.x + q.nx * (from - 0.1), z = q.z + q.nz * (from - 0.1);
+        assert.ok(layout.curbs.some((c) => {
+          const dx = x - c.x, dz = z - c.z, cs = Math.cos(c.rot), sn = Math.sin(c.rot);
+          return Math.abs(dx * cs + dz * sn) <= c.hw + 0.2 && Math.abs(-dx * sn + dz * cs) <= c.hd + 0.4;
+        }), `v${variant}: the curb covers the lava's lower edge`);
+        assert.ok(layout.groundAt(x, z) < q.y, 'no standing on the curb');
       }
       // its columns, in order up the path: from the walkway's edge to the next, a jump apart
       const near = (st) => fd.line.some((q) => q.a >= fd.a0 - 1 && q.a <= fd.a1 + 1 && Math.hypot(q.x - st.x, q.z - st.z) < 9);

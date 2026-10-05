@@ -64,7 +64,7 @@ export function buildLayout(terrain) {
     path: [],
     pools: plan.pools.map((p) => ({ x: p.x, z: p.z, r: p.r, level: p.level, kind: p.kind, disc: p.disc, small: p.small })),
     // every flow: the river, or the volcano's lava flows and its crater moat (`ring`)
-    rivers: flowsOf(plan).map((f) => ({ kind: f.kind, ring: !!f.ring, pts: f.pts.map((p) => ({ ...p })) })),
+    rivers: flowsOf(plan).map((f) => ({ kind: f.kind, ring: !!f.ring, field: !!f.field, pts: f.pts.map((p) => ({ ...p })) })),
     waterfalls: [],
     waterfall: null,
     volcano: null,
@@ -372,6 +372,15 @@ export function buildLayout(terrain) {
     circles.push(c);
     layout.stepColliders[s.id] = c;
     reserve(s.x, s.z, s.r + 1.5);
+  }
+  // the lava fields' basalt curbs along their lower edge: a low wall (no standing on it)
+  layout.curbs = [];
+  for (const fd of plan.fields || []) {
+    for (const c of fd.curb) {
+      const b = { x: c.x, z: c.z, hw: c.len / 2, hd: 0.35, rot: c.rot, top: c.top, bottom: c.top - 5, kind: 'basalt' };
+      boxes.push(b);
+      layout.curbs.push(b);
+    }
   }
   // the lava geysers (vents in the path) and the lava lake treasure on its islet
   layout.geysers = (plan.geysers || []).map((g) => ({ ...g, y: terrain.heightAt(g.x, g.z) }));

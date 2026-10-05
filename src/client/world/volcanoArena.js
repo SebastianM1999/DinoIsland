@@ -64,6 +64,11 @@ export function buildVolcanoArena(terrain, layout) {
       glow.push(place(emberGeometry(c), [c.x, c.y, c.z], [0, c.rot, 0]));
     }
   }
+  // the lava fields' basalt curbs: from the drop below up to a little over the lava
+  for (const c of layout.curbs || []) {
+    const h = c.top - c.bottom;
+    solid.push(place(paint(new THREE.BoxGeometry(c.hw * 2, h, c.hd * 2).translate(0, h / 2, 0), (p) => (p.y > h - 0.25 ? '#4a4248' : BASALT[Math.floor(p.y * 1.7) % BASALT.length])), [c.x, c.bottom, c.z], [0, -c.rot, 0]));
+  }
   // the jump-and-run columns: from deep in the lava up to their tops (sinking ones: meshes of their own)
   const sinking = [];
   for (const st of layout.steps || []) {
