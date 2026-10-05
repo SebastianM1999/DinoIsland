@@ -7,6 +7,8 @@
 // - The eruption cycle: calm -> rumble (a warning) -> erupt (lava bombs rain
 //   down, each one announced with a warning circle where it lands; they hurt
 //   dinosaurs too) -> ash (ash rain: thick air, dinosaurs see less far) -> calm.
+// - The mountain path up the caldera is a bomb zone: lava bombs keep coming
+//   down ahead of whoever climbs it, eruption or not.
 // - Ash rain also blows in on the wind between eruptions (source 'wind'). Out in
 //   it a player slowly loses health (never below a floor); the camp and the
 //   base plots shelter (shared/volcanoArena.js ashShelter).
@@ -85,6 +87,8 @@ export class Volcano {
       this.nextWave = now + V.bomb.wave;
       this.#wave();
     }
+    // --- the mountain path: bombs ahead of whoever climbs it
+    if (w.mission.phase !== 'sailing') this.#slopeBombs(now);
     // --- bombs landing
     for (let i = this.bombs.length - 1; i >= 0; i--) {
       if (now < this.bombs[i].at) continue;
@@ -137,11 +141,48 @@ export class Volcano {
       const spot = this.#spot(rng.range(-A, A), rng.range(-A, A));
       if (spot) { targets.push(spot); break; }
     }
-    for (const t of targets) {
-      const bomb = { ...t, at: w.now + B.warn };
-      this.bombs.push(bomb);
-      w.event(EV.BOMB, { x: r2(t.x), z: r2(t.z), y: r2(t.y), eta: B.warn, r: B.radius });
+    for (const t of targets) this.#launch(t);
+  }
+
+  /** A bomb on its way to `t` (it lands in bomb.warn s; everyone sees its warning circle). */
+  #launch(t) {
+    const B = V.bomb;
+    this.bombs.push({ ...t, at: this.world.now + B.warn });
+    this.world.event(EV.BOMB, { x: r2(t.x), z: r2(t.z), y: r2(t.y), eta: B.warn, r: B.radius });
+  }
+
+  /**
+   * The mountain path: on it (past its foot, short of the notch) a player gets
+   * a bomb every few seconds, landing on the path ahead of them.
+   */
+  #slopeBombs(now) {
+    const w = this.world, S = V.slope, rng = this.rng;
+    const climb = this.climb ??= w.layout.plan.ramps.find((r) => r.caldera)?.pts ?? [];
+    if (!climb.length) return;
+    for (const p of w.players.values()) {
+      const j = p.alive && !p.creative ? this.#onClimb(climb, p) : -1;
+      if (j < 0) { p.slopeBombAt = 0; continue; }
+      if (!p.slopeBombAt) { p.slopeBombAt = now + rng.range(S.first[0], S.first[1]); continue; }
+      if (now < p.slopeBombAt) continue;
+      p.slopeBombAt = now + rng.range(S.every[0], S.every[1]);
+      // up the path from where they stand
+      let k = j, s = 0;
+      const want = rng.range(S.ahead[0], S.ahead[1]);
+      while (k < climb.length - 1 && s < want) { s += Math.hypot(climb[k + 1].x - climb[k].x, climb[k + 1].z - climb[k].z); k++; }
+      const a = rng() * Math.PI * 2, o = rng() * S.side;
+      const spot = this.#spot(climb[k].x + Math.cos(a) * o, climb[k].z + Math.sin(a) * o);
+      if (spot) this.#launch(spot);
     }
+  }
+
+  /** The mountain path point a player is on (index), or -1 off it, at its foot or in the notch. */
+  #onClimb(climb, p) {
+    let j = -1, best = 8 * 8;
+    for (let i = 0; i < climb.length; i += 2) {
+      const d = (climb[i].x - p.x) ** 2 + (climb[i].z - p.z) ** 2;
+      if (d < best) { best = d; j = i; }
+    }
+    return j > climb.length * 0.08 && j < climb.length * 0.97 ? j : -1;
   }
 
   /** A landing spot for a bomb at (x, z), or null: on land, never at the camp, the base or the boat. */

@@ -5,6 +5,8 @@
 // layout.volcanoArena); the columns' colliders are circles in
 // layout.colliders. The lava moat is a lava flow (world/water.js), the floor
 // and the wall are terrain.
+// Also the stepping stones where the mountain path fords a lava flow
+// (layout.steps): basalt columns standing out of the lava, glowing at the foot.
 
 import * as THREE from 'three';
 import { MAT, paint, place, merge, mesh } from '../models/kit.js';
@@ -35,6 +37,13 @@ export function buildVolcanoArena(terrain, layout) {
       solid.push(place(columnGeometry(c, k++), [c.x, c.y, c.z], [c.tilt, c.rot, c.tilt * 0.5]));
       glow.push(place(emberGeometry(c), [c.x, c.y, c.z], [0, c.rot, 0]));
     }
+  }
+  // the ford's stepping stones: from deep in the lava up to their tops
+  for (const st of layout.steps || []) {
+    const c = { r: st.r, h: 3.2, tilt: 0, rot: (st.x * 7.3 + st.z * 3.1) % 6.28 };
+    solid.push(place(columnGeometry(c, k++), [st.x, st.top - c.h + 0.15, st.z], [0, c.rot, 0]));
+    const lava = terrain.lavaLevelAt(st.x, st.z);
+    if (lava !== null) glow.push(place(emberGeometry(c), [st.x, lava + 0.02, st.z], [0, c.rot, 0]));
   }
   if (a.sign) solid.push(place(signGeometry(), [a.sign.x, a.sign.y, a.sign.z], [0, -a.sign.angle + Math.PI / 2, 0]));
   for (const b of a.bones) solid.push(place(boneGeometry(b.kind), [b.x, b.y - 0.05, b.z], [0, b.rot, 0], b.s));

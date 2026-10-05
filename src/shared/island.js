@@ -185,9 +185,9 @@ function poolEffect(plan, x, z, h) {
 function ventEffect(plan, x, z, h) {
   // the young flow runs between high banks down the steep flank
   const q = riverQuery(plan, x, z, 12, 'lava');
-  if (q && q.flow.vent && q.i <= 3 && q.d > q.width / 2) {
-    const k = 1 - smoothstep(q.width / 2 + 3, q.width / 2 + 7, q.d);
-    h = Math.max(h, lerp(h, q.surface + 1.2, k));
+  if (q && q.flow.vent && q.i <= 4 && q.d > q.width / 2) {
+    const k = 1 - smoothstep(q.width / 2 + 4, q.width / 2 + 9, q.d);
+    h = Math.max(h, lerp(h, q.surface + 1.6, k));
   }
   for (const f of plan.flows) {
     const v = f.vent;
@@ -252,7 +252,8 @@ function riverCarve(plan, x, z, h) {
   if (!q) return h;
   const half = q.width / 2;
   // the crater's lava moat only digs its own channel: the crater wall beside it stays a wall
-  if (q.flow.ring) return q.d < half ? Math.min(h, q.surface - 0.8 * (1 - (q.d / half) ** 2) - 0.15) : h;
+  // (so does the lava seeping along the ridge path's ditch: the ditch is the path's)
+  if (q.flow.ring || q.flow.gutter) return q.d < half ? Math.min(h, q.surface - 0.8 * (1 - (q.d / half) ** 2) - 0.15) : h;
   const depth = q.flow.kind === 'lava' ? 0.8 : 1.35;
   if (q.d < half) {
     const k = q.d / half;
@@ -279,17 +280,37 @@ function riverCarve(plan, x, z, h) {
 }
 
 /** Mountain paths: ramps spiralling up to the summit, cut into / built onto the slopes. */
+/**
+ * The volcano's ridge path (calderaPath): how wide the walkway is, how far
+ * beside it the ditch on the upper side runs and how deep, how steeply the
+ * lower side drops away, and how far out all that reaches (m).
+ */
+const RIDGE = { width: 3.6, ditch: 2.8, depth: 3.5, drop: 1.6, reach: 15 };
+
 function rampEffect(plan, x, z, h) {
   for (const r of plan.ramps) {
     if (Math.hypot(x - r.cx, z - r.cz) > r.reach) continue;
-    let bd = Infinity, by = 0;
+    let bd = Infinity, by = 0, bk = 0;
     const pts = r.pts;
     for (let i = 0; i < pts.length - 1; i++) {
       const a = pts[i], b = pts[i + 1];
       const vx = b.x - a.x, vz = b.z - a.z;
       const u = clamp(((x - a.x) * vx + (z - a.z) * vz) / (vx * vx + vz * vz || 1), 0, 1);
       const d = Math.hypot(a.x + vx * u - x, a.z + vz * u - z);
-      if (d < bd) { bd = d; by = lerp(a.y, b.y, u); }
+      if (d < bd) { bd = d; by = lerp(a.y, b.y, u); bk = r.ridge ? lerp(a.ridge ?? 0, b.ridge ?? 0, u) : 0; }
+    }
+    if (bk > 0) {
+      // the volcano's narrow ridge path: a steep drop on the lower side, a
+      // ditch on the upper one (lava seeps along it in places: ridgeGutters)
+      const half = r.width * 0.5;
+      if (bd > half + RIDGE.reach) continue;
+      let hr;
+      if (bd <= half) hr = by;
+      else if (h > by) hr = Math.min(h, by - RIDGE.depth + Math.max(0, Math.abs(bd - half - RIDGE.ditch) - 1.3) * 2);
+      else hr = Math.max(h, by - (bd - half) * RIDGE.drop);
+      const hs = bd < half ? by : h > by ? Math.max(by, lerp(h, by, 1 - smoothstep(half, half * 5, bd))) : Math.min(by, Math.max(h, lerp(h, by, 1 - smoothstep(half, half * 5, bd))));
+      h = lerp(hs, hr, bk);
+      continue;
     }
     // the walkway breathes: wider and narrower stretches
     const width = r.width * (0.8 + 0.35 * (valueNoise(x * 0.08, z * 0.08, plan.seed + 71) * 0.5 + 0.5));
@@ -418,7 +439,7 @@ export function islandHeight(plan, x, z) {
   // never dams a river, it dips down to cross it
   // (also on the flat swamp, which has no mountain paths but sites and plots beside its creek)
   const q = plan.ramps.length || plan.shape === 'hourglass' ? riverQuery(plan, x, z, 12) : null;
-  const keep = q ? smoothstep(q.width / 2 + 1.5, q.width / 2 + 8, q.d) : 1;
+  const keep = q && !q.flow.gutter ? smoothstep(q.width / 2 + 1.5, q.width / 2 + 8, q.d) : 1;
   const hr = h;
   if (keep > 0) h = lerp(h, rampEffect(plan, x, z, h), keep);
   h = padEffect(plan, x, z, h);
@@ -761,13 +782,22 @@ export function planIsland(levelIndex = 0, variant = 1) {
     }
     plan.flows = [];
     const climb = plan.ramps.find((r) => r.caldera).pts;
+    // (where the mountain path passes on a bearing: its radius there)
+    const pathR = (a) => {
+      let best = null;
+      for (const c of climb) if (off(Math.atan2(c.z - v.z, c.x - v.x), a) < 0.08) { const r = Math.hypot(c.x - v.x, c.z - v.z); if (!best || r < best) best = r; }
+      return best;
+    };
+    let above = false;
     for (const a of angles) {
-      // the vent keeps clear of the mountain path (the flow crosses it further down, on a bridge)
+      // the vent keeps clear of the mountain path (the flow crosses it further down);
+      // one vent at least sits above the path, so the path has lava to cross
+      const pr = above ? null : pathR(a);
       let vr = 0;
       for (let k = 0; k < 24; k++) {
         const r = v.craterR + (v.radius - v.craterR) * rng.range(0.2, 0.55);
         const gap = distToPolyline(climb, v.x + Math.cos(a) * r, v.z + Math.sin(a) * r);
-        if (gap > 22) { vr = r; break; }
+        if (gap > 22 && (!pr || r < pr - 18)) { vr = r; above ||= !!pr; break; }
         if (!vr || gap > distToPolyline(climb, v.x + Math.cos(a) * vr, v.z + Math.sin(a) * vr)) vr = r;
       }
       const start = { x: v.x + Math.cos(a) * vr, z: v.z + Math.sin(a) * vr };
@@ -777,6 +807,26 @@ export function planIsland(levelIndex = 0, variant = 1) {
       flow.vent = { x: start.x, z: start.z, y: y0 };
       plan.flows.push(flow);
     }
+    // the mountain path crosses lava at least once (stepping stones there): if
+    // none of the flows does, one more breaks out a little above its middle
+    const crosses = (fl) => fl.pts.some((p, i) => i && climb.some((c, j) => j && segCross(fl.pts[i - 1], p, climb[j - 1], c)));
+    if (!plan.flows.some(crosses)) {
+      for (const t of [0.5, 0.4, 0.6, 0.3, 0.7]) {
+        const m = climb[Math.floor(climb.length * t)];
+        const a = Math.atan2(m.z - v.z, m.x - v.x), rm = Math.hypot(m.x - v.x, m.z - v.z);
+        if (off(a, Math.PI) < 0.8 || off(a, 0) < 0.65 || angles.some((b) => off(a, b) < 0.35)) continue;
+        const start = { x: v.x + Math.cos(a) * (rm - 16), z: v.z + Math.sin(a) * (rm - 16) };
+        const goal = { x: Math.cos(a) * A * 1.35, z: Math.sin(a) * A * 1.35 };
+        const y0 = naturalHeight(plan, start.x, start.z);
+        const flow = traceFlow(plan, start, goal, { kind: 'lava', width0: 4, width1: 7.5, surface0: y0 - 0.6, stopAt: 0.5 });
+        flow.vent = { x: start.x, z: start.z, y: y0 };
+        if (!crosses(flow)) continue;
+        plan.flows.push(flow);
+        break;
+      }
+    }
+    // the ridge eases off where the path meets a flow (the flow keeps its banks)
+    for (const c of climb) if (c.ridge) c.ridge *= smoothstep(10, 24, Math.min(...plan.flows.map((fl) => distToPolyline(fl.pts, c.x, c.z))));
     plan.volcanoArena = planVolcanoArena(plan);
     plan.flows.push(moatFlow(plan.volcanoArena));
     plan.river = plan.flows[0];
@@ -897,7 +947,10 @@ export function planIsland(levelIndex = 0, variant = 1) {
   }
   // the paths cross the lava flows on basalt bridges; the mountain path rises gently onto their decks
   plan.bridges = volcanic ? lavaBridges(plan) : [];
+  plan.steps = [];
+  if (volcanic) planLavaSteps(plan);
   for (const b of plan.bridges) {
+    if (b.steps) continue;
     for (const r of plan.ramps) {
       // (measured along the path from where it crosses: not the loop above or below)
       const pts = r.pts;
@@ -913,6 +966,9 @@ export function planIsland(levelIndex = 0, variant = 1) {
       }
     }
   }
+
+  // lava seeping along the ridge path's ditch
+  if (volcanic) ridgeGutters(plan);
 
   // --- sites: caves, ruins, nest, meadows (flat pads away from trail, river and each other)
   const taken = [
@@ -1119,7 +1175,7 @@ export function planIsland(levelIndex = 0, variant = 1) {
  */
 function calderaPath(plan, rng) {
   const v = plan.volcano;
-  const turns = rng.range(1.3, 1.5), dir = rng() < 0.5 ? -1 : 1;
+  const turns = rng.range(0.6, 0.7), dir = rng() < 0.5 ? -1 : 1;
   const outer = v.craterR + 9;
   const yEnd = v.floorY + 1.5 + 9 * 0.35;              // the notch's floor there (volcanoHeight, on the lowland)
   const footR = v.radius * 1.02;
@@ -1146,15 +1202,93 @@ function calderaPath(plan, rng) {
     for (let k = -3; k <= 3; k++) if (rs[i + k] != null) { sum += rs[i + k]; n++; }
     const r = clamp(sum / n, outer, footR);
     const a = a0 + dir * t * turns * TAU;
-    pts.push({ x: v.x + Math.cos(a) * r, z: v.z + Math.sin(a) * r, y: lerp(y0, yEnd, t) });
+    // (a ridge from a little way up the foot to just below the notch)
+    pts.push({ x: v.x + Math.cos(a) * r, z: v.z + Math.sin(a) * r, y: lerp(y0, yEnd, t), ridge: smoothstep(0.04, 0.12, t) * (1 - smoothstep(0.93, 0.99, t)) });
   }
   // through the notch and down onto the floor (across the moat's gap)
   const c = Math.cos(v.notchAngle), s = Math.sin(v.notchAngle);
   for (const [r, y] of [[v.craterR + 3, v.floorY + 2.6], [v.craterR - 2, v.floorY + 1.1], [v.floorR - 3, v.floorY + 0.15], [VOLCANO_ARENA.r - 6, v.floorY + 0.1]]) {
     pts.push({ x: v.x + c * r, z: v.z + s * r, y });
   }
-  return { pts, width: 5.6, cx: v.x, cz: v.z, reach: footR * 1.15 + 12, hill: -1, caldera: true };
+  return { pts, width: RIDGE.width, cx: v.x, cz: v.z, reach: footR * 1.15 + 12, hill: -1, caldera: true, ridge: true };
 }
+
+/**
+ * Where the volcano's mountain path crosses a lava flow, up to two crossings
+ * get no bridge but stepping stones: basalt columns standing out of the lava,
+ * a jump apart (plan.steps; players stand on them: shared/layout.js).
+ */
+function planLavaSteps(plan) {
+  const climb = plan.ramps.find((r) => r.caldera)?.pts;
+  if (!climb) { for (const b of plan.bridges) delete b.cross; return; }
+  const v = plan.volcano;
+  const cands = plan.bridges.filter((b) => b.cross === climb && Math.hypot(b.x - v.x, b.z - v.z) > v.craterR + 16
+    && distToPolyline(plan.trail, b.x, b.z) > b.r + 12);
+  for (const b of cands.slice(0, 2)) {
+    // along the path across the stream: from bank to bank
+    let j = 0, jd = Infinity;
+    climb.forEach((p, k) => { const d = Math.hypot(p.x - b.x, p.z - b.z); if (d < jd) { jd = d; j = k; } });
+    const p0 = climb[Math.max(0, j - 2)], p1 = climb[Math.min(climb.length - 1, j + 2)];
+    const l = Math.hypot(p1.x - p0.x, p1.z - p0.z) || 1, dx = (p1.x - p0.x) / l, dz = (p1.z - p0.z) / l;
+    const lava = (t) => { const q = riverQuery(plan, b.x + dx * t, b.z + dz * t, 12, 'lava'); return q && !q.flow.ring && q.d < q.width / 2 + 1.5 ? q : null; };
+    let t0 = 0, t1 = 0;
+    while (t0 > -20 && lava(t0 - 0.25)) t0 -= 0.25;
+    while (t1 < 20 && lava(t1 + 0.25)) t1 += 0.25;
+    const L = t1 - t0 + 1;                              // (a little onto each bank)
+    const n = Math.max(2, Math.round(L / STEPS.spacing));
+    for (let k = 0; k < n; k++) {
+      const t = t0 - 0.5 + (k + 0.5) * (L / n);
+      const x = b.x + dx * t, z = b.z + dz * t;
+      const q = riverQuery(plan, x, z, 12, 'lava');
+      plan.steps.push({ x, z, r: STEPS.r, top: (q ? q.surface : b.y - 0.9) + STEPS.above });
+    }
+    b.steps = true;
+  }
+  plan.bridges = plan.bridges.filter((b) => !b.steps);
+  for (const b of plan.bridges) delete b.cross;
+}
+/** Stepping stones: radius, how far apart (middle to middle) and how high over the lava (m). */
+const STEPS = { r: 0.75, spacing: 3.1, above: 0.8 };
+
+/**
+ * Lava seeping along the ditch beside the volcano's ridge path, in two or
+ * three stretches away from the crossings (flows of their own: gutter).
+ */
+function ridgeGutters(plan) {
+  const climb = plan.ramps.find((r) => r.caldera);
+  if (!climb) return;
+  const v = plan.volcano, pts = climb.pts, n = pts.length;
+  const len = [0];
+  for (let i = 1; i < n; i++) len.push(len[i - 1] + Math.hypot(pts[i].x - pts[i - 1].x, pts[i].z - pts[i - 1].z));
+  const near = (p) => [...plan.bridges, ...plan.steps].some((b) => Math.hypot(b.x - p.x, b.z - p.z) < 30)
+    || plan.flows.some((f) => !f.ring && distToPolyline(f.pts, p.x, p.z) < f.pts[0].w + 12);
+  let made = 0, i = Math.floor(n * 0.18);
+  while (i < n * 0.85 && made < 3) {
+    // a stretch of about 35 m along a steady ridge
+    let j = i;
+    while (j < n - 1 && len[j] - len[i] < GUTTER.length) j++;
+    const run = pts.slice(i, j + 1);
+    if (run.some((p) => (p.ridge ?? 0) < 0.99 || near(p))) { i += 3; continue; }
+    const out = [];
+    for (let k = run.length - 1; k >= 0; k--) {
+      const a = pts[Math.max(0, i + k - 1)], b = pts[Math.min(n - 1, i + k + 1)], p = run[k];
+      const tx = b.x - a.x, tz = b.z - a.z, tl = Math.hypot(tx, tz) || 1;
+      // to the upper side: toward the volcano
+      let nx = -tz / tl, nz = tx / tl;
+      if (nx * (v.x - p.x) + nz * (v.z - p.z) < 0) { nx = -nx; nz = -nz; }
+      const off = RIDGE.width * 0.5 + RIDGE.ditch;
+      const y = Math.min(out.length ? out[out.length - 1].y : Infinity, p.y - GUTTER.below);
+      out.push({ x: p.x + nx * off, z: p.z + nz * off, y, w: GUTTER.width });
+    }
+    const flow = { kind: 'lava', pts: out, gutter: true };
+    indexRiver(flow);
+    plan.flows.push(flow);
+    made++;
+    i = j + 25;
+  }
+}
+/** The ridge path's lava gutters: stretch length, channel width, how far below the walkway (m). */
+const GUTTER = { length: 35, width: 3, below: 2 };
 
 /** Segment intersection: the parameters (t on a, u on b) or null. */
 function segCross(a0, a1, b0, b1) {
@@ -1185,7 +1319,7 @@ function lavaBridges(plan) {
           const x = lerp(a.x, b.x, hit.t), z = lerp(a.z, b.z, hit.t);
           const lava = lerp(a.y, b.y, hit.t), w = lerp(a.w, b.w, hit.t);
           const pathY = c.y != null ? lerp(c.y, d.y, hit.u) : naturalHeight(plan, x, z);
-          const br = { x, z, r: w / 2 + 3.5, y: Math.max(pathY, lava + 0.9) };
+          const br = { x, z, r: w / 2 + 3.5, y: Math.max(pathY, lava + 0.9), cross: line };
           const near = out.find((o) => Math.hypot(o.x - x, o.z - z) < o.r + br.r);
           if (near) { near.y = Math.max(near.y, br.y); continue; }
           out.push(br);
