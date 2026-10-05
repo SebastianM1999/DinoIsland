@@ -530,13 +530,6 @@ export class Game {
       this.volcanoFx.bomb(m);
       if (Math.hypot(m.x - this.player.pos.x, m.z - this.player.pos.z) < 45) this.audio.play('bombWhistle', { pos: { x: m.x, y: m.y + 10, z: m.z } });
     });
-    net.on(`ev:${EV.CRUST}`, (m) => {
-      this.volcanoFx.crust(m.id, m.state, m.left);
-      const c = this.layout.crusts?.[m.id];
-      const pos = c ? { x: c.x, y: c.y, z: c.z } : undefined;
-      if (m.state === 'crack') this.audio.play('crustCrack', { pos });
-      if (m.state === 'broken') this.audio.play('crustBreak', { pos });
-    });
     net.on(`ev:${EV.TOWER_SHOT}`, (m) => {
       this.baseView.shoot(m);
       this.audio.play(m.kind === 'arrow' ? 'bow' : 'throw', { pos: { x: m.o[0], y: m.o[1], z: m.o[2] } });

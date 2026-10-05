@@ -2,7 +2,7 @@
 > All game sound on the client via Web Audio: recorded effects and footsteps, synthesized fallback/UI cues, positional 3D audio (including distinct Sarcosuchus attack wind-up cues), water and shore ambience, and adaptive island/menu/boss music.
 
 ## Files
-- `audio.js` — `GameAudio`: the audio graph (master, sfx, music, ambience buses), `play(name, opts)` (synthesized fallbacks, and the volcano's own: `rumble`, `eruption`, `bombWhistle`, `bombImpact`, `crustCrack`, `crustBreak`), listener updates, ambience and water loops (and the ash rain's wind: `update({ ash })`), music control; follows volume settings.
+- `audio.js` — `GameAudio`: the audio graph (master, sfx, music, ambience buses), `play(name, opts)` (synthesized fallbacks, and the volcano's own: `rumble`, `eruption`, `bombWhistle`, `bombImpact`), listener updates, ambience and water loops (and the ash rain's wind: `update({ ash })`), music control; follows volume settings.
 - `catalog.js` — sample file catalog: `FOOTSTEPS` per surface, `EFFECTS` per sound name, `ISLAND_MUSIC` (jungle/volcano calm+danger; the swamp borrows the volcano's), `MENU_MUSIC`, `BOSS_MUSIC`, `musicLoopStart`, `effectGroup()`.
 - `music.js` — `IslandMusic`: owns music sources across Game instances, crossfades calm/danger/boss/menu tracks (`MUSIC_FADE`, `DANGER_HOLD`).
 - `samples.js` — `SampleBank` (deduplicated fetch + decode, failures remembered for the session) and `SamplePicker` (variation picking).

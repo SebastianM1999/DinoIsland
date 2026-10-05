@@ -93,7 +93,7 @@ export class ServerWorld {
     this.base = freshBase();          // the team's own base (islands 2+, see shared/base.js)
     this._safe = undefined;
     this.raids = new Raids(this);     // raids on the base (sim/raids.js)
-    this.volcano = new Volcano(this); // heat, crust plates, eruptions (sim/volcano.js; idle off the volcano)
+    this.volcano = new Volcano(this); // heat, eruptions, ash rain (sim/volcano.js; idle off the volcano)
     this.dinos = new DinoSystem(this);
     this.log(`island ${level + 1} "${levelDef(level).name}" variant ${variant}`);
   }
@@ -1439,8 +1439,8 @@ export class ServerWorld {
         }
         if (rate > 0) this.healPlayer(p, rate * dt);
       }
-      // lava burns (and sets you back on your feet only if you get out) – a broken crust plate too
-      const lava = this.terrain.lavaLevelAt(p.x, p.z) ?? this.volcano.lavaAt(p.x, p.z);
+      // lava burns (and sets you back on your feet only if you get out)
+      const lava = this.terrain.lavaLevelAt(p.x, p.z);
       if (lava !== null && p.y < lava + 0.6 && !p.creative) {
         p.lavaT = (p.lavaT ?? 0.4) + dt;
         if (p.lavaT >= 0.4) {

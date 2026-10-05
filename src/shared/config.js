@@ -137,13 +137,11 @@ export const CONFIG = {
     wing: 1.0,
   },
 
-  // Ashfall Isle (sim/volcano.js): hot ground, crust plates, the eruption cycle
+  // Ashfall Isle (sim/volcano.js): hot ground, the eruption cycle, ash rain
   volcano: {
     // heat 0..1 (shared/terrain.js heatAt): stamina drains up to (1 + staminaMul) times faster and
     // refills up to regenCut slower (client); from dmgFrom on the ground burns (server)
     heat: { dmgFrom: 0.6, dps: 3, staminaMul: 1, regenCut: 0.6 },
-    // a plate cracks after `warn` s under someone, breaks after `hold` s, is lava for `broken` s
-    crust: { warn: 0.5, hold: 1.5, broken: 20 },
     // seconds: the first rumble, calm between eruptions, the warning, the eruption, the ash rain after
     cycle: { first: 150, calmMin: 180, calmMax: 300, rumble: 8, erupt: 20, ashMin: 60, ashMax: 90 },
     // lava bombs: a wave every `wave` s, each announced `warn` s ahead; one lands `near` m from
@@ -180,7 +178,7 @@ export const CONFIG = {
       mudwalker:  { name: 'Mud Walker',  time: 30, text: 'No swamp slowdown' },
       secondwind: { name: 'Second Wind', time: 25, text: 'Stamina refills twice as fast, sprinting costs less', regenMul: 2, drainMul: 0.6 },
       lotusskin:  { name: 'Lotus Skin',  time: 20, text: 'Takes 25 % less damage', damageMul: 0.75 },
-      heatproof:  { name: 'Fireproof',   time: 30, text: 'No heat damage or heat exhaustion, crust holds twice as long', crustMul: 2 },
+      heatproof:  { name: 'Fireproof',   time: 30, text: 'No heat damage or heat exhaustion' },
       quickfoot:  { name: 'Quickfoot',   time: 25, text: 'Moves 15 % faster', speedMul: 1.15 },
       sharpedge:  { name: 'Sharp Edge',  time: 20, text: 'Deals 25 % more damage to dinosaurs', dinoDamageMul: 1.25 },
     },

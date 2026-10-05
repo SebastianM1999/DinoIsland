@@ -140,9 +140,7 @@ test('downhill may be steep, uphill may not; water, lava, the grove, the boss is
         const x = (rnd() * 2 - 1) * 350, z = (rnd() * 2 - 1) * 350;
         const wet = t.waterDepthAt(x, z) > 1.2 || t.lavaLevelAt(x, z) !== null;
         const zone = world.safeZone();
-        const banned = insideGrove(L, x, z, 3) || insideBossArena(L, x, z, 4) || (zone && Math.hypot(x - zone.x, z - zone.z) < zone.r + 10)
-          // the volcano's crust plates
-          || !!t.crustAt(x, z);
+        const banned = insideGrove(L, x, z, 3) || insideBossArena(L, x, z, 4) || (zone && Math.hypot(x - zone.x, z - zone.z) < zone.r + 10);
         if (wet || banned) {
           assert.ok(!sys.walkable(x, z, d, true), `island ${level + 1}/${variant} ${type}: ${x.toFixed(1)},${z.toFixed(1)} stays closed going down`);
           closed++;

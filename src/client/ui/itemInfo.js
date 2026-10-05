@@ -59,7 +59,7 @@ export const ITEM_INFO = {
   },
   emberchili: {
     name: F.emberchili.name, kind: 'Fruit',
-    text: `A fiery chili from the shrubs on the volcano's warm ground. Heals ${F.emberchili.heal} HP – and for ${B.heatproof.time} s hot ground neither burns nor tires you, and crust plates hold twice as long under you (${B.heatproof.name}).`,
+    text: `A fiery chili from the shrubs on the volcano's warm ground. Heals ${F.emberchili.heal} HP – and for ${B.heatproof.time} s hot ground neither burns nor tires you (${B.heatproof.name}).`,
     use: 'F to eat · G to give to a teammate',
   },
   ashplum: {

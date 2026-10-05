@@ -115,9 +115,8 @@ export const EV = {
   REVIVE: 'revive',         // { id, by, t }                     by started reviving id (t = seconds; t 0 = stopped)
   REVIVED: 'revived',       // { id, by, x, z }                  id was revived (replaces a respawn)
   HEAL: 'heal',             // { id, by, hp }                    Field Medic healed id
-  VOLCANO: 'volcano',       // { phase, left }                   eruption cycle (sim/volcano.js): calm | rumble | erupt | ash
+  VOLCANO: 'volcano',       // { phase, left, source? }          eruption cycle (sim/volcano.js): calm | rumble | erupt | ash (source: eruption | wind)
   BOMB: 'bomb',             // { x, y, z, eta, r }               a lava bomb lands at (x, z) in eta seconds (radius r)
-  CRUST: 'crust',           // { id, state, left? }              crust plate id: crack | broken (lava for `left` s) | solid
 };
 
 /** Player snapshot tuple layout. */

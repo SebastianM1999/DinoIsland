@@ -400,40 +400,6 @@ function bridgeEffect(plan, x, z, h) {
   return h;
 }
 
-/** A crust plate's outline: its radius toward bearing `ang` is c.r times this (an irregular blob). */
-export function crustWarp(plan, c, ang) {
-  return 1 + 0.18 * valueNoise(Math.cos(ang) * 1.7 + c.id * 2.3, Math.sin(ang) * 1.7, plan.seed + 131);
-}
-
-/** Where (x, z) lies on crust plate c: 0 at its middle, 1 on its edge. */
-function crustK(plan, c, x, z) {
-  return Math.hypot(x - c.x, z - c.z) / (c.r * crustWarp(plan, c, Math.atan2(z - c.z, x - c.x)));
-}
-
-/**
- * The crust field at (x, z), or null: a thin plate of cooled lava over a lava
- * flow. It holds a moment – stand on it too long and it breaks (sim/volcano.js).
- */
-export function crustAt(plan, x, z) {
-  for (const c of plan.crusts || []) {
-    if (Math.abs(x - c.x) > c.r * 1.3 || Math.abs(z - c.z) > c.r * 1.3) continue;
-    if (crustK(plan, c, x, z) < 1) return c;
-  }
-  return null;
-}
-
-/** Flatten the crust plates: level with the lava, banks graded down to them. */
-function crustEffect(plan, x, z, h) {
-  for (const c of plan.crusts) {
-    if (Math.abs(x - c.x) > c.r * 2.4 || Math.abs(z - c.z) > c.r * 2.4) continue;
-    const k = crustK(plan, c, x, z);
-    if (k > 2) continue;
-    const w = 1 - smoothstep(0.95, 2, k);   // (gentle banks: no pits beside the plate)
-    h = lerp(h, c.y + fbm(x * 0.3, z * 0.3, 2, plan.seed + 132) * 0.04, w);
-  }
-  return h;
-}
-
 /** Inside a water pool's basin (its bowl, a little past the waterline)? */
 function inWaterPool(plan, x, z) {
   for (const p of plan.pools) if (p.kind === 'water' && Math.hypot(x - p.x, z - p.z) < p.r * 1.1) return true;
@@ -461,8 +427,7 @@ export function islandHeight(plan, x, z) {
   // the middle of it, where the waterfall comes down)
   // (a lava flow needs no levee over the paths: it runs in its own carved channel)
   if (q && q.flow.kind === 'water' && q.d >= q.width / 2 && q.surface > 0.3 && !inWaterPool(plan, x, z)) h = Math.max(h, Math.min(hr, q.surface + 0.35 + (q.d - q.width / 2) * 0.12));
-  // the volcano's crust plates and basalt bridges over its lava flows
-  if (plan.crusts?.length) h = crustEffect(plan, x, z, h);
+  // the volcano's basalt bridges over its lava flows
   if (plan.bridges?.length) h = bridgeEffect(plan, x, z, h);
   // Cut the cliff foot and clear the grotto opening. The drop has no shelf
   // or ramp: all ground directly beneath the outlet lies under the pool.
@@ -1138,10 +1103,8 @@ export function planIsland(levelIndex = 0, variant = 1) {
   // --- swamp: side paths from the trail, then the bogs around them
   if (swamp) planSwampPaths(plan, taken);
   if (swamp) planBogs(plan, taken, makeRng(seed ^ 0xb06), fnN);
-  // --- volcano: crust plates on the lava flows, steaming fumaroles
-  plan.crusts = [];
+  // --- volcano: steaming fumaroles
   plan.fumaroles = [];
-  if (volcanic) planCrusts(plan, taken, makeRng(seed ^ 0xc257));
   if (volcanic) planFumaroles(plan, taken, makeRng(seed ^ 0xf0a1), fnN);
   if (volcanic) planLavaCraters(plan, taken, makeRng(seed ^ 0x1a7a), fnN);
 
@@ -1243,35 +1206,6 @@ function lavaBridges(plan) {
     }
   }
   return out;
-}
-
-/**
- * Crust plates on the lava flows: thin cooled lava you can walk on – a short
- * way across, if you are quick (sim/volcano.js breaks a plate under someone
- * who lingers). Flat stretches of the flows, clear of the bridges and camps.
- */
-function planCrusts(plan, taken, rng) {
-  for (const f of plan.flows) {
-    if (f.ring) continue;
-    let placed = 0;
-    const idx = f.pts.map((_, i) => i).slice(6, -3).sort(() => rng() - 0.5);
-    for (const i of idx) {
-      if (placed >= 4) break;
-      const p = f.pts[i];
-      const r = p.w / 2 + rng.range(2.5, 4.5);
-      if (p.y < 0.8 || p.y > 40) continue;
-      if (plan.bridges.some((b) => Math.hypot(b.x - p.x, b.z - p.z) < b.r + r + 6)) continue;
-      if (plan.crusts.some((c) => Math.hypot(c.x - p.x, c.z - p.z) < c.r + r + 12)) continue;
-      if (taken.some((t) => !t.hill && Math.hypot(t.x - p.x, t.z - p.z) < t.r + r && !(plan.volcano && t.x === plan.volcano.x && t.z === plan.volcano.z))) continue;
-      if (Math.hypot(p.x - plan.hut.x, p.z - plan.hut.z) < 60 || Math.hypot(p.x - plan.boat.x, p.z - plan.boat.z) < 40) continue;
-      // the plate is flat: it sits a little above the highest lava under it
-      let top = -Infinity;
-      for (const q of f.pts) if (Math.hypot(q.x - p.x, q.z - p.z) < r * 1.3) top = Math.max(top, q.y);
-      if (top - p.y > 0.9) continue;                  // too steep a stretch for a flat plate
-      plan.crusts.push({ id: plan.crusts.length, x: p.x, z: p.z, r, y: top + 0.15, lava: p.y });
-      placed++;
-    }
-  }
 }
 
 /** Fumaroles: steaming cracks on the lower flanks and the lowland (hot ground round them). */

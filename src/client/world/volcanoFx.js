@@ -7,17 +7,14 @@
 //   everything facing up (SURFACE.uSdAsh, world/surfaceDetail.js), fading
 //   again once the rain has passed;
 // - fumaroles steam;
-// - crust plates over the lava: dark cooled lava with glowing cracks that
-//   flare when someone cracks a plate, molten while it is broken;
 // - an eruption throws lava up out of the crater; every lava bomb gets a red
 //   warning circle where it will land, flies in glowing and bursts.
 //
-// State comes from the server (setState on welcome, setPhase / bomb / crust on
+// State comes from the server (setState on welcome, setPhase / bomb on
 // its events). How many flakes and puffs follows the graphics tier.
 
 import * as THREE from 'three';
 import { makeRng } from '../../shared/rng.js';
-import { crustWarp } from '../../shared/island.js';
 import { SURFACE } from './surfaceDetail.js';
 
 const TAU = Math.PI * 2;
@@ -132,89 +129,6 @@ function flakeMaterial() {
   });
 }
 
-/** Crust plate surface: cooled lava cut by glowing cracks; uCrack flares them, uBroken melts it. */
-function crustMaterial() {
-  return new THREE.ShaderMaterial({
-    fog: true,
-    uniforms: THREE.UniformsUtils.merge([THREE.UniformsLib.fog, { uTime: { value: 0 }, uCrack: { value: 0 }, uBroken: { value: 0 } }]),
-    polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2,
-    vertexShader: /* glsl */`
-      #include <fog_pars_vertex>
-      varying vec2 vP;
-      varying float vEdge;
-      attribute float aEdge;
-      void main() {
-        vP = (modelMatrix * vec4(position, 1.0)).xz;
-        vEdge = aEdge;
-        vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
-        gl_Position = projectionMatrix * mvPosition;
-        #include <fog_vertex>
-      }`,
-    fragmentShader: /* glsl */`
-      #include <fog_pars_fragment>
-      uniform float uTime, uCrack, uBroken;
-      varying vec2 vP;
-      varying float vEdge;
-      vec2 hash2(vec2 p) { p = vec2(dot(p, vec2(127.1, 311.7)), dot(p, vec2(269.5, 183.3))); return fract(sin(p) * 43758.5453); }
-      float cells(vec2 p) {
-        vec2 i = floor(p), f = fract(p);
-        float d1 = 8.0, d2 = 8.0;
-        for (int y = -1; y <= 1; y++) for (int x = -1; x <= 1; x++) {
-          vec2 g = vec2(float(x), float(y));
-          vec2 r = g + hash2(i + g) - f;
-          float d = dot(r, r);
-          if (d < d1) { d2 = d1; d1 = d; } else if (d < d2) d2 = d;
-        }
-        return sqrt(d2) - sqrt(d1);
-      }
-      void main() {
-        float e = cells(vP * 0.55);
-        float crack = 1.0 - smoothstep(0.02, 0.08 + uCrack * 0.1, e);
-        vec3 crust = mix(vec3(0.07, 0.055, 0.06), vec3(0.15, 0.12, 0.12), smoothstep(0.1, 0.6, e));
-        float pulse = 0.5 + 0.5 * sin(uTime * 9.0);
-        vec3 glow = vec3(1.0, 0.33, 0.05) * (0.45 + uCrack * (1.2 + 0.8 * pulse));
-        vec3 col = mix(crust, glow, crack);
-        float flow = 0.5 + 0.5 * sin(vP.x * 0.7 + uTime * 1.3) * sin(vP.y * 0.6 - uTime * 0.9);
-        vec3 lava = mix(vec3(0.95, 0.24, 0.03), vec3(1.0, 0.78, 0.25), flow * 0.8 + crack * 0.2);
-        col = mix(col, lava * 1.6, uBroken);
-        // the rim blends into the ground
-        col = mix(col, vec3(0.12, 0.1, 0.1), smoothstep(0.75, 1.0, vEdge) * (1.0 - uBroken));
-        gl_FragColor = vec4(col, 1.0);
-        #include <tonemapping_fragment>
-        #include <colorspace_fragment>
-        #include <fog_fragment>
-      }`,
-  });
-}
-
-/** Flat disc following a crust plate's outline at its height (aEdge: 0 middle .. 1 rim). */
-function crustGeometry(plan, c) {
-  const n = 40, rings = 4;
-  const pos = [], edge = [], idx = [];
-  pos.push(c.x, c.y + 0.07, c.z); edge.push(0);
-  for (let r = 1; r <= rings; r++) {
-    for (let k = 0; k < n; k++) {
-      const a = (k / n) * TAU, rr = (r / rings) * c.r * crustWarp(plan, c, a);
-      pos.push(c.x + Math.cos(a) * rr, c.y + 0.07, c.z + Math.sin(a) * rr);
-      edge.push(r / rings);
-    }
-  }
-  for (let k = 0; k < n; k++) idx.push(0, 1 + ((k + 1) % n), 1 + k);
-  for (let r = 1; r < rings; r++) {
-    const a0 = 1 + (r - 1) * n, a1 = 1 + r * n;
-    for (let k = 0; k < n; k++) {
-      const k1 = (k + 1) % n;
-      idx.push(a0 + k, a0 + k1, a1 + k, a0 + k1, a1 + k1, a1 + k);
-    }
-  }
-  const g = new THREE.BufferGeometry();
-  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-  g.setAttribute('aEdge', new THREE.Float32BufferAttribute(edge, 1));
-  g.setIndex(idx);
-  g.computeBoundingSphere();
-  return g;
-}
-
 /**
  * @param {import('../../shared/terrain.js').Terrain} terrain
  * @param {object} layout
@@ -224,7 +138,7 @@ function crustGeometry(plan, c) {
 export function buildVolcanoFx(terrain, layout, camera, { onFog = null, onImpact = null } = {}) {
   const group = new THREE.Group();
   group.name = 'volcano-fx';
-  const none = { group, update() {}, setQuality() {}, setState() {}, setPhase() {}, bomb() {}, crust() {}, ashRaining: () => false };
+  const none = { group, update() {}, setQuality() {}, setState() {}, setPhase() {}, bomb() {}, ashRaining: () => false };
   if (!layout.plan.volcano || typeof document === 'undefined') return none;
   const plan = layout.plan;
   const rng = makeRng(plan.seed ^ 0xa5f);
@@ -318,15 +232,6 @@ export function buildVolcanoFx(terrain, layout, camera, { onFog = null, onImpact
     }),
   }));
 
-  // ------------------------------------------------------------ crust plates
-  const crusts = (layout.crusts || []).map((c) => {
-    const m = new THREE.Mesh(crustGeometry(plan, c), crustMaterial());
-    m.receiveShadow = true;
-    m.name = 'crust';
-    group.add(m);
-    return { c, m, crackT: -1, broken: false, left: 0 };
-  });
-
   // ------------------------------------------------------ eruption: crater spray
   const maxSpray = TIER.Ultra[2];
   const sprayPos = new Float32Array(maxSpray * 3), sprayCol = new Float32Array(maxSpray * 3);
@@ -372,11 +277,10 @@ export function buildVolcanoFx(terrain, layout, camera, { onFog = null, onImpact
       sprayGeo.setDrawRange(0, nSpray);
       for (const f of fumaroles) f.puffs.forEach((m, i) => { if (i >= nPuff) m.visible = false; });
     },
-    /** The server's volcano state (welcome): phase and broken plates. */
+    /** The server's volcano state (welcome): its phase. */
     setState(s) {
       if (!s) return;
       setPhase(s.phase, s.left);
-      for (const b of s.broken || []) { const c = crusts[b.id]; if (c) { c.broken = true; c.left = b.left; } }
     },
     setPhase,
     /** Is it raining ash (sim/volcano.js phase 'ash')? */
@@ -393,14 +297,6 @@ export function buildVolcanoFx(terrain, layout, camera, { onFog = null, onImpact
       b.disc.position.copy(b.ring.position);
       b.ring.scale.setScalar(b.r);
       b.disc.scale.setScalar(b.r);
-    },
-    /** A crust plate cracks (warning), breaks (molten for `left` s) or is solid again. */
-    crust(id, state, left = 0) {
-      const c = crusts[id];
-      if (!c) return;
-      if (state === 'crack') c.crackT = 0;
-      else if (state === 'broken') { c.broken = true; c.left = left; c.crackT = -1; }
-      else { c.broken = false; c.crackT = -1; }
     },
     update(dt, time) {
       clock += dt;
@@ -440,16 +336,6 @@ export function buildVolcanoFx(terrain, layout, camera, { onFog = null, onImpact
         }
       }
       puffMat.opacity = 0.3;
-      // --- crust plates
-      for (const c of crusts) {
-        const u = c.m.material.uniforms;
-        u.uTime.value = time;
-        if (c.broken) { c.left -= dt; if (c.left <= 0) c.broken = false; }
-        if (c.crackT >= 0) c.crackT += dt;
-        const crack = c.crackT >= 0 ? Math.min(1, c.crackT / 1.2) : 0;
-        u.uCrack.value = crack;
-        u.uBroken.value += ((c.broken ? 1 : 0) - u.uBroken.value) * Math.min(1, dt * (c.broken ? 6 : 0.4));
-      }
       // --- the eruption: lava thrown up out of the crater, the crater glows
       const erupting = phase === 'erupt';
       craterLight.intensity += ((erupting ? 900 : phase === 'rumble' ? 120 : 0) - craterLight.intensity) * Math.min(1, dt * 2);

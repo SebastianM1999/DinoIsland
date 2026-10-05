@@ -3,7 +3,7 @@
 
 ## Files
 - `world.js` — `ServerWorld`: island loading, players, actions, inventory, combat validation, base, skills, tick and snapshots (see map below).
-- `dinos.js` — `DinoSystem`: spawning, steering (20 % slower through swamp bogs, `Terrain.swampSpeedAt`; never onto the volcano's crust plates) and lateral steps, local avoidance, stuck nudges, footprints (tracks), traps, damage, death, carcass loot, respawn, pose history; delegates behaviour to the brains in `ai/`. Swamp boss leashes permit inland swimming, constrain combat to Drowned Hollow, and bosses do not respawn. Their waterborne carcasses preserve the death position and settle slowly toward the surface.
+- `dinos.js` — `DinoSystem`: spawning, steering (20 % slower through swamp bogs, `Terrain.swampSpeedAt`) and lateral steps, local avoidance, stuck nudges, footprints (tracks), traps, damage, death, carcass loot, respawn, pose history; delegates behaviour to the brains in `ai/`. Swamp boss leashes permit inland swimming, constrain combat to Drowned Hollow, and bosses do not respawn. Their waterborne carcasses preserve the death position and settle slowly toward the surface.
 - `ai/` — one behaviour "brain" per species (see `ai/package-info.md`).
 - `pathfind.js` — `findPath`: coarse A* over walkable ground (4 m cells, bog cells weighted by their slower going, hot ground on the volcano avoided) for detours and raiders.
 - `hitCheck.js` — `nearDino`, `plausibleZone`: plausibility checks for client-reported dinosaur hits.
@@ -11,7 +11,7 @@
 - `mission.js` — `Mission`: boat-parts main quest per island (search -> repaired -> sailing) and the team contracts from the mission board.
 - `raids.js` — `Raids` (scheduling, announcing, spawning, ending raids on the team base), `raidGroup`, `raiderStep` (raider movement/siege).
 - `towers.js` — `updateTowers`, `hostile`: base defence towers pick and shoot hostile dinosaurs.
-- `volcano.js` — `Volcano` (island 3, idle elsewhere): hot ground burns players (not with Fireproof), crust plates crack and break under whoever lingers (then burn like lava until they cool: `lavaAt`), the eruption cycle calm -> rumble -> erupt (lava bombs near players and anywhere, never at the camp, base or boat; they hurt dinosaurs too) -> ash (dinosaurs see less far: `sightMul`), and ash rain on the wind between eruptions (the eruption keeps its time); out in the ash a player loses health after a grace time, never below a floor (the camp and the base plots shelter: `ashShelter`); `public()` (phase, what brought the ash) for late joiners.
+- `volcano.js` — `Volcano` (island 3, idle elsewhere): hot ground burns players (not with Fireproof), the eruption cycle calm -> rumble -> erupt (lava bombs near players and anywhere, never at the camp, base or boat; they hurt dinosaurs too) -> ash (dinosaurs see less far: `sightMul`), and ash rain on the wind between eruptions (the eruption keeps its time); out in the ash a player loses health after a grace time, never below a floor (the camp and the base plots shelter: `ashShelter`); `public()` (phase, what brought the ash) for late joiners.
 - `unstuck.js` — `standable`, `goodSpot`, `findUnstuckSpot`: nearest safe spot for the "get unstuck" action.
 - `worker.js` — Web Worker host for solo play: runs `ServerWorld` on a timer and relays messages to the page.
 
@@ -26,7 +26,7 @@
 - `craft`, `validMeleeHit`, `validProjectileLanding`, `canSpotDino`, `groveBlocks`, `unstuck`.
 - items: `spawnItem`, `removeItem`, `dropInventoryItem`, `dropLoot`, `addTrack`.
 - fruit: `applyFruit` (heal, heal over time, fruit buffs in `p.buffs`, e.g. Lotus Skin's lower damage in `hurtPlayer`), `buffsLeft` (sent with every inventory), `bestFruitIndex`.
-- tick: `step(dt)` (player upkeep, eating/regen/aura, lava and broken crust plates, relic pickup, campfire healing, fruit regrowth, item/projectile/track expiry, then dinos, towers, raids, volcano, dino history, player-dino contact, mission), `snapshotDue`, `hitPose`, `snapshot`, `fullState`.
+- tick: `step(dt)` (player upkeep, eating/regen/aura, lava, relic pickup, campfire healing, fruit regrowth, item/projectile/track expiry, then dinos, towers, raids, volcano, dino history, player-dino contact, mission), `snapshotDue`, `hitPose`, `snapshot`, `fullState`.
 
 ## Entry points
 - `ServerWorld` (`world.js`): constructed by `server/gameHost.js` (online/LAN/Steam host) and by `worker.js` (solo). Hosts call `join`, `leave`, `receive(id, msg)`, `step(dt)` at `CONFIG.net.tickRate`, `snapshotDue(dt)` + `snapshot()`, and supply `host.send(to, msg, except)`.
