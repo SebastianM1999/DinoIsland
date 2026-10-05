@@ -201,13 +201,15 @@ export class PlayerController {
     const H = CONFIG.volcano.heat;
     this.heat = flying || this.creative ? 0 : t.heatAt?.(this.pos.x, this.pos.z) ?? 0;
     const heat = this.buffs.heatproof > 0 ? 0 : this.heat;
+    // out in the volcano's ash rain stamina refills slower too (core/game.js sets ashOutside)
+    const ashCut = this.ashOutside && !this.creative ? 1 - CONFIG.volcano.ash.staminaRegenCut : 1;
     if (this.sprinting) {
       if (!free) this.stamina -= P.staminaDrain * mods.sprintDrainMul * this.#buffMul('secondwind', 'drainMul') * (1 + H.staminaMul * heat) * dt;
       this.staminaDelay = P.staminaRegenDelay * mods.regenDelayMul;
     } else if (this.staminaDelay > 0) {
       this.staminaDelay -= dt;
     } else {
-      this.stamina += P.staminaRegen * mods.staminaRegenMul * this.#buffMul('secondwind', 'regenMul') * (1 - H.regenCut * heat) * dt;
+      this.stamina += P.staminaRegen * mods.staminaRegenMul * this.#buffMul('secondwind', 'regenMul') * (1 - H.regenCut * heat) * ashCut * dt;
     }
     this.stamina = this.creative ? max : Math.max(0, Math.min(max, this.stamina));
 

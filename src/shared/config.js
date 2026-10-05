@@ -147,8 +147,13 @@ export const CONFIG = {
     // seconds: the first rumble, calm between eruptions, the warning, the eruption, the ash rain after
     cycle: { first: 150, calmMin: 180, calmMax: 300, rumble: 8, erupt: 20, ashMin: 60, ashMax: 90 },
     // lava bombs: a wave every `wave` s, each announced `warn` s ahead; one lands `near` m from
-    // each player; dinosaurs see `ashSight` as far in the ash rain
-    bomb: { wave: 2.5, warn: 2.5, near: [10, 40], radius: 4, damage: 35, dinoDamage: 60, knock: 9, ashSight: 0.6 },
+    // each player
+    bomb: { wave: 2.5, warn: 2.5, near: [10, 40], radius: 4, damage: 35, dinoDamage: 60, knock: 9 },
+    // ash rain – after each eruption, and on the wind in between (the first after `first` s, then
+    // every gapMin..gapMax s for durMin..durMax s). Out in it for `after` s, a player loses `dps` HP/s
+    // (never below `floor` of their max) and refills stamina `staminaRegenCut` slower; the camp and
+    // the base plots shelter. Dinosaurs see `sight` as far.
+    ash: { first: 60, gapMin: 100, gapMax: 170, durMin: 45, durMax: 70, after: 8, dps: 1, floor: 0.25, sight: 0.6, staminaRegenCut: 0.5 },
   },
 
   fruit: {

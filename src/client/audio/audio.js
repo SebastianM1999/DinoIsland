@@ -644,10 +644,16 @@ export class GameAudio {
   }
 
   /** Per-frame: quiet positional ambience and calm/danger music scheduling. */
-  update(dt, { coast = 0, water = null, danger = false, bossArea = false } = {}) {
+  update(dt, { coast = 0, water = null, danger = false, bossArea = false, ash = 0 } = {}) {
     if (!this.ok || this.ctx.state !== 'running') return;
     const t = this.ctx.currentTime;
     if (this.amb) {
+      // the volcano's ash rain: a low, gusting wind hiss all round (built on first use)
+      if (ash > 0 || this.ashWind) {
+        this.ashWind ??= { low: this.#loopLayer({ brown: true, type: 'lowpass', f: 420, q: 0.6, wobble: 90, wobbleRate: 0.25, positional: false }), hiss: this.#loopLayer({ type: 'bandpass', f: 1500, q: 0.5, wobble: 500, wobbleRate: 0.18, positional: false }) };
+        this.#steer(this.ashWind.low, 0.22 * ash, null, t);
+        this.#steer(this.ashWind.hiss, 0.05 * ash, null, t);
+      }
       if (coast > 0.45 && t >= this.amb.surfAt) {
         this.#noise(t, 1.2, this.ambBus, { vol: 0.055 * coast, type: 'lowpass', f0: 360, f1: 210, q: 0.7, a: 0.25 });
         this.amb.surfAt = t + 2.2 + Math.random() * 0.7;

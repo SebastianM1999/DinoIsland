@@ -293,8 +293,10 @@ test('the eruption cycle: rumble, lava bombs (never at the camp), ash rain, calm
   put(spot.x, spot.z);
   p.hp = p.maxHp = 100000;
   assert.equal(world.volcano.phase, 'calm');
+  // (a wind ash rain may blow through first: the rumble keeps its time)
   run(C.first + 0.1);
   assert.equal(world.volcano.phase, 'rumble');
+  const before = evs(EV.VOLCANO).length - 1;
   run(C.rumble);
   assert.equal(world.volcano.phase, 'erupt');
   const hp = p.hp;
@@ -310,11 +312,68 @@ test('the eruption cycle: rumble, lava bombs (never at the camp), ash rain, calm
   assert.ok(bombs.some((b) => Math.hypot(b.x - spot.x, b.z - spot.z) <= B.near[1] + 1), 'bombs near the player');
   assert.ok(p.hp <= hp);
   // ash rain: the dinosaurs see less far
-  assert.equal(world.sightMul(), B.ashSight);
-  assert.deepEqual(evs(EV.VOLCANO).map((m) => m.phase), ['rumble', 'erupt', 'ash']);
+  assert.equal(world.sightMul(), CONFIG.volcano.ash.sight);
+  assert.deepEqual(evs(EV.VOLCANO).slice(before).map((m) => m.phase), ['rumble', 'erupt', 'ash']);
+  assert.equal(evs(EV.VOLCANO).at(-1).source, 'eruption');
   run(C.ashMax + 0.1);
   assert.equal(world.volcano.phase, 'calm');
   assert.equal(world.sightMul(), 1);
+});
+
+test('ash rain blows in on the wind between eruptions, which keep their time', () => {
+  const { world, p, put, run, evs } = volcanoWorld(5);
+  const A = CONFIG.volcano.ash, C = CONFIG.volcano.cycle;
+  put(world.layout.hut.x, world.layout.hut.z);      // sheltered: no harm meanwhile
+  run(A.first + 0.1);
+  assert.equal(world.volcano.phase, 'ash');
+  assert.equal(world.volcano.source, 'wind');
+  assert.equal(evs(EV.VOLCANO).at(-1).source, 'wind');
+  assert.equal(world.sightMul(), A.sight);
+  // late joiners hear of it
+  assert.equal(world.volcano.public().source, 'wind');
+  assert.equal(p.hp, p.maxHp, 'the camp shelters');
+  run(A.durMax + 0.1);
+  assert.equal(world.volcano.phase, 'calm');
+  // the eruption still comes on time
+  run(C.first - A.first - A.durMax - 0.4);
+  assert.equal(world.volcano.phase, 'calm');
+  run(0.6);
+  assert.equal(world.volcano.phase, 'rumble');
+});
+
+test('out in the ash rain a player slowly loses health – never below the floor; the camp and the base shelter', () => {
+  const { world, p, put, run } = volcanoWorld(2);
+  const A = CONFIG.volcano.ash, L = world.layout;
+  let spot = null;
+  for (let k = 0; k < 400 && !spot; k++) {
+    const a = k * 0.7, r = 80 + (k % 40) * 2;
+    const x = Math.cos(a) * r, z = Math.sin(a) * r;
+    if (world.terrain.heightAt(x, z) > 2 && world.terrain.heatAt(x, z) < 0.05 && Math.hypot(x - L.hut.x, z - L.hut.z) > 60 && world.terrain.slopeAt(x, z) < 0.4
+      && !L.basePlots.some((q) => Math.hypot(q.x - x, q.z - z) < q.r + 4)) spot = { x, z };
+  }
+  put(spot.x, spot.z);
+  run(A.first + 0.1);
+  assert.equal(world.volcano.phase, 'ash');
+  p.hp = p.maxHp;
+  run(A.after - 0.5);
+  assert.equal(p.hp, p.maxHp, 'a grace time first');
+  run(4);
+  assert.ok(p.hp < p.maxHp && p.hp >= p.maxHp - A.dps * 5, `then it hurts slowly (${p.hp})`);
+  p.hp = p.maxHp * A.floor + 0.5;
+  run(5);
+  assert.ok(Math.abs(p.hp - p.maxHp * A.floor) < 1e-6 && p.alive, 'never below the floor');
+  // sheltered at the camp and on a base plot
+  for (const at of [{ x: L.plan.hut.x, z: L.plan.hut.z + 2 }, ...L.basePlots.slice(0, 1)]) {
+    put(at.x, at.z);
+    p.hp = p.maxHp;
+    run(A.after + 3);
+    assert.equal(p.hp, p.maxHp, 'sheltered');
+  }
+  // creative players are never hurt
+  put(spot.x, spot.z);
+  p.creative = true;
+  run(A.after + 3);
+  assert.equal(p.hp, p.maxHp);
 });
 
 test('a lava bomb hurts a dinosaur in its blast – and a player standing there', () => {

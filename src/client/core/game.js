@@ -57,6 +57,7 @@ import { buildBossArena } from '../world/bossArena.js';
 import { buildSwampArena } from '../world/swampArena.js';
 import { buildSwampFx, thickSky } from '../world/swampFx.js';
 import { buildVolcanoArena } from '../world/volcanoArena.js';
+import { ashShelter } from '../../shared/volcanoArena.js';
 import { buildVolcanoFx, ashSky } from '../world/volcanoFx.js';
 import { BIOMES } from '../../shared/levels.js';
 import { disposeIslandScenes } from './resources.js';
@@ -523,7 +524,7 @@ export class Game {
       const pos = v ? { x: v.x, y: v.craterY, z: v.z } : undefined;
       if (m.phase === 'rumble') { this.audio.play('rumble'); this.shake = Math.max(this.shake, 0.6); this.hud.toast('The volcano rumbles – an eruption is coming!', 'flame'); }
       if (m.phase === 'erupt') { this.audio.play('eruption', { pos, vol: 2 }); this.shake = Math.max(this.shake, 1); this.hud.toast('Eruption! Watch the red circles – lava bombs land there', 'flame'); }
-      if (m.phase === 'ash') this.hud.toast('Ash rain – the dinosaurs can barely see you', 'info');
+      if (m.phase === 'ash') this.hud.toast(m.source === 'wind' ? 'Ash rain is blowing in – take shelter at the camp or your base' : 'Ash rain – the dinosaurs can barely see you, but it chokes you: take shelter', 'info');
     });
     net.on(`ev:${EV.BOMB}`, (m) => {
       this.volcanoFx.bomb(m);
@@ -546,7 +547,7 @@ export class Game {
         this.lastHurtAt = this.time;
         this.hud.damageFlash(m.dmg);
         if (m.src) {
-          const name = CONFIG.dinos[m.src]?.name || { lava: 'Lava', heat: 'Heat', bomb: 'Lava bomb' }[m.src] || 'Dinosaur';
+          const name = CONFIG.dinos[m.src]?.name || { lava: 'Lava', heat: 'Heat', bomb: 'Lava bomb', ash: 'Ash' }[m.src] || 'Dinosaur';
           let direction = 'nearby';
           if (m.from) {
             const dx = m.from.x - this.player.pos.x, dz = m.from.z - this.player.pos.z;
@@ -859,7 +860,7 @@ export class Game {
       this.audioWater = this.#waterSoundscape(cam.position);
       this.audioDanger = this.#inDanger();
     }
-    this.audio.update(dt, { coast, water: this.audioWater, danger: this.audioDanger, bossArea: this.bossMusicArea });
+    this.audio.update(dt, { coast, water: this.audioWater, danger: this.audioDanger, bossArea: this.bossMusicArea, ash: this.volcanoFx.ashRaining() ? 1 : 0 });
   }
 
   /**
@@ -967,6 +968,19 @@ export class Game {
   onDinoHit(v, m) { if (m.by !== this.me.id) this.audio.play('hit', { pos: v.pos, vol: 0.7 }); }
   onDinoStep(v) { this.audio.play('bigStep', { pos: v.pos, vol: v.type === 'trex' ? 1.2 : 0.7 }); }
 
+  /**
+   * The volcano's ash rain for the local player: sheltered at the camp or a
+   * base plot, else a grace time (as on the server, sim/volcano.js) before it hurts.
+   */
+  #updateAsh(dt) {
+    const p = this.player, A = CONFIG.volcano.ash;
+    const raining = this.volcanoFx.ashRaining() && this.me.alive && !p.creative;
+    const out = raining && !ashShelter(this.layout, p.pos.x, p.pos.z);
+    p.ashOutside = out;
+    this.ashT = out ? (this.ashT ?? 0) + dt : 0;
+    this.hud.setAsh(!raining ? '' : !out ? 'shelter' : this.ashT < A.after ? 'out' : 'hurt', A.after - this.ashT);
+  }
+
   #updateHud(dt) {
     const hud = this.hud;
     const p = this.player;
@@ -974,6 +988,7 @@ export class Game {
     hud.setStamina(p.stamina, p.maxStamina);
     hud.setSwamp(p.inBog && !p.flying);
     hud.setHeat(this.me.alive ? p.heat : 0, p.buffs.heatproof > 0);
+    this.#updateAsh(dt);
     hud.setBuffs(p.buffs);
     hud.setCompass(p.yaw, this.compassMarkers());
     const team = [{ id: this.me.id, name: this.me.name, slot: this.me.slot, hp: this.me.hp, mhp: this.maxHp, alive: this.me.alive, downed: !!this.downed, isYou: true }];

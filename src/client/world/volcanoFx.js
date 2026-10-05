@@ -1,8 +1,11 @@
 // The volcano's life (Ashfall Isle), client side of sim/volcano.js:
 //
 // - ash flakes drift down round the camera all the time – a few when it is
-//   calm, a thick fall during the ash rain, when the fog draws in too
-//   (onFog blends the biome's sky toward ashSky);
+//   calm, a thick, wind-blown fall during the ash rain (after an eruption or
+//   on the wind), with grey curtains of falling ash further off; the fog draws
+//   in (onFog blends the biome's sky toward ashSky) and fresh ash settles on
+//   everything facing up (SURFACE.uSdAsh, world/surfaceDetail.js), fading
+//   again once the rain has passed;
 // - fumaroles steam;
 // - crust plates over the lava: dark cooled lava with glowing cracks that
 //   flare when someone cracks a plate, molten while it is broken;
@@ -15,18 +18,22 @@
 import * as THREE from 'three';
 import { makeRng } from '../../shared/rng.js';
 import { crustWarp } from '../../shared/island.js';
+import { SURFACE } from './surfaceDetail.js';
 
 const TAU = Math.PI * 2;
-// [ash flakes, fumarole puffs each, crater spray]
-const TIER = { Low: [160, 3, 60], Medium: [320, 4, 110], High: [600, 6, 160], Ultra: [900, 7, 220] };
-const ASH_BOX = 36;              // half size of the box of ash round the camera (m)
+// [ash flakes, fumarole puffs each, crater spray, ash curtains]
+const TIER = { Low: [320, 3, 60, 0], Medium: [700, 4, 110, 36], High: [1300, 6, 160, 64], Ultra: [2000, 7, 220, 96] };
+const ASH_BOX = 45;              // half size of the box of ash round the camera (m)
+const ASH_CALM = 0.15;           // share of the flakes still falling when there is no ash rain
+const CURTAIN_BOX = 70;          // half size of the box of ash curtains round the camera (m)
+const ASH_COVER = 0.7;           // how thick fresh ash lies at most; it settles in ~40 s, fades in ~60 s
 const FUMAROLE_RANGE = 170;      // fumaroles further away do not steam
 const BOMB_FLIGHT = 1.7;         // the last seconds of a bomb's warning: it flies in from the crater
 const MAX_BOMBS = 24;
 
 /** The air in the ash rain: close, grey-brown, the sun a dull disc. */
 export function ashSky(sky) {
-  return { ...sky, fogNear: 6, fogFar: 72, fog: '#5c504c', background: '#4a3f3c', sunIntensity: (sky.sunIntensity ?? 1.6) * 0.55, exposure: (sky.exposure ?? 0.9) * 0.92 };
+  return { ...sky, fogNear: 15, fogFar: 110, fog: '#5c504c', background: '#4a3f3c', sunIntensity: (sky.sunIntensity ?? 1.6) * 0.55, exposure: (sky.exposure ?? 0.9) * 0.92 };
 }
 
 /** A soft round sprite (radial falloff). */
@@ -43,6 +50,86 @@ function softTexture() {
   const t = new THREE.CanvasTexture(c);
   t.colorSpace = THREE.SRGBColorSpace;
   return t;
+}
+
+/** Falling ash: thin vertical streaks, soft at the top and bottom (for the curtains). */
+function streakTexture() {
+  const c = document.createElement('canvas');
+  c.width = 64; c.height = 256;
+  const g = c.getContext('2d');
+  const rng = makeRng(0x5a5);
+  for (let i = 0; i < 140; i++) {
+    g.fillStyle = `rgba(255,255,255,${0.08 + rng() * 0.22})`;
+    g.fillRect(rng() * 64, rng() * 256, 1 + rng() * 1.5, 10 + rng() * 60);
+  }
+  // soft at the sides (the top and bottom fade in the vertex colours)
+  g.globalCompositeOperation = 'destination-in';
+  const h = g.createLinearGradient(0, 0, 64, 0);
+  h.addColorStop(0, 'rgba(0,0,0,0)'); h.addColorStop(0.3, 'rgba(0,0,0,1)'); h.addColorStop(0.7, 'rgba(0,0,0,1)'); h.addColorStop(1, 'rgba(0,0,0,0)');
+  g.fillStyle = h; g.fillRect(0, 0, 64, 256);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.wrapT = THREE.RepeatWrapping;
+  return t;
+}
+
+/**
+ * Ash flakes, moved on the GPU: each one falls (and drifts on the wind) through
+ * a box that wraps round the camera, turning as it goes – edge-on it is a thin sliver.
+ */
+function flakeMaterial() {
+  return new THREE.ShaderMaterial({
+    fog: true,
+    transparent: true,
+    depthWrite: false,
+    uniforms: THREE.UniformsUtils.merge([THREE.UniformsLib.fog, {
+      uTime: { value: 0 }, uCam: { value: new THREE.Vector3() }, uWind: { value: new THREE.Vector2() },
+      uBox: { value: ASH_BOX }, uSize: { value: 0.32 }, uViewH: { value: 800 },
+      uColor: { value: new THREE.Color('#b4aaa4') }, uOpacity: { value: 0.8 },
+    }]),
+    vertexShader: /* glsl */`
+      attribute vec4 aSeed;        // x, y, z in 0..1 (place in the box), w: fall speed
+      uniform float uTime, uBox, uSize, uViewH;
+      uniform vec3 uCam;
+      uniform vec2 uWind;
+      varying float vRot, vShape, vFade;
+      #include <fog_pars_vertex>
+      float wrapTo(float v, float c, float h) { return c + mod(v - c + h, 2.0 * h) - h; }
+      void main() {
+        float t = uTime * aSeed.w;
+        float ph = aSeed.x * 61.0 + aSeed.z * 17.0;
+        float hy = uBox * 0.6;
+        vec3 p = vec3(aSeed.x * 2.0 * uBox + uWind.x * t + sin(t * 0.9 + ph) * 1.2,
+                      aSeed.y * 2.0 * hy - t * 1.4,
+                      aSeed.z * 2.0 * uBox + uWind.y * t + cos(t * 0.7 + ph) * 1.2);
+        p = vec3(wrapTo(p.x, uCam.x, uBox), wrapTo(p.y, uCam.y, hy), wrapTo(p.z, uCam.z, uBox));
+        vec3 rel = abs(p - uCam) / vec3(uBox, hy, uBox);
+        vFade = 1.0 - smoothstep(0.7, 1.0, max(max(rel.x, rel.y), rel.z));
+        vShape = fract(ph * 0.37);
+        vRot = ph + uTime * (1.2 + vShape * 2.4);
+        vec4 mvPosition = viewMatrix * vec4(p, 1.0);
+        gl_Position = projectionMatrix * mvPosition;
+        gl_PointSize = clamp(uSize * (0.75 + 0.6 * vShape) * projectionMatrix[1][1] * uViewH * 0.5 / max(0.1, -mvPosition.z), 1.0, 48.0);
+        #include <fog_vertex>
+      }`,
+    fragmentShader: /* glsl */`
+      uniform vec3 uColor;
+      uniform float uOpacity;
+      varying float vRot, vShape, vFade;
+      #include <fog_pars_fragment>
+      void main() {
+        vec2 q = gl_PointCoord - 0.5;
+        float c = cos(vRot), s = sin(vRot);
+        q = mat2(c, -s, s, c) * q;
+        q.x *= 1.0 + 2.2 * abs(sin(vRot * 0.6));   // turning: thin when edge-on
+        float a = (1.0 - smoothstep(0.25, 0.5, length(q))) * uOpacity * vFade;
+        if (a < 0.02) discard;
+        gl_FragColor = vec4(uColor * (0.8 + 0.35 * vShape), a);
+        #include <tonemapping_fragment>
+        #include <colorspace_fragment>
+        #include <fog_fragment>
+      }`,
+  });
 }
 
 /** Crust plate surface: cooled lava cut by glowing cracks; uCrack flares them, uBroken melts it. */
@@ -137,7 +224,7 @@ function crustGeometry(plan, c) {
 export function buildVolcanoFx(terrain, layout, camera, { onFog = null, onImpact = null } = {}) {
   const group = new THREE.Group();
   group.name = 'volcano-fx';
-  const none = { group, update() {}, setQuality() {}, setState() {}, setPhase() {}, bomb() {}, crust() {} };
+  const none = { group, update() {}, setQuality() {}, setState() {}, setPhase() {}, bomb() {}, crust() {}, ashRaining: () => false };
   if (!layout.plan.volcano || typeof document === 'undefined') return none;
   const plan = layout.plan;
   const rng = makeRng(plan.seed ^ 0xa5f);
@@ -145,20 +232,75 @@ export function buildVolcanoFx(terrain, layout, camera, { onFog = null, onImpact
   const v = plan.volcano;
   const crater = { x: v.x, y: v.rimY + 6, z: v.z };
 
-  let [nAsh, nPuff, nSpray] = TIER.High;
+  let [nAsh, nPuff, nSpray, nCurtain] = TIER.High;
   let phase = 'calm', phaseLeft = 0, fogK = -1;
+  const wind = new THREE.Vector2(0.8, 0.5);         // m/s; each ash rain brings its own
+  SURFACE.uSdAsh.value = 0;
 
   // ------------------------------------------------------------- ash flakes
   const maxAsh = TIER.Ultra[0];
-  const ashPos = new Float32Array(maxAsh * 3);
-  const ashSeed = Array.from({ length: maxAsh }, () => ({ x: (rng() * 2 - 1) * ASH_BOX, y: rng() * 30, z: (rng() * 2 - 1) * ASH_BOX, sp: 0.6 + rng() * 0.8, ph: rng() * TAU }));
+  const ashSeed = new Float32Array(maxAsh * 4);
+  for (let i = 0; i < maxAsh; i++) ashSeed.set([rng(), rng(), rng(), 0.6 + rng() * 0.8], i * 4);
   const ashGeo = new THREE.BufferGeometry();
-  ashGeo.setAttribute('position', new THREE.BufferAttribute(ashPos, 3));
-  const ashMat = new THREE.PointsMaterial({ size: 0.16, map: tex, color: '#b8aea8', transparent: true, opacity: 0.85, depthWrite: false, fog: true });
+  // (the shader places each flake from aSeed; position only sizes the draw)
+  ashGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(maxAsh * 3), 3));
+  ashGeo.setAttribute('aSeed', new THREE.BufferAttribute(ashSeed, 4));
+  const ashMat = flakeMaterial();
   const ash = new THREE.Points(ashGeo, ashMat);
   ash.frustumCulled = false;
   ash.renderOrder = 5;
+  const viewSize = new THREE.Vector2();
+  ash.onBeforeRender = (renderer) => { ashMat.uniforms.uViewH.value = renderer.getDrawingBufferSize(viewSize).y; };
   group.add(ash);
+
+  // ------------------------------------- ash curtains (further off, rain only)
+  const maxCurtain = TIER.Ultra[3];
+  const curtains = Array.from({ length: maxCurtain }, () => ({ x: rng() * 2 * CURTAIN_BOX, z: rng() * 2 * CURTAIN_BOX, w: 10 + rng() * 14, h: 26 + rng() * 14, y: -10 + rng() * 6, sp: 0.7 + rng() * 0.6 }));
+  const curtainPos = new Float32Array(maxCurtain * 4 * 3);
+  const curtainCol = new Float32Array(maxCurtain * 4 * 4);
+  const curtainUv = new Float32Array(maxCurtain * 4 * 2);
+  const curtainIdx = [];
+  for (let i = 0; i < maxCurtain; i++) {
+    const o = i * 4;
+    curtainIdx.push(o, o + 1, o + 2, o, o + 2, o + 3);
+  }
+  const curtainGeo = new THREE.BufferGeometry();
+  curtainGeo.setAttribute('position', new THREE.BufferAttribute(curtainPos, 3));
+  curtainGeo.setAttribute('color', new THREE.BufferAttribute(curtainCol, 4));
+  curtainGeo.setAttribute('uv', new THREE.BufferAttribute(curtainUv, 2));
+  curtainGeo.setIndex(curtainIdx);
+  const curtainMat = new THREE.MeshBasicMaterial({ map: streakTexture(), vertexColors: true, transparent: true, depthWrite: false, fog: true, side: THREE.DoubleSide });
+  const curtain = new THREE.Mesh(curtainGeo, curtainMat);
+  curtain.frustumCulled = false;
+  curtain.renderOrder = 4;
+  curtain.visible = false;
+  group.add(curtain);
+  const curtainColor = new THREE.Color('#8e8580');
+  const wrapTo = (u, c, h) => c + ((((u - c + h) % (2 * h)) + 2 * h) % (2 * h)) - h;
+  /** Lay the curtains out round the camera, each turned to face it (k: how thick the rain is). */
+  const updateCurtains = (cx, cy, cz, time, k) => {
+    const n = k > 0.01 ? nCurtain : 0;
+    curtain.visible = n > 0;
+    curtainGeo.setDrawRange(0, n * 6);
+    if (!n) return;
+    for (let i = 0; i < n; i++) {
+      const c = curtains[i];
+      const x = wrapTo(c.x + wind.x * time * 0.8, cx, CURTAIN_BOX), z = wrapTo(c.z + wind.y * time * 0.8, cz, CURTAIN_BOX);
+      const dx = x - cx, dz = z - cz, d = Math.hypot(dx, dz) || 1;
+      // none right on top of the camera, thin at the edge of the box
+      const a = k * 0.32 * Math.min(1, Math.max(0, (d - 14) / 10)) * Math.min(1, Math.max(0, (CURTAIN_BOX - Math.max(Math.abs(dx), Math.abs(dz))) / 14));
+      const rx = -dz / d * c.w / 2, rz = dx / d * c.w / 2;
+      const y0 = Math.max(cy + c.y, terrain.heightAt(x, z) - 2), y1 = y0 + c.h;
+      curtainPos.set([x - rx, y0, z - rz, x + rx, y0, z + rz, x + rx, y1, z + rz, x - rx, y1, z - rz], i * 12);
+      const v = time * 0.18 * c.sp + i * 0.37;
+      curtainUv.set([0, v, 1, v, 1, v + 1, 0, v + 1], i * 8);
+      const r = curtainColor.r, g = curtainColor.g, b = curtainColor.b;
+      curtainCol.set([r, g, b, a * 0.4, r, g, b, a * 0.4, r, g, b, a, r, g, b, a], i * 16);
+    }
+    curtainGeo.attributes.position.needsUpdate = true;
+    curtainGeo.attributes.uv.needsUpdate = true;
+    curtainGeo.attributes.color.needsUpdate = true;
+  };
 
   // ---------------------------------------------------------- fumarole smoke
   const puffMat = new THREE.MeshBasicMaterial({ map: tex, color: '#d8d2cc', transparent: true, opacity: 0.32, depthWrite: false, fog: true });
@@ -215,12 +357,16 @@ export function buildVolcanoFx(terrain, layout, camera, { onFog = null, onImpact
   });
   let clock = 0;
 
-  const setPhase = (p, left = 0) => { phase = p; phaseLeft = left; };
+  const setPhase = (p, left = 0) => {
+    // each ash rain blows in on a wind of its own
+    if (p === 'ash' && phase !== 'ash') { const a = rng() * TAU, sp = 1.6 + rng() * 1.6; wind.set(Math.cos(a) * sp, Math.sin(a) * sp); }
+    phase = p; phaseLeft = left;
+  };
 
   return {
     group,
     setQuality(g = {}) {
-      [nAsh, nPuff, nSpray] = TIER[g.name] || TIER.High;
+      [nAsh, nPuff, nSpray, nCurtain] = TIER[g.name] || TIER.High;
       ashGeo.setDrawRange(0, nAsh);
       sprayGeo.setDrawRange(0, nSpray);
       for (const f of fumaroles) f.puffs.forEach((m, i) => { if (i >= nPuff) m.visible = false; });
@@ -232,6 +378,8 @@ export function buildVolcanoFx(terrain, layout, camera, { onFog = null, onImpact
       for (const b of s.broken || []) { const c = crusts[b.id]; if (c) { c.broken = true; c.left = b.left; } }
     },
     setPhase,
+    /** Is it raining ash (sim/volcano.js phase 'ash')? */
+    ashRaining: () => phase === 'ash',
     /** A lava bomb lands at (x, z) in m.eta seconds. */
     bomb(m) {
       const b = bombs.find((q) => !q.active) || bombs.reduce((a, q) => (q.at < a.at ? q : a));
@@ -263,20 +411,18 @@ export function buildVolcanoFx(terrain, layout, camera, { onFog = null, onImpact
       const want = phase === 'ash' ? 1 : phase === 'erupt' ? 0.35 : 0;
       const k = fogK < 0 ? want : fogK + (want - fogK) * Math.min(1, dt * 0.35);
       if (onFog && Math.abs(k - fogK) > 0.002) { fogK = k; onFog(k); } else if (!onFog) fogK = k;
-      // --- ash flakes: a box of them that wraps round the camera
-      const shown = Math.round(nAsh * (0.25 + 0.75 * Math.max(fogK, phase === 'erupt' ? 0.5 : 0)));
-      ashGeo.setDrawRange(0, shown);
-      ashMat.opacity = 0.55 + 0.35 * fogK;
-      for (let i = 0; i < shown; i++) {
-        const s = ashSeed[i];
-        s.y -= dt * s.sp * 1.1;
-        if (s.y < -6) s.y += 36;
-        const wrap = (u, c0) => ((((u - c0) % (2 * ASH_BOX)) + 3 * ASH_BOX) % (2 * ASH_BOX)) - ASH_BOX + c0;
-        const x = wrap(s.x + Math.sin(time * 0.4 + s.ph) * 1.5 + time * 0.8, cx);
-        const z = wrap(s.z + Math.cos(time * 0.3 + s.ph) * 1.5 + time * 0.5, cz);
-        ashPos[i * 3] = x; ashPos[i * 3 + 1] = cy - 6 + s.y; ashPos[i * 3 + 2] = z;
-      }
-      ashGeo.attributes.position.needsUpdate = true;
+      // --- ash flakes: a box of them that wraps round the camera (moved in the shader)
+      const rainK = Math.max(fogK, phase === 'erupt' ? 0.5 : 0);
+      ashGeo.setDrawRange(0, Math.round(nAsh * (ASH_CALM + (1 - ASH_CALM) * rainK)));
+      const u = ashMat.uniforms;
+      u.uTime.value = time;
+      u.uCam.value.set(cx, cy, cz);
+      u.uWind.value.copy(wind).multiplyScalar(0.3 + 0.7 * rainK);
+      u.uOpacity.value = 0.6 + 0.3 * rainK;
+      updateCurtains(cx, cy, cz, time, phase === 'ash' ? fogK : 0);
+      // --- fresh ash settles while it rains, and blows away after
+      const cover = SURFACE.uSdAsh.value, settle = phase === 'ash' ? ASH_COVER : 0;
+      SURFACE.uSdAsh.value = settle > cover ? Math.min(settle, cover + dt * ASH_COVER / 40) : Math.max(settle, cover - dt * ASH_COVER / 60);
       // --- fumaroles near the camera steam
       for (const f of fumaroles) {
         const near = Math.hypot(f.x - cx, f.z - cz) < FUMAROLE_RANGE;
