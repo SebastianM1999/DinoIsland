@@ -114,6 +114,13 @@ test('the mountain path is short and deadly: a narrow ridge, a ditch with lava b
     }
     const a = plan.steps[0], b = plan.steps[1];
     assert.notEqual(terrain.lavaLevelAt((a.x + b.x) / 2, (a.z + b.z) / 2), null, `v${variant}: lava between the stones`);
+    // lava pits break the walkway too: full of lava, stepping stones across
+    assert.ok(plan.pits.length >= 1, `v${variant}: lava pits on the path`);
+    for (const pit of plan.pits) {
+      assert.notEqual(terrain.lavaLevelAt(pit.x, pit.z), null, 'lava in the pit');
+      assert.ok(pit.disc >= pit.r, `v${variant}: the lava fills the pit (${(pit.disc / pit.r).toFixed(2)})`);
+      assert.ok(plan.steps.filter((st) => Math.hypot(st.x - pit.x, st.z - pit.z) < pit.r).length >= 2, 'stones across it');
+    }
   }
 });
 

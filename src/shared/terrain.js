@@ -31,6 +31,17 @@ export class Terrain {
       }
     }
     this.hutGround = HUT_GROUND;
+    // the volcano path's lava pits (island.js lavaPits): the lava sheet ends where
+    // the ground as sampled here rises above it, so no edge of it hangs in the air
+    for (const p of plan.pools || []) {
+      if (!p.pit) continue;
+      const above = (r) => { for (let k = 0; k < 24; k++) { const a = (k / 24) * Math.PI * 2; if (this.heightAt(p.x + Math.cos(a) * r, p.z + Math.sin(a) * r) < p.level) return false; } return true; };
+      // (out into its rim first, then in)
+      let r = p.r * 1.05;
+      while (r < p.r * 1.55 && !above(r)) r += 0.1;
+      if (!above(r)) { r = p.r * 1.05; while (r > p.r * 0.4 && !above(r)) r -= 0.1; }
+      p.disc = r;
+    }
     // bogs (swamp): how much bog each grid vertex lies in (0..1) and its water level (NaN = none)
     this.bogMask = null;
     this.bogLevel = null;
