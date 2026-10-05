@@ -166,7 +166,7 @@ function naturalHeight(plan, x, z) {
 
 function poolEffect(plan, x, z, h) {
   for (const p of plan.pools) {
-    if (p.kind === 'lava' && (p.crater || p.annex)) continue;   // the crater / boss arena shape their own bowls
+    if (p.kind === 'lava' && (p.crater || p.annex || p.pit)) continue;   // the crater / boss arena / path pits shape their own bowls
     // (bank: how far out the raised rim reaches – 2.5 radii unless the pool says)
     const dd = Math.hypot(x - p.x, z - p.z), bank = p.bank ?? p.r * 2.5;
     if (dd > bank + p.r * 0.1) continue;
@@ -285,7 +285,7 @@ function riverCarve(plan, x, z, h) {
  * beside it the ditch on the upper side runs and how deep, how steeply the
  * lower side drops away, and how far out all that reaches (m).
  */
-const RIDGE = { width: 3.6, ditch: 2.8, depth: 3.5, drop: 1.6, reach: 15 };
+const RIDGE = { width: 5, ditch: 2.8, depth: 3.5, drop: 1.6, reach: 16 };
 
 function rampEffect(plan, x, z, h) {
   for (const r of plan.ramps) {
@@ -422,6 +422,20 @@ function bridgeEffect(plan, x, z, h) {
   return h;
 }
 
+/**
+ * The lava pits that break the volcano's ridge path (lavaPits): a bowl of
+ * lava right across the walkway, a low rim round it where the ridge falls away.
+ */
+function pitEffect(plan, x, z, h) {
+  for (const p of plan.pits) {
+    const d = Math.hypot(x - p.x, z - p.z);
+    if (d > p.r * 2.4) continue;
+    h = lerp(h, Math.max(h, p.level + 0.9), 1 - smoothstep(p.r * 1.6, p.r * 2.4, d));
+    h = lerp(h, p.level - p.depth, 1 - smoothstep(p.r * 0.6, p.r * 1.05, d));
+  }
+  return h;
+}
+
 /** Inside a water pool's basin (its bowl, a little past the waterline)? */
 function inWaterPool(plan, x, z) {
   for (const p of plan.pools) if (p.kind === 'water' && Math.hypot(x - p.x, z - p.z) < p.r * 1.1) return true;
@@ -451,6 +465,7 @@ export function islandHeight(plan, x, z) {
   if (q && q.flow.kind === 'water' && q.d >= q.width / 2 && q.surface > 0.3 && !inWaterPool(plan, x, z)) h = Math.max(h, Math.min(hr, q.surface + 0.35 + (q.d - q.width / 2) * 0.12));
   // the volcano's basalt bridges over its lava flows
   if (plan.bridges?.length) h = bridgeEffect(plan, x, z, h);
+  if (plan.pits?.length) h = pitEffect(plan, x, z, h);
   // Cut the cliff foot and clear the grotto opening. The drop has no shelf
   // or ramp: all ground directly beneath the outlet lies under the pool.
   if (plan.waterfall) {
@@ -969,6 +984,9 @@ export function planIsland(levelIndex = 0, variant = 1) {
 
   // lava seeping along the ridge path's ditch
   if (volcanic) ridgeGutters(plan);
+  // lava pits across it, crossed on stepping stones
+  plan.pits = [];
+  if (volcanic) lavaPits(plan);
 
   // --- sites: caves, ruins, nest, meadows (flat pads away from trail, river and each other)
   const taken = [
@@ -1287,6 +1305,45 @@ function ridgeGutters(plan) {
     i = j + 25;
   }
 }
+/**
+ * Lava pits right across the ridge path, away from its fords, bridges and
+ * gutters: the way goes on over stepping stones a jump apart (plan.steps).
+ * Each pit is a lava pool of its own (pit: true; its bowl: pitEffect).
+ */
+function lavaPits(plan) {
+  const climb = plan.ramps.find((r) => r.caldera);
+  if (!climb) return;
+  const pts = climb.pts, n = pts.length;
+  const clear = (p) => [...plan.bridges, ...plan.steps, ...plan.pits].every((b) => Math.hypot(b.x - p.x, b.z - p.z) > PITS.gap)
+    && plan.flows.every((fl) => fl.ring || distToPolyline(fl.pts, p.x, p.z) > (fl.gutter ? 14 : PITS.gap));
+  for (const t of PITS.at) {
+    // the nearest steady stretch of ridge to that share of the way up
+    let best = -1;
+    for (let o = 0; o < n * 0.12 && best < 0; o++) {
+      for (const i of [Math.round(n * t) + o, Math.round(n * t) - o]) {
+        const p = pts[i];
+        if (!p || i < 3 || i > n - 4 || (p.ridge ?? 0) < 0.99 || pts[i - 3].ridge < 0.99 || pts[i + 3].ridge < 0.99 || !clear(p)) continue;
+        best = i;
+        break;
+      }
+    }
+    if (best < 0) continue;
+    const p = pts[best], a = pts[best - 2], b = pts[best + 2];
+    const l = Math.hypot(b.x - a.x, b.z - a.z) || 1, dx = (b.x - a.x) / l, dz = (b.z - a.z) / l;
+    const pit = { x: p.x, z: p.z, r: PITS.r, level: p.y - 0.7, depth: 0.9, kind: 'lava', pit: true, disc: PITS.r };
+    plan.pits.push(pit);
+    plan.pools.push(pit);
+    // stones along the path, the first and last just inside the rim
+    const L = PITS.r * 2, k = Math.max(2, Math.round(L / STEPS.spacing) + 1);
+    for (let j = 0; j < k; j++) {
+      const u = -PITS.r + 0.6 + (j / (k - 1)) * (L - 1.2);
+      plan.steps.push({ x: p.x + dx * u, z: p.z + dz * u, r: STEPS.r, top: pit.level + STEPS.above });
+    }
+  }
+}
+/** The ridge path's lava pits: where along the way (share of it), radius, room to anything else (m). */
+const PITS = { at: [0.3, 0.55, 0.78], r: 3.6, gap: 22 };
+
 /** The ridge path's lava gutters: stretch length, channel width, how far below the walkway (m). */
 const GUTTER = { length: 35, width: 3, below: 2 };
 
