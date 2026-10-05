@@ -424,6 +424,21 @@ export class GameAudio {
         this.#noise(t, 2.6, out, { vol: 0.9, type: 'lowpass', f0: 900, f1: 90, q: 0.7, a: 0.01 });
         this.#osc('sine', 70, 28, t, 1.8, out, 1, 0.01);
         break;
+      // a lava geyser: bubbling, then the blast of the spout; a sinking column cracking; the treasure
+      case 'geyserBubble':
+        for (let i = 0; i < 8; i++) this.#osc('sine', 140 + Math.random() * 120, 60, t + i * 0.13 + Math.random() * 0.05, 0.12, out, 0.25, 0.01);
+        break;
+      case 'geyserBlast':
+        this.#noise(t, 1.7, out, { vol: 0.6, type: 'lowpass', f0: 1400, f1: 500, q: 0.7, a: 0.05 });
+        this.#osc('sine', 60, 40, t, 1.2, out, 0.6, 0.02);
+        break;
+      case 'columnCrack':
+        for (let i = 0; i < 6; i++) this.#noise(t + i * 0.1 + Math.random() * 0.05, 0.05, out, { vol: 0.3, f0: 900 + Math.random() * 1200, q: 3 });
+        this.#osc('sine', 70, 45, t + 0.5, 1.4, out, 0.4, 0.2);
+        break;
+      case 'treasure':
+        for (const [i, f] of [523, 659, 784, 1047].entries()) this.#osc('triangle', f, f, t + i * 0.12, 0.35, out, 0.25, 0.01);
+        break;
       case 'bombWhistle':
         this.#noise(t, 1.6, out, { vol: 0.12, f0: 2400, f1: 500, q: 6, a: 0.4 });
         break;

@@ -290,6 +290,10 @@ export class Game {
     this.volcanoFx = buildVolcanoFx(this.terrain, this.layout, this.gfx.camera, {
       onFog: (k) => this.gfx.blendBiome(ashBase, ashThick, k),
       onImpact: (x, y, z) => this.#bombImpact(x, y, z),
+      onGeyser: (x, y, z) => {
+        this.audio.play('geyserBlast', { pos: { x, y: y + 2, z } });
+        if (Math.hypot(x - this.player.pos.x, z - this.player.pos.z) < 14) this.shake = Math.max(this.shake, 0.35);
+      },
     });
     scene.add(this.sky.group, this.water.group, this.vegetation.group, this.rocks.group, this.fruitPlants.group, this.hut.group, this.baseView.group, this.sites.group, this.grove.group, this.logs.group, this.bossArena.group, this.swampArena.group, this.swampFx.group, this.volcanoArena.group, this.volcanoFx.group);
     this.worldUpdaters = [this.sky, this.water, this.vegetation, this.rocks, this.fruitPlants, this.hut, this.baseView, this.sites, this.grove, this.bossArena, this.swampArena, this.swampFx, this.volcanoArena, this.volcanoFx];
@@ -335,6 +339,8 @@ export class Game {
     this.setBase(world.base || freshBase());
     this.raid = world.raid || { phase: 'idle' };
     this.volcanoFx.setState(world.volcano);
+    for (const c of world.volcano?.columns || []) this.volcanoArena.sink(c.id, c.left);
+    if (world.volcano?.treasure) this.volcanoArena.openTreasure();
     this.fruitCounts = world.fruit.slice();
     world.fruit.forEach((count, id) => this.fruitPlants.setCount(id, count));
     this.hud.setPlayer({ name: this.me.name, slot: this.me.slot });
@@ -526,6 +532,21 @@ export class Game {
       if (m.phase === 'erupt') { this.audio.play('eruption', { pos, vol: 2 }); this.shake = Math.max(this.shake, 1); this.hud.toast('Eruption! Watch the red circles – lava bombs land there', 'flame'); }
       if (m.phase === 'ash') this.hud.toast(m.source === 'wind' ? 'Ash rain is blowing in – take shelter at the camp or your base' : 'Ash rain – the dinosaurs can barely see you, but it chokes you: take shelter', 'info');
     });
+    net.on(`ev:${EV.GEYSER}`, (m) => {
+      this.volcanoFx.geyser(m);
+      const g = this.layout.geysers?.[m.id];
+      if (g && Math.hypot(g.x - this.player.pos.x, g.z - this.player.pos.z) < 40) this.audio.play('geyserBubble', { pos: { x: g.x, y: g.y, z: g.z } });
+    });
+    net.on(`ev:${EV.COLUMN}`, (m) => {
+      this.volcanoArena.sink(m.id, m.left);
+      const st = this.layout.steps?.[m.id];
+      if (st) this.audio.play('columnCrack', { pos: { x: st.x, y: st.top, z: st.z } });
+    });
+    net.on(`ev:${EV.TREASURE}`, () => {
+      this.volcanoArena.openTreasure();
+      const t = this.layout.treasure;
+      if (t) this.audio.play('treasure', { pos: { x: t.x, y: t.y + 1, z: t.z } });
+    });
     net.on(`ev:${EV.BOMB}`, (m) => {
       this.volcanoFx.bomb(m);
       if (Math.hypot(m.x - this.player.pos.x, m.z - this.player.pos.z) < 45) this.audio.play('bombWhistle', { pos: { x: m.x, y: m.y + 10, z: m.z } });
@@ -540,7 +561,7 @@ export class Game {
         this.lastHurtAt = this.time;
         this.hud.damageFlash(m.dmg);
         if (m.src) {
-          const name = CONFIG.dinos[m.src]?.name || { lava: 'Lava', heat: 'Heat', bomb: 'Lava bomb', ash: 'Ash' }[m.src] || 'Dinosaur';
+          const name = CONFIG.dinos[m.src]?.name || { lava: 'Lava', heat: 'Heat', bomb: 'Lava bomb', ash: 'Ash', geyser: 'Lava geyser' }[m.src] || 'Dinosaur';
           let direction = 'nearby';
           if (m.from) {
             const dx = m.from.x - this.player.pos.x, dz = m.from.z - this.player.pos.z;
@@ -994,7 +1015,7 @@ export class Game {
       x: p.pos.x, z: p.pos.z, yaw: p.yaw,
       players: [...this.remotes.map.values()].map((rp) => ({ x: rp.pos.x, z: rp.pos.z, yaw: rp.yaw, color: CONFIG.playerColors[rp.slot % 4] })),
       hut: this.stations().home,
-      markers: this.#collect('minimapMarkers'),
+      markers: [...this.#collect('minimapMarkers'), ...this.volcanoArena.minimapMarkers()],
     });
     if (!this.me.alive) {
       hud.setDeath(true, Math.ceil(this.me.deathT));
