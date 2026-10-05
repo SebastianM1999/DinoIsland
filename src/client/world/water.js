@@ -295,6 +295,8 @@ uniform float uFlowRef;
 uniform float uGlow;
 uniform float uFogAmount;
 uniform vec2 uCenter;
+uniform vec2 uEdge;         // pool: the depth over which the crust gives way to molten lava
+uniform float uPlates;      // how much of the surface crust plates may cover (1 = all they would)
 uniform vec3 uCrust;
 uniform vec3 uCrustHot;
 uniform vec3 uHot;
@@ -337,13 +339,13 @@ void main() {
     float a = uTime * 0.012;
     float c = cos(a), s = sin(a);
     q = mat2(c, -s, s, c) * (vWorld.xz - uCenter);
-    edge = 1.0 - smoothstep(0.3, 3.0, depth);
+    edge = 1.0 - smoothstep(uEdge.x, uEdge.y, depth);
   }
   // organic plate shapes: domain-warped cells
   vec2 wq = q + (vec2(vnoise(q * 0.15 + 3.1), vnoise(q * 0.15 + 7.7)) - 0.5) * 3.0;
   vec3 wc = worley(wq * 0.3);
   float crack = wc.y - wc.x;
-  float coverage = mix(0.3, 0.95, smoothstep(0.25, 1.0, edge)) - rapid * 0.35;
+  float coverage = (mix(0.3, 0.95, smoothstep(0.25, 1.0, edge)) - rapid * 0.35) * uPlates;
   float plate = step(wc.z, coverage);
   float plateMask = plate * smoothstep(0.04, 0.16, crack);
 
@@ -554,7 +556,7 @@ export function buildWater(terrain, layout = {}, sunDir = new THREE.Vector3(-0.4
     });
     return m;
   };
-  const lavaMaterial = ({ mode = 0, center = [0, 0], flowRef = 0.45 } = {}) => new THREE.ShaderMaterial({
+  const lavaMaterial = ({ mode = 0, center = [0, 0], flowRef = 0.45, edge = [0.3, 3.0], plates = 1 } = {}) => new THREE.ShaderMaterial({
     vertexShader: SURF_VERT,
     fragmentShader: LAVA_FRAG,
     uniforms: {
@@ -563,6 +565,8 @@ export function buildWater(terrain, layout = {}, sunDir = new THREE.Vector3(-0.4
       uMode: { value: mode },
       uWaveAmp: { value: 0 },
       uCenter: { value: new THREE.Vector2(center[0], center[1]) },
+      uEdge: { value: new THREE.Vector2(edge[0], edge[1]) },
+      uPlates: { value: plates },
       uFlowRef: { value: flowRef },
       uFogAmount: { value: 0.3 },
     },
@@ -586,7 +590,8 @@ export function buildWater(terrain, layout = {}, sunDir = new THREE.Vector3(-0.4
     const level = Number.isFinite(pool.level) ? pool.level : seaLevel;
     const lava = pool.kind === 'lava';
     const mat = lava
-      ? lavaMaterial({ mode: 0, center: [pool.x, pool.z] })
+      // (a small crater's shallow lava glows molten almost to its rim, a few thin plates on it)
+      ? lavaMaterial({ mode: 0, center: [pool.x, pool.z], ...(pool.small ? { edge: [0.05, 0.6], plates: 0.3 } : {}) })
       : waterMaterial({ waveAmp: 0.05, ripple: 0.18, alpha: [0.5, 0.92] });
     const rad = pool.disc ?? pool.r * 1.4;
     const mesh = new THREE.Mesh(discGeometry(rad, 56, Math.max(6, Math.min(16, Math.round(rad / 3)))), mat);
