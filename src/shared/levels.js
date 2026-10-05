@@ -50,8 +50,7 @@ export const BIOMES = {
 
   // Ashfall Isle: a round island round one huge caldera (shared/island.js
   // volcanoHeight). Lava flows run from vents on its flanks to the beach, the
-  // paths cross them on basalt bridges; crust plates over the lava break under
-  // anyone who lingers, the ground near lava and fumaroles is hot, and the
+  // paths cross them on basalt bridges; small lava craters dot the lowland; the ground near lava and fumaroles is hot, and the
   // volcano erupts now and then (sim/volcano.js). The crater floor on top is
   // the arena (shared/volcanoArena.js).
   volcano: {

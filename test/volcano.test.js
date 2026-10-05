@@ -1,6 +1,6 @@
 // Ashfall Isle (island 3): the round caldera island – its shape and size, the
 // path up the volcano through the notch, the crater arena, the lava flows with
-// their basalt bridges and vent cones, small lava craters, hot ground, crust plates and the eruption cycle
+// their basalt bridges and vent cones, small lava craters, hot ground, the eruption cycle and ash rain
 // (shared/island.js, shared/volcanoArena.js, shared/terrain.js, sim/volcano.js).
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -163,11 +163,10 @@ test('small lava craters dot the lowland, off the paths and camps', () => {
   }
 });
 
-test('camps stay cool and dry: hut, boat, relics and plots off the lava and crust', () => {
+test('camps stay cool and dry: hut, boat, relics and plots off the lava', () => {
   for (const { terrain, layout, variant } of islands) {
     for (const [what, p] of [['hut', layout.hut], ['boat', layout.boat], ...layout.relics.map((r) => [r.kind, r]), ...layout.basePlots.map((p) => ['plot', p])]) {
       assert.equal(terrain.lavaLevelAt(p.x, p.z), null, `v${variant}: ${what} in lava`);
-      assert.equal(terrain.crustAt(p.x, p.z), null, `v${variant}: ${what} on a crust plate`);
       // (the boat part by the lava flow lies on warm ground, never where it burns)
       assert.ok(terrain.heatAt(p.x, p.z) < (what === 'hut' || what === 'boat' || what === 'plot' ? 0.3 : CONFIG.volcano.heat.dmgFrom), `v${variant}: ${what} on hot ground`);
     }
@@ -177,7 +176,7 @@ test('camps stay cool and dry: hut, boat, relics and plots off the lava and crus
 
 test('heat: hot at the lava, cool away from it; fumaroles warm the ground round them', () => {
   for (const { plan, terrain, variant } of islands) {
-    // a stretch of open lava (no bridge or crust over it)
+    // a stretch of open lava (no bridge over it)
     const f = plan.flows[0];
     const i = f.pts.findIndex((q, k) => k > 3 && k < f.pts.length - 2 && terrain.lavaLevelAt(q.x, q.z) !== null);
     const p = f.pts[i];
@@ -191,18 +190,13 @@ test('heat: hot at the lava, cool away from it; fumaroles warm the ground round 
   }
 });
 
-test('crust plates lie on the flows: walkable, no lava under the feet while whole', () => {
-  let n = 0;
-  for (const { plan, terrain, variant } of islands) {
-    n += plan.crusts.length;
-    for (const c of plan.crusts) {
-      assert.equal(terrain.crustAt(c.x, c.z)?.id, c.id);
-      assert.equal(terrain.lavaLevelAt(c.x, c.z), null, `v${variant}: crust ${c.id} covers the lava`);
-      assert.ok(Math.abs(terrain.heightAt(c.x, c.z) - c.y) < 0.2, `v${variant}: crust ${c.id} is flat at its height`);
-      assert.ok(Math.hypot(c.x - plan.hut.x, c.z - plan.hut.z) > 60, 'far from the camp');
-    }
+test('no crust plates: the lava flows lie open (but for the bridges)', () => {
+  for (const { plan, layout } of islands) {
+    assert.equal(plan.crusts, undefined);
+    assert.equal(layout.crusts, undefined);
   }
-  assert.ok(n >= VARIANTS.length * 3, `${n} crust plates`);
+  assert.equal(EV.CRUST, undefined);
+  assert.equal(CONFIG.volcano.crust, undefined);
 });
 
 /** The volcano island, no dinosaurs, one player at a spot. */
@@ -227,7 +221,7 @@ test('hot ground burns – not with Fireproof; the volcano stays quiet elsewhere
     for (const q of f.pts) {
       for (let a = 0; a < 6.28 && !spot; a += 0.4) {
         const x = q.x + Math.cos(a) * (q.w / 2 + 2.2), z = q.z + Math.sin(a) * (q.w / 2 + 2.2);
-        if (t.lavaLevelAt(x, z) === null && !t.crustAt(x, z) && t.heatAt(x, z) > 0.75 && t.slopeAt(x, z) < 0.5) spot = { x, z };
+        if (t.lavaLevelAt(x, z) === null && t.heatAt(x, z) > 0.75 && t.slopeAt(x, z) < 0.5) spot = { x, z };
       }
     }
   }
@@ -244,39 +238,6 @@ test('hot ground burns – not with Fireproof; the volcano stays quiet elsewhere
   const swamp = new ServerWorld({ send() {} }, { level: 1, variant: 1 });
   assert.equal(swamp.volcano.public(), null);
   assert.equal(swamp.terrain.heatAt(0, 0), 0);
-});
-
-test('a crust plate cracks, breaks under someone who lingers, burns, and cools again', () => {
-  const { world, p, put, run, evs } = volcanoWorld();
-  const c = world.layout.crusts[0];
-  assert.ok(c, 'a crust plate');
-  put(c.x, c.z);
-  p.y = c.y;
-  p.hp = p.maxHp = 1000;
-  run(1);
-  assert.deepEqual(evs(EV.CRUST).map((m) => m.state), ['crack'], 'it cracks first');
-  run(0.6);
-  assert.deepEqual(evs(EV.CRUST).map((m) => m.state), ['crack', 'broken']);
-  assert.equal(world.volcano.lavaAt(c.x, c.z), c.y, 'broken: lava');
-  const hp = p.hp;
-  run(0.5);
-  assert.ok(p.hp < hp - 10, 'it burns like lava');
-  // a late joiner sees the broken plate
-  assert.deepEqual(world.fullState().volcano.broken.map((b) => b.id), [c.id]);
-  p.creative = true;
-  run(CONFIG.volcano.crust.broken);
-  assert.equal(evs(EV.CRUST).at(-1).state, 'solid');
-  assert.equal(world.volcano.lavaAt(c.x, c.z), null);
-  // Fireproof: it holds twice as long
-  p.creative = false;
-  p.hp = 1000;
-  p.buffs = { heatproof: world.now + 30 };
-  put(c.x + 0.5, c.z);
-  p.y = c.y;
-  run(CONFIG.volcano.crust.hold + 0.3);
-  assert.equal(evs(EV.CRUST).at(-1).state, 'crack', 'still holding');
-  run(CONFIG.volcano.crust.hold);
-  assert.equal(evs(EV.CRUST).at(-1).state, 'broken');
 });
 
 test('the eruption cycle: rumble, lava bombs (never at the camp), ash rain, calm again', () => {

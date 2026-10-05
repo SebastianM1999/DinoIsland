@@ -180,8 +180,7 @@ export function buildLayout(terrain) {
   const nearHut = (x, z, pad = 0) => Math.hypot(x - hf.x, z - (hf.z + 2)) < hf.radius + pad
     || layout.basePlots.some((p) => Math.hypot(x - p.x, z - p.z) < p.r + 2 + Math.min(pad, 12));
   const nearBoat = (x, z, pad = 0) => Math.hypot(x - plan.boat.x, z - plan.boat.z) < 10 + pad;
-  // (a volcano's crust plates are not dry ground either: nothing stands on them)
-  const dry = (x, z, min = 0.4) => terrain.waterLevelAt(x, z) === null && terrain.lavaLevelAt(x, z) === null && terrain.heightAt(x, z) > min && !terrain.crustAt(x, z);
+  const dry = (x, z, min = 0.4) => terrain.waterLevelAt(x, z) === null && terrain.lavaLevelAt(x, z) === null && terrain.heightAt(x, z) > min;
   const inside = (x, z, k) => insideOutline(plan, x, z, k);
   // (every flow: the river, or the volcano's lava flows and crater moat)
   const riverDist = (x, z) => {
@@ -359,8 +358,7 @@ export function buildLayout(terrain) {
       arena.bones.push({ x, z, y: groundAt(x, z), rot: ra() * TAU, kind: ra() < 0.3 ? 'skull' : 'rib', s: ra.range(0.9, 1.6) });
     }
   }
-  // the volcano's crust plates, basalt bridges and fumaroles (shared/island.js): nothing grows on them
-  layout.crusts = (plan.crusts || []).map((c) => ({ ...c }));
+  // the volcano's basalt bridges and fumaroles (shared/island.js): nothing grows on them
   layout.bridges = (plan.bridges || []).map((b) => ({ ...b }));
   layout.fumaroles = (plan.fumaroles || []).map((f) => ({ ...f, y: terrain.heightAt(f.x, f.z) }));
   for (const f of layout.fumaroles) reserve(f.x, f.z, 3.5);

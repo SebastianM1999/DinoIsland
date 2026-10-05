@@ -1,12 +1,9 @@
-// The volcano (Ashfall Isle, see shared/levels.js). Three things the server
-// decides for everyone:
+// The volcano (Ashfall Isle, see shared/levels.js). What the server decides
+// for everyone:
 //
 // - Heat: the ground near lava and fumaroles is hot (Terrain.heatAt). Players
 //   standing on very hot ground burn a little (the client also drains their
 //   stamina faster there, player/controller.js). Fireproof (ember chili) helps.
-// - Crust plates over the lava flows (Terrain.crustAt): they hold a moment –
-//   whoever stands on one too long breaks it. A broken plate is lava until it
-//   has cooled again.
 // - The eruption cycle: calm -> rumble (a warning) -> erupt (lava bombs rain
 //   down, each one announced with a warning circle where it lands; they hurt
 //   dinosaurs too) -> ash (ash rain: thick air, dinosaurs see less far) -> calm.
@@ -14,7 +11,7 @@
 //   it a player slowly loses health (never below a floor); the camp and the
 //   base plots shelter (shared/volcanoArena.js ashShelter).
 //
-// Everything replicates through EV.VOLCANO / EV.BOMB / EV.CRUST and, for late
+// Everything replicates through EV.VOLCANO / EV.BOMB and, for late
 // joiners, fullState().volcano (public()).
 
 import { CONFIG } from '../shared/config.js';
@@ -38,30 +35,20 @@ export class Volcano {
     this.resume = 0;                 // after a wind ash rain: the calm left until the next rumble
     this.nextWave = 0;
     this.bombs = [];                 // pending impacts { x, z, y, at }
-    // crust plates: broken until `until`; who stood on which one for how long
-    this.crusts = (layout.crusts || []).map((c) => ({ id: c.id, broken: false, until: 0, warned: false }));
   }
 
-  /** Replicated state (fullState): phase, seconds left, broken crust plates. */
+  /** Replicated state (fullState): phase, what brought the ash, seconds left. */
   public() {
     if (!this.active) return null;
     return {
       phase: this.phase,
       source: this.source,
       left: r2(Math.max(0, this.until - this.world.now)),
-      broken: this.crusts.filter((c) => c.broken).map((c) => ({ id: c.id, left: r2(c.until - this.world.now) })),
     };
   }
 
   /** Dinosaurs see this much less far (ash rain). */
   sightMul() { return this.active && this.phase === 'ash' ? V.ash.sight : 1; }
-
-  /** Lava surface of a broken crust plate at (x, z), or null (see world.js: it burns like lava). */
-  lavaAt(x, z) {
-    if (!this.active) return null;
-    const c = this.world.terrain.crustAt(x, z);
-    return c && this.crusts[c.id]?.broken ? c.y : null;
-  }
 
   #setPhase(phase, seconds, source = null) {
     this.phase = phase;
@@ -104,18 +91,10 @@ export class Volcano {
       this.#impact(this.bombs[i]);
       this.bombs.splice(i, 1);
     }
-    // --- crust plates cool down again
-    for (const c of this.crusts) {
-      if (c.broken && now >= c.until) {
-        c.broken = false;
-        c.warned = false;
-        w.event(EV.CRUST, { id: c.id, state: 'solid' });
-      }
-    }
-    // --- players: hot ground and crust plates
+    // --- players: ash rain and hot ground
     const H = V.heat;
     for (const p of w.players.values()) {
-      if (!p.alive || p.creative) { p.heatT = 0; p.ashT = 0; p.crust = null; continue; }
+      if (!p.alive || p.creative) { p.heatT = 0; p.ashT = 0; continue; }
       // out in the ash rain: after a while it starts to hurt (never below the floor)
       if (this.phase === 'ash' && !ashShelter(w.layout, p.x, p.z)) {
         p.ashT = (p.ashT ?? 0) + dt;
@@ -138,23 +117,6 @@ export class Volcano {
           if (!p.alive) continue;
         }
       } else p.heatT = 0;
-      // standing on a crust plate: it cracks, then breaks
-      const plate = w.terrain.crustAt(p.x, p.z);
-      const c = plate && this.crusts[plate.id];
-      if (!c || c.broken || p.y > plate.y + 1.2) { p.crust = null; continue; }
-      if (p.crust?.id !== c.id) p.crust = { id: c.id, t: 0 };
-      p.crust.t += dt;
-      const hold = V.crust.hold * (proof ? CONFIG.fruit.buffs.heatproof.crustMul : 1);
-      if (!c.warned && p.crust.t >= V.crust.warn) {
-        c.warned = true;
-        w.event(EV.CRUST, { id: c.id, state: 'crack' });
-      }
-      if (p.crust.t >= hold) {
-        c.broken = true;
-        c.until = now + V.crust.broken;
-        p.crust = null;
-        w.event(EV.CRUST, { id: c.id, state: 'broken', left: V.crust.broken });
-      }
     }
   }
 
