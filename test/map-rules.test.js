@@ -19,7 +19,8 @@ for (const level of [0, 1, 2]) {
 test('rivers flow downhill and always have higher ground on both sides', () => {
   for (const { plan, terrain, level, variant } of islands) {
    // every flow (the volcano has several lava flows; its crater moat is a ring at one level)
-   for (const flow of plan.flows.filter((f) => !f.ring)) {
+   // (not the volcano path's lava fields: their lower edge is a narrow lip, drawn narrow – volcano.test.js)
+   for (const flow of plan.flows.filter((f) => !f.ring && !f.field)) {
     const pts = flow.pts;
     for (let i = 1; i < pts.length - 1; i++) {
       assert.ok(pts[i].y <= pts[i - 1].y + 1e-6, `L${level} v${variant}: river rises at ${i}`);

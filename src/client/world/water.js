@@ -615,8 +615,9 @@ export function buildWater(terrain, layout = {}, sunDir = new THREE.Vector3(-0.4
   // --- rivers
   for (const river of layout?.rivers || []) {
     const lava = river?.kind === 'lava';
+    // (the volcano path's lava fields: drawn just as wide as they are – their lower edge is a narrow lip)
     const geo = riverGeometry(river, lava
-      ? { speed: (s) => Math.min(1.6, 0.35 + s * 6), fadeStart: 2, fadeEnd: 5, widthScale: 1.25, widthPad: 0.6 }
+      ? { speed: (s) => Math.min(1.6, 0.35 + s * 6), fadeStart: 2, fadeEnd: 5, widthScale: river.field ? 1 : 1.25, widthPad: river.field ? 0.3 : 0.6 }
       : { speed: (s) => Math.min(6, 1.2 + s * 30), fadeStart: 3, fadeEnd: 8 });
     if (!geo) continue;
     const mat = lava
