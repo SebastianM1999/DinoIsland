@@ -62,7 +62,7 @@ export function buildLayout(terrain) {
     nests: [],
     trexPatrol: [],
     path: [],
-    pools: plan.pools.map((p) => ({ x: p.x, z: p.z, r: p.r, level: p.level, kind: p.kind, disc: p.disc, small: p.small, pit: p.pit })),
+    pools: plan.pools.map((p) => ({ x: p.x, z: p.z, r: p.r, level: p.level, kind: p.kind, disc: p.disc, small: p.small })),
     // every flow: the river, or the volcano's lava flows and its crater moat (`ring`)
     rivers: flowsOf(plan).map((f) => ({ kind: f.kind, ring: !!f.ring, pts: f.pts.map((p) => ({ ...p })) })),
     waterfalls: [],
@@ -363,7 +363,7 @@ export function buildLayout(terrain) {
   layout.fumaroles = (plan.fumaroles || []).map((f) => ({ ...f, y: terrain.heightAt(f.x, f.z) }));
   for (const f of layout.fumaroles) reserve(f.x, f.z, 3.5);
   for (const b of layout.bridges) reserve(b.x, b.z, b.r);
-  // the stepping stones where the mountain path fords a lava flow: basalt columns to stand on
+  // the stepping stones of the mountain path's lava fields: basalt columns to stand on
   layout.steps = (plan.steps || []).map((s) => ({ ...s }));
   for (const s of layout.steps) {
     circles.push({ x: s.x, z: s.z, r: s.r, bottom: s.top - 4, top: s.top, kind: 'basalt', stand: true });

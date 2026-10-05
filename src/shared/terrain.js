@@ -12,7 +12,7 @@ import { smoothstep } from './rng.js';
  * lava, fading out over `reach` m (`fumarole` m round a fumarole). Effects in
  * CONFIG.volcano.heat (players) and sim/pathfind.js (dinosaurs).
  */
-export const HEAT = { reach: 12, fumarole: 7 };
+export const HEAT = { reach: 12, fumarole: 7, gutter: 4 };
 
 export class Terrain {
   /** @param {ReturnType<typeof planIsland>} [plan] defaults to level 1 */
@@ -31,17 +31,6 @@ export class Terrain {
       }
     }
     this.hutGround = HUT_GROUND;
-    // the volcano path's lava pits (island.js lavaPits): the lava sheet ends where
-    // the ground as sampled here rises above it, so no edge of it hangs in the air
-    for (const p of plan.pools || []) {
-      if (!p.pit) continue;
-      const above = (r) => { for (let k = 0; k < 24; k++) { const a = (k / 24) * Math.PI * 2; if (this.heightAt(p.x + Math.cos(a) * r, p.z + Math.sin(a) * r) < p.level) return false; } return true; };
-      // (out into its rim first, then in)
-      let r = p.r * 1.05;
-      while (r < p.r * 1.55 && !above(r)) r += 0.1;
-      if (!above(r)) { r = p.r * 1.05; while (r > p.r * 0.4 && !above(r)) r -= 0.1; }
-      p.disc = r;
-    }
     // bogs (swamp): how much bog each grid vertex lies in (0..1) and its water level (NaN = none)
     this.bogMask = null;
     this.bogLevel = null;
@@ -63,7 +52,9 @@ export class Terrain {
       const N = n1 * n1, dist = new Float32Array(N).fill(1e9);
       for (let j = 0; j <= segments; j++) {
         for (let i = 0; i <= segments; i++) {
-          if (this.lavaLevelAt(-this.half + i * this.cell, -this.half + j * this.cell) !== null) dist[j * n1 + i] = 0;
+          const x = -this.half + i * this.cell, z = -this.half + j * this.cell;
+          // (the lava along the ridge path's ditch warms the path but does not burn on it)
+          if (this.lavaLevelAt(x, z) !== null) dist[j * n1 + i] = riverQuery(plan, x, z, 12, 'lava')?.flow.gutter ? HEAT.gutter : 0;
         }
       }
       const c1 = this.cell, c2 = this.cell * Math.SQRT2;
