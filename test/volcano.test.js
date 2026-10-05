@@ -175,6 +175,13 @@ test('lava geysers on the path and in its fields; sinking columns; a treasure is
     assert.ok(plan.treasure && lake.islet, `v${variant}: a treasure islet`);
     assert.equal(terrain.lavaLevelAt(plan.treasure.x, plan.treasure.z), null, 'the islet is dry');
     assert.ok(Math.hypot(plan.treasure.x - lake.x, plan.treasure.z - lake.z) < lake.r, 'in the lake');
+    // lava all round it: no walking out to it
+    for (let k = 0; k < 24; k++) {
+      const a = (k / 24) * Math.PI * 2;
+      let wet = false;
+      for (let d = lake.islet.r + 0.5; d < lake.r * 1.3 && !wet; d += 0.4) wet = terrain.lavaLevelAt(plan.treasure.x + Math.cos(a) * d, plan.treasure.z + Math.sin(a) * d) !== null;
+      assert.ok(wet, `v${variant}: lava round the islet (${k})`);
+    }
     const row = plan.steps.filter((st) => Math.hypot(st.x - lake.x, st.z - lake.z) < lake.r * 1.2);
     assert.ok(row.length >= 4, `v${variant}: ${row.length} columns out to it`);
     for (let k = 1; k < row.length; k++) {
@@ -183,7 +190,7 @@ test('lava geysers on the path and in its fields; sinking columns; a treasure is
       assert.notEqual(terrain.lavaLevelAt((row[k].x + row[k - 1].x) / 2, (row[k].z + row[k - 1].z) / 2), null, 'lava between');
     }
     const last = row.at(-1);
-    assert.ok(Math.hypot(last.x - plan.treasure.x, last.z - plan.treasure.z) - last.r - 2.2 < jump * 0.85, 'a jump onto the islet');
+    assert.ok(Math.hypot(last.x - plan.treasure.x, last.z - plan.treasure.z) - last.r - lake.islet.r < jump * 0.85, 'a jump onto the islet');
     assert.ok(layout.treasure && layout.stepColliders.length === layout.steps.length);
   }
 });
@@ -276,7 +283,9 @@ test('lava lakes and craters dot the lowland, off the paths and camps', () => {
     for (const c of craters) {
       assert.equal(c.kind, 'lava');
       assert.ok(c.r >= 4.5 && c.r <= 12);
-      assert.notEqual(terrain.lavaLevelAt(c.x, c.z), null, `v${variant}: lava in the crater`);
+      // (the treasure lake has its islet in the middle: lava round it)
+      const mx = c.islet ? c.x + c.r * 0.55 : c.x;
+      assert.notEqual(terrain.lavaLevelAt(mx, c.z), null, `v${variant}: lava in the crater`);
       assert.equal(terrain.lavaLevelAt(c.x + c.bank, c.z), null, `v${variant}: dry past the rim`);
       assert.ok(layout.distToPath(c.x, c.z) > c.bank, `v${variant}: crater (and its rim) off the paths`);
       assert.ok(Math.hypot(c.x - plan.hut.x, c.z - plan.hut.z) > 45 && Math.hypot(c.x - plan.boat.x, c.z - plan.boat.z) > 30, 'off the camp and the boat');
@@ -503,6 +512,7 @@ test('a lava geyser bubbles, then spouts: it burns and throws back whoever is in
   const { world, p, run, evs } = volcanoWorld(2);
   const G = CONFIG.volcano.geyser;
   const g = world.volcano.geysers.find((q) => world.terrain.lavaLevelAt(q.x, q.z) === null);
+  world.volcano.climb = [];          // (no bomb zone here: only the geyser)
   p.hp = p.maxHp = 1000;
   p.buffs = { heatproof: world.now + 1000 };
   const stand = (x, z) => { p.x = x; p.z = z; p.y = world.layout.groundAt(x, z); };

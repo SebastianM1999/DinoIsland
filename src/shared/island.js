@@ -177,7 +177,7 @@ function poolEffect(plan, x, z, h) {
     // (an islet of basalt standing out of it: lavaTreasure)
     if (p.islet) {
       const di = Math.hypot(x - p.islet.x, z - p.islet.z);
-      h = lerp(h, Math.max(h, p.islet.top + fbm(x * 0.5, z * 0.5, 2, plan.seed + 17) * 0.15), 1 - smoothstep(p.islet.r, p.islet.r + 1.6, di));
+      h = lerp(h, Math.max(h, p.islet.top + fbm(x * 0.5, z * 0.5, 2, plan.seed + 17) * 0.15), 1 - smoothstep(p.islet.r, p.islet.r + 0.9, di));
     }
   }
   return h;
@@ -1344,14 +1344,15 @@ function columnRun(plan, rng, { at, a0, a1, from, to, surf, jump = FIELDS.jump }
       const room = a1 - prev.a - prev.r, rr = Math.min(0.9, (room - 2 * jump[0]) / 2);
       if (rr < 0.45) break;
       // (halfway – or a little further where a bend brings it too close to the last one)
-      let am = 0, pm = null, sx = 0, sz = 0;
+      let am = 0, pm = null, sx = 0, sz = 0, fits = false;
       for (const share of [0.5, 0.58, 0.66, 0.74]) {
         am = prev.a + prev.r + room * share;
         pm = at(am);
         sx = pm.x + pm.nx * prev.s;
         sz = pm.z + pm.nz * prev.s;
-        if (Math.hypot(sx - prev.x, sz - prev.z) - rr - prev.r >= jump[0]) break;
+        if ((fits = Math.hypot(sx - prev.x, sz - prev.z) - rr - prev.r >= jump[0])) break;
       }
+      if (!fits) break;                               // (then the jump to the ground has to do)
       const top = Math.max(surf(am) + FIELDS.above, Math.min(surf(am) + rng.range(FIELDS.above, 1.4), prev.top + FIELDS.rise));
       const st = { x: sx, z: sz, r: rr, top, lava: surf(am) };
       plan.steps.push(st);
@@ -1366,7 +1367,7 @@ function columnRun(plan, rng, { at, a0, a1, from, to, surf, jump = FIELDS.jump }
     }
     // (measured where it stands: on the inside of a bend it comes closer)
     let p = at(a);
-    for (let tries = 0; tries < 4; tries++) {
+    for (let tries = 0; tries < 10; tries++) {
       const real = Math.hypot(p.x + p.nx * s - prev.x, p.z + p.nz * s - prev.z) - r - prev.r;
       if (real >= jump[0]) break;
       a += jump[0] - real + 0.05;
@@ -1598,26 +1599,29 @@ function lavaTreasure(plan, rng) {
   // toward the nearest path
   let best = null;
   for (const l of lines) for (const p of l) { const d = Math.hypot(p.x - lake.x, p.z - lake.z); if (!best || d < best.d) best = { d, p }; }
-  // the row: in from the shore nearest the path, then round the lake in an arc to the islet
+  // the islet in the lake's middle (well clear of its shore: lava all round it); the row:
+  // in from the shore nearest the path, round the middle in an arc, then in onto the islet
   const th0 = Math.atan2(best.p.z - lake.z, best.p.x - lake.x), turn = rng() < 0.5 ? 1 : -1;
-  const rho = lake.r * 0.6, r0 = lake.r * 0.95, seg = r0 - rho, sweep = TREASURE.sweep;
-  const th1 = th0 + turn * sweep;
-  const islet = { x: lake.x + Math.cos(th1) * rho, z: lake.z + Math.sin(th1) * rho, r: TREASURE.islet, top: lake.level + 0.9 };
+  const rho = lake.r * 0.45, r0 = lake.r * 0.72, seg = r0 - rho, sweep = TREASURE.sweep;
+  const islet = { x: lake.x, z: lake.z, r: TREASURE.islet, top: lake.level + 0.9 };
   lake.islet = islet;
   plan.treasure = { x: islet.x, z: islet.z, y: islet.top };
+  const radial = (th, r) => ({ x: lake.x + Math.cos(th) * r, z: lake.z + Math.sin(th) * r, y: lake.level + 1.4, nx: -Math.sin(th), nz: Math.cos(th) });
+  const arc = seg + rho * sweep, th1 = th0 + turn * sweep;
   const at = (a) => {
-    if (a < seg) {
-      const r = r0 - a, c = Math.cos(th0), sn = Math.sin(th0);
-      return { x: lake.x + c * r, z: lake.z + sn * r, y: lake.level + 1.4, nx: -sn, nz: c };
+    if (a < seg) return radial(th0, r0 - a);
+    if (a < arc) {
+      const th = th0 + turn * (a - seg) / rho;
+      return { x: lake.x + Math.cos(th) * rho, z: lake.z + Math.sin(th) * rho, y: lake.level + 1.4, nx: Math.cos(th), nz: Math.sin(th) };
     }
-    const th = th0 + turn * (a - seg) / rho, c = Math.cos(th), sn = Math.sin(th);
-    return { x: lake.x + c * rho, z: lake.z + sn * rho, y: lake.level + 1.4, nx: c, nz: sn };
+    return radial(th1, rho - (a - arc));
   };
-  const L = seg + rho * sweep - islet.r;
-  columnRun(plan, rng, { at, a0: 0, a1: L, from: -lake.r * 0.22, to: lake.r * 0.22, surf: () => lake.level, jump: TREASURE.jump });
+  const L = arc + rho - islet.r;
+  // (start from the lava's edge: the shore of the bowl)
+  columnRun(plan, rng, { at, a0: 0, a1: L, from: -lake.r * 0.15, to: lake.r * 0.15, surf: () => lake.level, jump: TREASURE.jump });
 }
 /** The lava lake treasure: the islet's radius, the jumps out to it (edge to edge, m), how far round the lake the row bends (rad). */
-const TREASURE = { islet: 2.2, jump: [1, 1.7], sweep: 3.1 };
+const TREASURE = { islet: 1.8, jump: [1, 1.7], sweep: 3.4 };
 
 const insideVolcanoCrater = (plan, x, z, pad) => !!plan.volcano && Math.hypot(x - plan.volcano.x, z - plan.volcano.z) < plan.volcano.craterR + pad;
 
