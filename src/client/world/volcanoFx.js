@@ -270,9 +270,10 @@ export function buildVolcanoFx(terrain, layout, camera, { onFog = null, onImpact
   const geysers = (layout.geysers || []).map((g) => {
     const vent = new THREE.Mesh(ringGeo, new THREE.MeshBasicMaterial({ color: '#ff5a1c', transparent: true, opacity: 0.35, depthWrite: false, fog: true }));
     const mouth = new THREE.Mesh(discGeo, new THREE.MeshBasicMaterial({ color: '#2a1410', transparent: true, opacity: 0.85, depthWrite: false, fog: true }));
-    const jet = new THREE.Mesh(spoutGeo, new THREE.MeshBasicMaterial({ color: '#ffae4a', transparent: true, opacity: 0.8, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide }));
-    const core = new THREE.Mesh(spoutGeo, new THREE.MeshBasicMaterial({ color: '#ff5a1c', transparent: true, opacity: 0.95, depthWrite: false, side: THREE.DoubleSide, fog: true }));
-    const cap = new THREE.Mesh(flashGeo, new THREE.MeshBasicMaterial({ color: '#ffb060', transparent: true, opacity: 0.8, depthWrite: false, blending: THREE.AdditiveBlending }));
+    // (a red-orange sheath of lava round a white-hot core, a splash on top)
+    const jet = new THREE.Mesh(spoutGeo, new THREE.MeshBasicMaterial({ color: '#d8361a', transparent: true, opacity: 0.92, depthWrite: false, side: THREE.DoubleSide, fog: true }));
+    const core = new THREE.Mesh(spoutGeo, new THREE.MeshBasicMaterial({ color: '#ffc24a', transparent: true, opacity: 0.9, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide }));
+    const cap = new THREE.Mesh(flashGeo, new THREE.MeshBasicMaterial({ color: '#ff7a24', transparent: true, opacity: 0.9, depthWrite: false, fog: true }));
     vent.position.set(g.x, g.y + 0.08, g.z);
     vent.scale.setScalar(g.r);
     mouth.position.set(g.x, g.y + 0.06, g.z);
