@@ -71,56 +71,88 @@ test('one path winds up the volcano and in through the notch onto the crater flo
   }
 });
 
-/** Between the stepping stones of a ford, where the mountain path wades through lava. */
-const atFord = (plan, x, z) => plan.steps.some((st) => Math.hypot(st.x - x, st.z - z) < 4);
+/** On one of the mountain path's lava fields (the jump and runs), where its walkway is lava. */
+const atFord = (plan, x, z) => plan.fields.some((fd) => fd.line.some((q) => q.a > fd.a0 - 2 && q.a < fd.a1 + 2 && Math.hypot(q.x - x, q.z - z) < 9));
 
-test('the mountain path is short and deadly: a narrow ridge, a ditch with lava beside it, a ford of stepping stones', () => {
-  for (const { plan, terrain, layout, variant } of islands) {
-    const climb = plan.ramps.find((r) => r.caldera), pts = climb.pts;
+/** The path's points with the sideways unit vector up the volcano. */
+const pathSides = (plan) => {
+  const pts = plan.ramps.find((r) => r.caldera).pts, v = plan.volcano;
+  return pts.map((p, i) => {
+    const a = pts[Math.max(0, i - 1)], b = pts[Math.min(pts.length - 1, i + 1)], tl = Math.hypot(b.x - a.x, b.z - a.z) || 1;
+    let nx = -(b.z - a.z) / tl, nz = (b.x - a.x) / tl;
+    if (nx * (v.x - p.x) + nz * (v.z - p.z) < 0) { nx = -nx; nz = -nz; }
+    return { ...p, nx, nz };
+  });
+};
+
+test('the mountain path is short and deadly: a ridge with lava all along its upper side', () => {
+  for (const { plan, terrain, variant } of islands) {
+    const pts = pathSides(plan);
     let len = 0;
     for (let i = 1; i < pts.length; i++) len += Math.hypot(pts[i].x - pts[i - 1].x, pts[i].z - pts[i - 1].z);
     assert.ok(len < 420, `v${variant}: ${len.toFixed(0)} m up`);
-    // a narrow ridge: past the walkway the lower side drops steeply, the upper side has a ditch
+    // a ridge: past the walkway the lower side drops steeply, the upper side has a ditch
     let drops = 0, ditches = 0, n = 0;
     for (let i = 20; i < pts.length - 20; i += 6) {
       const p = pts[i];
       if ((p.ridge ?? 0) < 0.99 || atFord(plan, p.x, p.z)) continue;
-      const a = pts[i - 1], b = pts[i + 1], tl = Math.hypot(b.x - a.x, b.z - a.z);
-      let nx = -(b.z - a.z) / tl, nz = (b.x - a.x) / tl;
-      if (nx * (plan.volcano.x - p.x) + nz * (plan.volcano.z - p.z) < 0) { nx = -nx; nz = -nz; }   // n: up the volcano
       const y = terrain.heightAt(p.x, p.z);
       n++;
-      if (terrain.heightAt(p.x - nx * 5, p.z - nz * 5) < y - 3) drops++;
-      if (terrain.heightAt(p.x + nx * 4.3, p.z + nz * 4.3) < y - 1.5) ditches++;
+      if (terrain.heightAt(p.x - p.nx * 6, p.z - p.nz * 6) < y - 3) drops++;
+      if (terrain.heightAt(p.x + p.nx * 5.3, p.z + p.nz * 5.3) < y - 1.5) ditches++;
     }
-    assert.ok(n > 8 && drops / n > 0.8 && ditches / n > 0.8, `v${variant}: ridge ${drops}/${n} drops, ${ditches}/${n} ditches`);
-    // lava seeps along the ditch in places, never onto the walkway
-    const gutters = plan.flows.filter((f) => f.gutter);
-    assert.ok(gutters.length >= 1, `v${variant}: lava beside the path`);
-    for (const g of gutters) {
-      const mid = g.pts[Math.floor(g.pts.length / 2)];
-      assert.notEqual(terrain.lavaLevelAt(mid.x, mid.z), null, 'the gutter holds lava');
-      assert.ok(terrain.heatAt(mid.x, mid.z) > 0.9, 'and it is hot');
+    assert.ok(n >= 5 && drops / n > 0.8 && ditches / n > 0.8, `v${variant}: ridge ${drops}/${n} drops, ${ditches}/${n} ditches`);
+    // lava beside it almost all the way (but at the bridges and the last stretch into the notch)
+    let side = 0, m = 0;
+    for (let i = Math.floor(pts.length * 0.05); i < pts.length * 0.93; i++) {
+      const p = pts[i];
+      if (atFord(plan, p.x, p.z)) continue;
+      m++;
+      for (let o = 2; o <= 8.5; o += 0.5) if (terrain.lavaLevelAt(p.x + p.nx * o, p.z + p.nz * o) !== null) { side++; break; }
     }
-    // a ford: stepping stones a jump apart, lava between them, a stone to stand on above it
-    assert.ok(plan.steps.length >= 2, `v${variant}: stepping stones`);
-    const jump = CONFIG.player.walkSpeed * 2 * CONFIG.player.jumpSpeed / CONFIG.player.gravity;
-    for (const st of plan.steps) {
-      assert.ok(layout.groundAt(st.x, st.z) >= st.top - 1e-6, 'one stands on a stone');
-      const lava = terrain.lavaLevelAt(st.x, st.z);
-      if (lava !== null) assert.ok(st.top > lava + 0.6, 'above the lava');
-      const next = plan.steps.filter((o) => o !== st).map((o) => Math.hypot(o.x - st.x, o.z - st.z) - o.r - st.r).sort((a, b) => a - b)[0];
-      assert.ok(next > 0.8 && next < jump * 0.8, `v${variant}: a jump to the next stone (${next.toFixed(2)} m)`);
+    assert.ok(side / m > 0.72, `v${variant}: lava beside the path ${side}/${m}`);
+    // it warms the walkway but does not burn there (most of the way)
+    let hot = 0;
+    for (const p of pts) if (!atFord(plan, p.x, p.z) && terrain.lavaLevelAt(p.x, p.z) === null && terrain.heatAt(p.x, p.z) >= CONFIG.volcano.heat.dmgFrom) hot++;
+    assert.ok(hot < pts.length * 0.1, `v${variant}: ${hot} burning points on the walkway`);
+  }
+});
+
+test('two jump and runs on the mountain path: long lava fields, no way round, varied columns a jump apart', () => {
+  const jump = CONFIG.player.walkSpeed * 2 * CONFIG.player.jumpSpeed / CONFIG.player.gravity;
+  const hop = CONFIG.player.jumpSpeed ** 2 / (2 * CONFIG.player.gravity);
+  for (const { plan, terrain, layout, variant } of islands) {
+    assert.equal(plan.fields.length, 2, `v${variant}: two lava fields`);
+    const pts = pathSides(plan);
+    for (const fd of plan.fields) {
+      assert.ok(fd.a1 - fd.a0 >= 30, 'a long one');
+      // no way round: across from the drop's edge to the ditch's wall it is all lava
+      for (const q of fd.line.filter((l) => l.a > fd.a0 + 2 && l.a < fd.a1 - 2)) {
+        for (let o = -2; o <= 6.5; o += 0.5) {
+          const x = q.x + q.nx * o, z = q.z + q.nz * o;
+          if (plan.steps.some((st) => Math.hypot(st.x - x, st.z - z) < st.r + 0.3)) continue;
+          assert.notEqual(terrain.lavaLevelAt(x, z), null, `v${variant}: lava across the field (${o} m)`);
+        }
+      }
+      // its columns, in order up the path: from the walkway's edge to the next, a jump apart
+      const near = (st) => fd.line.some((q) => q.a >= fd.a0 - 1 && q.a <= fd.a1 + 1 && Math.hypot(q.x - st.x, q.z - st.z) < 9);
+      const cols = plan.steps.filter(near);
+      assert.ok(cols.length >= 7, `v${variant}: ${cols.length} columns`);
+      const rs = cols.map((c) => c.r), tops = cols.map((c) => c.top - terrain.lavaLevelAt(c.x, c.z));
+      assert.ok(Math.max(...rs) - Math.min(...rs) > 0.25 && Math.max(...tops) - Math.min(...tops) > 0.4, 'thick and thin, low and high');
+      for (let k = 1; k < cols.length; k++) {
+        const p = cols[k - 1], c = cols[k];
+        const gap = Math.hypot(c.x - p.x, c.z - p.z) - p.r - c.r;
+        assert.ok(gap > 0.8 && gap < jump * 0.85, `v${variant}: a jump to the next column (${gap.toFixed(2)} m)`);
+        assert.ok(c.top - p.top < hop * 0.87, 'never too high a hop up');
+        assert.notEqual(terrain.lavaLevelAt((c.x + p.x) / 2, (c.z + p.z) / 2), null, 'lava between them');
+      }
+      for (const c of cols) {
+        assert.ok(layout.groundAt(c.x, c.z) >= c.top - 1e-6, 'one stands on a column');
+        assert.ok(c.top > terrain.lavaLevelAt(c.x, c.z) + 0.7, 'above the lava (the lava burns below 0.6 m)');
+      }
     }
-    const a = plan.steps[0], b = plan.steps[1];
-    assert.notEqual(terrain.lavaLevelAt((a.x + b.x) / 2, (a.z + b.z) / 2), null, `v${variant}: lava between the stones`);
-    // lava pits break the walkway too: full of lava, stepping stones across
-    assert.ok(plan.pits.length >= 1, `v${variant}: lava pits on the path`);
-    for (const pit of plan.pits) {
-      assert.notEqual(terrain.lavaLevelAt(pit.x, pit.z), null, 'lava in the pit');
-      assert.ok(pit.disc >= pit.r, `v${variant}: the lava fills the pit (${(pit.disc / pit.r).toFixed(2)})`);
-      assert.ok(plan.steps.filter((st) => Math.hypot(st.x - pit.x, st.z - pit.z) < pit.r).length >= 2, 'stones across it');
-    }
+
   }
 });
 
@@ -160,7 +192,7 @@ test('the crater arena: a flat floor, a lava moat open at the entrance, columns 
 
 test('lava flows run from vents to the beach; paths cross them on basalt bridges', () => {
   for (const { plan, terrain, variant } of islands) {
-    const flows = plan.flows.filter((f) => !f.ring && !f.gutter && f.kind === 'lava');
+    const flows = plan.flows.filter((f) => !f.ring && !f.gutter && !f.field && f.kind === 'lava');
     assert.ok(flows.length >= 2, `v${variant}: ${flows.length} flows`);
     for (const f of flows) {
       assert.ok(f.pts[0].y > 15, `v${variant}: starts high on the flank`);
@@ -194,7 +226,7 @@ test('no lava hangs in the air: every lava pool lies in a bowl, every flow wells
         assert.ok(terrain.heightAt(x, z) >= p.level - 0.05, `v${variant}: lava pool edge ${(p.level - terrain.heightAt(x, z)).toFixed(2)} m above the ground at ${x.toFixed(0)},${z.toFixed(0)}`);
       }
     }
-    for (const f of plan.flows.filter((q) => !q.ring && !q.gutter)) {
+    for (const f of plan.flows.filter((q) => !q.ring && !q.gutter && !q.field)) {
       assert.ok(f.vent, `v${variant}: the flow has a vent`);
       // a cone round the mouth: its crest stands above the lava welling out
       let crest = -Infinity;

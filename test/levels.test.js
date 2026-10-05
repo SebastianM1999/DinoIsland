@@ -76,7 +76,8 @@ test('lava burns players', () => {
   const world = new ServerWorld({ send() {} }, { level: 2, variant: 3 });
   const a = world.join('Bo');
   const p = world.players.get(a.id);
-  const pt = world.layout.rivers[0].pts[3];
+  // (a point of the first lava flow that is open lava: not under a bridge)
+  const pt = world.layout.rivers[0].pts.find((q, i) => i >= 3 && world.terrain.lavaLevelAt(q.x, q.z) !== null);
   Object.assign(p, { x: pt.x, z: pt.z, y: world.terrain.heightAt(pt.x, pt.z) });
   const hp = p.hp;
   world.step(0.05);
