@@ -7,6 +7,8 @@
 //   everything facing up (SURFACE.uSdAsh, world/surfaceDetail.js), fading
 //   again once the rain has passed;
 // - fumaroles steam;
+// - lava geysers: a glowing mouth in the path that bubbles (warning), then
+//   a spout of lava shoots up (geyser; onGeyser for the sound and the shake);
 // - an eruption throws lava up out of the crater; every lava bomb gets a red
 //   warning circle where it will land, flies in glowing and bursts.
 //
@@ -16,6 +18,7 @@
 import * as THREE from 'three';
 import { makeRng } from '../../shared/rng.js';
 import { SURFACE } from './surfaceDetail.js';
+import { CONFIG } from '../../shared/config.js';
 
 const TAU = Math.PI * 2;
 // [ash flakes, fumarole puffs each, crater spray, ash curtains]
@@ -135,10 +138,10 @@ function flakeMaterial() {
  * @param {THREE.Camera} camera
  * @param {{ onFog?: (k:number) => void, onImpact?: (x:number, y:number, z:number) => void }} [hooks]
  */
-export function buildVolcanoFx(terrain, layout, camera, { onFog = null, onImpact = null } = {}) {
+export function buildVolcanoFx(terrain, layout, camera, { onFog = null, onImpact = null, onGeyser = null } = {}) {
   const group = new THREE.Group();
   group.name = 'volcano-fx';
-  const none = { group, update() {}, setQuality() {}, setState() {}, setPhase() {}, bomb() {}, ashRaining: () => false };
+  const none = { group, update() {}, setQuality() {}, setState() {}, setPhase() {}, bomb() {}, geyser() {}, ashRaining: () => false };
   if (!layout.plan.volcano || typeof document === 'undefined') return none;
   const plan = layout.plan;
   const rng = makeRng(plan.seed ^ 0xa5f);
@@ -261,6 +264,24 @@ export function buildVolcanoFx(terrain, layout, camera, { onFog = null, onImpact
     for (const m of [ring, disc, rock, glow, flash, smoke]) { m.visible = false; m.renderOrder = 6; group.add(m); }
     return { ring, disc, rock, glow, flash, smoke, active: false, t: 0, at: 0, x: 0, y: 0, z: 0, r: 4, from: new THREE.Vector3(), landed: false };
   });
+  // ---------------------------------------------------------------- geysers
+  const GY = CONFIG.volcano.geyser;
+  const spoutGeo = new THREE.CylinderGeometry(0.55, 1, 1, 18, 4, true).translate(0, 0.5, 0);
+  const geysers = (layout.geysers || []).map((g) => {
+    const vent = new THREE.Mesh(ringGeo, new THREE.MeshBasicMaterial({ color: '#ff5a1c', transparent: true, opacity: 0.35, depthWrite: false, fog: true }));
+    const mouth = new THREE.Mesh(discGeo, new THREE.MeshBasicMaterial({ color: '#2a1410', transparent: true, opacity: 0.85, depthWrite: false, fog: true }));
+    const jet = new THREE.Mesh(spoutGeo, new THREE.MeshBasicMaterial({ color: '#ffae4a', transparent: true, opacity: 0.8, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide }));
+    const core = new THREE.Mesh(spoutGeo, new THREE.MeshBasicMaterial({ color: '#ff5a1c', transparent: true, opacity: 0.95, depthWrite: false, side: THREE.DoubleSide, fog: true }));
+    const cap = new THREE.Mesh(flashGeo, new THREE.MeshBasicMaterial({ color: '#ffb060', transparent: true, opacity: 0.8, depthWrite: false, blending: THREE.AdditiveBlending }));
+    vent.position.set(g.x, g.y + 0.08, g.z);
+    vent.scale.setScalar(g.r);
+    mouth.position.set(g.x, g.y + 0.06, g.z);
+    mouth.scale.setScalar(g.r * 0.85);
+    for (const m of [jet, core, cap]) { m.visible = false; m.position.set(g.x, g.y, g.z); }
+    for (const m of [vent, mouth, jet, core, cap]) { m.renderOrder = 6; group.add(m); }
+    return { ...g, vent, mouth, jet, core, cap, t: -1, eta: 0, blown: false };
+  });
+
   let clock = 0;
 
   const setPhase = (p, left = 0) => {
@@ -285,6 +306,11 @@ export function buildVolcanoFx(terrain, layout, camera, { onFog = null, onImpact
     setPhase,
     /** Is it raining ash (sim/volcano.js phase 'ash')? */
     ashRaining: () => phase === 'ash',
+    /** Lava geyser m.id spouts in m.eta seconds (it bubbles till then). */
+    geyser(m) {
+      const g = geysers[m.id];
+      if (g) Object.assign(g, { t: 0, eta: m.eta, blown: false });
+    },
     /** A lava bomb lands at (x, z) in m.eta seconds. */
     bomb(m) {
       const b = bombs.find((q) => !q.active) || bombs.reduce((a, q) => (q.at < a.at ? q : a));
@@ -356,6 +382,28 @@ export function buildVolcanoFx(terrain, layout, camera, { onFog = null, onImpact
       }
       sprayGeo.attributes.position.needsUpdate = true;
       sprayGeo.attributes.color.needsUpdate = true;
+      // --- geysers: a glowing mouth; it bubbles, then spouts
+      for (const g of geysers) {
+        if (g.t < 0) { g.vent.material.opacity = 0.28 + 0.08 * Math.sin(time * 1.3 + g.id); continue; }
+        g.t += dt;
+        if (g.t < g.eta) {
+          const k = g.t / g.eta;
+          g.vent.material.opacity = 0.45 + 0.5 * k * (0.5 + 0.5 * Math.sin(g.t * (10 + 14 * k)));
+          g.vent.scale.setScalar(g.r * (1 + 0.12 * Math.sin(g.t * 18)));
+          continue;
+        }
+        const s = g.t - g.eta;
+        if (!g.blown) { g.blown = true; onGeyser?.(g.x, g.y, g.z); }
+        if (s > GY.spout) { g.t = -1; g.jet.visible = g.core.visible = g.cap.visible = false; g.vent.scale.setScalar(g.r); continue; }
+        const k = Math.min(1, s / 0.2) * Math.min(1, (GY.spout - s) / 0.4);
+        const h = GY.height * k, w = 1 + 0.08 * Math.sin(time * 25 + g.id);
+        g.jet.visible = g.core.visible = g.cap.visible = h > 0.05;
+        g.jet.scale.set(g.r * 0.85 * w, h, g.r * 0.85 * w);
+        g.core.scale.set(g.r * 0.5 / w, h * 0.92, g.r * 0.5 / w);
+        g.cap.position.y = g.y + h;
+        g.cap.scale.setScalar(g.r * (0.9 + 0.3 * Math.sin(time * 18)));
+        g.vent.material.opacity = 0.95;
+      }
       // --- bombs: warning circle, flight from the crater, burst
       for (const b of bombs) {
         if (!b.active) continue;
