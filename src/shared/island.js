@@ -170,12 +170,37 @@ function poolEffect(plan, x, z, h) {
     const dd = Math.hypot(x - p.x, z - p.z);
     if (dd > p.r * 2.6) continue;
     const rim = 1 - smoothstep(p.r * 1.2, p.r * 2.5, dd);
-    h = lerp(h, Math.max(h, p.level + 0.8 + fbm(x * 0.1, z * 0.1, 2, plan.seed + 13) * 0.35), rim);
+    h = lerp(h, Math.max(h, p.level + (p.rim ?? 0.8) + fbm(x * 0.1, z * 0.1, 2, plan.seed + 13) * 0.35), rim);
     const bowl = 1 - smoothstep(p.r * 0.55, p.r * 1.05, dd);
     h = lerp(h, p.level - p.depth, bowl);
   }
   return h;
 }
+
+/**
+ * The vents on the volcano's flanks: a low cinder cone round the spot where a
+ * lava flow wells out (the flow then carves its mouth and its way out of it).
+ */
+function ventEffect(plan, x, z, h) {
+  // the young flow runs between high banks down the steep flank
+  const q = riverQuery(plan, x, z, 12, 'lava');
+  if (q && q.flow.vent && q.i <= 3 && q.d > q.width / 2) {
+    const k = 1 - smoothstep(q.width / 2 + 3, q.width / 2 + 7, q.d);
+    h = Math.max(h, lerp(h, q.surface + 1.2, k));
+  }
+  for (const f of plan.flows) {
+    const v = f.vent;
+    if (!v) continue;
+    const d = Math.hypot(x - v.x, z - v.z);
+    if (d > VENT.r * 2) continue;
+    // a crest round the mouth on a low mound (it holds the young flow's banks high)
+    const ring = Math.exp(-(((d - VENT.r) / VENT.w) ** 2));
+    const mound = 1 - smoothstep(VENT.r, VENT.r * 2.2, d);
+    h += (ring * VENT.h + mound * 0.9) * (1 + fbm(x * 0.4, z * 0.4, 2, plan.seed + 141) * 0.25);
+  }
+  return h;
+}
+const VENT = { r: 4.5, w: 3, h: 1.6 };
 
 /** All flows of the island: the river (or first lava flow), more lava flows, the crater's lava moat. */
 export const flowsOf = (plan) => plan.flows ?? (plan.river ? [plan.river] : []);
@@ -419,6 +444,7 @@ function inWaterPool(plan, x, z) {
 export function islandHeight(plan, x, z) {
   let h = naturalHeight(plan, x, z);
   h = poolEffect(plan, x, z, h);
+  if (plan.flows) h = ventEffect(plan, x, z, h);
   h = riverCarve(plan, x, z, h);
   // mountain paths win over the wide river valley walls (so the valley never
   // bites a cliff out of a trail), but give way right at the water: a path
@@ -784,8 +810,6 @@ export function planIsland(levelIndex = 0, variant = 1) {
       const flow = traceFlow(plan, start, goal, { kind: 'lava', width0: 4, width1: 7.5, surface0: y0 - 0.6, stopAt: 0.5 });
       flow.vent = { x: start.x, z: start.z, y: y0 };
       plan.flows.push(flow);
-      // the vent: a small glowing cone the lava wells out of
-      plan.pools.push({ x: start.x, z: start.z, r: 4, level: y0 - 0.6, depth: 0.5, kind: 'lava', vent: true });
     }
     plan.volcanoArena = planVolcanoArena(plan);
     plan.flows.push(moatFlow(plan.volcanoArena));
@@ -1119,6 +1143,7 @@ export function planIsland(levelIndex = 0, variant = 1) {
   plan.fumaroles = [];
   if (volcanic) planCrusts(plan, taken, makeRng(seed ^ 0xc257));
   if (volcanic) planFumaroles(plan, taken, makeRng(seed ^ 0xf0a1), fnN);
+  if (volcanic) planLavaCraters(plan, taken, makeRng(seed ^ 0x1a7a), fnN);
 
   return plan;
 }
@@ -1263,6 +1288,48 @@ function planFumaroles(plan, taken, rng, fnN) {
     if (flowDist(plan, x, z) < 12 || lines.some((l) => distToPolyline(l, x, z) < 7)) continue;
     if (plan.fumaroles.some((f) => Math.hypot(f.x - x, f.z - z) < 26)) continue;
     plan.fumaroles.push({ id: plan.fumaroles.length, x, z });
+  }
+}
+
+/**
+ * Small lava craters: glowing pools of lava in bowls of their own, scattered
+ * over the gentle ground of the lowland and the volcano's foot. Only where the
+ * ground round them is flat, so the rim holds the lava all round (poolEffect
+ * shapes the bowl and the rim).
+ */
+function planLavaCraters(plan, taken, rng, fnN) {
+  const { A } = plan;
+  const lines = [plan.trail, ...plan.ramps.map((r) => r.pts)];
+  const ringAt = (x, z, rr) => {
+    let lo = Infinity, hi = -Infinity, sum = 0;
+    for (let k = 0; k < 12; k++) {
+      const a = (k / 12) * TAU;
+      const y = fnN(x + Math.cos(a) * rr, z + Math.sin(a) * rr);
+      lo = Math.min(lo, y); hi = Math.max(hi, y); sum += y;
+    }
+    return { lo, hi, mean: sum / 12 };
+  };
+  let made = 0;
+  for (let i = 0; i < 9000 && made < 24; i++) {
+    const x = rng.range(-A * 0.85, A * 0.85), z = rng.range(-A * 0.85, A * 0.85);
+    const r = rng.range(3, 5);
+    if (!insideEllipse(plan, x, z, 0.8) || insideVolcanoCrater(plan, x, z, 12)) continue;
+    if (Math.hypot(x - plan.hut.x, z - plan.hut.z) < 50 || Math.hypot(x - plan.boat.x, z - plan.boat.z) < 35) continue;
+    if (taken.some((t) => !t.hill && t.r < 60 && Math.hypot(t.x - x, t.z - z) < t.r + r * 2.6 + 2)) continue;
+    // (not on a hilltop: its summit pad levels the ground there afterwards; not
+    // up against a basalt spire)
+    if (plan.hills.some((f) => Math.hypot(f.x - x, f.z - z) < (f.radius > 15 ? f.radius * 0.6 : f.radius + 4) + r * 2.6)) continue;
+    if (lines.some((l) => distToPolyline(l, x, z) < r * 2.6 + 5)) continue;
+    if (flowDist(plan, x, z) < r * 2.2 + 7) continue;
+    if (plan.bridges.some((b) => Math.hypot(b.x - x, b.z - z) < b.r + r * 2.6 + 4)) continue;
+    if (plan.fumaroles.some((f) => Math.hypot(f.x - x, f.z - z) < r * 2.6 + 8)) continue;
+    if (plan.pools.some((p) => Math.hypot(p.x - x, p.z - z) < p.r * 2.6 + r * 2.6 + 3)) continue;
+    // gentle ground: poolEffect raises the rim all round (a little bank on the
+    // lower side), so the lava never hangs over a slope
+    const inner = ringAt(x, z, r * 1.4);
+    if (inner.lo < 1.5 || inner.hi - inner.lo > 3.6 || slopeOf(fnN, x, z, r * 2) > 0.42) continue;
+    plan.pools.push({ x, z, r, level: inner.mean - 0.35, depth: 0.8, rim: 1.4, kind: 'lava', small: true, disc: r * 1.2 });
+    made++;
   }
 }
 

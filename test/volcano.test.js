@@ -1,6 +1,6 @@
 // Ashfall Isle (island 3): the round caldera island – its shape and size, the
 // path up the volcano through the notch, the crater arena, the lava flows with
-// their basalt bridges, hot ground, crust plates and the eruption cycle
+// their basalt bridges and vent cones, small lava craters, hot ground, crust plates and the eruption cycle
 // (shared/island.js, shared/volcanoArena.js, shared/terrain.js, sim/volcano.js).
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -123,6 +123,42 @@ test('lava flows run from vents to the beach; paths cross them on basalt bridges
     for (const b of plan.bridges) {
       assert.equal(terrain.lavaLevelAt(b.x, b.z), null, 'a bridge is dry');
       assert.ok(terrain.heatAt(b.x, b.z) < CONFIG.volcano.heat.dmgFrom, `v${variant}: a bridge never burns (${terrain.heatAt(b.x, b.z).toFixed(2)})`);
+    }
+  }
+});
+
+test('no lava hangs in the air: every lava pool lies in a bowl, every flow wells out of a vent cone', () => {
+  for (const { plan, terrain, variant } of islands) {
+    for (const p of plan.pools.filter((q) => q.kind === 'lava' && !q.crater && !q.annex)) {
+      // the drawn disc's edge lies under the ground all round
+      const rad = p.disc ?? p.r * 1.4;
+      for (let k = 0; k < 16; k++) {
+        const a = (k / 16) * Math.PI * 2, x = p.x + Math.cos(a) * rad, z = p.z + Math.sin(a) * rad;
+        assert.ok(terrain.heightAt(x, z) >= p.level - 0.05, `v${variant}: lava pool edge ${(p.level - terrain.heightAt(x, z)).toFixed(2)} m above the ground at ${x.toFixed(0)},${z.toFixed(0)}`);
+      }
+    }
+    for (const f of plan.flows.filter((q) => !q.ring)) {
+      assert.ok(f.vent, `v${variant}: the flow has a vent`);
+      // a cone round the mouth: its crest stands above the lava welling out
+      let crest = -Infinity;
+      for (let k = 0; k < 12; k++) crest = Math.max(crest, terrain.heightAt(f.vent.x + Math.cos(k * 0.52) * 4.5, f.vent.z + Math.sin(k * 0.52) * 4.5));
+      assert.ok(crest > f.pts[0].y + 1, `v${variant}: vent cone`);
+    }
+  }
+});
+
+test('small lava craters dot the lowland, off the paths and camps', () => {
+  for (const { plan, terrain, layout, variant } of islands) {
+    const craters = plan.pools.filter((p) => p.small);
+    assert.ok(craters.length >= 10, `v${variant}: ${craters.length} lava craters`);
+    for (const c of craters) {
+      assert.equal(c.kind, 'lava');
+      assert.ok(c.r >= 3 && c.r <= 5);
+      assert.notEqual(terrain.lavaLevelAt(c.x, c.z), null, `v${variant}: lava in the crater`);
+      assert.equal(terrain.lavaLevelAt(c.x + c.r * 2.4, c.z), null, `v${variant}: dry past the rim`);
+      assert.ok(layout.distToPath(c.x, c.z) > c.r * 2 + 3, `v${variant}: crater off the paths`);
+      assert.ok(Math.hypot(c.x - plan.hut.x, c.z - plan.hut.z) > 45 && Math.hypot(c.x - plan.boat.x, c.z - plan.boat.z) > 30, 'off the camp and the boat');
+      assert.ok(!layout.basePlots.some((p) => Math.hypot(p.x - c.x, p.z - c.z) < p.r + c.r * 2), 'off the plots');
     }
   }
 });
