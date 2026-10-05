@@ -117,6 +117,9 @@ export const EV = {
   HEAL: 'heal',             // { id, by, hp }                    Field Medic healed id
   VOLCANO: 'volcano',       // { phase, left, source? }          eruption cycle (sim/volcano.js): calm | rumble | erupt | ash (source: eruption | wind)
   BOMB: 'bomb',             // { x, y, z, eta, r }               a lava bomb lands at (x, z) in eta seconds (radius r)
+  GEYSER: 'geyser',         // { id, eta }                       lava geyser id spouts in eta seconds (it bubbles till then)
+  COLUMN: 'column',         // { id, left }                      sinking column id started its cycle (left: seconds into it)
+  TREASURE: 'treasure',     // { by, name }                      the lava lake treasure was opened
 };
 
 /** Player snapshot tuple layout. */

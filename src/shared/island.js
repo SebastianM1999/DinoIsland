@@ -174,6 +174,11 @@ function poolEffect(plan, x, z, h) {
     h = lerp(h, Math.max(h, p.level + (p.rim ?? 0.8) + fbm(x * 0.1, z * 0.1, 2, plan.seed + 13) * 0.35), rim);
     const bowl = 1 - smoothstep(p.r * 0.55, p.r * 1.05, dd);
     h = lerp(h, p.level - p.depth, bowl);
+    // (an islet of basalt standing out of it: lavaTreasure)
+    if (p.islet) {
+      const di = Math.hypot(x - p.islet.x, z - p.islet.z);
+      h = lerp(h, Math.max(h, p.islet.top + fbm(x * 0.5, z * 0.5, 2, plan.seed + 17) * 0.15), 1 - smoothstep(p.islet.r, p.islet.r + 1.6, di));
+    }
   }
   return h;
 }
@@ -944,6 +949,9 @@ export function planIsland(levelIndex = 0, variant = 1) {
   plan.steps = [];
   if (volcanic) lavaFields(plan, makeRng(seed ^ 0x57e9));
   if (volcanic) ridgeGutters(plan);
+  // lava geysers on the path and in its fields
+  plan.geysers = [];
+  if (volcanic) lavaGeysers(plan, makeRng(seed ^ 0x6e75));
 
   // --- sites: caves, ruins, nest, meadows (flat pads away from trail, river and each other)
   const taken = [
@@ -1139,6 +1147,10 @@ export function planIsland(levelIndex = 0, variant = 1) {
   plan.fumaroles = [];
   if (volcanic) planFumaroles(plan, taken, makeRng(seed ^ 0xf0a1), fnN);
   if (volcanic) planLavaCraters(plan, taken, makeRng(seed ^ 0x1a7a), fnN);
+  // the treasure on an islet in the widest lava lake, a row of columns out to it
+  plan.treasure = null;
+  if (volcanic) lavaTreasure(plan, makeRng(seed ^ 0x7ea5));
+  plan.steps?.forEach((st, i) => { st.id = i; });
 
   return plan;
 }
@@ -1301,53 +1313,78 @@ function lavaFields(plan, rng) {
     const c = at((a0 + a1) / 2);
     plan.fields.push({ a0, a1, line, cx: c.x, cz: c.z, reach: FIELDS.length / 2 + FIELDS.dam + 14 });
     // the columns: from the walkway's edge at the bottom end to the one at the top
-    const surf = (a) => at(a).y - FIELDS.below;
-    const p0 = at(a0);
-    let prev = { a: a0, s: 0, r: 0, top: p0.y, x: p0.x, z: p0.z };
-    for (let k = 0; k < 40; k++) {
-      const left = a1 - prev.a - prev.r;
-      if (left <= FIELDS.jump[1]) break;                 // the last jump: onto the walkway
-      const r = rng.range(0.55, 1.1);
-      const gap = rng() < 0.2 ? rng.range(2, FIELDS.jump[1]) : rng.range(FIELDS.jump[0], 1.8);
-      // zigzag across the field, never too close to its edges
-      const s = clamp(prev.s + rng.range(-2.6, 2.6), FIELDS.from + r + 0.8, FIELDS.to - r - 1.2);
-      let D = gap + prev.r + r;
-      const ds = s - prev.s;
-      let a = prev.a;
-      // near the top end: one more column halfway to the walkway (unless that jump is short enough)
-      if (prev.a + Math.sqrt(Math.max(D * D - ds * ds, (D * 0.5) ** 2)) > a1 - r - FIELDS.jump[0]) {
-        const room = a1 - prev.a - prev.r, rr = Math.min(0.9, (room - 2 * FIELDS.jump[0]) / 2);
-        if (rr < 0.45) break;
-        const am = prev.a + prev.r + room / 2, pm = at(am);
-        const top = Math.max(surf(am) + FIELDS.above, Math.min(surf(am) + rng.range(FIELDS.above, 1.4), prev.top + FIELDS.rise));
-        const st = { x: pm.x + pm.nx * prev.s, z: pm.z + pm.nz * prev.s, r: rr, top };
-        plan.steps.push(st);
-        prev = { a: am, s: prev.s, r: rr, top, x: st.x, z: st.z };
-        continue;
-      }
-      // (up the slope the lava rises: a shorter jump where the next column would stand too high)
-      for (let tries = 0; tries < 6; tries++) {
-        a = Math.min(prev.a + Math.sqrt(Math.max(D * D - ds * ds, (D * 0.5) ** 2)), a1 - r - FIELDS.jump[0]);
-        if (surf(a) + FIELDS.above - prev.top <= FIELDS.rise || D <= FIELDS.jump[0] + prev.r + r + 0.05) break;
-        D = Math.max(FIELDS.jump[0] + prev.r + r, D * 0.85);
-      }
-      // (measured where it stands: on the inside of the path's bend it comes closer)
-      let p = at(a);
-      for (let tries = 0; tries < 4; tries++) {
-        const real = Math.hypot(p.x + p.nx * s - prev.x, p.z + p.nz * s - prev.z) - r - prev.r;
-        if (real >= FIELDS.jump[0]) break;
-        a += FIELDS.jump[0] - real + 0.05;
-        p = at(a);
-      }
-      // heights: a low stump to a tall column, never more than a hop above the last
-      // (how high over the lava wanders: up a little, down a little, now and then a tall one)
-      const want = rng() < 0.15 ? 1.7 : clamp(prev.top - surf(prev.a) + rng.range(-0.45, 0.4), FIELDS.above, 1.7);
-      const top = Math.max(surf(a) + FIELDS.above, Math.min(surf(a) + want, prev.top + FIELDS.rise));
-      const st = { x: p.x + p.nx * s, z: p.z + p.nz * s, r, top };
-      plan.steps.push(st);
-      prev = { a, s, r, top: st.top, x: st.x, z: st.z };
-    }
+    columnRun(plan, rng, { at, a0, a1, from: FIELDS.from, to: FIELDS.to, surf: (a) => at(a).y - FIELDS.below });
   }
+}
+
+/**
+ * A row of basalt columns across lava (plan.steps), a jump apart: from the
+ * ground at a0 to the ground at a1 along at(a) -> { x, z, y, nx, nz } (nx, nz:
+ * sideways), zigzagging between `from` and `to` sideways, standing 0.8 to
+ * 1.7 m over the lava surface surf(a) and never more than a hop above the one
+ * before; now and then one sinks under whoever stands on it (sink: true; not
+ * the first or the last).
+ */
+function columnRun(plan, rng, { at, a0, a1, from, to, surf, jump = FIELDS.jump }) {
+  const first = plan.steps.length;
+  const p0 = at(a0);
+  let prev = { a: a0, s: 0, r: 0, top: p0.y, x: p0.x, z: p0.z };
+  for (let k = 0; k < 40; k++) {
+    const left = a1 - prev.a - prev.r;
+    if (left <= jump[1]) break;                       // the last jump: onto the ground
+    const r = rng.range(0.55, 1.1);
+    const gap = rng() < 0.2 ? rng.range(2, jump[1]) : rng.range(jump[0], 1.8);
+    // zigzag across, never too close to the edges
+    const s = clamp(prev.s + rng.range(-2.6, 2.6), from + r + 0.8, to - r - 1.2);
+    let D = gap + prev.r + r;
+    const ds = s - prev.s;
+    let a = prev.a;
+    // near the far end: one more column halfway to the ground (unless that jump is short enough)
+    if (prev.a + Math.sqrt(Math.max(D * D - ds * ds, (D * 0.5) ** 2)) > a1 - r - jump[0]) {
+      const room = a1 - prev.a - prev.r, rr = Math.min(0.9, (room - 2 * jump[0]) / 2);
+      if (rr < 0.45) break;
+      // (halfway – or a little further where a bend brings it too close to the last one)
+      let am = 0, pm = null, sx = 0, sz = 0;
+      for (const share of [0.5, 0.58, 0.66, 0.74]) {
+        am = prev.a + prev.r + room * share;
+        pm = at(am);
+        sx = pm.x + pm.nx * prev.s;
+        sz = pm.z + pm.nz * prev.s;
+        if (Math.hypot(sx - prev.x, sz - prev.z) - rr - prev.r >= jump[0]) break;
+      }
+      const top = Math.max(surf(am) + FIELDS.above, Math.min(surf(am) + rng.range(FIELDS.above, 1.4), prev.top + FIELDS.rise));
+      const st = { x: sx, z: sz, r: rr, top, lava: surf(am) };
+      plan.steps.push(st);
+      prev = { a: am, s: prev.s, r: rr, top, x: st.x, z: st.z };
+      continue;
+    }
+    // (where the lava rises ahead: a shorter jump where the next column would stand too high)
+    for (let tries = 0; tries < 6; tries++) {
+      a = Math.min(prev.a + Math.sqrt(Math.max(D * D - ds * ds, (D * 0.5) ** 2)), a1 - r - jump[0]);
+      if (surf(a) + FIELDS.above - prev.top <= FIELDS.rise || D <= jump[0] + prev.r + r + 0.05) break;
+      D = Math.max(jump[0] + prev.r + r, D * 0.85);
+    }
+    // (measured where it stands: on the inside of a bend it comes closer)
+    let p = at(a);
+    for (let tries = 0; tries < 4; tries++) {
+      const real = Math.hypot(p.x + p.nx * s - prev.x, p.z + p.nz * s - prev.z) - r - prev.r;
+      if (real >= jump[0]) break;
+      a += jump[0] - real + 0.05;
+      p = at(a);
+    }
+    // heights: how high over the lava wanders – up a little, down a little, now and then a tall one
+    const want = rng() < 0.25 ? 1.7 : clamp(prev.top - surf(prev.a) + rng.range(-0.45, 0.4), FIELDS.above, 1.7);
+    const top = Math.max(surf(a) + FIELDS.above, Math.min(surf(a) + want, prev.top + FIELDS.rise));
+    const st = { x: p.x + p.nx * s, z: p.z + p.nz * s, r, top, lava: surf(a) };
+    plan.steps.push(st);
+    prev = { a, s, r, top: st.top, x: st.x, z: st.z };
+  }
+  // every third or fourth column (never the first or the last) sinks under whoever stands on it
+  const run = plan.steps.slice(first);
+  for (let k = 2 + Math.floor(rng() * 2); k < run.length - 1; k += 3 + Math.floor(rng() * 2)) run[k].sink = true;
+}
+/**
+ * The ridge path's lava fields:  }
 }
 /**
  * The ridge path's lava fields: where along the way (share of it), how long,
@@ -1508,6 +1545,79 @@ function planLavaCraters(plan, taken, rng, fnN) {
 }
 /** Lava craters per island: how many of which size (radius m), and how hard to look for room. */
 const LAVA_CRATERS = [{ n: 5, r0: 8, r1: 12, tries: 12000 }, { n: 16, r0: 4.5, r1: 7, tries: 16000 }];
+
+/**
+ * Lava geysers: on the ridge path's walkway between its lava fields (each a
+ * vent in the path that spouts now and then: sim/volcano.js), and one in each
+ * field between its columns. Each keeps its own beat (period, offset).
+ */
+function lavaGeysers(plan, rng) {
+  const climb = plan.ramps.find((r) => r.caldera);
+  if (!climb) return;
+  const pts = climb.pts, n = pts.length, len = pathLengths(pts);
+  const add = (x, z, y) => plan.geysers.push({ id: plan.geysers.length, x, z, y, r: GEYSER.r, period: rng.range(GEYSER.period[0], GEYSER.period[1]), offset: rng() * 10 });
+  // on the walkway: steady ridge, clear of the fields, the bridges and each other
+  for (const t of [0.2, 0.5, 0.85, 0.62]) {
+    for (let o = 0; o < n * 0.1; o++) {
+      const i = Math.round(n * t) + (o % 2 ? o : -o) / 2 | 0, p = pts[i];
+      if (!p || (p.ridge ?? 0) < 0.99) continue;
+      if (plan.fields.some((fd) => len[i] > fd.a0 - 20 && len[i] < fd.a1 + 20)) continue;
+      if (plan.bridges.some((b) => Math.hypot(b.x - p.x, b.z - p.z) < b.r + 15)) continue;
+      if (plan.geysers.some((g) => Math.hypot(g.x - p.x, g.z - p.z) < 25)) continue;
+      add(p.x, p.z, p.y);
+      break;
+    }
+  }
+  // one in each field: in the lava, the widest room between its columns
+  for (const fd of plan.fields) {
+    let best = null;
+    for (const q of fd.line) {
+      if (q.a < fd.a0 + 4 || q.a > fd.a1 - 4) continue;
+      for (let o = FIELDS.from + 1.5; o < FIELDS.to - 1.5; o += 0.5) {
+        const x = q.x + q.nx * o, z = q.z + q.nz * o;
+        const room = Math.min(...plan.steps.map((st) => Math.hypot(st.x - x, st.z - z) - st.r));
+        if (!best || room > best.room) best = { x, z, y: q.y - FIELDS.below, room };
+      }
+    }
+    if (best && best.room > GEYSER.r + 0.8) add(best.x, best.z, best.y);
+  }
+}
+/** Geysers: radius of the vent, beat between spouts (s). */
+const GEYSER = { r: 1.6, period: [7, 11] };
+
+/**
+ * The lava lake treasure: an islet of basalt in the widest lava lake, a chest
+ * on it (plan.treasure: sim/volcano.js opens it), and a row of columns out to
+ * it from the shore nearest a path, bending round the lake to the islet on
+ * its far side (so the row is a long one).
+ */
+function lavaTreasure(plan, rng) {
+  const lake = plan.pools.filter((p) => p.small).sort((a, b) => b.r - a.r)[0];
+  if (!lake || lake.r < 6) return;
+  const lines = [plan.trail, ...plan.ramps.map((r) => r.pts)];
+  // toward the nearest path
+  let best = null;
+  for (const l of lines) for (const p of l) { const d = Math.hypot(p.x - lake.x, p.z - lake.z); if (!best || d < best.d) best = { d, p }; }
+  // the row: in from the shore nearest the path, then round the lake in an arc to the islet
+  const th0 = Math.atan2(best.p.z - lake.z, best.p.x - lake.x), turn = rng() < 0.5 ? 1 : -1;
+  const rho = lake.r * 0.6, r0 = lake.r * 0.95, seg = r0 - rho, sweep = TREASURE.sweep;
+  const th1 = th0 + turn * sweep;
+  const islet = { x: lake.x + Math.cos(th1) * rho, z: lake.z + Math.sin(th1) * rho, r: TREASURE.islet, top: lake.level + 0.9 };
+  lake.islet = islet;
+  plan.treasure = { x: islet.x, z: islet.z, y: islet.top };
+  const at = (a) => {
+    if (a < seg) {
+      const r = r0 - a, c = Math.cos(th0), sn = Math.sin(th0);
+      return { x: lake.x + c * r, z: lake.z + sn * r, y: lake.level + 1.4, nx: -sn, nz: c };
+    }
+    const th = th0 + turn * (a - seg) / rho, c = Math.cos(th), sn = Math.sin(th);
+    return { x: lake.x + c * rho, z: lake.z + sn * rho, y: lake.level + 1.4, nx: c, nz: sn };
+  };
+  const L = seg + rho * sweep - islet.r;
+  columnRun(plan, rng, { at, a0: 0, a1: L, from: -lake.r * 0.22, to: lake.r * 0.22, surf: () => lake.level, jump: TREASURE.jump });
+}
+/** The lava lake treasure: the islet's radius, the jumps out to it (edge to edge, m), how far round the lake the row bends (rad). */
+const TREASURE = { islet: 2.2, jump: [1, 1.7], sweep: 3.1 };
 
 const insideVolcanoCrater = (plan, x, z, pad) => !!plan.volcano && Math.hypot(x - plan.volcano.x, z - plan.volcano.z) < plan.volcano.craterR + pad;
 

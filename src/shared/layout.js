@@ -365,9 +365,22 @@ export function buildLayout(terrain) {
   for (const b of layout.bridges) reserve(b.x, b.z, b.r);
   // the stepping stones of the mountain path's lava fields: basalt columns to stand on
   layout.steps = (plan.steps || []).map((s) => ({ ...s }));
+  // (a sinking column's collider moves with it: layout.stepColliders[id], see shared/volcanoArena.js columnTop)
+  layout.stepColliders = [];
   for (const s of layout.steps) {
-    circles.push({ x: s.x, z: s.z, r: s.r, bottom: s.top - 4, top: s.top, kind: 'basalt', stand: true });
+    const c = { x: s.x, z: s.z, r: s.r, bottom: s.top - 4, top: s.top, kind: 'basalt', stand: true };
+    circles.push(c);
+    layout.stepColliders[s.id] = c;
     reserve(s.x, s.z, s.r + 1.5);
+  }
+  // the lava geysers (vents in the path) and the lava lake treasure on its islet
+  layout.geysers = (plan.geysers || []).map((g) => ({ ...g, y: terrain.heightAt(g.x, g.z) }));
+  for (const g of layout.geysers) reserve(g.x, g.z, g.r + 1);
+  layout.treasure = plan.treasure ? { ...plan.treasure, y: terrain.heightAt(plan.treasure.x, plan.treasure.z) } : null;
+  if (layout.treasure) {
+    const t = layout.treasure;
+    reserve(t.x, t.z, 2.5);
+    boxes.push({ x: t.x, z: t.z, hw: 0.75, hd: 0.5, rot: 0, top: t.y + 0.9, kind: 'chest', stand: true });
   }
 
   // --------------------------------------------------------- boss arena

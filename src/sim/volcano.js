@@ -9,17 +9,22 @@
 //   dinosaurs too) -> ash (ash rain: thick air, dinosaurs see less far) -> calm.
 // - The mountain path up the caldera is a bomb zone: lava bombs keep coming
 //   down ahead of whoever climbs it, eruption or not.
+// - Lava geysers on the mountain path and in its lava fields bubble, then
+//   spout now and then (hurting and throwing back whoever is in them); some of
+//   the jump-and-run columns sink into the lava under whoever stands on them
+//   and rise again; a treasure waits on an islet in the widest lava lake.
 // - Ash rain also blows in on the wind between eruptions (source 'wind'). Out in
 //   it a player slowly loses health (never below a floor); the camp and the
 //   base plots shelter (shared/volcanoArena.js ashShelter).
 //
-// Everything replicates through EV.VOLCANO / EV.BOMB and, for late
+// Everything replicates through EV.VOLCANO / EV.BOMB / EV.GEYSER / EV.COLUMN /
+// EV.TREASURE and, for late
 // joiners, fullState().volcano (public()).
 
 import { CONFIG } from '../shared/config.js';
 import { EV } from '../shared/protocol.js';
 import { makeRng } from '../shared/rng.js';
-import { ashShelter } from '../shared/volcanoArena.js';
+import { ashShelter, columnTop, columnCycle } from '../shared/volcanoArena.js';
 
 const V = CONFIG.volcano;
 const r2 = (v) => Math.round(v * 100) / 100;
@@ -37,6 +42,10 @@ export class Volcano {
     this.resume = 0;                 // after a wind ash rain: the calm left until the next rumble
     this.nextWave = 0;
     this.bombs = [];                 // pending impacts { x, z, y, at }
+    // geysers: idle -> warn -> spout, each on its own beat
+    this.geysers = (layout.geysers || []).map((g) => ({ ...g, phase: 'idle', until: world.now + (g.offset % g.period), nextHit: 0 }));
+    this.columns = new Map();        // sinking columns: id -> when its cycle started
+    this.treasure = layout.treasure ? { ...layout.treasure, opened: false, by: null } : null;
   }
 
   /** Replicated state (fullState): phase, what brought the ash, seconds left. */
@@ -46,6 +55,8 @@ export class Volcano {
       phase: this.phase,
       source: this.source,
       left: r2(Math.max(0, this.until - this.world.now)),
+      columns: [...this.columns].map(([id, at]) => ({ id, left: r2(this.world.now - at) })),
+      treasure: this.treasure?.opened ? { by: this.treasure.by } : null,
     };
   }
 
@@ -89,6 +100,10 @@ export class Volcano {
     }
     // --- the mountain path: bombs ahead of whoever climbs it
     if (w.mission.phase !== 'sailing') this.#slopeBombs(now);
+    // --- geysers, sinking columns, the treasure
+    this.#geysers(now);
+    this.#columns(now);
+    this.#treasure();
     // --- bombs landing
     for (let i = this.bombs.length - 1; i >= 0; i--) {
       if (now < this.bombs[i].at) continue;
@@ -172,6 +187,86 @@ export class Volcano {
       const a = rng() * Math.PI * 2, o = rng() * S.side;
       const spot = this.#spot(climb[k].x + Math.cos(a) * o, climb[k].z + Math.sin(a) * o);
       if (spot) this.#launch(spot);
+    }
+  }
+
+  /** The geysers' beat: they warn (bubbling), then spout – only while a player is near. */
+  #geysers(now) {
+    const w = this.world, G = V.geyser;
+    for (const g of this.geysers) {
+      if (g.phase === 'idle') {
+        if (now < g.until) continue;
+        if (![...w.players.values()].some((p) => p.alive && Math.hypot(p.x - g.x, p.z - g.z) < G.near)) { g.until = now + g.period; continue; }
+        g.phase = 'warn';
+        g.until = now + G.warn;
+        w.event(EV.GEYSER, { id: g.id, eta: G.warn });
+      } else if (g.phase === 'warn') {
+        if (now >= g.until) { g.phase = 'spout'; g.until = now + G.spout; g.nextHit = now; }
+      } else {
+        if (now >= g.nextHit) { g.nextHit = now + 0.5; this.#spout(g); }
+        if (now >= g.until) { g.phase = 'idle'; g.until = now + Math.max(1, g.period - G.warn - G.spout); }
+      }
+    }
+  }
+
+  /** A geyser's spout: burns and throws back everyone (and every dinosaur) in it. */
+  #spout(g) {
+    const w = this.world, G = V.geyser;
+    for (const p of w.players.values()) {
+      if (!p.alive || p.creative) continue;
+      const d = Math.hypot(p.x - g.x, p.z - g.z);
+      if (d > g.r + 0.6 || p.y < g.y - 1.5 || p.y > g.y + G.height) continue;
+      const a = d > 0.05 ? Math.atan2(p.z - g.z, p.x - g.x) : this.rng() * Math.PI * 2;
+      w.hurtPlayer(p, G.damage, { kx: Math.cos(a) * G.knock, kz: Math.sin(a) * G.knock, src: 'geyser', from: { x: g.x, y: g.y, z: g.z } });
+    }
+    for (const d of w.dinos.list) {
+      if (!d.alive || d.type === 'ptera') continue;
+      if (Math.hypot(d.x - g.x, d.z - g.z) - (CONFIG.dinos[d.type].radius ?? 1) > g.r + 0.6) continue;
+      w.dinos.damage(d, G.damage * 2, 'body', null, 'geyser');
+    }
+  }
+
+  /**
+   * Sinking columns: whoever stands on one starts its cycle (shared/volcanoArena.js
+   * columnTop); its collider goes down and up with it.
+   */
+  #columns(now) {
+    const w = this.world, L = w.layout, C = V.column;
+    for (const [id, at] of this.columns) {
+      const st = L.steps[id], col = L.stepColliders[id], t = now - at;
+      const top = t >= columnCycle(st) ? st.top : columnTop(st, t);
+      col.top = top;
+      col.bottom = top - 4;
+      if (t >= columnCycle(st)) this.columns.delete(id);
+    }
+    for (const p of w.players.values()) {
+      if (!p.alive || p.creative) continue;
+      for (const st of L.steps) {
+        if (!st.sink || this.columns.has(st.id)) continue;
+        if ((p.x - st.x) ** 2 + (p.z - st.z) ** 2 > st.r * st.r || p.y > st.top + C.stand || p.y < st.top - 0.3) continue;
+        this.columns.set(st.id, now);
+        w.event(EV.COLUMN, { id: st.id, left: 0 });
+      }
+    }
+  }
+
+  /** The lava lake treasure: the first to walk up to it opens it – loot for the team. */
+  #treasure() {
+    const w = this.world, t = this.treasure, T = V.treasure;
+    if (!t || t.opened) return;
+    for (const p of w.players.values()) {
+      if (!p.alive || p.creative) continue;
+      if (Math.hypot(p.x - t.x, p.z - t.z) > T.reach || Math.abs(p.y - t.y) > 2.5) continue;
+      t.opened = true;
+      t.by = p.name;
+      w.event(EV.TREASURE, { by: p.id, name: p.name });
+      let k = 0;
+      const drop = (kind, n) => { const a = (k++ / 3) * Math.PI * 2; w.spawnItem(kind, t.x + Math.cos(a) * 1.2, t.z + Math.sin(a) * 1.2, n); };
+      for (const [kind, n] of Object.entries(T.loot)) drop(kind, n);
+      drop('arrow', T.arrows);
+      w.awardXp(T.xp, 'Lava treasure');
+      w.toast(`${p.name} found the lava treasure!`, 'trophy');
+      return;
     }
   }
 
