@@ -105,7 +105,7 @@ export function buildVolcanoArena(terrain, layout) {
     openTreasure() { opened = true; },
     /** The treasure on the minimap once someone came within 60 m of it, till it is opened. */
     minimapMarkers() { return tr && seen && !opened ? [{ kind: 'objective', x: tr.x, z: tr.z, color: '#ff8a2a' }] : []; },
-    update(dt, time, cam) {
+    update(dt, time, cam) {   // (cam: the camera's position)
       clock += dt;
       // the cracks at the columns' feet breathe
       if (embers) embers.material.color.setScalar(0.75 + 0.25 * Math.sin(time * 1.7));
@@ -122,7 +122,7 @@ export function buildVolcanoArena(terrain, layout) {
         if (done) s.start = null;
       }
       if (lid) lid.rotation.x += ((opened ? -1.9 : 0) - lid.rotation.x) * Math.min(1, dt * 4);
-      if (tr && cam && !seen && Math.hypot(cam.position.x - tr.x, cam.position.z - tr.z) < 60) seen = true;
+      if (tr && cam && !seen && Math.hypot(cam.x - tr.x, cam.z - tr.z) < 60) seen = true;
     },
   };
 }
