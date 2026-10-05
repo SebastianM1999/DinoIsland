@@ -85,7 +85,7 @@ function flakeMaterial() {
     uniforms: THREE.UniformsUtils.merge([THREE.UniformsLib.fog, {
       uTime: { value: 0 }, uCam: { value: new THREE.Vector3() }, uWind: { value: new THREE.Vector2() },
       uBox: { value: ASH_BOX }, uSize: { value: 0.32 }, uViewH: { value: 800 },
-      uColor: { value: new THREE.Color('#b4aaa4') }, uOpacity: { value: 0.8 },
+      uColor: { value: new THREE.Color('#8f8681') }, uOpacity: { value: 0.8 },
     }]),
     vertexShader: /* glsl */`
       attribute vec4 aSeed;        // x, y, z in 0..1 (place in the box), w: fall speed
@@ -255,14 +255,15 @@ export function buildVolcanoFx(terrain, layout, camera, { onFog = null, onImpact
 
   // ------------------------------------- ash curtains (further off, rain only)
   const maxCurtain = TIER.Ultra[3];
-  const curtains = Array.from({ length: maxCurtain }, () => ({ x: rng() * 2 * CURTAIN_BOX, z: rng() * 2 * CURTAIN_BOX, w: 10 + rng() * 14, h: 26 + rng() * 14, y: -10 + rng() * 6, sp: 0.7 + rng() * 0.6 }));
-  const curtainPos = new Float32Array(maxCurtain * 4 * 3);
-  const curtainCol = new Float32Array(maxCurtain * 4 * 4);
-  const curtainUv = new Float32Array(maxCurtain * 4 * 2);
+  const curtains = Array.from({ length: maxCurtain }, () => ({ x: rng() * 2 * CURTAIN_BOX, z: rng() * 2 * CURTAIN_BOX, w: 10 + rng() * 14, h: 22 + rng() * 12, sp: 0.7 + rng() * 0.6 }));
+  // each curtain: three rows of two vertices – dense near the ground, fading out up in the sky
+  const curtainPos = new Float32Array(maxCurtain * 6 * 3);
+  const curtainCol = new Float32Array(maxCurtain * 6 * 4);
+  const curtainUv = new Float32Array(maxCurtain * 6 * 2);
   const curtainIdx = [];
   for (let i = 0; i < maxCurtain; i++) {
-    const o = i * 4;
-    curtainIdx.push(o, o + 1, o + 2, o, o + 2, o + 3);
+    const o = i * 6;
+    curtainIdx.push(o, o + 1, o + 3, o, o + 3, o + 2, o + 2, o + 3, o + 5, o + 2, o + 5, o + 4);
   }
   const curtainGeo = new THREE.BufferGeometry();
   curtainGeo.setAttribute('position', new THREE.BufferAttribute(curtainPos, 3));
@@ -281,21 +282,21 @@ export function buildVolcanoFx(terrain, layout, camera, { onFog = null, onImpact
   const updateCurtains = (cx, cy, cz, time, k) => {
     const n = k > 0.01 ? nCurtain : 0;
     curtain.visible = n > 0;
-    curtainGeo.setDrawRange(0, n * 6);
+    curtainGeo.setDrawRange(0, n * 12);
     if (!n) return;
     for (let i = 0; i < n; i++) {
       const c = curtains[i];
       const x = wrapTo(c.x + wind.x * time * 0.8, cx, CURTAIN_BOX), z = wrapTo(c.z + wind.y * time * 0.8, cz, CURTAIN_BOX);
       const dx = x - cx, dz = z - cz, d = Math.hypot(dx, dz) || 1;
       // none right on top of the camera, thin at the edge of the box
-      const a = k * 0.32 * Math.min(1, Math.max(0, (d - 14) / 10)) * Math.min(1, Math.max(0, (CURTAIN_BOX - Math.max(Math.abs(dx), Math.abs(dz))) / 14));
+      const a = k * 0.22 * Math.min(1, Math.max(0, (d - 14) / 10)) * Math.min(1, Math.max(0, (CURTAIN_BOX - Math.max(Math.abs(dx), Math.abs(dz))) / 14));
       const rx = -dz / d * c.w / 2, rz = dx / d * c.w / 2;
-      const y0 = Math.max(cy + c.y, terrain.heightAt(x, z) - 2), y1 = y0 + c.h;
-      curtainPos.set([x - rx, y0, z - rz, x + rx, y0, z + rz, x + rx, y1, z + rz, x - rx, y1, z - rz], i * 12);
-      const v = time * 0.18 * c.sp + i * 0.37;
-      curtainUv.set([0, v, 1, v, 1, v + 1, 0, v + 1], i * 8);
+      const y0 = Math.max(0, terrain.heightAt(x, z)) - 1, ym = y0 + c.h * 0.35, y1 = y0 + c.h;
+      curtainPos.set([x - rx, y0, z - rz, x + rx, y0, z + rz, x - rx, ym, z - rz, x + rx, ym, z + rz, x - rx, y1, z - rz, x + rx, y1, z + rz], i * 18);
+      const v = i * 0.37 - time * 0.18 * c.sp;
+      curtainUv.set([0, v, 1, v, 0, v + 0.35, 1, v + 0.35, 0, v + 1, 1, v + 1], i * 12);
       const r = curtainColor.r, g = curtainColor.g, b = curtainColor.b;
-      curtainCol.set([r, g, b, a * 0.4, r, g, b, a * 0.4, r, g, b, a, r, g, b, a], i * 16);
+      curtainCol.set([r, g, b, a * 0.8, r, g, b, a * 0.8, r, g, b, a, r, g, b, a, r, g, b, 0, r, g, b, 0], i * 24);
     }
     curtainGeo.attributes.position.needsUpdate = true;
     curtainGeo.attributes.uv.needsUpdate = true;

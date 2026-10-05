@@ -11,7 +11,7 @@
 - `layout.js` — `buildLayout(terrain)`: deterministic placement of hut, boat, trees, rocks, bushes, fruit spots, sites, dino zones, nests, paths and all static colliders. Swamp arena mangroves stay on shallow banks outside deep boss ambush pockets.
 - `bossArena.js` — the first island's lava islet: `planBossArena` (placed from the boat, no randomness), causeway and height shaping, `insideBossArena`.
 - `grove.js` — the giant Brachiosaurus pen on the boss arena plateau (`GROVE`): barrier tests `insideGrove`, `groveEntry`, `mayEnterGrove`, `titanScale`.
-- `volcanoArena.js` — the crater arena on top of the volcano (`VOLCANO_ARENA`): `planVolcanoArena` (the floor, the lava moat round it, the entrance at the notch – `locked` once the boss exists – and the boss spawn), `insideVolcanoArena`, `entranceOffset`, `moatFlow` (the moat as a lava flow, open at the entrance); its boss (the T-Rex) comes later.
+- `volcanoArena.js` — the crater arena on top of the volcano (`VOLCANO_ARENA`): `planVolcanoArena` (the floor, the lava moat round it, the entrance at the notch – `locked` once the boss exists – and the boss spawn), `insideVolcanoArena`, `entranceOffset`, `moatFlow`, `ashShelter` (the camp clearing and the base plots: shelter from the ash rain) (the moat as a lava flow, open at the entrance); its boss (the T-Rex) comes later.
 - `swampArena.js` — the swamp's root-walled kettle in the middle of the hourglass waist, the only way to the second half (`SWAMP_ARENA`): `planSwampArena` (entrance gate west, exit gate east, both gates remain open), `insideSwampArena`, `gateOffset`, ring colliders (`arenaWallColliders`, `onArenaWall`), the waist walls out into the deep sea (`waistWalls`, `waistWallColliders`), boss spawn and deep ambush pockets beside the dry causeway for Alpha Sarcosuchus.
 
 ### Collider/shape builders
@@ -37,7 +37,7 @@
 
 ### Netcode, config & brand
 - `protocol.js` — JSON message types (`MSG`), client actions (`ACT`), events (`EV`; the volcano's `VOLCANO`, `BOMB`, `CRUST`), snapshot field lists (boss attack clip/start/duration/sequence), player flags (`PF`), `EQUIP`, dino states (`DS`, including Sarcosuchus swimming and committed attacks), `DINO_TYPES`; the header documents the authority model.
-- `config.js` — `CONFIG`: all tunables (net, world, player, weapons, hit zones, volcano – heat, crust plates, eruption cycle, lava bombs –, fruit – kinds with a `role` and optional `buff`, and the `buffs` –, loot, dinos, tracks, mission, render, audio).
+- `config.js` — `CONFIG`: all tunables (net, world, player, weapons, hit zones, volcano – heat, crust plates, eruption cycle, lava bombs, ash rain –, fruit – kinds with a `role` and optional `buff`, and the `buffs` –, loot, dinos, tracks, mission, render, audio).
 - `brand.js` — `BRAND` (name, slug, storage prefix), `storageKey`, `migrateStorage`.
 
 ## Entry points

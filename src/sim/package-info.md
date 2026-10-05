@@ -11,7 +11,7 @@
 - `mission.js` — `Mission`: boat-parts main quest per island (search -> repaired -> sailing) and the team contracts from the mission board.
 - `raids.js` — `Raids` (scheduling, announcing, spawning, ending raids on the team base), `raidGroup`, `raiderStep` (raider movement/siege).
 - `towers.js` — `updateTowers`, `hostile`: base defence towers pick and shoot hostile dinosaurs.
-- `volcano.js` — `Volcano` (island 3, idle elsewhere): hot ground burns players (not with Fireproof), crust plates crack and break under whoever lingers (then burn like lava until they cool: `lavaAt`), the eruption cycle calm -> rumble -> erupt (lava bombs near players and anywhere, never at the camp, base or boat; they hurt dinosaurs too) -> ash (dinosaurs see less far: `sightMul`); `public()` for late joiners.
+- `volcano.js` — `Volcano` (island 3, idle elsewhere): hot ground burns players (not with Fireproof), crust plates crack and break under whoever lingers (then burn like lava until they cool: `lavaAt`), the eruption cycle calm -> rumble -> erupt (lava bombs near players and anywhere, never at the camp, base or boat; they hurt dinosaurs too) -> ash (dinosaurs see less far: `sightMul`), and ash rain on the wind between eruptions (the eruption keeps its time); out in the ash a player loses health after a grace time, never below a floor (the camp and the base plots shelter: `ashShelter`); `public()` (phase, what brought the ash) for late joiners.
 - `unstuck.js` — `standable`, `goodSpot`, `findUnstuckSpot`: nearest safe spot for the "get unstuck" action.
 - `worker.js` — Web Worker host for solo play: runs `ServerWorld` on a timer and relays messages to the page.
 
