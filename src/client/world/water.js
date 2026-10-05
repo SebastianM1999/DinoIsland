@@ -590,8 +590,8 @@ export function buildWater(terrain, layout = {}, sunDir = new THREE.Vector3(-0.4
     const level = Number.isFinite(pool.level) ? pool.level : seaLevel;
     const lava = pool.kind === 'lava';
     const mat = lava
-      // (a small crater's shallow lava glows molten almost to its rim, a few thin plates on it)
-      ? lavaMaterial({ mode: 0, center: [pool.x, pool.z], ...(pool.small ? { edge: [0.05, 0.6], plates: 0.3 } : {}) })
+      // (a lava crater's shallow lava glows molten almost to its rim, a few plates drifting on it – more on a wide lake)
+      ? lavaMaterial({ mode: 0, center: [pool.x, pool.z], ...(pool.small ? { edge: [0.05, 0.6], plates: pool.r > 7 ? 0.55 : 0.3 } : {}) })
       : waterMaterial({ waveAmp: 0.05, ripple: 0.18, alpha: [0.5, 0.92] });
     const rad = pool.disc ?? pool.r * 1.4;
     const mesh = new THREE.Mesh(discGeometry(rad, 56, Math.max(6, Math.min(16, Math.round(rad / 3)))), mat);

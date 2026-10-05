@@ -167,9 +167,10 @@ function naturalHeight(plan, x, z) {
 function poolEffect(plan, x, z, h) {
   for (const p of plan.pools) {
     if (p.kind === 'lava' && (p.crater || p.annex)) continue;   // the crater / boss arena shape their own bowls
-    const dd = Math.hypot(x - p.x, z - p.z);
-    if (dd > p.r * 2.6) continue;
-    const rim = 1 - smoothstep(p.r * 1.2, p.r * 2.5, dd);
+    // (bank: how far out the raised rim reaches – 2.5 radii unless the pool says)
+    const dd = Math.hypot(x - p.x, z - p.z), bank = p.bank ?? p.r * 2.5;
+    if (dd > bank + p.r * 0.1) continue;
+    const rim = 1 - smoothstep(p.r * 1.2, bank, dd);
     h = lerp(h, Math.max(h, p.level + (p.rim ?? 0.8) + fbm(x * 0.1, z * 0.1, 2, plan.seed + 13) * 0.35), rim);
     const bowl = 1 - smoothstep(p.r * 0.55, p.r * 1.05, dd);
     h = lerp(h, p.level - p.depth, bowl);
@@ -1243,29 +1244,36 @@ function planLavaCraters(plan, taken, rng, fnN) {
     }
     return { lo, hi, mean: sum / 12 };
   };
+  // a few wide lava lakes first, then smaller craters between them
+  for (const { n, r0, r1, tries } of LAVA_CRATERS) {
   let made = 0;
-  for (let i = 0; i < 9000 && made < 24; i++) {
-    const x = rng.range(-A * 0.85, A * 0.85), z = rng.range(-A * 0.85, A * 0.85);
-    const r = rng.range(3, 5);
+  for (let i = 0; i < tries && made < n; i++) {
+    // (anywhere between the volcano's crater and the beach)
+    const ang = rng() * TAU, dist = Math.sqrt(rng.range(0.06, 0.64)) * A;
+    const x = Math.cos(ang) * dist, z = Math.sin(ang) * dist;
+    const r = rng.range(r0, r1), R = r * 1.2 + 6;   // R: the outer foot of its rim
     if (!insideEllipse(plan, x, z, 0.8) || insideVolcanoCrater(plan, x, z, 12)) continue;
     if (Math.hypot(x - plan.hut.x, z - plan.hut.z) < 50 || Math.hypot(x - plan.boat.x, z - plan.boat.z) < 35) continue;
-    if (taken.some((t) => !t.hill && t.r < 60 && Math.hypot(t.x - x, t.z - z) < t.r + r * 2.6 + 2)) continue;
+    if (taken.some((t) => !t.hill && t.r < 60 && Math.hypot(t.x - x, t.z - z) < t.r + R - 4)) continue;
     // (not on a hilltop: its summit pad levels the ground there afterwards; not
     // up against a basalt spire)
-    if (plan.hills.some((f) => Math.hypot(f.x - x, f.z - z) < (f.radius > 15 ? f.radius * 0.6 : f.radius + 4) + r * 2.6)) continue;
-    if (lines.some((l) => distToPolyline(l, x, z) < r * 2.6 + 5)) continue;
-    if (flowDist(plan, x, z) < r * 2.2 + 7) continue;
-    if (plan.bridges.some((b) => Math.hypot(b.x - x, b.z - z) < b.r + r * 2.6 + 4)) continue;
-    if (plan.fumaroles.some((f) => Math.hypot(f.x - x, f.z - z) < r * 2.6 + 8)) continue;
-    if (plan.pools.some((p) => Math.hypot(p.x - x, p.z - z) < p.r * 2.6 + r * 2.6 + 3)) continue;
+    if (plan.hills.some((f) => Math.hypot(f.x - x, f.z - z) < (f.radius > 15 ? f.radius * 0.6 : f.radius + 4) + R)) continue;
+    if (lines.some((l) => distToPolyline(l, x, z) < R + 3)) continue;
+    if (flowDist(plan, x, z) < R + 7) continue;
+    if (plan.bridges.some((b) => Math.hypot(b.x - x, b.z - z) < b.r + R + 4)) continue;
+    if (plan.fumaroles.some((f) => Math.hypot(f.x - x, f.z - z) < R + 8)) continue;
+    if (plan.pools.some((p) => Math.hypot(p.x - x, p.z - z) < (p.bank ?? p.r * 2.6) + R + 3)) continue;
     // gentle ground: poolEffect raises the rim all round (a little bank on the
     // lower side), so the lava never hangs over a slope
     const inner = ringAt(x, z, r * 1.4);
     if (inner.lo < 1.5 || inner.hi - inner.lo > 3.6 || slopeOf(fnN, x, z, r * 2) > 0.42) continue;
-    plan.pools.push({ x, z, r, level: inner.mean - 0.35, depth: 0.8, rim: 1.4, kind: 'lava', small: true, disc: r * 1.2 });
+    plan.pools.push({ x, z, r, level: inner.mean - 0.35, depth: 0.8, rim: 1.4, bank: R, kind: 'lava', small: true, disc: r * 1.2 });
     made++;
   }
+  }
 }
+/** Lava craters per island: how many of which size (radius m), and how hard to look for room. */
+const LAVA_CRATERS = [{ n: 5, r0: 8, r1: 12, tries: 12000 }, { n: 16, r0: 4.5, r1: 7, tries: 16000 }];
 
 const insideVolcanoCrater = (plan, x, z, pad) => !!plan.volcano && Math.hypot(x - plan.volcano.x, z - plan.volcano.z) < plan.volcano.craterR + pad;
 

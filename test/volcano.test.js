@@ -147,16 +147,17 @@ test('no lava hangs in the air: every lava pool lies in a bowl, every flow wells
   }
 });
 
-test('small lava craters dot the lowland, off the paths and camps', () => {
+test('lava lakes and craters dot the lowland, off the paths and camps', () => {
   for (const { plan, terrain, layout, variant } of islands) {
     const craters = plan.pools.filter((p) => p.small);
-    assert.ok(craters.length >= 10, `v${variant}: ${craters.length} lava craters`);
+    assert.ok(craters.length >= 8, `v${variant}: ${craters.length} lava craters`);
+    assert.ok(craters.some((c) => c.r >= 8), `v${variant}: a wide lava lake among them`);
     for (const c of craters) {
       assert.equal(c.kind, 'lava');
-      assert.ok(c.r >= 3 && c.r <= 5);
+      assert.ok(c.r >= 4.5 && c.r <= 12);
       assert.notEqual(terrain.lavaLevelAt(c.x, c.z), null, `v${variant}: lava in the crater`);
-      assert.equal(terrain.lavaLevelAt(c.x + c.r * 2.4, c.z), null, `v${variant}: dry past the rim`);
-      assert.ok(layout.distToPath(c.x, c.z) > c.r * 2 + 3, `v${variant}: crater off the paths`);
+      assert.equal(terrain.lavaLevelAt(c.x + c.bank, c.z), null, `v${variant}: dry past the rim`);
+      assert.ok(layout.distToPath(c.x, c.z) > c.bank, `v${variant}: crater (and its rim) off the paths`);
       assert.ok(Math.hypot(c.x - plan.hut.x, c.z - plan.hut.z) > 45 && Math.hypot(c.x - plan.boat.x, c.z - plan.boat.z) > 30, 'off the camp and the boat');
       assert.ok(!layout.basePlots.some((p) => Math.hypot(p.x - c.x, p.z - c.z) < p.r + c.r * 2), 'off the plots');
     }
