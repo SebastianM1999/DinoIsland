@@ -16,7 +16,7 @@ Grouped by the module area they mainly cover. Many simulation tests also check t
 - `grove.test.js` — giant's pen barrier: entry tests, shots stopped by `shotEnd`, titan only hurtable from inside.
 - `water.test.js` — every waterfall forms an unbroken grotto -> fall -> basin -> river chain (incl. client `buildWater`).
 - `spring-collision.test.js` — waterfall grotto SDF colliders vs. player controller and server movement checks.
-- `props.test.js` — cave, ruins, boat, tree colliders and relic/prop meshes match (shared shapes + `src/client/models/props/*`).
+- `props.test.js` — cave, ruins, boat, tree colliders and relic/prop meshes match (shared shapes + `src/client/models/props/*`); pines keep their needles over the trunk to the tip, without gaps.
 - `traversal.test.js` — the player controller gets over every fallen trunk and ruin stone on real islands without server corrections.
 - `swim.test.js` — swimming in rivers/lakes, climbing out on banks, sea stays blocked (PlayerController).
 - `movement.test.js` — `resolveCircle`/`penetration`, player controller, server movement correction, unstuck (`src/sim/unstuck.js`), dinosaur spawn spots.
