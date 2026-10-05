@@ -18,6 +18,7 @@ export const SURFACE = {
   uSdLevel: { value: 2 },
   uSdFar: { value: 90 },
   uSdGreen: { value: 1 },      // 1 = green island (moss, lichen, blossoms), 0 = volcanic
+  uSdAsh: { value: 0 },        // volcano: fresh ash lying on everything facing up (world/volcanoFx.js)
 };
 
 /** Follow the graphics tier (core/renderer.js onGraphics): Low = macro only, Medium = no bump. */
@@ -30,6 +31,7 @@ export function setSurfaceQuality(g = {}) {
 /** Green or volcanic look for the island being built. */
 export function setSurfaceBiome(biome) {
   SURFACE.uSdGreen.value = biome?.id === 'volcano' ? 0 : 1;
+  SURFACE.uSdAsh.value = 0;
 }
 
 // ------------------------------------------------------------------ GLSL
@@ -38,6 +40,7 @@ const NOISE = /* glsl */ `
 uniform float uSdLevel;
 uniform float uSdFar;
 uniform float uSdGreen;
+uniform float uSdAsh;
 float sdHash(vec2 p) { p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
 vec2 sdHash2(vec2 p) { float h = sdHash(p); return vec2(h, sdHash(p + h * 17.13 + 3.7)); }
 float sdNoise(vec2 p) {
@@ -325,6 +328,17 @@ const FRAG = {
   `,
 };
 
+/** Fresh ash (volcano's ash rain): a dull grey dusting on what faces up, patchy where it is thin. */
+const ASH = /* glsl */ `
+  if (uSdAsh > 0.001) {
+    float sdUp = smoothstep(0.3, 0.8, normalize(vSdNormal).y);
+    float sdPatch = smoothstep(0.2, 0.7, sdFbm(vSdPos.xz * 0.35) - 0.45 + uSdAsh * 0.9);
+    float sdA = uSdAsh * sdUp * mix(0.35, 1.0, sdPatch);
+    diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.25, 0.23, 0.22) * (0.85 + 0.3 * sdNoise(vSdPos.xz * 2.7)), sdA);
+    sdRough = mix(sdRough, 1.3, sdA);
+  }
+`;
+
 const BUMP = { terrain: 0.9, rock: 1.2, foliage: 0.7 };
 
 /**
@@ -342,6 +356,7 @@ export function withSurfaceDetail(mat, kind) {
     shader.uniforms.uSdLevel = SURFACE.uSdLevel;
     shader.uniforms.uSdFar = SURFACE.uSdFar;
     shader.uniforms.uSdGreen = SURFACE.uSdGreen;
+    shader.uniforms.uSdAsh = SURFACE.uSdAsh;
     shader.vertexShader = shader.vertexShader
       .replace('#include <common>', `#include <common>\n${VERT_PARS}${terrain ? 'attribute vec4 surface;\nattribute vec2 surface2;\nvarying vec4 vSdSurf;\nvarying vec2 vSdSurf2;\n' : ''}`)
       .replace('#include <project_vertex>', `#include <project_vertex>\n${VERT_MAIN}${terrain ? 'vSdSurf = surface; vSdSurf2 = surface2;\n' : ''}`);
@@ -351,7 +366,8 @@ export function withSurfaceDetail(mat, kind) {
   float sdDist = length(vViewPosition);
   float sdH = 0.0;
   float sdRough = 1.0;
-  ${FRAG[kind]}`)
+  ${FRAG[kind]}
+  ${ASH}`)
       .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\n  roughnessFactor = clamp(roughnessFactor * sdRough, 0.04, 1.0);')
       .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
   if (uSdLevel > 1.5) normal = sdBumpNormal(-vViewPosition, normal, sdH * ${BUMP[kind].toFixed(2)} * 0.06, faceDirection);`);

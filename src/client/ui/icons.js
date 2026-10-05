@@ -133,6 +133,7 @@ export const ICONS = {
     <path d="M11.5 15.5l3 3-2 5M20 14l-2.5 4 3 4.5" stroke="#ff7a2a" stroke-width="1.3" stroke-linecap="round" fill="none"/>
     <path d="M12.5 13c-1 1.4-1.6 3-1.6 4.6" stroke="#8a7ab8" stroke-width="1.4" stroke-linecap="round" fill="none"/>`),
 
+  ash: svg(`<path d="M8 15a5 5 0 0 1 2-9.6A7 7 0 0 1 23 7a4.5 4.5 0 0 1 1 8.9z" fill="#8e8580" stroke="#4a4240" stroke-width="1.4" stroke-linejoin="round"/><g fill="#b4aaa4"><circle cx="10" cy="20" r="1.6"/><circle cx="16" cy="23" r="1.6"/><circle cx="22" cy="19.5" r="1.6"/><circle cx="12.5" cy="27" r="1.4"/><circle cx="20" cy="27.5" r="1.4"/></g>`),
   flame: svg(`<path d="M16 2c1 5.5 8.5 8.5 8.5 17A8.5 8.5 0 0 1 7.5 19c0-4.5 2.5-6.8 4-9.5.4 2.8 1.6 4 3 4.5C14 10 14.5 5.5 16 2z" fill="#ff6a1c" stroke="#b8320c" stroke-width="1.2" stroke-linejoin="round"/>
     <path d="M16 14c.6 3 4.5 4.6 4.5 8.6a4.5 4.5 0 0 1-9 0c0-2.4 1.6-3.6 2.4-5.2.5 1.4 1.2 2 2 2.2-.4-2.2-.3-3.8.1-5.6z" fill="#ffd23a"/>`),
 

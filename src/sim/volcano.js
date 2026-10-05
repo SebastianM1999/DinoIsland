@@ -10,6 +10,9 @@
 // - The eruption cycle: calm -> rumble (a warning) -> erupt (lava bombs rain
 //   down, each one announced with a warning circle where it lands; they hurt
 //   dinosaurs too) -> ash (ash rain: thick air, dinosaurs see less far) -> calm.
+// - Ash rain also blows in on the wind between eruptions (source 'wind'). Out in
+//   it a player slowly loses health (never below a floor); the camp and the
+//   base plots shelter (shared/volcanoArena.js ashShelter).
 //
 // Everything replicates through EV.VOLCANO / EV.BOMB / EV.CRUST and, for late
 // joiners, fullState().volcano (public()).
@@ -17,6 +20,7 @@
 import { CONFIG } from '../shared/config.js';
 import { EV } from '../shared/protocol.js';
 import { makeRng } from '../shared/rng.js';
+import { ashShelter } from '../shared/volcanoArena.js';
 
 const V = CONFIG.volcano;
 const r2 = (v) => Math.round(v * 100) / 100;
@@ -29,6 +33,9 @@ export class Volcano {
     this.rng = makeRng((Math.random() * 0xffffffff) >>> 0);
     this.phase = 'calm';
     this.until = world.now + V.cycle.first;
+    this.source = null;              // what brought the ash rain: 'eruption' | 'wind'
+    this.nextAsh = world.now + V.ash.first;
+    this.resume = 0;                 // after a wind ash rain: the calm left until the next rumble
     this.nextWave = 0;
     this.bombs = [];                 // pending impacts { x, z, y, at }
     // crust plates: broken until `until`; who stood on which one for how long
@@ -40,13 +47,14 @@ export class Volcano {
     if (!this.active) return null;
     return {
       phase: this.phase,
+      source: this.source,
       left: r2(Math.max(0, this.until - this.world.now)),
       broken: this.crusts.filter((c) => c.broken).map((c) => ({ id: c.id, left: r2(c.until - this.world.now) })),
     };
   }
 
   /** Dinosaurs see this much less far (ash rain). */
-  sightMul() { return this.active && this.phase === 'ash' ? V.bomb.ashSight : 1; }
+  sightMul() { return this.active && this.phase === 'ash' ? V.ash.sight : 1; }
 
   /** Lava surface of a broken crust plate at (x, z), or null (see world.js: it burns like lava). */
   lavaAt(x, z) {
@@ -55,10 +63,11 @@ export class Volcano {
     return c && this.crusts[c.id]?.broken ? c.y : null;
   }
 
-  #setPhase(phase, seconds) {
+  #setPhase(phase, seconds, source = null) {
     this.phase = phase;
+    this.source = phase === 'ash' ? source : null;
     this.until = this.world.now + seconds;
-    this.world.event(EV.VOLCANO, { phase, left: r2(seconds) });
+    this.world.event(EV.VOLCANO, { phase, left: r2(seconds), ...(this.source ? { source: this.source } : {}) });
   }
 
   update(dt) {
@@ -70,8 +79,20 @@ export class Volcano {
       const C = V.cycle;
       if (this.phase === 'calm') this.#setPhase('rumble', C.rumble);
       else if (this.phase === 'rumble') { this.#setPhase('erupt', C.erupt); this.nextWave = now; }
-      else if (this.phase === 'erupt') this.#setPhase('ash', this.rng.range(C.ashMin, C.ashMax));
-      else this.#setPhase('calm', this.rng.range(C.calmMin, C.calmMax));
+      else if (this.phase === 'erupt') this.#setPhase('ash', this.rng.range(C.ashMin, C.ashMax), 'eruption');
+      else {
+        this.#setPhase('calm', this.source === 'wind' ? this.resume : this.rng.range(C.calmMin, C.calmMax));
+        // a clear spell after every ash rain
+        this.nextAsh = Math.max(this.nextAsh, now + this.rng.range(V.ash.gapMin, V.ash.gapMax));
+      }
+    }
+    // --- ash on the wind between eruptions (the eruption keeps its time)
+    if (this.phase === 'calm' && now >= this.nextAsh && w.mission.phase !== 'sailing') {
+      const A = V.ash, dur = this.rng.range(A.durMin, A.durMax);
+      if (this.until - now >= dur + 20) {
+        this.resume = this.until - now - dur;
+        this.#setPhase('ash', dur, 'wind');
+      } else this.nextAsh = this.until;            // not before the eruption: after it (and its ash), see above
     }
     if (this.phase === 'erupt' && now >= this.nextWave) {
       this.nextWave = now + V.bomb.wave;
@@ -94,7 +115,17 @@ export class Volcano {
     // --- players: hot ground and crust plates
     const H = V.heat;
     for (const p of w.players.values()) {
-      if (!p.alive || p.creative) { p.heatT = 0; p.crust = null; continue; }
+      if (!p.alive || p.creative) { p.heatT = 0; p.ashT = 0; p.crust = null; continue; }
+      // out in the ash rain: after a while it starts to hurt (never below the floor)
+      if (this.phase === 'ash' && !ashShelter(w.layout, p.x, p.z)) {
+        p.ashT = (p.ashT ?? 0) + dt;
+        const A = V.ash, floor = p.maxHp * A.floor;
+        if (p.ashT >= A.after + 1 && p.hp > floor) {
+          p.ashT -= 1;
+          w.hurtPlayer(p, Math.min(A.dps, p.hp - floor), { src: 'ash' });
+          if (!p.alive) continue;
+        }
+      } else p.ashT = 0;
       const proof = p.buffs?.heatproof > now;
       const ground = w.terrain.heightAt(p.x, p.z);
       const onGround = p.y < Math.max(ground, w.layout.groundAt(p.x, p.z, p.y + 0.5)) + 1.2;

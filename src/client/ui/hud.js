@@ -200,7 +200,11 @@ export class Hud {
     this.$heat = el('div', 'hud-pill hud-heat brush');
     this.$heat.setAttribute('role', 'status');
     this.$heat.hidden = true;
-    this.$carry.append(this.$quiver, this.$fruitRow, this.$loot, this.$swamp, this.$heat, this.$buffs);
+    // the volcano's ash rain: shelter, a countdown, or hurting
+    this.$ash = el('div', 'hud-pill hud-ash brush');
+    this.$ash.setAttribute('role', 'status');
+    this.$ash.hidden = true;
+    this.$carry.append(this.$quiver, this.$fruitRow, this.$loot, this.$swamp, this.$heat, this.$ash, this.$buffs);
     this.$hotbar = el('ol', 'hud-hotbar brush');
     this.$hotbar.setAttribute('aria-label', 'Equipment');
     this._slots = [];
@@ -427,6 +431,20 @@ export class Hud {
     this.$heat.classList.toggle('is-burn', state === 'burn');
     const text = { hot: 'Hot ground: stamina drains', burn: 'Burning!', proof: 'Hot ground: Fireproof' }[state] || '';
     this.$heat.innerHTML = state ? `<span class="hud-hot">${icon('flame')}${text}</span>` : '';
+  }
+
+  /**
+   * Ash rain (volcano): state '' (none) | 'shelter' (at the camp or base) |
+   * 'out' (`left` s until it starts to hurt) | 'hurt'.
+   */
+  setAsh(state, left = 0) {
+    const key = state === 'out' ? `out${Math.ceil(left)}` : state;
+    if (this._c.ash === key) return;
+    this._c.ash = key;
+    this.$ash.hidden = !state;
+    this.$ash.classList.toggle('is-hurt', state === 'hurt');
+    const text = { shelter: 'Ash rain: sheltered', out: `Ash rain: find shelter (${Math.ceil(left)} s)`, hurt: 'Choking on ash – get to the camp or your base!' }[state] || '';
+    this.$ash.innerHTML = state ? `<span class="hud-hot">${icon('ash')}${text}</span>` : '';
   }
 
   _bar(b, key, v, max) {

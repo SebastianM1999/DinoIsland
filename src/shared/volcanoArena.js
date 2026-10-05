@@ -55,6 +55,17 @@ export function insideVolcanoArena(layout, x, z, pad = 0) {
   return (x - a.x) ** 2 + (z - a.z) ** 2 < r * r;
 }
 
+/**
+ * Shelter from the volcano's ash rain: the camp's clearing round the hut and
+ * the base plots (sim/volcano.js hurts players out in it, player/controller.js
+ * slows their stamina).
+ */
+export function ashShelter(layout, x, z) {
+  const hut = layout.plan.hut;
+  if (Math.hypot(x - hut.x, z - (hut.z + 2)) < hut.radius) return true;
+  return (layout.basePlots || []).some((p) => Math.hypot(x - p.x, z - p.z) < p.r);
+}
+
 /** Distance (m, along the moat) from (x, z)'s bearing to the entrance's middle. */
 export function entranceOffset(a, x, z) {
   const ang = Math.atan2(z - a.z, x - a.x);
