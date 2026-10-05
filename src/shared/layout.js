@@ -363,6 +363,12 @@ export function buildLayout(terrain) {
   layout.fumaroles = (plan.fumaroles || []).map((f) => ({ ...f, y: terrain.heightAt(f.x, f.z) }));
   for (const f of layout.fumaroles) reserve(f.x, f.z, 3.5);
   for (const b of layout.bridges) reserve(b.x, b.z, b.r);
+  // the stepping stones where the mountain path fords a lava flow: basalt columns to stand on
+  layout.steps = (plan.steps || []).map((s) => ({ ...s }));
+  for (const s of layout.steps) {
+    circles.push({ x: s.x, z: s.z, r: s.r, bottom: s.top - 4, top: s.top, kind: 'basalt', stand: true });
+    reserve(s.x, s.z, s.r + 1.5);
+  }
 
   // --------------------------------------------------------- boss arena
   // The lava islet beside the boat (shared/bossArena.js): obsidian spires on the

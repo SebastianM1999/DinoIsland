@@ -147,6 +147,9 @@ export const CONFIG = {
     // lava bombs: a wave every `wave` s, each announced `warn` s ahead; one lands `near` m from
     // each player
     bomb: { wave: 2.5, warn: 2.5, near: [10, 40], radius: 4, damage: 35, dinoDamage: 60, knock: 9 },
+    // the mountain path (calderaPath) is a bomb zone: whoever climbs it gets a bomb every
+    // `every` s (the first after `first` s on it), `ahead` m up the path and up to `side` m off it
+    slope: { first: [2, 4], every: [5, 9], ahead: [3, 16], side: 3 },
     // ash rain – after each eruption, and on the wind in between (the first after `first` s, then
     // every gapMin..gapMax s for durMin..durMax s). Out in it for `after` s, a player loses `dps` HP/s
     // (never below `floor` of their max) and refills stamina `staminaRegenCut` slower; the camp and
