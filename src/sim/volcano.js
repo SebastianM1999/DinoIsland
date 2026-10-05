@@ -239,8 +239,9 @@ export class Volcano {
       col.bottom = top - 4;
       if (t >= columnCycle(st)) this.columns.delete(id);
     }
+    // (in creative too: sinking harms no one there, and one can try the columns out)
     for (const p of w.players.values()) {
-      if (!p.alive || p.creative) continue;
+      if (!p.alive) continue;
       for (const st of L.steps) {
         if (!st.sink || this.columns.has(st.id)) continue;
         if ((p.x - st.x) ** 2 + (p.z - st.z) ** 2 > st.r * st.r || p.y > st.top + C.stand || p.y < st.top - 0.3) continue;
