@@ -150,6 +150,15 @@ export const CONFIG = {
     // the mountain path (calderaPath) is a bomb zone: whoever climbs it gets a bomb every
     // `every` s (the first after `first` s on it), `ahead` m up the path and up to `side` m off it
     slope: { first: [2, 4], every: [5, 9], ahead: [3, 16], side: 3 },
+    // lava geysers (island.js lavaGeysers): each warns `warn` s (bubbling), then spouts `spout` s
+    // up to `height` m: `damage` every 0.5 s and a `knock` outward to whoever is in it; they only
+    // keep their beat while a player is within `near` m
+    geyser: { warn: 1.2, spout: 1.6, height: 7, damage: 18, knock: 7, near: 80 },
+    // sinking columns (plan.steps with sink): stood on (feet at most `stand` m over the top) they
+    // shake `wobble` s, sink at `speed` m/s to 1 m under the lava, stay `down` s, rise again in `rise` s
+    column: { stand: 0.4, wobble: 0.7, speed: 0.9, down: 3.5, rise: 2 },
+    // the lava lake treasure (plan.treasure): opened by walking up to it (`reach` m), once an island
+    treasure: { reach: 1.8, loot: { teeth: 6, claws: 4 }, arrows: 12, xp: 150 },
     // ash rain – after each eruption, and on the wind in between (the first after `first` s, then
     // every gapMin..gapMax s for durMin..durMax s). Out in it for `after` s, a player loses `dps` HP/s
     // (never below `floor` of their max) and refills stamina `staminaRegenCut` slower; the camp and

@@ -11,7 +11,7 @@ import { ServerWorld } from '../src/sim/world.js';
 import { CONFIG } from '../src/shared/config.js';
 import { EV, MSG } from '../src/shared/protocol.js';
 import { resolveCircle } from '../src/shared/collision.js';
-import { VOLCANO_ARENA, insideVolcanoArena } from '../src/shared/volcanoArena.js';
+import { VOLCANO_ARENA, insideVolcanoArena, columnTop, columnCycle } from '../src/shared/volcanoArena.js';
 
 const VARIANTS = [1, 2, 3, 4, 5, 6];
 const islands = VARIANTS.map((variant) => {
@@ -153,6 +153,38 @@ test('two jump and runs on the mountain path: long lava fields, no way round, va
       }
     }
 
+  }
+});
+
+test('lava geysers on the path and in its fields; sinking columns; a treasure islet in the widest lava lake', () => {
+  const jump = CONFIG.player.walkSpeed * 2 * CONFIG.player.jumpSpeed / CONFIG.player.gravity;
+  for (const { plan, terrain, layout, variant } of islands) {
+    // geysers: some on the walkway, one in each field, never on a column
+    assert.ok(plan.geysers.length >= 3, `v${variant}: ${plan.geysers.length} geysers`);
+    const inField = plan.geysers.filter((g) => terrain.lavaLevelAt(g.x, g.z) !== null);
+    assert.ok(inField.length >= 1 && plan.geysers.length - inField.length >= 2, `v${variant}: geysers on the walkway and in the lava`);
+    for (const g of plan.geysers) assert.ok(plan.steps.every((st) => Math.hypot(st.x - g.x, st.z - g.z) > st.r + g.r), 'not on a column');
+    // sinking columns in every field, never the first or the last of a row
+    for (const fd of plan.fields) {
+      const cols = plan.steps.filter((st) => fd.line.some((q) => q.a >= fd.a0 - 1 && q.a <= fd.a1 + 1 && Math.hypot(q.x - st.x, q.z - st.z) < 9));
+      assert.ok(cols.some((c) => c.sink), `v${variant}: a sinking column`);
+      assert.ok(!cols[0].sink && !cols.at(-1).sink, 'not the first or the last');
+    }
+    // the treasure: on a dry islet in the widest lava lake, a row of columns out to it
+    const lake = plan.pools.filter((p) => p.small).sort((a, b) => b.r - a.r)[0];
+    assert.ok(plan.treasure && lake.islet, `v${variant}: a treasure islet`);
+    assert.equal(terrain.lavaLevelAt(plan.treasure.x, plan.treasure.z), null, 'the islet is dry');
+    assert.ok(Math.hypot(plan.treasure.x - lake.x, plan.treasure.z - lake.z) < lake.r, 'in the lake');
+    const row = plan.steps.filter((st) => Math.hypot(st.x - lake.x, st.z - lake.z) < lake.r * 1.2);
+    assert.ok(row.length >= 4, `v${variant}: ${row.length} columns out to it`);
+    for (let k = 1; k < row.length; k++) {
+      const gap = Math.hypot(row[k].x - row[k - 1].x, row[k].z - row[k - 1].z) - row[k].r - row[k - 1].r;
+      assert.ok(gap > 0.8 && gap < jump * 0.85, `v${variant}: a jump (${gap.toFixed(2)} m)`);
+      assert.notEqual(terrain.lavaLevelAt((row[k].x + row[k - 1].x) / 2, (row[k].z + row[k - 1].z) / 2), null, 'lava between');
+    }
+    const last = row.at(-1);
+    assert.ok(Math.hypot(last.x - plan.treasure.x, last.z - plan.treasure.z) - last.r - 2.2 < jump * 0.85, 'a jump onto the islet');
+    assert.ok(layout.treasure && layout.stepColliders.length === layout.steps.length);
   }
 });
 
@@ -465,6 +497,69 @@ test('on a stepping stone the lava below does not burn', () => {
   const b = world.layout.steps[1], mx = (st.x + b.x) / 2, mz = (st.z + b.z) / 2;
   for (let t = 0; t < 1; t += 0.25) { p.x = mx; p.z = mz; p.y = world.terrain.heightAt(mx, mz); run(0.25); }
   assert.ok(p.hp < 1000, 'in the lava between them');
+});
+
+test('a lava geyser bubbles, then spouts: it burns and throws back whoever is in it, not who stands by', () => {
+  const { world, p, run, evs } = volcanoWorld(2);
+  const G = CONFIG.volcano.geyser;
+  const g = world.volcano.geysers.find((q) => world.terrain.lavaLevelAt(q.x, q.z) === null);
+  p.hp = p.maxHp = 1000;
+  p.buffs = { heatproof: world.now + 1000 };
+  const stand = (x, z) => { p.x = x; p.z = z; p.y = world.layout.groundAt(x, z); };
+  // beside it: the geyser keeps its beat, nobody gets hurt
+  for (let t = 0; t < g.period * 2 + 3; t += 0.25) { stand(g.x + 5, g.z); run(0.25); }
+  assert.ok(evs(EV.GEYSER).some((m) => m.id === g.id && m.eta === G.warn), 'it warns before it spouts');
+  assert.equal(p.hp, 1000, 'standing by');
+  // in it: hurt and thrown back
+  let hit = false;
+  for (let t = 0; t < g.period * 2 + 3 && !hit; t += 0.1) { stand(g.x + 0.3, g.z); run(0.1); hit = p.hp < 1000; }
+  assert.ok(hit, 'in the spout');
+  // nobody near: no beat, no events
+  const n = evs(EV.GEYSER).length;
+  stand(world.layout.hut.x, world.layout.hut.z);
+  for (let t = 0; t < 30; t += 0.5) { stand(world.layout.hut.x, world.layout.hut.z); run(0.5); }
+  assert.ok(evs(EV.GEYSER).filter((m) => m.id === g.id).length <= evs(EV.GEYSER).slice(0, n).filter((m) => m.id === g.id).length + 1, 'quiet while nobody is near');
+});
+
+test('a sinking column goes down under whoever stands on it, burns them, and comes back up', () => {
+  const { world, p, run, evs } = volcanoWorld(2);
+  const st = world.layout.steps.find((q) => q.sink);
+  const col = world.layout.stepColliders[st.id];
+  p.hp = p.maxHp = 1000;
+  p.buffs = { heatproof: world.now + 1000 };
+  p.x = st.x; p.z = st.z; p.y = st.top;
+  run(0.1);
+  assert.deepEqual(evs(EV.COLUMN).map((m) => m.id), [st.id]);
+  assert.ok(world.volcano.public().columns.some((c) => c.id === st.id), 'late joiners hear of it');
+  // it goes down: the player with it, into the lava
+  for (let t = 0; t < 4; t += 0.1) { p.x = st.x; p.z = st.z; p.y = Math.max(col.top, world.terrain.heightAt(st.x, st.z)); run(0.1); }
+  assert.ok(col.top < world.terrain.lavaLevelAt(st.x, st.z), 'under the lava');
+  assert.ok(p.hp < 1000, 'and it burns');
+  // it comes back up
+  p.x = st.x + 30; p.z = st.z;
+  run(columnCycle(st));
+  assert.equal(col.top, st.top);
+  assert.equal(world.volcano.public().columns.length, 0);
+  // the shared curve: still, shaking, down, up
+  assert.equal(columnTop(st, -1), st.top);
+  assert.equal(columnTop(st, 0.3), st.top);
+  assert.ok(columnTop(st, columnCycle(st) - CONFIG.volcano.column.rise - 0.5) < st.lava);
+});
+
+test('the lava lake treasure opens once, for the first who reaches it: loot and xp for the team', () => {
+  const { world, p, run, evs } = volcanoWorld(2);
+  const t = world.layout.treasure;
+  const items = () => [...world.items.values()].filter((it) => Math.hypot(it.x - t.x, it.z - t.z) < 3);
+  assert.equal(items().length, 0);
+  const xp = p.prof.xp;
+  p.x = t.x + 1; p.z = t.z; p.y = t.y;
+  run(0.2);
+  assert.equal(evs(EV.TREASURE).length, 1);
+  assert.equal(items().length, Object.keys(CONFIG.volcano.treasure.loot).length + 1);
+  assert.ok(p.prof.xp > xp, 'xp');
+  assert.deepEqual(world.volcano.public().treasure, { by: p.name });
+  run(1);
+  assert.equal(evs(EV.TREASURE).length, 1, 'only once');
 });
 
 test('a lava bomb hurts a dinosaur in its blast – and a player standing there', () => {

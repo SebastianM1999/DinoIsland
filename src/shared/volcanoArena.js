@@ -9,6 +9,8 @@
 // Planned from the caldera alone (no rng draws), shared by client (look,
 // minimap) and server (terrain, colliders, AI).
 
+import { CONFIG } from './config.js';
+
 export const VOLCANO_ARENA = {
   name: 'Ember Crown',
   /** Radius of the fighting floor inside the moat. */
@@ -53,6 +55,31 @@ export function insideVolcanoArena(layout, x, z, pad = 0) {
   if (!a || a.craterR == null) return false;
   const r = a.craterR + pad;
   return (x - a.x) ** 2 + (z - a.z) ** 2 < r * r;
+}
+
+/**
+ * A sinking column's top `t` seconds into its cycle (sim/volcano.js starts it
+ * when someone stands on it; t < 0 or past the cycle: standing still): it
+ * shakes, sinks to 1 m under the lava, stays down a while, then rises again.
+ * Shared so the server, the controller and the view agree.
+ */
+export function columnTop(st, t, C = CONFIG.volcano.column) {
+  if (!(t >= 0)) return st.top;
+  const floor = (st.lava ?? st.top - 1) - 1, sink = (st.top - floor) / C.speed;
+  if (t < C.wobble) return st.top;
+  t -= C.wobble;
+  if (t < sink) return st.top - t * C.speed;
+  t -= sink;
+  if (t < C.down) return floor;
+  t -= C.down;
+  if (t < C.rise) return floor + (st.top - floor) * (t / C.rise);
+  return st.top;
+}
+
+/** How long a sinking column's whole cycle lasts (s). */
+export function columnCycle(st, C = CONFIG.volcano.column) {
+  const floor = (st.lava ?? st.top - 1) - 1;
+  return C.wobble + (st.top - floor) / C.speed + C.down + C.rise;
 }
 
 /**
