@@ -14,7 +14,7 @@ import { buildSpringCave, springSdf, SPRING_LIP_OFFSET, SPRING_FLOOR } from '../
 import { buildRuins } from '../src/client/models/props/ruins.js';
 import { buildNest } from '../src/client/models/props/nest.js';
 import { buildVolcanoFx } from '../src/client/models/props/volcano.js';
-import { treeGeometry, TREE_VARIANTS, TREE_WIND } from '../src/client/world/veg/trees.js';
+import { treeGeometry, TREE_VARIANTS, TREE_WIND, CROWN_TYPES } from '../src/client/world/veg/trees.js';
 import { BUSH_TYPES } from '../src/client/world/veg/plants.js';
 
 const meshes = (o) => { let n = 0; o.traverse((m) => { if (m.isMesh) n++; }); return n; };
@@ -98,6 +98,28 @@ test('every tree type has geometry, wind, and matching colliders; bush types bui
   for (const [k, b] of Object.entries(BUSH_TYPES)) {
     assert.ok(b.geometry().attributes.position.count > 0, k);
     assert.ok(b.wind.strength > 0 && 'pivotY' in b.wind && 'frequency' in b.wind && 'heightScale' in b.wind);
+  }
+});
+
+test('pines: the needles cover the trunk to its tip and nothing floats above them', () => {
+  assert.ok(!CROWN_TYPES.has('pine'), 'no lumpy crown warp on the thin tiers');
+  for (let v = 0; v < TREE_VARIANTS.pine; v++) {
+    const g = treeGeometry('pine', v);
+    g.trunk.computeBoundingBox();
+    const trunkTop = g.trunk.boundingBox.max.y;
+    const p = g.foliage.attributes.position;
+    // the highest foliage point stands above the trunk's end
+    let top = -Infinity;
+    for (let i = 0; i < p.count; i++) top = Math.max(top, p.getY(i));
+    assert.ok(top > trunkTop + 0.8, `pine ${v}: the tip ${top.toFixed(2)} over the trunk ${trunkTop.toFixed(2)}`);
+    // no gap up the crown: every metre from the lowest tier to the tip holds foliage
+    let low = Infinity;
+    for (let i = 0; i < p.count; i++) low = Math.min(low, p.getY(i));
+    for (let y = low; y < top; y += 0.5) {
+      let hit = false;
+      for (let i = 0; i < p.count && !hit; i++) hit = Math.abs(p.getY(i) - y) < 0.6;
+      assert.ok(hit, `pine ${v}: a gap in the crown at ${y.toFixed(1)} m`);
+    }
   }
 });
 

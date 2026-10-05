@@ -29,7 +29,7 @@
 - `hut/fx.js` — animated parts: waving flag, campfire flames and light, pooled smoke, arrow stock.
 
 ### veg/
-- `veg/trees.js` — procedural tree types (palm ... dead; swamp: mangrove, snag, nipa, swampfig; volcano: charred, ashplum with `ASHPLUM_FRUIT_LOCAL`; `deadMangroveGeometry` for the arena wall) as cached `{ trunk, foliage }`; crown variants (`CROWN_TYPES`, `CROWN_VARIANTS`) reshape and recolour only the foliage, the trunk stays; `treeMatrix`, `TREE_WIND`, `TREE_VARIANTS`, `MANGO_FRUIT_LOCAL`, `SWAMPFIG_FRUIT_LOCAL`.
+- `veg/trees.js` — procedural tree types (palm ... dead; swamp: mangrove, snag, nipa, swampfig; volcano: charred, ashplum with `ASHPLUM_FRUIT_LOCAL`; `deadMangroveGeometry` for the arena wall) as cached `{ trunk, foliage }`; crown variants (`CROWN_TYPES`, `CROWN_VARIANTS`) reshape and recolour only the foliage, the trunk stays (leaf-clump crowns only: never the pine, whose overlapping fir tiers rise past the trunk's end to the tip); `treeMatrix`, `TREE_WIND`, `TREE_VARIANTS`, `MANGO_FRUIT_LOCAL`, `SWAMPFIG_FRUIT_LOCAL`.
 - `veg/plants.js` — small plants (bush, fern, big leaf, shrub, reed with cattails, grass, flower, berry bush, dragon plant, swamp marsh shrub and glow lotus, volcano chili shrub and obsidian-fig cactus); `BUSH_TYPES`.
 - `veg/swampDecor.js` — `buildSwampDecor`: lily pads and duckweed on the bogs, breathing-root fields on their mud shores (instanced, handed to `SpatialInstances`).
 - `veg/shapes.js` — shared vegetation helpers (`clump`, `leafStrip`, `arcPath`, `LEAF_MAT`, `windPair`, `glowMaterial`, `instanced`, `foliageTint`, geometry-detail scope).

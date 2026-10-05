@@ -530,22 +530,28 @@ function buildPine(variant) {
   const H = pts[pts.length - 1].y;
   const trunk = trunkTube(shape, { base: '#5a4a40', dark: '#3a302a', seed: s, moss: '#6b7a4a', mossAmt: 0.15, lichen: '#9a9c92', lichenAmt: 0.4 }, { radial: 8, grooves: 6 });
   const tiers = [];
-  const count = variant ? 5 : 6;
+  // overlapping conical tiers, like a fir: from a third of the way up to past
+  // the trunk's end – the top tier is the tip, so no trunk sticks out above
+  const count = variant ? 6 : 7;
+  const top = pts[pts.length - 1];
   const ash = new THREE.Color('#9a9c96'), dark = new THREE.Color('#34503f'), mid = new THREE.Color('#44634a'), tip = new THREE.Color('#5d7c56'), tmp = new THREE.Color();
   for (let i = 0; i < count; i++) {
-    const f = i / count;
-    const yT = H * 0.3 + f * H * 0.66 + 0.5;
-    const R = 0.55 + (1 - f) * 2.5;
-    const droop = 0.45 + R * 0.28, th = 0.4 + R * 0.08;
-    const prof = [[0.12, yT - droop - th], [R * 0.55, yT - droop * 0.78 - th * 0.75], [R * 0.97, yT - droop - th * 0.2], [R, yT - droop], [R * 0.6, yT - droop * 0.45], [R * 0.25, yT - droop * 0.08], [0, yT]]
+    const f = i / (count - 1);
+    const yB = H * 0.32 + f * (H * 0.68 - 0.2);
+    const R = (2.7 - f * 1.95) * (variant ? 0.9 : 1);
+    const hgt = 1.3 + R * 0.75;
+    // underside up to the trunk, a drooping rim, the cone up to its point
+    const prof = [[0.12, yB + hgt * 0.25], [R * 0.7, yB + 0.1], [R, yB], [R * 0.93, yB + 0.14], [R * 0.5, yB + hgt * 0.5], [R * 0.15, yB + hgt * 0.88], [0, yB + hgt]]
       .map(([x, y]) => new THREE.Vector2(x, y));
     let g = new THREE.LatheGeometry(prof, 20);
     const rot = rng() * TAU;
     g = deform(g, (v) => {
       const r = Math.hypot(v.x, v.z), a = Math.atan2(v.z, v.x) + rot;
       const w = Math.cos(a * 7) * (r / R);
-      v.x *= 1 + 0.1 * w; v.z *= 1 + 0.1 * w;
-      v.y -= 0.18 * (0.5 + 0.5 * w) * (r / R);
+      v.x *= 1 + 0.08 * w; v.z *= 1 + 0.08 * w;
+      v.y -= 0.14 * (0.5 + 0.5 * w) * (r / R);
+      // the tiers follow the trunk's slight lean
+      v.x += top.x * (v.y / H); v.z += top.z * (v.y / H);
     });
     tiers.push(paint(g, (c, n) => {
       const r = Math.hypot(c.x, c.z) / R;
@@ -554,8 +560,7 @@ function buildPine(variant) {
       return tmp;
     }));
   }
-  tiers.push(place(spike(0.3, 1.2, '#44634a', '#8a9088', 6), [pts[pts.length - 1].x, H + 0.3, pts[pts.length - 1].z]));
-  return { trunk: merge([trunk]), foliage: merge(tiers), height: H + 1.5 };
+  return { trunk: merge([trunk]), foliage: merge(tiers), height: H + 1.9 };
 }
 
 // ------------------------------------------------------------ dead snag
@@ -863,8 +868,11 @@ export function treeGeometry(type, variant = 0, detail = 0, crown = 0) {
 
 /** Crown variants per leafy tree type: the base crown, a taller lighter one and a wider deeper one. */
 export const CROWN_VARIANTS = 3;
-/** Types whose crowns are leaf clumps (palms, bananas and bamboo keep their fronds; mango keeps its fruit spots). */
-export const CROWN_TYPES = new Set(['round', 'tall', 'jungle', 'giant', 'kapok', 'pine']);
+/**
+ * Types whose crowns are leaf clumps (palms, bananas and bamboo keep their fronds; mango keeps its
+ * fruit spots; pines keep their tiers – the lumpy warp tore the thin tiers apart and off the trunk).
+ */
+export const CROWN_TYPES = new Set(['round', 'tall', 'jungle', 'giant', 'kapok']);
 const CROWN_SHAPE = [null, { sy: 1.12, sxz: 0.93, tint: [1.08, 1.06, 0.86] }, { sy: 0.9, sxz: 1.08, tint: [0.86, 0.97, 1.06] }];
 
 /**
