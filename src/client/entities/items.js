@@ -89,6 +89,32 @@ export class Items {
     net.on(`ev:${EV.TRAP_ADD}`, (m) => this.addTrap(m.trap));
     net.on(`ev:${EV.TRAP_REMOVE}`, (m) => this.removeTrap(m.id));
     net.on(`ev:${EV.TRAP_SNAP}`, (m) => this.snapTrap(m.id));
+    this.#addWarmUp();
+  }
+
+  /** The model of one loot kind (the same for every drop of it), or null when the kind has none. */
+  #model(kind) {
+    const make = LOOT_GEO[kind];
+    if (kind === 'pistol' || kind === 'rifle') return makeFirearm(kind);
+    if (Object.hasOwn(CONFIG.fruit.types, kind)) return makeFruitMesh(kind);
+    return make ? mesh(make(), kind === 'meat' ? MAT.glossy : MAT.standard) : null;
+  }
+
+  /**
+   * One hidden copy of every loot model. The renderer's warm-up frame
+   * (`Renderer.prepare`) draws hidden things too, so their programs, textures and
+   * buffers exist before the first drop of a kind (a first pistol or fig cost 160-230 ms).
+   */
+  #addWarmUp() {
+    const group = new THREE.Group();
+    group.visible = false;
+    group.position.y = -1000;
+    for (const kind of [...Object.keys(LOOT_GEO), 'pistol', 'rifle', ...Object.keys(CONFIG.fruit.types)]) {
+      const m = this.#model(kind);
+      if (m) group.add(m);
+    }
+    group.add(mesh(trapGeometry(false)), mesh(trapGeometry(true)));
+    this.scene.add(group);
   }
 
   onWelcome(world) {
@@ -98,12 +124,9 @@ export class Items {
 
   addItem(it) {
     if (this.items.has(it.id)) return;
-    const make = LOOT_GEO[it.kind];
-    const isFruit = Object.hasOwn(CONFIG.fruit.types, it.kind);
-    const isGun = it.kind === 'pistol' || it.kind === 'rifle';
-    if (!make && !isFruit && !isGun) return;
+    const m = this.#model(it.kind);
+    if (!m) return;
     const obj = new THREE.Group();
-    const m = isGun ? makeFirearm(it.kind) : isFruit ? makeFruitMesh(it.kind) : mesh(make(), it.kind === 'meat' ? MAT.glossy : MAT.standard);
     if ((it.kind === 'arrow' || it.kind === 'spear') && !it.dino && !it.pose) {
       m.rotation.set(Math.PI / 2, Math.random() * 6, 0);
       m.position.y = 0.06;

@@ -5,7 +5,8 @@ import * as THREE from 'three';
 import { CONFIG } from '../../shared/config.js';
 import { onSettings, settings, FPS_LIMITS } from './settings.js';
 import { GpuTimer } from './gpuTimer.js';
-import { WorldPost } from './worldPost.js';
+import { WorldPost, usesPost } from './worldPost.js';
+import { requestPrograms } from './programs.js';
 import { TIERS, GraphicsAutoTune, gpuName } from './graphicsTier.js';
 
 const R = CONFIG.render;
@@ -47,15 +48,94 @@ export class Renderer {
     this.setTier(this.autoTune.tier);
   }
 
-  /** Render scale and contact shading, applied live (no restart). */
+  /**
+   * Render scale and contact shading, applied live (no restart). Whether the
+   * world draws into a render target changes every program (see `prepare`), so
+   * a switch that needs not-yet-compiled programs waits until they are built in
+   * the background; the old path keeps rendering meanwhile.
+   */
   applySettings(st) {
-    this.renderScale = (st.renderScale ?? 100) / 100;
-    this.aoStrength = (st.ambientOcclusion ?? 0) / 100;
+    this.wanted = { scale: (st.renderScale ?? 100) / 100, ao: (st.ambientOcclusion ?? 0) / 100 };
+    this.#adoptWanted();
+  }
+
+  #adoptWanted() {
+    const { scale, ao } = this.wanted;
+    const post = usesPost(scale, ao);
+    if (this.renderScale === null || this.compiledPaths.has(post)) {
+      this.renderScale = scale;
+      this.aoStrength = ao;
+      return;
+    }
+    if (this.warming) return;   // the latest wish is adopted when the running compile ends
+    this.warming = true;
+    this.#compilePath(post, scale, ao)
+      .catch((e) => console.warn('Shader precompile failed', e))
+      .finally(() => { this.warming = false; this.compiledPaths.add(post); this.#adoptWanted(); });
+  }
+
+  /** Build the world programs for drawing into the render target (`post`) or the canvas, without drawing. */
+  async #compilePath(post, scale, ao) {
+    const r = this.renderer;
+    const target = post ? this.#syncPost(scale, ao).target : null;
+    // The programs are requested here, synchronously, for the target set now; the
+    // compile itself then runs in parallel while frames keep drawing.
+    let done;
+    r.setRenderTarget(target);
+    try { done = requestPrograms(r, this.scene, this.camera); } finally { r.setRenderTarget(null); }
+    await done;
+    if (post) await this.post.compile(this.camera);
   }
 
   /** Switch the internal graphics level (live; listeners rebuild vegetation LOD/density). */
   setTier(tier) {
     const g = TIERS[tier] ?? TIERS[TIERS.length - 1];
+    const r = this.renderer;
+    // Shadows on/off are compiled into every lit program: once the island is
+    // drawn, build the other variant in the background before switching to it.
+    if (this.prepared && r.shadowMap.enabled !== g.shadows) {
+      this.pendingTier = tier;
+      if (!this.shadowSwitch) {
+        this.shadowSwitch = this.#compileShadowVariant(g.shadows)
+          .catch((e) => console.warn('Shader precompile failed', e))
+          .finally(() => {
+            this.shadowSwitch = null;
+            const next = this.pendingTier;
+            this.pendingTier = null;
+            this.#applyTier(TIERS[next] ?? TIERS[TIERS.length - 1]);
+          });
+      }
+      return;
+    }
+    this.pendingTier = null;
+    this.#applyTier(g);
+  }
+
+  /** Programs for the shadow setting `enabled`, requested without changing what is drawn. */
+  async #compileShadowVariant(enabled) {
+    const r = this.renderer;
+    const was = r.shadowMap.enabled;
+    const post = usesPost(this.renderScale, this.aoStrength);
+    let world, view;
+    r.shadowMap.enabled = enabled;
+    try {
+      r.setRenderTarget(post ? this.post.target : null);
+      world = requestPrograms(r, this.scene, this.camera);
+      r.setRenderTarget(null);
+      view = requestPrograms(r, this.viewScene, this.viewCamera);
+    } finally { r.shadowMap.enabled = was; r.setRenderTarget(null); }
+    // The materials now point at the new variant: have the next frame look them up again.
+    this.#invalidatePrograms();
+    await Promise.all([world, view]);
+  }
+
+  #invalidatePrograms() {
+    for (const sc of [this.scene, this.viewScene]) sc.traverse((o) => {
+      for (const m of [o.material].flat()) if (m) m.needsUpdate = true;
+    });
+  }
+
+  #applyTier(g) {
     const r = this.renderer;
     this.graphics = g;
     // The canvas remains at output resolution. Only the world target scales;
@@ -63,10 +143,7 @@ export class Renderer {
     r.setPixelRatio(Math.min(devicePixelRatio, g.pixelRatio));
     if (r.shadowMap.enabled !== g.shadows) {
       r.shadowMap.enabled = g.shadows;
-      // shadows on/off are compiled into the shaders
-      for (const sc of [this.scene, this.viewScene]) sc.traverse((o) => {
-        for (const m of [o.material].flat()) if (m) m.needsUpdate = true;
-      });
+      this.#invalidatePrograms();   // the variant is compiled already (or the scene is still empty)
     }
     this.#applyShadow();
     this.resize();
@@ -96,6 +173,8 @@ export class Renderer {
   /** Fresh, empty scenes (a new island reuses the renderer). */
   reset() {
     this.sun?.shadow.dispose();
+    this.compiledPaths = new Set();   // programs of the new island's materials are not built yet
+    this.prepared = false;
     // Post targets are renderer-owned and reused between islands.
     this.scene = new THREE.Scene();
     this.scene.fog = new THREE.Fog(0xa8dcf7, R.fogNear, R.fogFar);
@@ -199,10 +278,62 @@ export class Renderer {
     this.lastPostSize = '';
   }
 
+  /**
+   * Get everything the first playable frames need compiled, uploaded and
+   * allocated while the loading screen is still up. Programs depend on what is
+   * being rendered into (a render target skips tone mapping and uses linear
+   * output), so the world compiles against the real target; compiling against
+   * the canvas left ~60 programs for the first frame (a 2-8 s freeze).
+   */
   async prepare() {
-    // Avoid compiling the largest scene shaders during the first playable frame.
-    await this.renderer.compileAsync(this.scene, this.camera);
-    await this.renderer.compileAsync(this.viewScene, this.viewCamera);
+    const r = this.renderer;
+    const post = this.#syncPost(this.renderScale, this.aoStrength);
+    try {
+      r.setRenderTarget(post ? this.post.target : null);
+      await r.compileAsync(this.scene, this.camera);
+      r.setRenderTarget(null);
+      await r.compileAsync(this.viewScene, this.viewCamera);
+      if (post) await this.post.compile(this.camera);
+    } finally { r.setRenderTarget(null); }
+    this.compiledPaths.add(!!post);
+    this.#warmRender();
+    this.prepared = true;
+  }
+
+  /**
+   * One real frame with culling off: shadow-depth programs, texture uploads and
+   * every geometry buffer are created now instead of when it first comes into view.
+   */
+  #warmRender() {
+    // Also shows what is hidden at this moment (LOD levels, effects that only appear
+    // later): shadow-depth programs exist per drawn object and are not part of
+    // compile(). Lights stay as they are: their count is part of every program.
+    const culled = [], hidden = [];
+    for (const sc of [this.scene, this.viewScene]) sc.traverse((o) => {
+      if (o.frustumCulled) { o.frustumCulled = false; culled.push(o); }
+      if (!o.visible && !o.isLight) { o.visible = true; hidden.push(o); }
+    });
+    try { this.render(0); } finally {
+      for (const o of culled) o.frustumCulled = true;
+      for (const o of hidden) o.visible = false;
+    }
+    this.metrics.cpuRenderMs = 0;
+  }
+
+  /** The world target when scaling or contact shading is on (created and sized on demand), else null. */
+  #syncPost(scale, ao) {
+    if (!usesPost(scale, ao)) return null;
+    const r = this.renderer;
+    this.post ??= new WorldPost(r);
+    const size = r.getDrawingBufferSize(_bufferSize);
+    const w = Math.max(1, Math.round(size.x * scale)), h = Math.max(1, Math.round(size.y * scale));
+    const samples = Math.min(MSAA_SAMPLES, r.capabilities.maxSamples);
+    const key = `${w}:${h}:${samples}:${ao > 0}`;
+    if (key !== this.lastPostSize) {
+      this.post.resize(w, h, samples, ao > 0);
+      this.lastPostSize = key;
+    }
+    return this.post;
   }
 
   render(rawDt = 0) {
@@ -217,18 +348,9 @@ export class Renderer {
     const scale = this.renderScale;
     // The canvas is created with MSAA; the world target only exists when it
     // is scaled or shaded, and then carries its own MSAA samples.
-    if (scale < 0.999 || this.aoStrength > 0) {
-      this.post ??= new WorldPost(r);
-      const size = r.getDrawingBufferSize(_bufferSize);
-      const w = Math.max(1, Math.round(size.x * scale)), h = Math.max(1, Math.round(size.y * scale));
-      const samples = Math.min(MSAA_SAMPLES, r.capabilities.maxSamples);
-      const key = `${w}:${h}:${samples}:${this.aoStrength > 0}`;
-      if (key !== this.lastPostSize) {
-        this.post.resize(w, h, samples, this.aoStrength > 0);
-        this.lastPostSize = key;
-      }
-      this.post.render(this.scene, this.camera, scale < 0.999 ? SHARPNESS : 0, this.aoStrength);
-    } else {
+    const post = this.#syncPost(scale, this.aoStrength);
+    if (post) post.render(this.scene, this.camera, scale < 0.999 ? SHARPNESS : 0, this.aoStrength);
+    else {
       r.setRenderTarget(null);
       r.clear();
       r.render(this.scene, this.camera);
