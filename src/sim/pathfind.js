@@ -71,6 +71,7 @@ export function findPath(sys, d, fx, fz, tx, tz, reach = 8, maxNodes = MAX_NODES
   // animal on a plateau finds the way down a wall it could never climb back up
   const open = new Map();
   const heights = new Map();
+  const edges = new Map();
   const cell = (i, j) => {
     const k = key(i, j);
     let v = open.get(k);
@@ -125,6 +126,11 @@ export function findPath(sys, d, fx, fz, tx, tz, reach = 8, maxNodes = MAX_NODES
       if (!walk(n.i, n.j, i, j)) continue;
       // no corner cutting past an unwalkable cell
       if (di && dj && (!walk(n.i, n.j, n.i + di, n.j) || !walk(n.i, n.j, n.i, n.j + dj))) continue;
+      // Walkable cell centers can straddle a narrow water channel or steep ridge.
+      // Validate the continuous, directed segment with the same rule as movement.
+      const edge = `${nk}:${key(i, j)}`;
+      if (!edges.has(edge)) edges.set(edge, reachable(sys, d, n.i * CELL, n.j * CELL, i * CELL, j * CELL));
+      if (!edges.get(edge)) continue;
       const k = key(i, j);
       // bogs (swamp) are slow going: weigh them by the time they take, so the dry paths win
       // ... and hot ground (volcano) is avoided where there is another way

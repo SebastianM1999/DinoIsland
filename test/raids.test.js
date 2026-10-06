@@ -4,6 +4,8 @@ import { ServerWorld } from '../src/sim/world.js';
 import { MSG, ACT, EV } from '../src/shared/protocol.js';
 import { BUILD_TIME, plotPoint, repairCost } from '../src/shared/base.js';
 import { RAID, raidGroup } from '../src/sim/raids.js';
+import { makeRng } from '../src/shared/rng.js';
+import { findPath } from '../src/sim/pathfind.js';
 
 /** Island 2 (variant 7), no wild dinosaurs, a camp standing on plot 0 and one player at its fire. */
 function campWithPlayer() {
@@ -28,6 +30,22 @@ function campWithPlayer() {
 }
 
 const raidEvents = (events) => events.filter((m) => m.e === EV.RAID).map((m) => m.raid.phase);
+
+test('raid paths detour around water between otherwise walkable grid centers', () => {
+  const sys = {
+    terrain: { heightAt: () => 1 },
+    walkable: (x, z) => Math.abs(x) <= 12 && Math.abs(z) <= 8
+      && !(x > 1 && x < 3 && Math.abs(z) < 1),
+  };
+  const path = findPath(sys, { type: 'raptor', radius: 1, raid: true }, 0, 0, 8, 0, 0, 100, { every: 1 });
+  assert.ok(path && path.some(p => Math.abs(p.z) >= 4), 'the route goes around the narrow channel');
+  for (let i = 1; i < path.length; i++) {
+    const a = path[i - 1], b = path[i];
+    for (let t = 0; t <= 1; t += 0.05) {
+      assert.ok(sys.walkable(a.x + (b.x - a.x) * t, a.z + (b.z - a.z) * t), 'each route edge stays on walkable ground');
+    }
+  }
+});
 
 test('a raid is announced, then a group comes – bigger bases draw bigger raids', () => {
   const { world, run, events } = campWithPlayer();
@@ -54,7 +72,16 @@ test('no raid while nobody is near the base', () => {
   assert.equal(world.raids.phase, 'idle');
 });
 
-test('raiders wreck the base (never destroy it) and the team repairs it', () => {
+// Exercise repeatable approach/spawn configurations rather than betting CI on
+// an arbitrary random route. Mock restoration is scoped to each test.
+for (const seed of [1, 7, 42, 295]) {
+test(`raiders wreck the base (never destroy it) and the team repairs it (seed ${seed})`, (t) => {
+  let state = seed;
+  // LCG seed 295 reproduces all three raiders wedged at the first swamp-bank corner.
+  const random = seed === 295
+    ? () => ((state = (Math.imul(state, 1664525) + 1013904223) >>> 0) / 4294967296)
+    : makeRng(seed);
+  t.mock.method(Math, 'random', random);
   const { world, p, act, run, goTo, plot } = campWithPlayer();
   world.raids.nextAt = world.now;          // straight to the raid
   run(RAID.warn + 1);
@@ -73,6 +100,7 @@ test('raiders wreck the base (never destroy it) and the team repairs it', () => 
   for (const [k, n] of Object.entries(cost)) assert.equal(world.store[k], before[k] - n);
   assert.ok(world.safeZone());
 });
+}
 
 test('a raid ends when every raider is down; raiders never respawn', () => {
   const { world, run, events } = campWithPlayer();
