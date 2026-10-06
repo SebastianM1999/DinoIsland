@@ -18,20 +18,33 @@ def a_idle(t):
     look=track(t,[(0,0),(.12,0),(.25,.09),(.43,.09),(.57,-.07),(.75,-.07),(.9,0),(1,0)])
     rot('Neck1',(Z,look*.4));rot('Neck2',(Z,look*.35));rot('Head',(Z,look*.25),(X,.007*br))
     rot('Jaw',(X,.015*max(0,math.sin(TAU*t))));a_tail(t,.025)
+def a_spine_wave(t,hips,shoulders,neck,tail,lag=.55):
+    """Crocodilian lateral undulation: hips and shoulders swing in opposition, the neck/head counter
+    so the head stays steady, and an S-wave travels down the tail growing toward the tip."""
+    f=TAU*t
+    rot('Body',(Z,hips*math.sin(f)),(Y,.035*math.sin(f)))
+    rot('Shoulders',(Z,-shoulders*math.sin(f+.35)))
+    rot('Neck1',(Z,neck*math.sin(f+.6)));rot('Neck2',(Z,neck*.8*math.sin(f+.9)))
+    rot('Head',(Z,-neck*.6*math.sin(f+1.1)))
+    chain('Tail',8,lambda i:((X,.006*math.sin(2*f-.5*i)),(Z,tail*(.55+.12*i)*math.sin(f-lag*(i+1)))))
 def a_walk(t):
-    for k in A_LEGS:quad_leg(k,(t+LATERAL[k])%1,1.2,.68,.26,tilt=0)
-    loc('Body',(.025*math.sin(TAU*t),0,-.08+.025*math.cos(2*TAU*t)))
-    rot('Body',(Z,.012*math.sin(TAU*t)),(Y,.018*math.sin(TAU*t)))
-    rot('Shoulders',(Z,-.016*math.sin(TAU*t)))
-    rot('Head',(Z,-.012*math.sin(TAU*t)));a_tail(t,.035)
+    # Big, unhurried strides (lateral sequence) so the giant does not patter: stride 2.0 m / duty .7.
+    for k in A_LEGS:quad_leg(k,(t+LATERAL[k])%1,2.0,.7,.34,tilt=.1)
+    loc('Body',(.04*math.sin(TAU*t),0,-.1+.035*math.cos(2*TAU*(t-.06))))
+    a_spine_wave(t,.11,.14,.075,.085)        # agile: strong S-wave through body and tail
+    rot('Head',(X,.015*math.cos(2*TAU*t)))
 def a_run(t):
-    phases={'BackL':0,'BackR':.2,'FrontL':.7,'FrontR':.5}
-    for k in A_LEGS:quad_leg(k,(t+phases[k])%1,1.5,.42,.4,tilt=0)
-    loc('Body',(0,0,-.1+.06*math.cos(2*TAU*(t-.06))))
-    rot('Body',(X,.025*math.sin(TAU*t)))
-    rot('Shoulders',(X,.025*math.sin(TAU*t+.6)))
-    rot('Head',(X,-.035-.025*math.sin(TAU*t)));rot('Jaw',(X,.03));a_tail(t,.02)
-    rot('Tail1',(X,.065+.008*math.sin(TAU*t)),(Z,.02*math.sin(TAU*t)))
+    # Charge: bounding gallop - hind pair drives, front pair lands; the body rocks nose-down/up,
+    # the head stays up and forward, the tail swings less and lifts a little for balance.
+    phases={'BackL':0,'BackR':.1,'FrontL':.5,'FrontR':.6}
+    for k in A_LEGS:quad_leg(k,(t+phases[k])%1,2.6,.38,.55,tilt=.12)
+    rock=1.35*math.sin(TAU*t+.5)
+    loc('Body',(0,0,-.24+.12*math.cos(2*TAU*(t-.08))))
+    rot('Body',(X,.07*rock),(Z,.03*math.sin(TAU*t)))
+    rot('Shoulders',(X,-.06*rock),(Z,-.035*math.sin(TAU*t+.4)))
+    rot('Neck1',(X,-.06+.03*rock));rot('Neck2',(X,-.03))
+    rot('Head',(X,-.06-.05*rock));rot('Jaw',(X,.06+.03*math.sin(2*TAU*t)))
+    chain('Tail',8,lambda i:((X,(.09 if i==0 else .012)+.016*math.sin(TAU*t-.6*i)),(Z,.035*(1+.15*i)*math.sin(TAU*t-.55*(i+1)))))
 def a_attack(t):
     wind=track(t,[(0,0),(.24,.9),(.40,1),(.49,0),(.70,0),(1,0)])
     thrust=track(t,[(0,0),(.38,-.18),(.49,.36),(.57,.31),(.78,.10),(1,0)])

@@ -5,7 +5,8 @@ export const SARCO_MODEL = {
   height: 3.4308, length: 16.2, width: 4.427790898814507, yaw: Math.PI,
   hitHeight: 3.812, groundPitchLimit: 0, terrainLegs: true, maxFootAdjustment: .45,
   authoredPoseClips: ['attack', 'bite', 'shove', 'tailsweep', 'pivot', 'retreat', 'ambush', 'recovery', 'swim'],
-  walkStride: 1.866 * .9, runStride: 3.775 * .9, runThreshold: 3, maxCadence: 2.55,
+  // measured on the fitted 16.2 m model (90_validate.mjs); 2.4 Hz covers the 15 m/s lunge
+  walkStride: 2.719, runStride: 6.51, runThreshold: 3, maxCadence: 2.4,
   bones: {
     head: 'Head', jaw: 'Jaw', body: 'Body', spine: ['Body', 'Shoulders'],
     neck: ['Neck1', 'Neck2'], tail: Array.from({ length: 8 }, (_, i) => `Tail${i + 1}`),

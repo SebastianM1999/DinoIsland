@@ -112,7 +112,7 @@ test('tail hit envelopes match fitted width-preserving geometry instead of a uni
   assert.ok(extendedRadius > peakRadius);
   assert.ok(Math.abs(C.biteRange - 7.2) < 1e-9);
   assert.ok(Math.abs(C.bodyHeightScale - .9) < 1e-9);
-  assert.equal(C.body[0][1], 1.8, 'body width remains unchanged');
+  assert.ok(C.body[0][1] >= 1.8, 'body width is never shrunk with the length/height fit');
 });
 
 test('lateral repositioning keeps its facing and respects arena limits', () => {

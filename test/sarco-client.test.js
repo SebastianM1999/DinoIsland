@@ -212,7 +212,8 @@ test('Sarcosuchus fit shrinks length and height only and keeps its torso level w
       assert.ok(previous[i].angleTo(rig.legChains[i].lower.quaternion) < .4, 'smaller stride keeps run knees stable');
     previous = rig.legChains.map(leg => leg.lower.quaternion.clone());
   }
-  assert.ok(animator.actions.run.timeScale / rig.clips.run.duration > 2.3, 'scaled stride maintains the same running speed');
+  assert.ok(Math.abs(animator.actions.run.timeScale / rig.clips.run.duration - 8.5 / rig.spec.runStride) < 1e-6,
+    'run cadence = speed / measured stride: feet stay planted at full speed');
   for (const input of [{ pose: { clip: 'swim', clipDuration: 1.6, phaseElapsed: .5, clipId: 100 } }, { dead: true }]) {
     animator.update(.1, { groundAt: () => 10, groundPitch: 1, ...input });
     flat.update(.1, input);

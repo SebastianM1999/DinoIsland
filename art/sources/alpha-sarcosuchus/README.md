@@ -1,8 +1,11 @@
 # Alpha Sarcosuchus
 
 Project-authored model based on `docs/newDinos/new-dinos.md` and the supplied
-`AlphaSarcosuchus.png`. The owner's revision calls for dark green crocodilian hide,
-dense plate scales and irregular bloody scars rather than pale armor, dots or tubes.
+`AlphaSarcosuchus.png`: green crocodilian hide, dense plate scales and irregular bloody
+scars rather than pale armor, dots or tubes. The 2026-10 revision brightened the hide
+(the near-black #17271b palette rendered as a flat silhouette in game light) to an
+olive-bronze back, lighter olive flanks and cream-green ventral shields with dark
+crocodile crossbands and flank speckles, and gave the walk and charge an agile spine.
 
 The model is the unique boss in Drowned Hollow, the middle arena on the second
 island (Misty Swamp). The authoritative simulation owns spawning, attack damage,
@@ -21,7 +24,7 @@ addon running. Rebuild verified from an empty scene.
 
 - `abody`: continuous trunk, long wedge snout, mouth trough, fused jaw and limbs.
 - `adetail`: beveled plate scales, cranial and limb scutes, vertex-painted fine scale
-  fields, nearly black green pigments, bright red wounds, interlocking worn teeth,
+  fields, olive-green pigments with crossbands, bright red wounds, interlocking worn teeth,
   claws and one red / one yellow glowing slit eye.
   Irregular scar masks stain the actual skin and plates and slightly recess the skin;
   there are no separate scar sticks or tubes.
@@ -48,11 +51,17 @@ addon running. Rebuild verified from an empty scene.
 
 - 58,575 triangles, below the 60,000 limit; no image textures.
 - Game fit: 16.2 m long, 3.4308 m high, about 4.428 m wide.
-- Original walk/run strides: 1.866 / 3.775 m per cycle; fitted strides are 90%
-  of those values (1.679 / 3.398 m). Maximum cadence is 2.55 Hz to preserve speed.
+- Walk: lateral sequence, 2.0 m sweep / duty .7, strong crocodilian S-wave (hips and
+  shoulders in opposition, head stabilised, tail wave growing to the tip). Run (charge):
+  bounding gallop, 2.6 m sweep / duty .38, body rocking, tail lifted.
+- Fitted strides measured by `90_validate.mjs`: walk 2.719 m, run 6.51 m. Maximum
+  cadence 2.4 Hz (the 15 m/s lunge needs 2.3).
 - IK rest knee error: 0; normalized deform weights, no unweighted vertices.
 - 3,588 exported vertices carry majority Jaw weight.
-- Knee changes at maximum cadence: walk 0.184 / run 0.204 rad per 1/60 s.
+- Knee changes at maximum cadence: walk 0.377 / run 0.332 rad per 1/60 s.
+- Player collision footprint (`CONFIG.dinos['alpha-sarcosuchus'].body`) measured on the
+  fitted model: legs reach 2.2 m out, snout +7.6 m, tail tip -9.4 m. Creative-mode
+  players are never blocked by any dino (intentional in `world.js` / `game.js`).
 - Rest-pose client hit-sphere coverage: 99.6% at 0.12 m margin.
 - 94 leg-area plates transferred out of body armor; walk/run limb close-ups are
   saved as `review/walk-legs.png` and `review/run-legs.png`.
