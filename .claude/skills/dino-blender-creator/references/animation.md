@@ -99,6 +99,19 @@ sweep. Near full extension the IK knee flips between frames ("knee snaps during 
 0.4 rad per 1/60 s at max cadence). Fix by shortening S, shifting y0 under the hip, or lowering
 the body — never by speeding the clip up.
 
+**Sprawled crocodilian quadruped (Alpha Sarcosuchus, `art/sources/alpha-sarcosuchus/13_aanim.py`)**
+— the owner rejected pillar "dog legs" and a stiff body. Legs: joint low on the body side, upper
+arm/thigh out and down to an elbow/knee well outside the body, lower leg near-vertical to an
+out-turned foot (see modeling.md). Gait: `a_leg()` = `quad_leg` plus a swing that arcs the foot
+OUT (`dx = side * out * sin(pi*s)`, out .22 walk / .3 charge). Body: `a_spine_wave()` — hips yaw
+(Z) ±.11 and shoulders ±.14 in opposition (phase +.35), roll ±.035, neck +.075 and head counter-yaw
+so the head stays steady, tail S-wave per bone `amp*(.55+.12*i)*sin(f - .55*(i+1))` (amp .085,
+growing to the tip). Walk = lateral sequence, sweep 1.5 / duty .7 / lift .34; charge = bounding
+gallop (BackL 0, BackR .1, FrontL .5, FrontR .6), sweep 1.9 / duty .38, body pitch rock ±.09 with
+shoulders countering, head up, tail lifted (raise it enough or the tip drags while rocking).
+Sprawled legs reach less: size the sweep from the hip-ankle distance (keep <= 95 % of the chain
+at both sweep ends) — 2.0/2.6 m sweeps snapped the knees (0.59/0.67 rad per frame).
+
 ## 5. Clip recipes
 
 - **Idle (3-6 s loop):** breathing 2-3 cycles (body z ±1 %, torso pitch), look-around with holds
