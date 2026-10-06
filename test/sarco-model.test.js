@@ -7,7 +7,7 @@ import { GLB_DINOS } from '../src/client/models/dino/glbCatalog.js';
 import { registerDinoGLTF, buildGLBDino } from '../src/client/models/dino/glbDino.js';
 import { SARCO_MODEL, SARCO_TYPE } from '../src/client/models/dino/sarcoModel.js';
 
-test('Sarcosuchus boss asset has dark hide, distinct glowing eyes and fourteen clean clips', async () => {
+test('Sarcosuchus boss asset has olive-green hide, distinct glowing eyes and fourteen clean clips', async () => {
   const bytes = await fs.readFile(new URL('../assets/models/dinos/alpha-sarcosuchus.glb', import.meta.url));
   const gltf = await new GLTFLoader().parseAsync(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength), '');
   assert.ok(GLB_DINOS[SARCO_TYPE], 'boss has a gameplay model registration');
@@ -32,7 +32,9 @@ test('Sarcosuchus boss asset has dark hide, distinct glowing eyes and fourteen c
       let red = 0, green = 0;
       for (let i = 0; i < col.count; i += 11) { red += col.getX(i); green += col.getY(i); }
       assert.ok(green > red, 'green crocodilian palette survives export');
-      assert.ok(green / Math.ceil(col.count / 11) < .12, 'near-black dark green skin');
+      // Readable olive-green hide: the old near-black skin (< .12 linear) rendered as a flat silhouette.
+      const meanGreen = green / Math.ceil(col.count / 11);
+      assert.ok(meanGreen > .1 && meanGreen < .3, `readable dark-olive skin (mean linear green ${meanGreen.toFixed(3)})`);
       let brightScars = 0;
       for (let i = 0; i < col.count; i++) {
         if (col.getX(i) > .18 && col.getX(i) > col.getY(i)*3) brightScars++;

@@ -7,7 +7,9 @@ bs.inputs['Emission Color'].default_value=(1,.01,.003,1); bs.inputs['Emission St
 A_YELLOW=vc_mat('AlphaYellowEyeGlow',.2)
 bs=next(n for n in A_YELLOW.node_tree.nodes if n.type=='BSDF_PRINCIPLED')
 bs.inputs['Emission Color'].default_value=(1,.63,.015,1);bs.inputs['Emission Strength'].default_value=1.8
-A_P={k:lin(v) for k,v in dict(back='#17271b',back2='#243b29',flank='#29412c',flank2='#395237',belly='#414a36',stripe='#111d15').items()}
+# Readable under the game's darker lighting: olive-bronze back, lighter olive flanks, cream-yellow
+# ventral shields, dark crocodile crossbands. (The near-black #17271b hide read as a flat silhouette.)
+A_P={k:lin(v) for k,v in dict(back='#435e2c',back2='#354d24',flank='#5f7d3c',flank2='#728f48',belly='#bfc28a',stripe='#22311a').items()}
 A_WOUNDS=[(-6.1,2.6,.54,-.54,.075,1.4),(-2.7,2.95,.38,-.86,.105,2.1),(-.9,2.7,.7,-1.12,.09,3.3),(1.0,2.55,.76,-.87,.12,4.5),(2.4,2.3,.22,-.42,.055,5.8)]
 def a_wound(p):
     if abs(p.x)<.35:return 0
@@ -54,9 +56,14 @@ def a_hide(p,n):
     centre,variation=a_cells(p.y/.38+.13*math.sin(p.z*3),p.x/.32)
     side,sv=a_cells(p.y/.37+.15*math.sin(p.z*4),p.z/.31)
     centre=centre*top+side*(1-top);variation=variation*top+sv*(1-top)
-    c=shade(c,.46+.42*centre+.30*variation)
-    c=mix(c,lin('#527445'),smooth(-.03,.28,broad)*(.08+.14*centre))
-    c=mix(c,lin('#14241a'),smooth(.10,.32,grain)*.28)
+    c=shade(c,.62+.34*centre+.2*variation)
+    c=mix(c,lin('#7c8a4a'),smooth(-.03,.28,broad)*(.1+.16*centre))
+    c=mix(c,lin('#2b3519'),smooth(.10,.32,grain)*.22)
+    # crocodile crossbands over back and tail (fading down the flanks), dark speckles on the sides
+    band=smooth(.55,.8,math.sin(p.y*2.35+.9*fbm(p,.9)))*smooth(-.35,.25,n.z)*smooth(-1.5,.5,p.y)
+    c=mix(c,A_P['stripe'],band*.62)
+    speck=smooth(.62,.7,fbm(p*V((1,.7,1)),7.5))*smooth(.6,-.1,abs(n.z))
+    c=mix(c,A_P['stripe'],speck*.55)
     # Longer rectangular ventral shields and irregular folds at elbows/hips.
     belly=smooth(.15,-.55,n.z)
     shield=abs(math.sin(p.y*math.pi/.43+.15*math.sin(p.x*4)))
@@ -127,19 +134,20 @@ for i in range(29):
             if hit[0] is not None and abs(hit[1].x)>.3:a_plate(peb,hit,.165,.18,.04)
 armor=mk('AlphaArmor',bm); ridges=mk('AlphaRidges',rbm); pebbles=mk('AlphaPebbles',peb)
 def a_armor(p,n):
-    return mix(lin('#15251a'),lin('#405a37'),smooth(-.15,.8,n.z)*.4+.14*fbm(p,3))
+    return mix(lin('#34421f'),lin('#6f7c3f'),smooth(-.15,.8,n.z)*.5+.16*fbm(p,3))
 def a_scale_color(p,t):
-    green=mix(lin('#172b1e'),lin('#47623c'),.40+.7*fbm(p,2.2))
+    green=mix(lin('#3a4723'),lin('#76833f'),.40+.7*fbm(p,2.2))
+    green=mix(green,lin('#262f17'),smooth(.55,.8,math.sin(p.y*2.35+.9*fbm(p,.9)))*.55)   # crossbands continue over the scutes
     # Embedded almost-black seams, olive crown, weathered lichen flecks, and
     # directional ribbing carry detail like the stego's modeled plate painting.
     crown=smooth(.12,.70,t)
-    green=shade(green,.35+.65*crown)
+    green=shade(green,.5+.5*crown)
     rib=abs(math.sin(p.y*19+.65*math.sin(p.x*8+p.z*5)))
     green=shade(green,1-.24*smooth(.65,.95,rib)*crown)
-    green=mix(green,lin('#6c8050'),smooth(.16,.36,fbm(p,8))*.22*crown)
+    green=mix(green,lin('#a4a468'),smooth(.16,.36,fbm(p,8))*.3*crown)              # weathered pale crowns
     return green
 paint_t(armor,a_scale_color);armor.data.materials.append(A_SKIN)
-paint_t(ridges,lambda p,t:mix(lin('#122219'),lin('#425b36'),smooth(.15,.8,t)));ridges.data.materials.append(A_SKIN)
+paint_t(ridges,lambda p,t:mix(lin('#2c371b'),lin('#8a8e52'),smooth(.15,.8,t)));ridges.data.materials.append(A_SKIN)
 paint_t(pebbles,a_scale_color);pebbles.data.materials.append(A_SKIN)
 # Fine cranial scutes: compact asymmetric fields, not oversized separate lumps.
 hbm=bmesh.new()

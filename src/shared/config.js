@@ -214,11 +214,13 @@ export const CONFIG = {
     'alpha-sarcosuchus': {
       name: 'Alpha Sarcosuchus', health: 1800, radius: 2.2,
       bodyLengthScale: .9, bodyHeightScale: .9,
-      walkSpeed: 3, runSpeed: 8.5, lungeSpeed: 15, turnRate: 2.1,
+      walkSpeed: 3, runSpeed: 8.5, lungeSpeed: 15, turnRate: 2.8,
       sightRadius: 44, biteRange: 7.2, biteDamage: 32, biteCooldown: 1.8,
       shoveDamage: 18, tailRange: 9.9, tailDamage: 30, knockback: 12,
-      body: [[0, 1.8], [1.8, 1.6], [3.6, 1], [5.4, .8], [6.75, .55],
-        [-1.8, 1.3], [-3.6, 1], [-5.4, .75], [-7.2, .45]],
+      // footprint measured on the fitted model: legs reach 2.2 m out at the shoulders/hips, snout to
+      // +7.6 m, tail tip to -9.4 m (the old circles left the snout, tail end and feet walk-through)
+      body: [[0, 1.9], [1.8, 1.85], [3.6, 1.1], [5.4, .8], [6.75, .6], [7.35, .4],
+        [-1.8, 1.8], [-3.6, 1.05], [-5.4, .78], [-7.2, .5], [-8.4, .35], [-9.1, .2]],
       loot: { meat: 8, hide: 6, teeth: 6 },
       butcher: { time: 10, loot: { bones: 10, skull: 1, plates: 6 } },
       respawn: 0, // The arena boss is unique and stays defeated.
