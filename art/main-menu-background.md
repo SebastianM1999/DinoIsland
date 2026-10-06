@@ -1,6 +1,6 @@
 # Main menu background
 
-Generated with the built-in image_gen tool. Final asset: assets/images/main-menu-island.png.
+Generated with the built-in image_gen tool. Final asset: assets/images/main-menu-island.webp.
 
 ## Initial prompt
 

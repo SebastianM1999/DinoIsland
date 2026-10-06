@@ -20,6 +20,7 @@
   3. `launch(net)`: loading screen, `preloadDinoModels`, `new Game(canvas, net, reuse)`, `game.gfx.prepare()` (shader precompile), `game.start()`, pointer lock.
   4. On `game.onNewIsland(welcome)` (team set sail) the old game is `dispose()`d and `launch` runs again, reusing renderer, audio and input; creative mode is carried over.
   5. Leaving or a disconnect calls `backToMenu`, which reloads the page with the reason in the URL hash.
+- `core/game.js` (and everything only it imports) is loaded with a dynamic `import()` from `main.js`: prefetched when the browser is idle after the menu is up, and awaited in `launch()`. Keep new static imports of game-only modules out of `main.js`, `ui/menus.js`, `ui/wardrobe.js` and the other menu modules, or they end up on the menu's critical path (the server preloads the static graph).
 - `?debug` exposes the running game as `window.dinoGame`; `window.__game` is always set.
 
 ## Rules

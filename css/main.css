@@ -91,7 +91,7 @@ input[type="text"], input:not([type]) {
 #menu {
   background:
     linear-gradient(180deg, rgba(15, 30, 39, 0.06), rgba(15, 30, 39, 0.22)),
-    url('../assets/images/main-menu-island.png') center / cover no-repeat,
+    url('../assets/images/main-menu-island.webp') center / cover no-repeat,
     #7cc8f5;
 }
 #loading { background: rgba(20, 28, 48, 0.6); }
