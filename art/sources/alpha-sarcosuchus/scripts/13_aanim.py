@@ -18,6 +18,16 @@ def a_idle(t):
     look=track(t,[(0,0),(.12,0),(.25,.09),(.43,.09),(.57,-.07),(.75,-.07),(.9,0),(1,0)])
     rot('Neck1',(Z,look*.4));rot('Neck2',(Z,look*.35));rot('Head',(Z,look*.25),(X,.007*br))
     rot('Jaw',(X,.015*max(0,math.sin(TAU*t))));a_tail(t,.025)
+def a_leg(k,phi,S,duty,h,out=.22,tilt=.1):
+    """Sprawled crocodile step: planted stance sliding back S, then a swing that arcs the foot OUT
+    to the side and forward (not straight under the body like a dog)."""
+    sx=1 if k.endswith('L') else -1
+    if phi<duty:
+        u=phi/duty;dy=-S/2+S*u;dz=0;dx=0;tl=tilt*ss((u-.75)/.25)
+    else:
+        s_=(phi-duty)/(1-duty);dy=S/2-S*ss(s_);dz=h*math.sin(math.pi*s_)**1.3
+        dx=sx*out*math.sin(math.pi*s_);tl=tilt*(1-ss(s_/.4))+1.5*tilt*math.sin(math.pi*s_)
+    loc('IK_'+k,(dx,dy,dz));rot('IK_'+k,(X,-tl))
 def a_spine_wave(t,hips,shoulders,neck,tail,lag=.55):
     """Crocodilian lateral undulation: hips and shoulders swing in opposition, the neck/head counter
     so the head stays steady, and an S-wave travels down the tail growing toward the tip."""
@@ -29,7 +39,7 @@ def a_spine_wave(t,hips,shoulders,neck,tail,lag=.55):
     chain('Tail',8,lambda i:((X,.006*math.sin(2*f-.5*i)),(Z,tail*(.55+.12*i)*math.sin(f-lag*(i+1)))))
 def a_walk(t):
     # Big, unhurried strides (lateral sequence) so the giant does not patter: stride 2.0 m / duty .7.
-    for k in A_LEGS:quad_leg(k,(t+LATERAL[k])%1,2.0,.7,.34,tilt=.1)
+    for k in A_LEGS:a_leg(k,(t+LATERAL[k])%1,1.5,.7,.34)
     loc('Body',(.04*math.sin(TAU*t),0,-.1+.035*math.cos(2*TAU*(t-.06))))
     a_spine_wave(t,.11,.14,.075,.085)        # agile: strong S-wave through body and tail
     rot('Head',(X,.015*math.cos(2*TAU*t)))
@@ -37,7 +47,7 @@ def a_run(t):
     # Charge: bounding gallop - hind pair drives, front pair lands; the body rocks nose-down/up,
     # the head stays up and forward, the tail swings less and lifts a little for balance.
     phases={'BackL':0,'BackR':.1,'FrontL':.5,'FrontR':.6}
-    for k in A_LEGS:quad_leg(k,(t+phases[k])%1,2.6,.38,.55,tilt=.12)
+    for k in A_LEGS:a_leg(k,(t+phases[k])%1,1.9,.38,.5,out=.3,tilt=.12)
     rock=1.35*math.sin(TAU*t+.5)
     loc('Body',(0,0,-.24+.12*math.cos(2*TAU*(t-.08))))
     rot('Body',(X,.07*rock),(Z,.03*math.sin(TAU*t)))
