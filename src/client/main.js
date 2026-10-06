@@ -1,6 +1,5 @@
 // Entry point: menu / lobby flow and game start.
 
-import { Game } from './core/game.js';
 import { Net } from './net/net.js';
 import { CONFIG } from '../shared/config.js';
 import { ICON_SPRITE, initSettings, renderPause } from './ui/menus.js';
@@ -56,6 +55,12 @@ function playMenuMusic() {
 document.addEventListener('pointerdown', playMenuMusic, { capture: true });
 document.addEventListener('keydown', playMenuMusic, { capture: true });
 const settingsUi = initSettings();
+
+// The game module graph (about 4/5 of the client code) is not needed to show the
+// menu: load it once the menu is up, so the first paint and clicks are not delayed.
+let gameModule = null;
+const loadGameModule = () => (gameModule ??= import('./core/game.js'));
+(window.requestIdleCallback ?? ((fn) => setTimeout(fn, 1500)))(() => { loadGameModule().catch(() => { gameModule = null; }); }, { timeout: 4000 });
 
 /** Show or hide the pause card; refresh its expedition/team info when shown. */
 function setPaused(show) {
@@ -122,6 +127,7 @@ async function launch(net, reuse = null) {
     });
     if (net.closed) throw new Error(disconnectReason);
     loadingText.textContent = 'Building the island…';
+    const { Game } = await loadGameModule();
     game = new Game(canvas, net, reuse ?? (menuAudio ? { audio: menuAudio } : null));
     if (DEBUG_QUERY.has('debug')) window.dinoGame = game;   // testing aid: inspect the running game
     loadingText.textContent = 'Preparing shaders…';

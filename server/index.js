@@ -12,6 +12,7 @@ import { startGameHost } from './gameHost.js';
 import { lanAddresses } from './lanAddress.js';
 import { InternetHost } from './internetHost.js';
 import { BRAND } from '../src/shared/brand.js';
+import { serveStatic } from './staticFiles.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -23,6 +24,7 @@ const MIME = {
   '.json': 'application/json; charset=utf-8',
   '.svg': 'image/svg+xml',
   '.png': 'image/png',
+  '.webp': 'image/webp',
   '.jpg': 'image/jpeg',
   '.woff2': 'font/woff2',
   '.txt': 'text/plain; charset=utf-8',
@@ -96,17 +98,11 @@ export function createGameServer() {
     res.writeHead(404).end('Not found');
     return;
   }
-  fs.stat(file, (err, st) => {
-    if (err || !st.isFile()) {
-      res.writeHead(404).end('Not found');
-      return;
-    }
-    res.writeHead(200, {
-      'Content-Type': MIME[path.extname(file).toLowerCase()] || 'application/octet-stream',
-      'Content-Length': st.size,
-      'Cache-Control': 'no-cache',
-    });
-    fs.createReadStream(file).pipe(res);
+  serveStatic(req, res, file, {
+    urlPath: req.url.split('?')[0],
+    type: MIME[path.extname(file).toLowerCase()] || 'application/octet-stream',
+    root: ROOT,
+    resolveUrl: resolvePath,
   });
   });
   host = startGameHost(httpServer, { onConnection: (ws, req) => internet?.trackHost(ws, req) });
