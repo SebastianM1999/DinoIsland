@@ -43,7 +43,7 @@ Grouped by the module area they mainly cover. Many simulation tests also check t
 - `creative.test.js` — creative mode: all skills, free crafting, full supplies, boat repair without parts.
 - `crafting.test.js` — workbench recipes, upgrades and their effects on the server.
 - `base.test.js` — base building stages, costs, colliders, camp stations, towers.
-- `raids.test.js` — raids on the team's base and base repair (`src/sim/raids.js`).
+- `raids.test.js` — raids on the team's base and base repair (`src/sim/raids.js`); four scoped random seeds include a narrow-channel navigation regression, with a focused continuous-path edge check.
 - `inventory-drop.test.js` — dropping, picking up and depositing inventory stacks without duplication.
 - `discovery-fruit.test.js` — fruit plant harvests/regrowth, shared dinosaur sightings, fruit plant visuals.
 - `outfits.test.js` — outfit sanitizing, server outfit changes, player model outfits.
