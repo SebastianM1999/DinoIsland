@@ -99,6 +99,9 @@ void main() {
   gl_FragColor = vec4(vec3(clamp(ao/4.0,0.0,1.0)),1.0);
 }`;
 
+/** The world draws into its own target (not the canvas) when scaled down or contact-shaded. */
+export const usesPost = (scale, ao) => scale < 0.999 || ao > 0;
+
 export class WorldPost {
   constructor(renderer) {
     this.renderer = renderer;
@@ -139,6 +142,23 @@ export class WorldPost {
       this.aoTarget.setSize(w,h);
       this.output.uniforms.aoSize.value.set(w,h);
     } else { this.aoTarget?.dispose(); this.aoTarget = null; }
+  }
+
+  /**
+   * Compile the full-screen programs ahead of the first frame. Each is built
+   * against the target it will draw into (a program is specific to it): the
+   * contact AO into its half-size target, the output pass into the canvas.
+   */
+  async compile(camera) {
+    const r = this.renderer;
+    const passes = [[this.ao, this.aoTarget], [this.output, null]].filter(([, target], i) => i === 1 || target);
+    for (const [material, target] of passes) {
+      const mesh = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), material);
+      try {
+        r.setRenderTarget(target);
+        await r.compileAsync(mesh, camera);
+      } finally { r.setRenderTarget(null); mesh.geometry.dispose(); }
+    }
   }
 
   render(scene, camera, sharpness, aoStrength) {

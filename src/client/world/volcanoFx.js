@@ -366,7 +366,8 @@ export function buildVolcanoFx(terrain, layout, camera, { onFog = null, onImpact
       // --- the eruption: lava thrown up out of the crater, the crater glows
       const erupting = phase === 'erupt';
       craterLight.intensity += ((erupting ? 900 : phase === 'rumble' ? 120 : 0) - craterLight.intensity) * Math.min(1, dt * 2);
-      craterLight.visible = craterLight.intensity > 1;
+      // never toggle `visible`: a light joining or leaving the scene changes the light count and
+      // recompiles every lit program (a multi-second freeze). A dark light costs next to nothing.
       for (let i = 0; i < nSpray; i++) {
         const s = spraySeed[i];
         s.age += dt;

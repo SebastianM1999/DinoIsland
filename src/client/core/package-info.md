@@ -3,8 +3,9 @@
 
 ## Files
 - `game.js` — `Game`: one instance per island; builds the world view, owns player, systems, HUD panels, audio and the `requestAnimationFrame` loop (see map below).
-- `renderer.js` — `Renderer`: Three.js WebGL renderer (ACES tone mapping, sRGB, shadows), sun + hemisphere lights, biome sky/fog blending, world pass (optionally scaled + contact AO via `WorldPost`) and a second viewmodel pass; shader precompile (`prepare`).
-- `worldPost.js` — `WorldPost`: offscreen world render target with upscaling/sharpening and depth-based contact AO.
+- `renderer.js` — `Renderer`: Three.js WebGL renderer (ACES tone mapping, sRGB, shadows), sun + hemisphere lights, biome sky/fog blending, world pass (optionally scaled + contact AO via `WorldPost`) and a second viewmodel pass; `prepare` (shader precompile against the real render target, then one hidden warm-up frame); live switches of render scale / contact shading / shadow tier compile their programs in the background first.
+- `worldPost.js` — `WorldPost`: offscreen world render target with upscaling/sharpening and depth-based contact AO (`compile` warms its two passes); `usesPost(scale, ao)`: whether the world draws into that target.
+- `programs.js` — `requestPrograms(renderer, scene, camera)`: asks for a scene's shader programs for the current target/shadow state and resolves once they are linked (parallel to drawing).
 - `graphicsTier.js` — `TIERS`, `GraphicsAutoTune`, `guessTier`, `decide`, `gpuName`: automatic graphics level per GPU, measured in-game and stored per GPU.
 - `gpuTimer.js` — `GpuTimer`: non-blocking GPU frame time via `EXT_disjoint_timer_query_webgl2`.
 - `settings.js` — `settings`, `SETTING_DEFS`, `setSetting`, `resetSettings`, `onSettings`, `audioGains`, `FPS_LIMITS`: player preferences in localStorage with change listeners.
@@ -31,6 +32,7 @@
 - `Game` never mutates authoritative state locally; it sends `net.act(ACT.*)` / `net.sendState` and applies what the server returns (only own movement is predicted).
 - Everything island-specific created by a `Game` must be released in `Game.dispose()`; the renderer, audio and input survive across islands.
 - Geometry/materials/textures owned by a reusable model cache must be marked with `retainResource`/`retainObjectResources`, otherwise `disposeIslandScenes` disposes them at the next island.
+- Frame hitches are almost always shader recompiles: a program is specific to the render target (canvas vs. `WorldPost` target), the shadow setting and the number of visible lights. Never toggle a light's `visible` (keep intensity 0 instead), compile anything that can change these in `Renderer` first (`prepare`, `#compilePath`, `#compileShadowVariant`), and give things that first appear in play a hidden copy that the warm-up frame draws (see `Items`). `prepare` draws hidden objects too (not lights).
 - Graphics tier is never chosen by the player; render scale and contact shading are the only graphics sliders (`SETTING_DEFS`).
 - localStorage access goes through `storageKey()` and is guarded with try/catch (`settings.js`, `profile.js`, `graphicsTier.js`).
 - The saved profile is untrusted: the server re-validates it (`sanitizeProfile`).
