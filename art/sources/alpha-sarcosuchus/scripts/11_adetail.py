@@ -210,3 +210,14 @@ for name in ['AlphaArmor','AlphaPebbles','AlphaHeadScales','AlphaLegScales']:
     for v in ob.data.vertices:
         rgb=col.data[v.index].color[:3];col.data[v.index].color=(*a_scar_tint(v.co,rgb),1)
 print('tris',sum(len(p.vertices)-2 for o in bpy.data.objects if o.type=='MESH' for p in o.data.polygons))
+# Build the lateral proportions INTO the model (x 10/9): the game fits length/height by 0.9 but keeps
+# the width. A non-uniform runtime scale sheared the sprawled legs (feet missed banks by ~5 cm), so the
+# runtime scale is uniform now and the extra width lives here, before rigging, skinning and IK.
+A_WIDEN=10/9
+_wm=mathutils.Matrix.Diagonal((A_WIDEN,1,1,1))
+for o in bpy.data.objects:
+    if o.type=='MESH' and o.name.startswith('Alpha'):o.data.transform(_wm);o.data.update()
+A_TRUNK=[(x,y,z,rx*A_WIDEN,rz) for x,y,z,rx,rz in A_TRUNK]
+A_TEETH=[(x*A_WIDEN,y,z,l,lo,i) for x,y,z,l,lo,i in A_TEETH]
+A_LEGJ={k:tuple((p[0]*A_WIDEN,p[1],p[2]) for p in j) for k,j in A_LEGJ.items()}
+bpy.data.texts['adata'].from_string('\n'.join(k+' = '+repr(globals()[k]) for k in ['A_TRUNK','A_MOUTH','A_CORNER','A_TEETH','A_LEGJ']))

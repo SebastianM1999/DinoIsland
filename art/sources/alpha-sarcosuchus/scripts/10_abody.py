@@ -25,16 +25,32 @@ for side in (-1,1):
 body=fuse_head('AlphaBody','AlphaHead','AlphaJaw',A_CORNER,A_MOUTH,lip_gap=.024,region=.12,seam_width=.22,fillet_iters=28)
 print('fused head',len(body.data.vertices))
 A_LEGJ={}
-for pre,y,ky,ay in [('Front',-1.85,-1.15,-2.05),('Back',1.65,.95,1.95)]:
+# Crocodilian SPRAWLED legs (not pillar "dog legs"): the joint sits low on the body side, the upper
+# arm/thigh angles out and down to an elbow/knee well outside the body, the lower leg drops nearly
+# vertically to a splayed, out-turned foot. Front elbow points back, hind knee forward.
+#                 shoulder/hip            elbow/knee              wrist/ankle           toe tip
+A_LEGDEF={'Front':((1.2,-1.85,1.72),(2.3,-1.6,1.12),(2.38,-1.95,.3),(2.62,-2.45,.2)),
+          'Back': ((1.2,1.65,1.68),(2.35,1.38,1.12),(2.42,1.9,.3),(2.7,1.38,.21))}
+for pre,(hip0,knee0,ank0,toe0) in A_LEGDEF.items():
     for side,sx in [('L',1),('R',-1)]:
-        x=1.5*sx; hip=(x,y,2.05); knee=(x,ky,1.23); ank=(x,ay,.32); toe=(x,ay-.55,.23)
+        m=lambda p:(p[0]*sx,p[1],p[2])
+        hip,knee,ank,toe=m(hip0),m(knee0),m(ank0),m(toe0)
         key=pre+side; A_LEGJ[key]=(hip,knee,ank,toe)
-        nodes=[(*hip,.48,.53),(x,y+(ky-y)*.4,1.75,.57,.58),(*knee,.43,.43),(x,ky+(ay-ky)*.55,.75,.28,.31),(*ank,.29,.24),(*toe,.38,.21)]
-        leg=tube_ref('AlphaLeg'+key,nodes,ring=12,k=3,sub=1); apply_mods(leg)
+        root=(hip[0]*.7,hip[1],hip[2]+.15)                      # starts deep inside the trunk
+        mid1=tuple(h+(k-h)*.5 for h,k in zip(hip,knee)); mid2=tuple(k+(a_-k)*.5 for k,a_ in zip(knee,ank))
+        nodes=[(*root,.5,.55),(*hip,.55,.58),(*mid1,.5,.5),(*knee,.42,.42),(*mid2,.31,.31),(*ank,.29,.26),(ank[0]+sx*.08,ank[1]-.2,.2,.36,.2)]
+        leg=tube_ref('AlphaLeg'+key,nodes,ring=12,k=3,sub=1,ref=(0,1,0)); apply_mods(leg)
+        for v in leg.data.vertices:                              # flat sole on the ground plane
+            if v.co.z<.05:v.co.z=.05+(v.co.z-.05)*.12
+        leg.data.update()
         union_fillet('AlphaBody',leg.name,width=.2,iters=24,head_back_y=-2.7)
+        # four toes fanned forward and outward from the out-turned foot
+        fx,fy=toe[0]-ank[0],toe[1]-ank[1]; fl=math.hypot(fx,fy); fx,fy=fx/fl,fy/fl; rx,ry=-fy*sx,fx*sx
         for j in range(4):
-            tx=x+(j-1.5)*.24; ty=ay-.55-.13*(1-abs(j-1.5)/2)
-            toeob=tube_ref('AlphaToe',[(tx,ay-.23,.26,.14,.16),(tx,ty,.2,.13,.15),(tx+sx*.055,ty-.23,.19,.09,.12)],ring=8,k=2,sub=1)
+            o=(j-1.5)*.24; bx,by=ank[0]+fx*.25+rx*o*.4,ank[1]+fy*.25+ry*o*.4
+            ang=(j-1.5)*.22; cx,cy=fx*math.cos(ang)-fy*math.sin(ang),fx*math.sin(ang)+fy*math.cos(ang)
+            L=.62-.08*abs(j-1.5)
+            toeob=tube_ref('AlphaToe',[(bx,by,.28,.14,.16),(bx+cx*L*.55,by+cy*L*.55,.235,.13,.15),(bx+cx*L,by+cy*L,.215,.09,.12)],ring=8,k=2,sub=1)
             apply_mods(toeob); union_fillet('AlphaBody',toeob.name,width=.08,iters=10,head_back_y=-2.7)
 print('body',len(body.data.vertices))
 # Boolean operands can inherit head-region membership onto front toes ahead of the shoulder.

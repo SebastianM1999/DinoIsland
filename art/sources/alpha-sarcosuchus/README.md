@@ -23,6 +23,9 @@ Blender 5.2.1 LTS was used through Blender MCP. Do not reset factory settings wi
 addon running. Rebuild verified from an empty scene.
 
 - `abody`: continuous trunk, long wedge snout, mouth trough, fused jaw and limbs.
+  Legs are SPRAWLED like a crocodile's high walk (not pillar "dog legs"): the joint sits low
+  on the body side, upper arm/thigh angle out and down to an elbow/knee ~2.4 m out, the
+  lower leg drops to a splayed, out-turned four-toed foot with a flat sole.
 - `adetail`: beveled plate scales, cranial and limb scutes, vertex-painted fine scale
   fields, olive-green pigments with crossbands, bright red wounds, interlocking worn teeth,
   claws and one red / one yellow glowing slit eye.
@@ -31,7 +34,10 @@ addon running. Rebuild verified from an empty scene.
   The refined skin combines irregular scale cells, dark seams, mottled olive
   centers, ventral shield bands, joint folds and weathered, ribbed plate crowns.
   Raptor hide variation and stego plate painting informed the contrast and density.
-- `arig`: Body/Shoulders, Neck1/2, Head, flipped Jaw, Tail1..8 and four IK legs.
+- `arig`: Body/Shoulders, Neck1/2, Head, flipped Jaw, Tail1..8 and four IK legs with
+  outward poles (knees/elbows bend out to the side; pole angle searched for zero rest error).
+  `adetail` ends by widening every mesh x10/9 so the game fit is a UNIFORM scale: a
+  non-uniform runtime width sheared the sprawled legs (feet missed banks by ~5 cm).
   Plates over the limbs are separated from the body armor into the leg scale mesh.
   Plate weights are interpolated from the underlying skin, including shoulder/hip
   transitions, so scales follow the leg surface during walk and run.
@@ -49,18 +55,18 @@ addon running. Rebuild verified from an empty scene.
 
 ## Measurements and validation
 
-- 58,575 triangles, below the 60,000 limit; no image textures.
-- Game fit: 16.2 m long, 3.4308 m high, about 4.428 m wide.
-- Walk: lateral sequence, 2.0 m sweep / duty .7, strong crocodilian S-wave (hips and
+- 58,752 triangles, below the 60,000 limit; no image textures.
+- Game fit (uniform): 16.2 m long, 3.4455 m high, 6.33 m wide incl. sprawled feet.
+- Walk: lateral sequence, 1.5 m sweep / duty .7, swing arcs the foot out to the side, strong crocodilian S-wave (hips and
   shoulders in opposition, head stabilised, tail wave growing to the tip). Run (charge):
-  bounding gallop, 2.6 m sweep / duty .38, body rocking, tail lifted.
-- Fitted strides measured by `90_validate.mjs`: walk 2.719 m, run 6.51 m. Maximum
-  cadence 2.4 Hz (the 15 m/s lunge needs 2.3).
+  bounding gallop, 1.9 m sweep / duty .38, body rocking, tail lifted.
+- Fitted strides measured by `90_validate.mjs`: walk 2.039 m, run 4.755 m. Maximum
+  cadence 2.4 Hz (charge 8.5 m/s = 1.8 Hz; the 15 m/s lunge plays the attack clip).
 - IK rest knee error: 0; normalized deform weights, no unweighted vertices.
 - 3,588 exported vertices carry majority Jaw weight.
-- Knee changes at maximum cadence: walk 0.377 / run 0.332 rad per 1/60 s.
+- Knee changes at maximum cadence: walk 0.232 / run 0.199 rad per 1/60 s.
 - Player collision footprint (`CONFIG.dinos['alpha-sarcosuchus'].body`) measured on the
-  fitted model: legs reach 2.2 m out, snout +7.6 m, tail tip -9.4 m. Creative-mode
+  fitted model: sprawled legs reach ~2.9 m out, snout +7.6 m, tail tip -9.4 m. Creative-mode
   players are never blocked by any dino (intentional in `world.js` / `game.js`).
 - Rest-pose client hit-sphere coverage: 99.6% at 0.12 m margin.
 - 94 leg-area plates transferred out of body armor; walk/run limb close-ups are

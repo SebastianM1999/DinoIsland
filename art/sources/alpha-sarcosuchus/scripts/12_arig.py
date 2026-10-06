@@ -13,9 +13,22 @@ def a_tz(y):
         if a[1]<=y<=b[1]:return a[2]+(b[2]-a[2])*(y-a[1])/(b[1]-a[1])
     return .8
 for i in range(8):bone(eb,'Tail%d'%(i+1),(0,A_TAILY[i],a_tz(A_TAILY[i])),(0,A_TAILY[i+1],a_tz(A_TAILY[i+1])),'Body' if i==0 else 'Tail%d'%i,i>0)
-for key,j in A_LEGJ.items():quad_leg_ik(eb,key,*j,'Body' if key.startswith('Back') else 'Shoulders',-1 if key.startswith('Back') else 1)
+for key,j in A_LEGJ.items():
+    quad_leg_ik(eb,key,*j,'Body' if key.startswith('Back') else 'Shoulders',-1 if key.startswith('Back') else 1)
+    # sprawled legs: the knee/elbow points OUT to the side, so the pole sits outside it
+    k=V(j[1]);sx=1 if k.x>0 else -1;pole=eb['Pole_'+key]
+    pole.head=(k.x+sx*3,k.y,k.z+.4);pole.tail=(k.x+sx*3,k.y,k.z+.9)
 bpy.ops.object.mode_set(mode='POSE');init('AlphaRig')
-for key in A_LEGJ:quad_constraints(key,-math.pi/2 if key.startswith('Back') else math.pi/2)
+for key in A_LEGJ:quad_constraints(key,0)
+bpy.context.view_layer.update()
+def _a_rest_err(key):
+    bpy.context.view_layer.update();return (pb[key[:-1]+'LowLeg'+key[-1]].head-V(A_LEGJ[key][1])).length
+for key in A_LEGJ:                      # pole angle that leaves the modelled rest pose untouched
+    c=pb[key[:-1]+'LowLeg'+key[-1]].constraints['IK'];best=None
+    for i in range(720):
+        c.pole_angle=-math.pi+i*math.pi/360;e=_a_rest_err(key)
+        if best is None or e<best[0]:best=(e,c.pole_angle)
+    c.pole_angle=best[1]
 finish_rig();bpy.context.view_layer.update()
 print('IK rest errors',{k:round((pb[k[:-1]+'LowLeg'+k[-1]].head-V(j[1])).length,5) for k,j in A_LEGJ.items()})
 body=bpy.data.objects['AlphaBody']; A_TAIL=['Tail%d'%i for i in range(1,9)]
