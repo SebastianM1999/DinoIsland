@@ -48,6 +48,16 @@
   billow, thickness ~3 cm at the arm -> ~6 mm at the edge, store `mu`/`mv` per vertex for paint).
   Skin the slab by distance to the wing bones + Body with a WIDE sigma (~0.18 m) so it stretches.
 
+- **Sprawled legs (crocodilians, lizards):** never in a vertical plane under the body. Joint
+  low on the body side (~0.7 of the half-width), upper limb out and down to the elbow/knee about
+  1.4x the half-width out, lower limb near-vertical, foot turned out with fanned toes, flat sole.
+  Build the limb tube with `tube_ref(..., ref=(0,1,0))` (the default X frame degenerates on a
+  sideways bone). IK poles go OUTSIDE the knee (`knee + side*3 m` in X), and search the pole angle
+  (720 steps) for zero rest error instead of assuming ±pi/2.
+- **Keep the runtime fit uniform.** A catalog `width` (non-uniform X scale) shears every bone that
+  points sideways: sprawled feet missed banks by ~5 cm in `conformFeet`. Build extra width into
+  the meshes (scale X after painting, before rigging, and update the shared joint data) instead.
+
 ## 3. Head
 
 - Build the skull with `loft2()` from ~10 cross-sections, each a 9-point half profile:

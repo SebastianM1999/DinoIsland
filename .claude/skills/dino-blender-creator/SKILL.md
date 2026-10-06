@@ -127,6 +127,7 @@ scripts as text blocks and a `scripts/` mirror.
 | over 60k after adding eyes/tongue (brachio) | default eye/tongue resolution | `E['ball']`, `E['rimseg']`, `add_tongue(seg=...)` |
 | lifeless eyes (ball, button pupil, cap lid) | no highlight, no lid wrap, flat iris | `eyes.py`; slim + `tilt > 0` for an angry look |
 | fused body came back as a scrap of the head (whole trunk gone) | exact boolean without self-intersection handling (spino jaw union); a joined limb set that intersects itself (toes in the leg, fingers in the arm) | `fuse.py` sets `use_self`; union each limb part separately (`art/sources/spinosaurus` `spfuse`); check vertex count after every union |
+| croc with "dog legs", stiff walk, pattering charge | pillar legs in a vertical plane, tiny spine/tail sway, short sweeps at high cadence | sprawled legs + outward poles, `a_spine_wave`, big sweeps (animation.md: sprawled quadruped) |
 | shots pass through snout, lower legs, plates, beak, wings | generic GLB joint spheres cover ~65-75 % | `hit_coverage.mjs`, add `extraHitZones` until ≥ 95 % |
 
 ## Done checklist
