@@ -3,7 +3,7 @@
 
 ## Files
 - `torches.js` — `Torches`: world light of torches. Owns a pool of 4 point lights (slot 0 local flame, 1-3 remote players with `PF.TORCH`), created via `gfx.addLightPool` only on islands with `layout.torchSpots` or with `?torch` in the URL; intensity-only, layered-noise flicker. `items.js` shows the ground torch (burning, warm-up copy included); `remotePlayers.js` passes `torch` to `PlayerModel.animate`.
-- `dinoViews.js` — `SPECIES` table and `DinoView`/`DinoViews`: interpolated, animated dinosaurs with hit spheres, health bars, spotting, raycast and minimap markers.
+- `dinoViews.js` — `SPECIES` table and `DinoView`/`DinoViews`: interpolated, animated dinosaurs (culled by hand: the skinned meshes opt out of Three's frustum culling, so a view that is off screen and further than `SHADOW_REACH` or past the fog is hidden) with hit spheres, health bars, spotting, raycast and minimap markers.
 - `sarcoEffects.js` — server-triggered water ambush warning eye glints, silt burst and swimming wakes (the Sump Lurker uses it without glints and with weaker wakes).
 - `gunEffects.js` — `GunEffects`: short-lived bullet tracer lines plus the shot sound, from `EV.SHOT` events.
 - `items.js` — `Items`: loot, dropped/lodged arrows and spears, firearms, fruit and traps on the ground (`EV.ITEM_*`, `EV.TRAP_*`); keeps one hidden copy of every loot model so the renderer's warm-up frame compiles and uploads them before the first drop.
