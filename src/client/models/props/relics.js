@@ -46,7 +46,7 @@ function build(kind) {
 }
 
 /** Per-kind size tweak so every relic is ~0.8–1.1 m. */
-const SCALE = { crystal: 0.8, rudder: 0.8 };
+const SCALE = { crystal: 0.8, rudder: 0.8, bell: 1.1, compass: 1.5 };
 
 // --------------------------------------------------------------- builders
 const BUILDERS = {
@@ -177,6 +177,34 @@ const BUILDERS = {
     }
     rope.push(tube(coil, () => 0.02, { radial: 6, color: ropeCol }));
     add('wood', merge(rope));
+  },
+
+  /** Ship's bell: a brass bell with a ring on top and an iron clapper (cave level). */
+  bell(add) {
+    const prof = [[0.01, 0.02], [0.3, 0.0], [0.33, 0.03], [0.27, 0.12], [0.2, 0.3], [0.15, 0.46], [0.1, 0.58], [0.04, 0.63], [0.01, 0.64]].map(([r, y]) => new THREE.Vector2(r, y));
+    const body = new THREE.LatheGeometry(prof, 36);
+    const tmp = new THREE.Color();
+    const brass = paint(body, (c) => lerpC('#b88a2a', '#f0cf6a', smoothstep(0.0, 0.64, c.y) * 0.6 + (noise3(c.x * 9, c.y * 9, c.z * 9, 4) > 0.5 ? 0.2 : 0), tmp));
+    const parts = [brass];
+    parts.push(part(new THREE.TorusGeometry(0.06, 0.018, 10, 24), '#d9b24a', [0, 0.69, 0], [Math.PI / 2, 0, 0]));
+    parts.push(part(new THREE.TorusGeometry(0.31, 0.022, 10, 36), '#c99a36', [0, 0.04, 0], [Math.PI / 2, 0, 0]));
+    add('brass', merge(parts));
+    add('iron', merge([place(blob(0.05, 0.05, 0.05, '#4f5764', { w: 10, h: 8 }), [0, 0.07, 0])]));
+  },
+
+  /** Brass compass: a round case with a glass top, a rose and a needle. */
+  compass(add) {
+    const parts = [];
+    parts.push(part(new THREE.CylinderGeometry(0.34, 0.36, 0.1, 36), '#b58a34', [0, 0.05, 0]));
+    parts.push(part(new THREE.TorusGeometry(0.33, 0.03, 10, 36), '#d8b45c', [0, 0.1, 0], [Math.PI / 2, 0, 0]));
+    parts.push(part(new THREE.CylinderGeometry(0.29, 0.29, 0.02, 36), '#efe3c4', [0, 0.105, 0]));
+    parts.push(part(new THREE.TorusGeometry(0.07, 0.016, 8, 20), '#d8b45c', [0, 0.13, -0.4], [0, 0, 0]));
+    for (let k = 0; k < 4; k++) {
+      const a = (k / 4) * TAU;
+      parts.push(part(new THREE.ConeGeometry(0.028, 0.2, 8), k === 0 ? '#c43b2f' : '#5a4a32', [Math.cos(a) * 0.1, 0.13, Math.sin(a) * 0.1], [Math.PI / 2, 0, -a + Math.PI / 2]));
+    }
+    parts.push(part(new THREE.SphereGeometry(0.03, 10, 8), '#d8b45c', [0, 0.14, 0]));
+    add('brass', merge(parts));
   },
 
   /** Folded, patched sail bundle tied with rope. */

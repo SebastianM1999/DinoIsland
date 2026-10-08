@@ -6,7 +6,7 @@ import { planIsland } from '../src/shared/island.js';
 import { levelDef } from '../src/shared/levels.js';
 
 test('every island has a hut beach, a boat beach and three reachable relic spots', () => {
-  for (const level of [0, 1, 2]) {
+  for (const level of [0, 1, 2, 3]) {
     for (const variant of [1, 2, 3]) {
       const world = new ServerWorld({ send() {} }, { level, variant });
       const { layout, terrain } = world;
@@ -18,15 +18,17 @@ test('every island has a hut beach, a boat beach and three reachable relic spots
       }
     }
   }
-  // the starter island is small, the swamp and volcano islands bigger and each harder; there are three
+  // the starter island is small, the swamp and volcano islands bigger and each harder; the Hollow Mountain ends the game; there are four
   assert.ok(planIsland(0, 1).A < planIsland(1, 1).A * 0.7);
   // (the volcano island is round: compare the outline's area)
   const area = (p) => p.A * p.B;
   assert.ok(area(planIsland(0, 1)) < area(planIsland(2, 1)) * 0.5);
   assert.ok(levelDef(1).difficulty > levelDef(0).difficulty);
   assert.ok(levelDef(2).difficulty > levelDef(1).difficulty);
-  assert.deepEqual([0, 1, 2].map((i) => levelDef(i).biome.id), ['jungle', 'swamp', 'volcano']);
-  assert.equal(levelDef(5).index, 2);
+  assert.ok(levelDef(3).difficulty > levelDef(2).difficulty);
+  assert.deepEqual([0, 1, 2, 3].map((i) => levelDef(i).biome.id), ['jungle', 'swamp', 'volcano', 'cave']);
+  assert.deepEqual([0, 1, 2, 3].map((i) => levelDef(i).last), [false, false, false, true]);
+  assert.equal(levelDef(5).index, 3);
 });
 
 test('find the parts, repair the boat and sail to the next island together', () => {
@@ -85,7 +87,7 @@ test('lava burns players', () => {
 });
 
 test('sailing away from the last island wins and starts a fresh first island', () => {
-  const world = new ServerWorld({ send() {} }, { level: 2, variant: 4 });
+  const world = new ServerWorld({ send() {} }, { level: 3, variant: 4 });
   const a = world.join('Cy');
   world.players.get(a.id).creative = true;
   world.mission.phase = 'sailing';

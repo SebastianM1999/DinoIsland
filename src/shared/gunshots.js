@@ -14,6 +14,10 @@ export function shotEnd(world, origin, dir, range) {
     if (origin[1] + dir[1] * t <= world.layout.groundAt(origin[0] + dir[0] * t, origin[2] + dir[2] * t)) {
       distance = t; break;
     }
+    // the roof of the Hollow Mountain stops a shot too
+    if (origin[1] + dir[1] * t >= (world.terrain?.ceilingAt?.(origin[0] + dir[0] * t, origin[2] + dir[2] * t) ?? Infinity)) {
+      distance = t; break;
+    }
   }
   return origin.map((n, i) => n + dir[i] * distance);
 }

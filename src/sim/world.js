@@ -762,7 +762,9 @@ export class ServerWorld {
     }
     const previous = { x: p.x, y: p.y, z: p.z };
     const x = num(m.x, p.x), z = num(m.z, p.z);
-    const y = num(m.y, p.y);
+    let y = num(m.y, p.y);
+    // the roof of the Hollow Mountain caps the height (Infinity elsewhere)
+    y = Math.min(y, this.terrain.ceilingAt(x, z) - P.height - 0.05);
     // A small distance reserve accommodates packet bunching without allowing
     // repeated state packets to move faster than the player's sprint.
     const creative = p.creative;

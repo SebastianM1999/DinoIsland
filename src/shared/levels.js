@@ -148,6 +148,55 @@ export const BIOMES = {
     dinos: { brachio: 1, stego: 1, raptor: 3, ptera: 3, trex: 0 },
     music: 'calm',
   },
+
+  // The Hollow Mountain: a round mountain between two coves. The team lands in
+  // the west cove, crosses the mountain through a branching tunnel maze (dark,
+  // wet stone, crystal halls, flooded tunnels, shared/caveMaze.js) and leaves
+  // it by the one exit tunnel onto the east beach. The world is still a
+  // heightfield: tunnels are low floor, rock is high wall, the roof is
+  // Terrain.ceilingAt. Cave species come later (layout.caveDinoSpots).
+  cave: {
+    id: 'cave',
+    name: 'Hollow Mountain',
+    sites: ['cave', 'lake', 'abyss'],
+    river: 'water',
+    shape: 'cave',
+    vegetation: {
+      treeDensity: 0,
+      maxTrees: 0,
+      trees: {},
+      beachTrees: [],
+      bushes: {},
+      maxBushes: 0,
+      grass: 0,
+      flowers: 0,
+    },
+    // wet dark stone with cool tints, little moss (stone kinds as in the jungle)
+    rocks: { colors: ['#5d6068', '#4b4e5a', '#6a6a70'], moss: '#3f6a52', mossChance: 0.45, count: 0.7,
+      kinds: [[0.98, 0.98, 1.0], [1.1, 1.0, 0.9], [0.66, 0.68, 0.78], [1.05, 1.08, 1.14]] },
+    terrain: {
+      sandDry: '#8a8678', sand: '#767366', sandWet: '#4f4f4a',
+      seabed: '#4f5558', seabedDeep: '#2c3640',
+      grass: '#3d5a4a', grassLight: '#4c6c58', grassDark: '#2f4a3c',
+      floor: '#3a4048', high: '#565a66',
+      rock: '#555864', rockDark: '#383b48', rockWarm: '#6a5d66',
+      dirt: '#5b5148', dirtDark: '#3e3732',
+      riverbed: '#2c3238',
+      // flowstone (pale, banded), moss on wet ledges, cave mud
+      flowstone: '#a79fa6', moss: '#3f6a52', mud: '#4a4038',
+    },
+    // very dark, cold teal and violet: lamps and crystals do the lighting
+    sky: {
+      background: '#0a1016', fog: '#0c1820', fogNear: 15, fogFar: 70,
+      top: '#101826', horizon: '#1c3038', cloud: '#2a3a46',
+      sun: '#9fb8d0', sunIntensity: 0.25, hemiSky: '#4a6a8a', hemiGround: '#2a2438', hemiIntensity: 0.55,
+      exposure: 1.2,
+    },
+    water: { shallow: '#2f7f86', mid: '#16525e', deep: '#0b2a3a', foam: '#9fc4c8', sky: '#1c3038' },
+    // flyers and giants never fit under the roof; only the pack hunters live here for now
+    dinos: { brachio: 0, stego: 0, raptor: 4, ptera: 0, trex: 0 },
+    music: 'volcano',   // (cave music comes with the client)
+  },
 };
 
 /** The islands, in order. Sailing away from the last one wins the game. */
@@ -162,6 +211,8 @@ export const LEVELS = [
   // round, about 1.3 times the swamp's land area; the crater arena on top waits
   // for its boss (shared/volcanoArena.js)
   { name: 'Ashfall Isle', biome: 'volcano', scale: 0.65, seedIndex: 1 },
+  // the last level: through the mountain from the west cove to the east beach (shared/caveMaze.js)
+  { name: 'Hollow Mountain', biome: 'cave', scale: 1, seedIndex: 3 },
 ];
 
 export const LEVEL_COUNT = LEVELS.length;
