@@ -1,0 +1,55 @@
+
+V = mathutils.Vector
+for n in ('GloomHead','GloomJaw','GloomNostrils','GloomTongue'): remove(n)
+head = loft2('GloomHead', HEAD_N)   # snout narrowing lives in glib (_narrow)
+bpy.context.view_layer.objects.active = head
+for o in bpy.context.selected_objects: o.select_set(False)
+head.select_set(True); bpy.ops.object.modifier_apply(modifier='Sub')
+def seg_dist(p, a, b):
+    ab = b - a; u = max(0, min(1, (p - a).dot(ab) / ab.length_squared)); return (p - (a + ab*u)).length, u
+for v in head.data.vertices:
+    p = v.co.copy(); n = v.normal.copy(); sx = 1 if p.x >= 0 else -1
+    d, u = seg_dist(p, V((sx*.165, -0.70, 1.585)), V((sx*.115, -0.93, 1.54)))
+    p += (n*0.75 + V((sx*0.25, 0, 0.35))) * .042 * math.exp(-(d/.032)**2) * (0.6 + 0.4*math.sin(u*math.pi))
+    p -= n * .018 * math.exp(-((p - V((sx*.15, -0.80, 1.505))).length/.045)**2)
+    p += n * .024 * math.exp(-((p - V((sx*.17, -0.66, 1.42))).length/.07)**2)
+    for yy in (SY(-0.98), SY(-1.06), SY(-1.13)):
+        p += n * .01 * math.exp(-((p - V((sx*.045, yy, 1.53 + (yy+1)*0.35))).length/.022)**2)
+    # enlarged nostrils: a deep dent ringed by a fleshy rim, high on the snout
+    nc = V((sx*.04, SY(-1.19), 1.452))
+    p -= n * .03 * math.exp(-((p - nc).length/.026)**2)
+    p += n * .012 * math.exp(-(((p - nc).length - .036)/.014)**2)
+    # snarl: upper lip lifts over the fangs
+    for yy in (SY(-1.11), SY(-0.975)):
+        p += V((0, 0, .012)) * math.exp(-((p.y - yy)/.035)**2) * smooth(1.39, 1.35, p.z)
+    v.co = p
+head.data.update()
+HJ = JAW_N
+# lower jaw (mouth.py): flat sides to a jawline keel, thin inward-rolled lip the lower teeth root in,
+# mouth trough + tongue (the cavity you see when it snaps)
+exec(bpy.data.texts['mouth'].as_string(), globals())
+jaw = loft2('GloomJaw', [(y, jaw_prof(w, bot, 1.348, 0.02 * trough_fade(y, SY(-1.228), -0.6))) for y, w, bot in HJ])
+add_tongue('GloomTongue', (0, -0.93, 1.348 - .016), (.045, .15, .009), seg=(16, 10))
+def head_fn(p, n):
+    sx = 1 if p.x >= 0 else -1
+    c = skin(p, n, stripes=False)
+    c = mix(c, mix(P['back'], P['back2'], .5 + fbm(p, 5)), smooth(0.25, 0.7, n.z + 0.15*fbm(p, 6)) * smooth(1.42, 1.5, p.z))
+    w = math.sin(p.y * 26 + 1.5*fbm(p, 3))
+    c = mix(c, P['stripe'], smooth(0.45, 0.75, w) * smooth(-0.1, 0.45, n.z) * smooth(-0.95, -0.85, -p.y) * 0.9)
+    d = (p - V((sx*.15, -0.80, 1.51))).length
+    c = mix(c, P['mask'], smooth(.1, .04, d + .02*fbm(p, 12)) * .6)   # blind: only a faint sunken patch round the tiny eyes
+    c = mix(c, P['mask'], smooth(0.5, 0.9, n.z) * smooth(.03, .0, abs(abs(p.x) - .12)) * smooth(-0.7, -0.75, p.y) * smooth(-0.95, -0.9, p.y))
+    c = mix(c, P['lip'], smooth(0.055, 0.025, p.z - 1.345) * smooth(-0.2, 0.2, 0.3 - n.z) * 0.6)
+    c = mix(c, P['red'], smooth(0.028, 0.008, p.z - 1.348) * smooth(-0.1, 0.3, 0.3 - n.z) * smooth(-0.8, -0.86, p.y) * 0.9)
+    c = mix(c, P['gum'], smooth(-0.3, -0.7, n.z) * smooth(1.38, 1.355, p.z))
+    nd = (p - V((sx*.04, SY(-1.19), 1.452))); nd = V((nd.x*1.3, nd.y*.7, nd.z*1.3)).length
+    c = mix(c, P['nostril'], smooth(.036, .02, nd))
+    return c
+def jaw_fn(p, n):
+    c = skin(p, n, stripes=False)
+    c = mix(c, P['belly'], smooth(-0.1, -0.6, n.z))
+    c = mix(c, P['lip'], smooth(1.30, 1.335, p.z) * 0.7)
+    return mix(c, mix(P['tongue'], P['gum'], 0.5 + fbm(p, 6)), smooth(0.2, 0.6, n.z) * smooth(1.322, 1.33, p.z) * smooth(1.35, 1.344, p.z))  # trough
+paint(head, head_fn); paint(jaw, jaw_fn)
+paint(bpy.data.objects['GloomTongue'], lambda p, n: mix(P['tongue'], P['gum'], smooth(0.6, -0.2, n.z)))
+for o in (head, jaw, bpy.data.objects['GloomTongue']): o.data.materials.append(bpy.data.materials['GloomSkin'])
