@@ -155,7 +155,11 @@ void plunge(inout vec2 grad, inout float foam, vec2 p, float t) {
   }
 }`;
 
+/** Lamps the water reflects inside the Hollow Mountain (torches + crystal pool). */
+export const CAVE_LAMPS = 12;
+
 const WATER_FRAG = /* glsl */`
+#define CAVE_LAMPS ${CAVE_LAMPS}
 uniform float uTime;
 uniform float uMode;        // 0 = sheet (sea / pool), 1 = river ribbon
 uniform float uWaveAmp;
@@ -173,6 +177,9 @@ uniform vec3 uSky;
 uniform vec3 uSkyTop;
 uniform vec3 uSunDir;
 uniform vec3 uSunColor;
+uniform float uCave;        // Hollow Mountain: 0 daylight .. 1 inside (lit by the lamps only)
+uniform vec4 uLamps[CAVE_LAMPS];     // xyz position, w intensity (torches, crystal lights)
+uniform vec3 uLampCol[CAVE_LAMPS];
 varying vec3 vWorld;
 varying float vSurfY;
 varying vec2 vUv;
@@ -247,16 +254,33 @@ void main() {
   // lighting: soft diffuse + fresnel reflection of the sky (zenith to horizon)
   // + sun glint
   float diff = 0.8 + 0.2 * max(dot(N, uSunDir), 0.0);
-  col *= diff;
+  col *= mix(diff, 0.16, uCave);
   float ndv = max(dot(N, V), 0.0);
   float fres = 0.02 + 0.98 * pow(1.0 - ndv, 5.0);
   vec3 R = reflect(-V, N);
   vec3 skyCol = mix(uSky, uSkyTop, smoothstep(0.05, 0.7, R.y));
+  skyCol *= 1.0 - 0.93 * uCave;      // under the roof it reflects the dark stone, not the sky
+  vec3 lampSpec = vec3(0.0);
+  if (uCave > 0.01) {
+    // torch and crystal light on the water: a soft pool of colour and sharp glints
+    for (int i = 0; i < CAVE_LAMPS; i++) {
+      vec3 L = uLamps[i].xyz - vWorld;
+      float d2 = dot(L, L) + 1.0;
+      float at = uLamps[i].w * 0.045 / d2;
+      if (at < 0.002) continue;
+      float soft = uLamps[i].w * 0.011 / d2;
+      vec3 Ln = normalize(L);
+      col += uCave * uLampCol[i] * min(soft, 0.35) * (0.5 + 0.5 * max(dot(N, Ln), 0.0)) * (0.55 + 0.45 * smoothstep(0.0, 2.0, depth));
+      vec3 Hl = normalize(Ln + V);
+      lampSpec += uLampCol[i] * min(at, 0.5) * pow(max(dot(N, Hl), 0.0), 90.0) * 5.0;
+    }
+  }
   // (less in the shallows, where you mostly look through to the sand)
   col = mix(col, skyCol, clamp(fres * 0.85 + 0.06, 0.0, 0.62) * mix(0.45, 1.0, smoothstep(0.2, 1.5, depth)));
   vec3 H = normalize(uSunDir + V);
   float spec = pow(max(dot(N, H), 0.0), 180.0) * 1.8;
-  col += uSunColor * spec * uGloss;
+  col += uSunColor * spec * uGloss * (1.0 - uCave);
+  col += lampSpec * uCave;
 
   // sparkles on open water (more where a gust ruffles it)
   float sp = vnoise(vWorld.xz * 0.9 + vec2(uTime * 0.6, -uTime * 0.4));
@@ -499,7 +523,8 @@ export function buildWater(terrain, layout = {}, sunDir = new THREE.Vector3(-0.4
   const heightTex = heightTexture(terrain);
   const biome = layout?.biome || {};
   const pal = { ...DEFAULT_WATER, ...(biome.water || {}) };
-  const sunHex = biome.sky?.sun || DEFAULT_SUN;
+  const outsideSky = biome.skyOutside || biome.sky;   // (the Hollow Mountain's sea lies in the daylit coves)
+  const sunHex = outsideSky?.sun || DEFAULT_SUN;
   const seaLevel = CONFIG.world?.seaLevel ?? 0;
 
   // Uniform objects shared by every water/lava material (one update per frame).
@@ -513,6 +538,9 @@ export function buildWater(terrain, layout = {}, sunDir = new THREE.Vector3(-0.4
     uSunDir: { value: sunDir.clone().normalize() },
     uRipples: { value: Array.from({ length: MAX_RIPPLES }, () => new THREE.Vector4(0, 0, -99, 0)) },
     uImpact: { value: new THREE.Vector4(0, 0, 0, 0) },
+    uCave: { value: 0 },
+    uLamps: { value: Array.from({ length: CAVE_LAMPS }, () => new THREE.Vector4(0, -1000, 0, 0)) },
+    uLampCol: { value: Array.from({ length: CAVE_LAMPS }, () => new THREE.Vector3(1, 1, 1)) },
   };
   let nextRipple = 0;
   const waterColors = {
@@ -522,7 +550,7 @@ export function buildWater(terrain, layout = {}, sunDir = new THREE.Vector3(-0.4
     uFoam: { value: color(pal.foam, DEFAULT_WATER.foam) },
     uSky: { value: color(pal.sky, DEFAULT_WATER.sky) },
     // reflections looking up: the biome's zenith, a little lighter
-    uSkyTop: { value: color(biome.sky?.top, '#4fb0f0').lerp(color(pal.sky, DEFAULT_WATER.sky), 0.35) },
+    uSkyTop: { value: color(outsideSky?.top, '#4fb0f0').lerp(color(pal.sky, DEFAULT_WATER.sky), 0.35) },
     uSunColor: { value: color(sunHex, DEFAULT_SUN) },
   };
   const lavaColors = {
@@ -781,6 +809,11 @@ export function buildWater(terrain, layout = {}, sunDir = new THREE.Vector3(-0.4
   return {
     group,
     heightTex,
+    /** Hollow Mountain: how dark the air is (0..1) and the lamps lighting the water (see world/caveFx.js). */
+    setCave(k, lamps = null) {
+      shared.uCave.value = k;
+      if (lamps) lamps(shared.uLamps.value, shared.uLampCol.value);
+    },
     /**
      * A ring ripple spreading from (x, z) on whatever water is there (footsteps,
      * wading, things falling in). strength ~0.3 (step) .. 1.5 (big splash).

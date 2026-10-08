@@ -22,6 +22,12 @@ export const SURFACE = {
 };
 
 /** Follow the graphics tier (core/renderer.js onGraphics): Low = macro only, Medium = no bump. */
+/** Hollow Mountain: the baked crystal / daylight glow over the island (caveStyle.js glowTexture), set by caveTerrain. */
+export const CAVE_GLOW = {
+  uCaveGlow: { value: null },
+  uCaveGlowRect: { value: new THREE.Vector3(-1000, -1000, 1e-3) },   // x0, z0, 1 / size
+};
+
 export function setSurfaceQuality(g = {}) {
   const name = g.name || 'High';
   SURFACE.uSdLevel.value = name === 'Low' ? 0 : name === 'Medium' ? 1 : 2;
@@ -126,6 +132,22 @@ vec3 sdRock(vec3 c, vec3 p, vec3 n, float kind, float near, inout float h, inout
   c = mix(c, vec3(0.74, 0.76, 0.52) * (0.8 + 0.3 * spk), lich * 0.45 * (0.4 + 0.6 * up));
   h += rh;
   return c;
+}
+`;
+
+// Hollow Mountain (kind 'cave'): wet layered rock, gravel and mud, flowstone, moss,
+// calcite sparkle. Triplanar on the walls and the roof so steep faces never stretch.
+const GLOW_RANGE = 1.6;   // = caveStyle.GLOW_RANGE (the glow texture stores colour / GLOW_RANGE)
+const CAVE = /* glsl */ `
+#define GLOW_RANGE_F ${GLOW_RANGE.toFixed(2)}
+vec2 sdCavePat(vec2 q, float near) {
+  vec2 wq = q + vec2(sdNoise(q * 0.6), sdNoise(q * 0.6 + 9.0)) * 0.9;
+  vec3 v = sdVoronoi(wq * 0.55);
+  float crackMask = smoothstep(0.55, 0.8, sdFbm(q * 0.2 + 4.0));
+  float crack = (1.0 - smoothstep(0.0, 0.06, v.y)) * crackMask;
+  float lump = sdFbm(q * 1.1);
+  float grain = sdNoise(q * 8.0) * near;
+  return vec2(lump * 0.7 + grain * 0.25 - crack * 0.6, crack);
 }
 `;
 
@@ -277,6 +299,75 @@ const FRAG = {
     diffuseColor.rgb = c;
   }
   `,
+  cave: /* glsl */ `
+  {
+    vec3 p = vSdPos;
+    vec3 n = normalize(vSdNormal);
+    float near = 1.0 - smoothstep(uSdFar * 0.35, uSdFar, sdDist);
+    float close = 1.0 - smoothstep(8.0, 36.0, sdDist);
+    vec3 c = diffuseColor.rgb;
+    float wSand = vSdSurf.x, wCliff = vSdSurf.y, wMud = vSdSurf.z, wFlow = vSdSurf.w;
+    float wWet = vSdSurf2.x, wMoss = vSdSurf2.y;
+    float macro = sdFbm(p.xz * 0.05 + p.y * 0.03);
+    c *= 0.9 + 0.2 * macro;
+    float wallK = 1.0 - smoothstep(0.45, 0.85, abs(n.y));
+    float roofK = smoothstep(0.3, 0.75, -n.y);
+    float rockW = clamp(max(max(wallK, roofK), wCliff), 0.0, 1.0) * (1.0 - wSand * (1.0 - wallK));
+    float sparkle = 0.0;
+    if (uSdLevel > 0.5) {
+      // --- rock: triplanar cracks, lumps and grain; fine strata lines and warm/cool tint swaps
+      vec3 w = pow(abs(n), vec3(5.0)); w /= (w.x + w.y + w.z);
+      vec2 pat = vec2(0.0);
+      if (w.x > 0.05) pat += sdCavePat(p.zy, near) * w.x;
+      if (w.y > 0.05) pat += sdCavePat(p.xz, near) * w.y;
+      if (w.z > 0.05) pat += sdCavePat(p.xy, near) * w.z;
+      float strata = sin(p.y * 6.5 + sdFbm(p.xz * 0.35) * 5.0 + sdNoise(p.xz * 0.9) * 1.5);
+      float tintSwap = smoothstep(-0.4, 0.4, sin(p.y * 1.3 + sdFbm(p.xz * 0.08) * 6.0));
+      vec3 rockC = c * (0.8 + 0.36 * smoothstep(-0.3, 0.7, pat.x)) * (1.0 - 0.3 * pat.y);
+      rockC *= mix(vec3(1.07, 0.98, 0.9), vec3(0.9, 1.0, 1.1), tintSwap);
+      rockC *= 1.0 + 0.07 * strata * wallK;
+      // drips: vertical dark wet streaks down the walls
+      float drip = smoothstep(0.55, 0.85, sdNoise(vec2((p.x + p.z) * 3.1, p.y * 0.22 + sdNoise(p.xz * 0.5) * 2.0)));
+      rockC *= 1.0 - 0.16 * drip * wallK * near;
+      // --- ground: gravel pebbles, dried mud cracks
+      vec3 pv = sdVoronoi(p.xz * 2.4 + vec2(sdNoise(p.xz * 1.4), sdNoise(p.xz * 1.4 + 4.0)) * 0.6);
+      float peb = 1.0 - smoothstep(0.15, 0.45, pv.x);
+      float gravelMask = smoothstep(0.45, 0.7, sdFbm(p.xz * 0.18 + 7.0));
+      vec3 floorC = c * (0.88 + 0.22 * sdFbm(p.xz * 0.7));
+      floorC = mix(floorC, floorC * (0.9 + 0.35 * fract(pv.z * 5.0)), peb * gravelMask * near * 0.7);
+      float dry = smoothstep(0.62, 0.8, sdFbm(p.xz * 0.12 + 17.0));
+      vec3 mv = sdVoronoi(p.xz * 0.55 + vec2(sdNoise(p.xz * 0.5), sdNoise(p.xz * 0.5 + 3.0)) * 1.2);
+      floorC *= 1.0 - 0.1 * (1.0 - smoothstep(0.0, 0.05, mv.y)) * dry * close;
+      floorC *= mix(vec3(1.0), vec3(0.9, 1.0, 1.08), smoothstep(0.4, 0.8, sdFbm(p.xz * 0.3 + 5.0)) * 0.6);
+      // --- beach sand: soft ripples, dark pebbles, a few shells
+      vec3 sv = sdVoronoi(p.xz * 1.3);
+      float sPeb = (1.0 - smoothstep(0.06, 0.13, sv.x)) * step(0.7, sv.z) * near;
+      vec3 sandC = c * (0.94 + 0.12 * sdNoise(p.xz * 14.0) * close) * (1.0 + 0.05 * sin(dot(p.xz, vec2(0.8, 0.6)) * 3.0 + sdFbm(p.xz * 0.2) * 6.0));
+      sandC = mix(sandC, c * 0.5, sPeb);
+      floorC = mix(floorC, sandC, wSand);
+      c = mix(floorC, rockC, rockW);
+      // --- flowstone: pale, smooth, glossy ridges
+      float ridge = sdNoise(vec2(dot(p.xz, vec2(0.72, 0.69)) * 2.3 + sdNoise(p.xz * 0.6) * 1.2, p.y * 0.35));
+      float fl = wFlow * smoothstep(0.38, 0.78, ridge);
+      c = mix(c, c * vec3(1.38, 1.32, 1.36) + 0.035, fl);
+      // --- moss and algae near water
+      float mossN = sdFbm(p.xz * 1.9 + p.y * 0.8 + 3.0);
+      float mossM = wMoss * smoothstep(0.35, 0.68, mossN) * near;
+      c = mix(c, vec3(0.14, 0.3, 0.2) * (0.7 + 0.6 * sdNoise(p.xz * 7.0)), mossM * 0.7);
+      // --- calcite sparkle in the rock and the flowstone
+      sparkle = step(0.9935, sdNoise3(p * 34.0)) * close * max(rockW, fl);
+      c += vec3(0.5, 0.58, 0.62) * sparkle;
+      float wetPatch = wWet * (0.55 + 0.45 * smoothstep(0.3, 0.7, sdFbm(p.xz * 0.9)));
+      sdRough = mix(1.0, 0.3, max(wetPatch * (1.0 - rockW * 0.4), fl * 0.8)) * (1.0 - 0.45 * sparkle);
+      sdRough = min(sdRough, 1.0 - 0.5 * drip * wallK * near);
+      float floorH = (sdFbm(p.xz * 1.3) * 0.45 + peb * gravelMask * 0.14 - sPeb * 0.2) * near;
+      sdH = mix(floorH, pat.x * 0.9 * near, rockW) + fl * 0.4 + mossM * 0.3;
+    } else {
+      c *= 0.9 + 0.2 * sdNoise(p.xz * 0.5 + p.y * 0.3);
+    }
+    diffuseColor.rgb = c;
+  }
+  `,
   rock: /* glsl */ `
   {
     float near = 1.0 - smoothstep(uSdFar * 0.35, uSdFar, sdDist);
@@ -339,7 +430,7 @@ const ASH = /* glsl */ `
   }
 `;
 
-const BUMP = { terrain: 0.9, rock: 1.2, foliage: 0.7 };
+const BUMP = { terrain: 0.9, rock: 1.2, foliage: 0.7, cave: 1.1 };
 
 /**
  * Add procedural surface detail of `kind` ('terrain' | 'rock' | 'foliage')
@@ -350,24 +441,27 @@ const BUMP = { terrain: 0.9, rock: 1.2, foliage: 0.7 };
 export function withSurfaceDetail(mat, kind) {
   const prev = Object.prototype.hasOwnProperty.call(mat, 'onBeforeCompile') ? mat.onBeforeCompile : null;
   const prevKey = Object.prototype.hasOwnProperty.call(mat, 'customProgramCacheKey') ? mat.customProgramCacheKey : null;
-  const terrain = kind === 'terrain';
+  const terrain = kind === 'terrain' || kind === 'cave';
+  const cave = kind === 'cave';
   mat.onBeforeCompile = (shader, renderer) => {
     prev?.call(mat, shader, renderer);
     shader.uniforms.uSdLevel = SURFACE.uSdLevel;
     shader.uniforms.uSdFar = SURFACE.uSdFar;
     shader.uniforms.uSdGreen = SURFACE.uSdGreen;
     shader.uniforms.uSdAsh = SURFACE.uSdAsh;
+    if (cave) { shader.uniforms.uCaveGlow = CAVE_GLOW.uCaveGlow; shader.uniforms.uCaveGlowRect = CAVE_GLOW.uCaveGlowRect; }
     shader.vertexShader = shader.vertexShader
       .replace('#include <common>', `#include <common>\n${VERT_PARS}${terrain ? 'attribute vec4 surface;\nattribute vec2 surface2;\nvarying vec4 vSdSurf;\nvarying vec2 vSdSurf2;\n' : ''}`)
       .replace('#include <project_vertex>', `#include <project_vertex>\n${VERT_MAIN}${terrain ? 'vSdSurf = surface; vSdSurf2 = surface2;\n' : ''}`);
     shader.fragmentShader = shader.fragmentShader
-      .replace('#include <common>', `#include <common>\n${VERT_PARS}${terrain ? 'varying vec4 vSdSurf;\nvarying vec2 vSdSurf2;\n' : ''}${NOISE}${terrain || kind === 'rock' ? ROCK : ''}`)
+      .replace('#include <common>', `#include <common>\n${VERT_PARS}${terrain ? 'varying vec4 vSdSurf;\nvarying vec2 vSdSurf2;\n' : ''}${cave ? 'uniform sampler2D uCaveGlow;\nuniform vec3 uCaveGlowRect;\n' : ''}${NOISE}${terrain || kind === 'rock' ? ROCK : ''}${cave ? CAVE : ''}`)
       .replace('#include <color_fragment>', `#include <color_fragment>
   float sdDist = length(vViewPosition);
   float sdH = 0.0;
   float sdRough = 1.0;
   ${FRAG[kind]}
   ${ASH}`)
+      .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>${cave ? '\n  totalEmissiveRadiance += texture2D(uCaveGlow, (vSdPos.xz - uCaveGlowRect.xy) * uCaveGlowRect.z).rgb * GLOW_RANGE_F * caveGlowK() * (0.07 + 0.5 * diffuseColor.rgb);' : ''}`)
       .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\n  roughnessFactor = clamp(roughnessFactor * sdRough, 0.04, 1.0);')
       .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
   if (uSdLevel > 1.5) normal = sdBumpNormal(-vViewPosition, normal, sdH * ${BUMP[kind].toFixed(2)} * 0.06, faceDirection);`);
