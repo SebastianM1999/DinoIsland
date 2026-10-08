@@ -1,4 +1,5 @@
 import { SARCO_MODEL, SARCO_TYPE } from './sarcoModel.js';
+import { SUMP_MODEL, SUMP_TYPE } from './sumpModel.js';
 // Replace files, semantic clips and bone aliases here when changing asset providers.
 const bones = {
   head: 'Head', jaw: null, neck: ['Neck'], body: 'Body', spine: ['Hips', 'Torso', 'Shoulders'],
@@ -20,6 +21,7 @@ function model(species, source, height, length, walkStride, runStride, quadruped
 }
 export const GLB_DINOS = {
   [SARCO_TYPE]: SARCO_MODEL,
+  [SUMP_TYPE]: SUMP_MODEL,
   // Median grounded foot velocity × clip duration; see measure-dino-strides.mjs.
   raptor: model('raptor', 'Velociraptor', 1.675, 3.037, 1.818, 4.09),
   // Cave-dwelling raptor kin (art/sources/gloom-raptor): ~25% larger than the raptor (uniform fit).

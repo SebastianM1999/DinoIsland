@@ -5,12 +5,16 @@ import { blob, mesh, spike, place } from '../kit.js';
 export const SARCO_ANIM = { gait: 'quad', walkSpeed: 3, runSpeed: 8.5,
   walkStride: 1.866 * .9, runStride: 3.775 * .9, bob: .05, stepHeight: .18 };
 
+const SARCO_LOOK = { dark: '#14271b', light: '#27372a', eyes: ['#ff220e', '#ffce20'], tooth: '#c7bea1', emissive: 2, scale: [1, .9, .9] };
+/** Pale cave palette and a ~5 m, slim and low build for the Sump Lurker fallback (clouded eyes, no glow). */
+const SUMP_LOOK = { dark: '#7d8993', light: '#c5ced2', eyes: ['#dfe8ea', '#dfe8ea'], tooth: '#f2efe2', emissive: 0, scale: [.17, .18, .3], long: .55 };
+
 /** Low, long crocodile silhouette keeps missing art playable without a wrong species. */
-export function buildSarcoFallback() {
+export function buildSarcoFallback(look = SARCO_LOOK) {
   const r = new Rig();
   r.body.position.y = 1.65;
   const mass = (joint, radii, pos, zone, radius) => {
-    joint.add(mesh(place(blob(...radii, c => c.y > 0 ? '#14271b' : '#27372a'), pos)));
+    joint.add(mesh(place(blob(...radii, c => c.y > 0 ? look.dark : look.light), pos)));
     r.hitZones.push({ zone, joint, offset: new THREE.Vector3(...pos), radius });
   };
   mass(r.body, [1.7, 1.2, 2.7], [0, 0, 0], 'body', 1.65);
@@ -19,11 +23,11 @@ export function buildSarcoFallback() {
   r.jaw = new THREE.Group(); r.jaw.position.set(0, -.32, 0); r.head.add(r.jaw);
   mass(r.jaw, [.9, .18, 2.6], [0, -.05, -2.05], 'head', .8);
   for (const side of [-1, 1]) {
-    const eye = mesh(blob(.18, .16, .18, side < 0 ? '#ff220e' : '#ffce20'));
-    eye.material = new THREE.MeshStandardMaterial({ color: side < 0 ? 0xff220e : 0xffce20,
-      emissive: side < 0 ? 0xff220e : 0xffce20, emissiveIntensity: 2 });
+    const eyeColor = look.eyes[side < 0 ? 0 : 1];
+    const eye = mesh(blob(.18, .16, .18, eyeColor));
+    eye.material = new THREE.MeshStandardMaterial({ color: eyeColor, emissive: eyeColor, emissiveIntensity: look.emissive });
     eye.position.set(side * .8, .6, -.8); r.head.add(eye);
-    for (let i = 0; i < 13; i++) r.jaw.add(mesh(place(spike(.07, .24, '#c7bea1'), [side * .78, .05, -i * .33 - .3])));
+    for (let i = 0; i < 13; i++) r.jaw.add(mesh(place(spike(.07, .24, look.tooth), [side * .78, .05, -i * .33 - .3])));
   }
   let parent = r.body;
   for (let i = 0; i < 8; i++) {
@@ -42,6 +46,7 @@ export function buildSarcoFallback() {
     r.legs.push({ hip, knee, foot, l1: .7, l2: .65, kneeDir: front ? 1 : -1,
       offset: front === (side > 0) ? 0 : .5, front });
   }
-  r.body.scale.set(1, .9, .9); r.body.position.y *= .9;
+  r.body.scale.set(...look.scale); r.body.position.y *= look.scale[1];
   return r.finalize();
 }
+export const buildSumpLurkerFallback = () => buildSarcoFallback(SUMP_LOOK);
