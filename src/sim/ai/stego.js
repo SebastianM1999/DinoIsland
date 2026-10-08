@@ -7,6 +7,7 @@
 import { CONFIG } from '../../shared/config.js';
 import { DS } from '../../shared/protocol.js';
 import { angleDiff } from '../../shared/rng.js';
+import { makeTailSweep, rearYaw, dir, smoothstep, grazeWander } from './territorial.js';
 
 const C = CONFIG.dinos.stego;
 const TAIL_TIME = 1.2;          // length of the Attack clip (art/sources/stego, Stegosaurus_Attack)
@@ -22,67 +23,27 @@ const COUNTER_SHIFT = 4.5;      // ... the body swings at most this far round it
  */
 const SWEEP = [[0.433, 0.328, 0.738], [0.467, 0.226, 0.645], [0.5, -0.013, 0.354], [0.533, -0.249, -0.051],
   [0.567, -0.573, -0.351], [0.6, -0.672, -0.415], [0.633, -0.871, -0.459], [0.667, -0.988, -0.464], [0.7, -1.032, -0.457]];
-const STRIKE_START = SWEEP[0][0];
 const PIVOT_BACK = 0.68;        // hip pivot behind the body centre (m, scale 1)
 const TAIL_REACH = 4.1;         // pivot -> spike tips
 const TAIL_HALF_WIDTH = 0.35;
 
-function sweepAt(t) {
-  if (t <= SWEEP[0][0]) return [SWEEP[0][1], SWEEP[0][2]];
-  for (let i = 1; i < SWEEP.length; i++) {
-    const [t1, lo1, hi1] = SWEEP[i];
-    if (t <= t1) {
-      const [t0, lo0, hi0] = SWEEP[i - 1], u = (t - t0) / (t1 - t0);
-      return [lo0 + (lo1 - lo0) * u, hi0 + (hi1 - hi0) * u];
-    }
-  }
-  return [SWEEP.at(-1)[1], SWEEP.at(-1)[2]];
-}
-
+const tail = makeTailSweep({ sweep: SWEEP, strikeEnd: STRIKE_END, pivotBack: PIVOT_BACK, reach: TAIL_REACH, halfWidth: TAIL_HALF_WIDTH });
+const STRIKE_START = tail.strikeStart;
 /** Angular span (around the hip pivot) the tail swept through between clip times t0 and t1. */
-export function tailSweep(t0, t1) {
-  t0 = Math.max(t0, STRIKE_START); t1 = Math.min(t1, STRIKE_END);
-  if (t1 < t0) return null;
-  let [lo, hi] = sweepAt(t0);
-  const keep = ([l, h]) => { lo = Math.min(lo, l); hi = Math.max(hi, h); };
-  keep(sweepAt(t1));
-  for (const [t, l, h] of SWEEP) if (t > t0 && t < t1) keep([l, h]);
-  return [lo, hi];
-}
-
-/** Yaw that puts a point at angle `phi` behind the stego (phi + = its right). */
-const rearYaw = (d, x, z, phi) => Math.atan2(x - d.x, z - d.z) - phi;
-
+export const tailSweep = tail.tailSweep;
 /** Hip pivot of the tail and where a player sits relative to it: distance + angle from behind. */
-export function tailRelative(d, p) {
-  const k = d.scale || 1;
-  const px = d.x + Math.sin(d.yaw) * PIVOT_BACK * k, pz = d.z + Math.cos(d.yaw) * PIVOT_BACK * k;
-  const dx = p.x - px, dz = p.z - pz;
-  return { px, pz, r: Math.hypot(dx, dz), phi: angleDiff(d.yaw, Math.atan2(dx, dz)) };
-}
+export const tailRelative = tail.tailRelative;
 
 /** Swept tail hitbox: everyone inside the arc the tail crossed this tick gets hit once. */
 function tailStrike(d, sys, t0, t1) {
-  const span = tailSweep(t0, t1);
-  if (!span) return;
-  const k = d.scale || 1, reach = (TAIL_REACH + TAIL_HALF_WIDTH) * k + CONFIG.player.radius;
-  for (const p of sys.world.players.values()) {
-    if (!p.alive || d.tailVictims.has(p.id) || sys.inSafeZone(p)) continue;
-    if (p.y > d.y + 2.6 * k) continue;                         // jumped/standing high above the tail
-    const rel = tailRelative(d, p);
-    if (rel.r > reach) continue;
-    const margin = Math.atan2(TAIL_HALF_WIDTH * k + CONFIG.player.radius, Math.max(rel.r, 0.5));
-    if (rel.phi < span[0] - margin || rel.phi > span[1] + margin) continue;
-    d.tailVictims.add(p.id);
+  tail.tailStrike(d, sys, t0, t1, (p, rel) => {
     const counter = d.tailCounter;
     sys.hitPlayer(d, p, counter ? C.tailCounterDamage : C.tailDamage, counter ? C.tailCounterKnockback : C.tailKnockback, 1,
       { x: rel.px, z: rel.pz });
-  }
+  });
 }
 
 const AIM_PHI = -0.2;            // target angle behind the stego: the middle of the strike arc
-const dir = a => [Math.sin(a), Math.cos(a)];
-const smoothstep = x => (x = Math.min(1, Math.max(0, x))) * x * (3 - 2 * x);
 
 function startTail(d, sys, target, counter) {
   d.mode = 'tail';
@@ -244,25 +205,6 @@ export const stegoBrain = {
     }
 
     // --- calm: graze and wander inside the territory
-    d.fl &= ~1;
-    d.targetId = null;
-    d.mode = d.mode === 'walk' ? 'walk' : 'graze';
-    d.modeT -= dt;
-    if (d.mode === 'graze') {
-      sys.halt(d, dt);
-      d.st = DS.GRAZE;
-      if (d.modeT <= 0) {
-        d.mode = 'walk';
-        d.wander = sys.randomWalkablePoint(d, home.x, home.z, C.territoryRadius * 0.8);
-        d.modeT = 20;
-      }
-    } else {
-      const left = d.wander ? sys.steer(d, d.wander.x, d.wander.z, C.walkSpeed, dt) : 0;
-      d.st = DS.WALK;
-      if (!d.wander || left < 2 || d.modeT <= 0) {
-        d.mode = 'graze';
-        d.modeT = 5 + Math.random() * 8;
-      }
-    }
+    grazeWander(d, sys, dt, C, home);
   },
 };

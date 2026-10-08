@@ -349,6 +349,34 @@ export const CONFIG = {
       butcher: { time: 6, loot: { bones: 4, skull: 1 } },
       respawn: 150,
     },
+    // Cave herbivore of the Hollow Mountain's big halls: heavily armoured, crystals on its back. Peaceful until hit or
+    // crowded (angerRadius), then it turns its rump on you and swings the club tail, with a short charge. One per hall,
+    // at most; the chambers come from shared/caveDinos.js, the per-level count is `level.dinos['crystal-plodder']`.
+    'crystal-plodder': {
+      name: 'Crystal Plodder',
+      health: 600,
+      groupSize: 1,
+      height: 2.1,            // fitted model height (m): the hall's roof must clear it by a metre
+      walkSpeed: 1.1,
+      chargeSpeed: 3.4,
+      turnRate: 1.5,
+      territoryRadius: 12,    // grazes and wanders within this of its hall's centre
+      angerRadius: 3,         // a player this close (not attacking) already upsets it
+      calmTime: 8,            // seconds of peace before it calms down again
+      chargeDuration: 1.1,
+      chargeCooldown: 3.5,
+      chargeRange: 9,         // charges at attackers farther than the tail reach but closer than this
+      tailRange: 3.4,         // body centre -> club tip (hip pivot 0.63 m back + 2.33 m tail) + player radius
+      tailDamage: 38,
+      tailKnockback: 13,
+      chargeDamage: 20,
+      radius: 1.3,
+      // footprint [forward offset m, radius m] of the fitted ~6 m model (snout to +3 m, club tail to -2.9 m)
+      body: [[0.2, 1.0], [-0.5, 1.0], [1.3, 0.75], [2.15, 0.32], [2.85, 0.22], [-1.4, 0.3], [-2.4, 0.42], [-2.85, 0.2]],
+      loot: { meat: 3, hide: 2 },
+      butcher: { time: 5, loot: { bones: 5, skull: 1 } },
+      respawn: 200,
+    },
     ptera: {
       name: 'Pteranodon',
       health: 45,

@@ -6,7 +6,7 @@
 import { CONFIG } from '../shared/config.js';
 
 /** How far above/below its origin a hit on each species can be (× scale). */
-const HIT_HEIGHT = { brachio: 17, trex: 12, stego: 7, raptor: 5, 'gloom-raptor': 6, 'sump-lurker': 4, ptera: 6 };
+const HIT_HEIGHT = { brachio: 17, trex: 12, stego: 7, raptor: 5, 'gloom-raptor': 6, 'sump-lurker': 4, 'crystal-plodder': 4, ptera: 6 };
 
 /**
  * @param {object} d dinosaur

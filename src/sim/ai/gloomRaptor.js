@@ -3,6 +3,7 @@
 // raptor's (`packHunterBrain`); what differs is how it notices players: by NOISE, not by sight.
 
 import { CONFIG } from '../../shared/config.js';
+import { plodderChambers } from '../../shared/caveDinos.js';
 import { packHunterBrain, spawnPack } from './raptor.js';
 
 const C = CONFIG.dinos['gloom-raptor'];
@@ -47,14 +48,14 @@ export const gloomRaptorBrain = {
    * Packs only exist where the level layout provides cave chambers (`layout.caveDinoSpots`).
    * `level.dinos['gloom-raptor']` is the number of PACKS (2-3 each, like raptor zones); they take the
    * deep chambers first (relic chambers, then the biggest), never the entrance/exit halls or pockets,
-   * and never a chamber a raptor zone already holds.
+   * and never a chamber a raptor zone or a Crystal Plodder (`plodderChambers`) already holds.
    */
   spawnInitial(sys) {
     const layout = sys.world.layout;
     const spots = layout.caveDinoSpots;
     const packs = layout.level?.dinos?.[TYPE] ?? 0;
     if (!Array.isArray(spots) || !spots.length || !(packs > 0)) return;
-    const taken = new Set((layout.dinoZones?.raptor ?? []).map((z) => z.room).filter((r) => r != null));
+    const taken = new Set([...(layout.dinoZones?.raptor ?? []).map((z) => z.room), ...plodderChambers(layout).map((s) => s.id)].filter((r) => r != null));
     const tags = (s) => s.tags ?? [];
     const eligible = spots.filter((s) => (s.spawns?.length ?? 3) >= 3 && s.kind !== 'pocket'
       && !tags(s).includes('entrance') && !tags(s).includes('exit') && !taken.has(s.id));
