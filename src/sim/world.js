@@ -24,6 +24,7 @@ import { lineBlocked, DINO_SIGHTING } from '../shared/visibility.js';
 import { sanitizeOutfit, sameOutfit } from '../shared/outfits.js';
 import { planIsland } from '../shared/island.js';
 import { levelDef, LEVEL_COUNT } from '../shared/levels.js';
+import { TORCH } from '../shared/torch.js';
 import { findUnstuckSpot, goodSpot } from './unstuck.js';
 import { nearDino, plausibleZone } from './hitCheck.js';
 import { freshBase, campStations, safeZone as baseSafeZone, hasBasePlots, PLOT_REACH, MAX_STAGE, stageCost, BUILD_TIME, BASE_STAGES, applyBaseColliders, baseSpawnPoints, TOWERS, TOWER_SLOTS, towerCost, repairCost } from '../shared/base.js';
@@ -84,6 +85,7 @@ export class ServerWorld {
     this.terrain = new Terrain(planIsland(level, variant));
     this.layout = buildLayout(this.terrain);
     this.items = new Map();
+    this.torchSpawns = [];
     this.traps = new Map();
     this.projectiles = new Map();
     this.tracks = [];
@@ -95,6 +97,7 @@ export class ServerWorld {
     this.raids = new Raids(this);     // raids on the base (sim/raids.js)
     this.volcano = new Volcano(this); // heat, eruptions, ash rain (sim/volcano.js; idle off the volcano)
     this.dinos = new DinoSystem(this);
+    this.placeTorches();
     this.log(`island ${level + 1} "${levelDef(level).name}" variant ${variant}`);
   }
 
@@ -222,6 +225,7 @@ export class ServerWorld {
       spearHealth: W.spear.durability,
       traps: W.trap.startCount,
       fruit: [],
+      torch: false,          // owns the hand-held torch (picked up at the island's torch spots)
       loot: Object.fromEntries(LOOT_KEYS.map((k) => [k, 0])),
     };
   }
@@ -791,7 +795,7 @@ export class ServerWorld {
     p.pitch = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, num(m.pitch, p.pitch)));
     p.spd = Math.max(0, Math.min(20, num(m.spd, 0)));
     p.eq = Math.max(0, Math.min(EQUIP.length - 1, m.eq | 0));
-    p.fl = (m.fl | 0) & (63 | PF.DASH);   // DOWNED is the server's to set
+    p.fl = (m.fl | 0) & (63 | PF.DASH | (p.inv.torch ? PF.TORCH : 0));   // DOWNED is the server's to set; a lit torch only with one in the pack
     if (p.fl & PF.SPRINT) {
       if (!p.sprinting) p.sprintArmed = true;   // Sprint Strike arms when a sprint starts
       p.sprinting = true;
@@ -1061,6 +1065,12 @@ export class ServerWorld {
         } else if (it.kind === 'pistol' || it.kind === 'rifle') {
           if (inv.guns[it.kind].owned !== false) return;
           inv.guns[it.kind] = { ...it.ammo, owned: true };
+        } else if (it.kind === 'torch') {
+          if (inv.torch) return this.fullAlert(p, 'You already carry a torch', 'torch');
+          inv.torch = true;
+          this.toast('Torch taken – light it with L', 'torch', p.id);
+          const spawn = this.torchSpawns[it.spot];
+          if (spawn) { spawn.item = null; spawn.respawnAt = this.now + TORCH.respawnTime; }
         } else if (it.kind === 'trap') {
           if (inv.traps + it.n > caps.traps) return this.fullAlert(p, 'You cannot carry more traps', 'trap');
           inv.traps += it.n;
@@ -1363,6 +1373,23 @@ export class ServerWorld {
     return it;
   }
 
+  /**
+   * One torch on the ground at each `layout.torchSpots` entry (islands without
+   * spots have none). A taken torch comes back after `TORCH.respawnTime`, so
+   * every player can get one; a player who already owns one does not use it up.
+   */
+  placeTorches() {
+    this.torchSpawns = (this.layout.torchSpots ?? []).map((s, spot) => ({ spot, x: s.x, z: s.z, y: Number.isFinite(s.y) ? s.y : null, item: null, respawnAt: 0 }));
+    for (const s of this.torchSpawns) this.#spawnTorch(s, false);
+  }
+
+  #spawnTorch(s, publish) {
+    const it = this.spawnItem('torch', s.x, s.z, 1, s.y, null, false);
+    it.spot = s.spot;
+    if (publish) this.event(EV.ITEM_ADD, { item: it });
+    s.item = it.id;
+  }
+
   removeItem(id, by = null) {
     if (!this.items.delete(id)) return;
     this.event(EV.ITEM_REMOVE, { id, by });
@@ -1475,9 +1502,12 @@ export class ServerWorld {
         this.event(EV.FRUIT, { spot: f.spot, count: f.count });
       }
     }
+    // taken torches at their spots come back
+    for (const s of this.torchSpawns) if (s.item === null && this.now >= s.respawnAt) this.#spawnTorch(s, true);
     // stale items
     for (const it of this.items.values()) {
       if (it.dino) this.updateAttachedItem(it);
+      if (it.kind === 'torch') continue;
       const life = it.kind === 'arrow' ? W.bow.arrowLifetime * 3 : it.kind === 'spear' ? Infinity : CONFIG.lootDespawn;
       if (this.now - it.t > life) this.removeItem(it.id);
     }
