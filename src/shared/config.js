@@ -214,6 +214,9 @@ export const CONFIG = {
     'alpha-sarcosuchus': {
       name: 'Alpha Sarcosuchus', health: 1800, radius: 2.2,
       bodyLengthScale: .9, bodyHeightScale: .9,
+      // water ambusher (sim/ai/aquatic.js, DinoSystem): walks/swims in water up to maxWaterDepth, sinks to `shallow + range * submergence`
+      // below the surface, its carcass floats `carcassDepth` under it; phaseClips: boss snapshot rows carry clip phases
+      aquatic: { maxWaterDepth: 6, submerge: { shallow: 0.35, range: 2.75 }, carcassDepth: 0.8, phaseClips: true },
       walkSpeed: 3, runSpeed: 8.5, lungeSpeed: 15, turnRate: 2.8,
       sightRadius: 44, biteRange: 7.2, biteDamage: 32, biteCooldown: 1.8,
       shoveDamage: 18, tailRange: 9.9, tailDamage: 30, knockback: 12,
@@ -320,6 +323,31 @@ export const CONFIG = {
       loot: { meat: 1, teeth: 2 },
       butcher: { time: 5, loot: { bones: 2, skull: 1 } },
       respawn: 90,
+    },
+    // Cave ambusher of the flooded tunnels (Hollow Mountain): lies submerged, lunges at players who swim or stand at
+    // the water's edge, drags back into the water. Not a boss: normal respawn, no phases. Spawns only at flooded
+    // `layout.caveDinoSpots`; the per-level count is `level.dinos['sump-lurker']`.
+    'sump-lurker': {
+      name: 'Sump Lurker',
+      health: 220,
+      walkSpeed: 1.4,
+      runSpeed: 3.6,          // swimming / scuttling back to the water
+      lungeSpeed: 9,
+      turnRate: 4,
+      sightRadius: 16,        // clouded eyes: it feels the ripples more than it sees
+      lungeRange: 6,          // players this close to its water get lunged at
+      edge: 3,                // ... when they stand within this distance of deep water (or swim)
+      leashRadius: 14,        // never farther than this from the flooded spot it spawned at
+      biteDamage: 30,
+      biteCooldown: 2.4,
+      knockback: 7,
+      radius: 0.9,
+      aquatic: { maxWaterDepth: 6, submerge: { shallow: 0.1, range: 0.5 }, carcassDepth: 0.25 },
+      // footprint of the fitted ~5 m model: snout to +2.2 m, sprawled legs ~0.55 m out, tail tip to -2.7 m
+      body: [[0, 0.6], [0.9, 0.55], [1.6, 0.25], [2.1, 0.15], [-0.9, 0.6], [-1.8, 0.35], [-2.5, 0.15]],
+      loot: { meat: 3, hide: 2, teeth: 3 },
+      butcher: { time: 6, loot: { bones: 4, skull: 1 } },
+      respawn: 150,
     },
     ptera: {
       name: 'Pteranodon',

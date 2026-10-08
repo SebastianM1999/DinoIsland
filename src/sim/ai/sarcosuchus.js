@@ -4,6 +4,7 @@ import { CONFIG } from '../../shared/config.js';
 import { DS, EV } from '../../shared/protocol.js';
 import { angleDiff, clamp } from '../../shared/rng.js';
 import { insideSwampArena } from '../../shared/swampArena.js';
+import { toYaw, phase, submergeToward, flagSubmerged, aquaticGroundHeight, mouthCapsuleHit } from './aquatic.js';
 
 const C = () => CONFIG.dinos['alpha-sarcosuchus'];
 const lengthScale = () => C().bodyLengthScale ?? 1;
@@ -29,17 +30,12 @@ const TAIL = [[.6, -1.145, .067, 7.04], [2 / 3, -1.155, .08, 6.976],
   [1, .06, 1.423, 6.669], [16 / 15, -.012, 1.372, 6.365],
   [17 / 15, -.051, 1.267, 6.577], [1.2, -.085, 1.181, 6.802],
   [19 / 15, -.157, 1.073, 6.914]];
-const toYaw = (d, p) => Math.atan2(-(p.x - d.x), -(p.z - d.z));
 const duration = (mode) => {
   const T = SARCO_TIMING;
   return mode === 'lunge' ? T.lungeWindup + T.lungeStrike : mode === 'bite' ? T.biteWindup + T.biteStrike :
     mode === 'shove' ? T.shoveWindup + T.shoveStrike : mode === 'tail' ? T.tailWindup + T.tailStrike + T.tailSettle :
       mode === 'ambush' ? T.ambushWindup + T.ambushStrike : mode === 'pivot' ? T.pivot : T.reposition;
 };
-function phase(d, sys, clip, seconds) {
-  d.phaseSeq = (d.phaseSeq ?? 0) + 1;
-  d.phase = clip ? { clip, started: sys.world.now, duration: seconds, seq: d.phaseSeq } : null;
-}
 function start(d, sys, mode, p = null) {
   d.mode = mode; d.modeT = 0; d.victims = new Set();
   d.strikeYaw = d.yaw;
@@ -81,14 +77,7 @@ function hit(d, sys, p, damage, knock, origin = null) {
 }
 /** Swept mouth capsule: a fast committed lunge cannot skip a player between ticks. */
 export function sarcoMouthHit(d, p, from, reach = C().biteRange) {
-  const fx = -Math.sin(d.strikeYaw), fz = -Math.cos(d.strikeYaw);
-  const ax = from.x + fx * (reach - 1.5 * lengthScale()), az = from.z + fz * (reach - 1.5 * lengthScale());
-  const bx = d.x + fx * (reach - 1.5 * lengthScale()), bz = d.z + fz * (reach - 1.5 * lengthScale());
-  const sx = bx - ax, sz = bz - az;
-  const t = clamp(((p.x - ax) * sx + (p.z - az) * sz) / (sx * sx + sz * sz || 1), 0, 1);
-  const dx = p.x - ax - sx * t, dz = p.z - az - sz * t;
-  const side = dx * fz - dz * fx, front = dx * fx + dz * fz;
-  return (side / 2.1) ** 2 + (front / (2.1 * lengthScale())) ** 2 <= 1;
+  return mouthCapsuleHit(d, p, from, reach, { lengthScale: lengthScale(), half: 2.1, back: 1.5 });
 }
 /** Strike angle relative to the rear hip; tick intervals cover the moving arc. */
 export function sarcoTailSweep(from, to) {
@@ -117,21 +106,15 @@ function waterGoal(d, sys, p) {
   return best ?? d.home;
 }
 /** Absolute water support, resolved AFTER horizontal movement at the new position. */
-export function sarcoGroundHeight(d, terrain) {
-  const ground = terrain.heightAt(d.x, d.z), water = terrain.waterLevelAt(d.x, d.z);
-  if (water === null) return ground;
-  const depth = (0.35 + (3.1 - 0.35) * clamp(d.submergence ?? 0, 0, 1)) * heightScale();
-  return Math.max(ground, water - depth);
-}
+export const sarcoGroundHeight = (d, terrain) => aquaticGroundHeight(d, terrain, C());
 function immersion(d, sys, dt, submerged) {
   if (d.mode === 'ambush') {
     const u = clamp((d.modeT - SARCO_TIMING.ambushWindup) / SARCO_TIMING.ambushStrike, 0, 1);
     // Hold the whole harmless wind-up low, then rise with the actual committed
     // bank surge. Zero velocity at both ends prevents a vertical pop.
     d.submergence = 1 - u * u * (3 - 2 * u);
-  } else d.submergence = clamp((d.submergence ?? (submerged ? 1 : 0)) +
-    clamp((submerged ? 1 : 0) - (d.submergence ?? 0), -2.5 * dt, 2.5 * dt), 0, 1);
-  if (d.submergence > 0.05) d.fl |= 8; else d.fl &= ~8;
+  } else submergeToward(d, dt, submerged);
+  flagSubmerged(d);
 }
 function complete(d, sys, p) {
   if (d.mode === 'bite' && p && d.combo) { start(d, sys, 'pivot', p); return; }
