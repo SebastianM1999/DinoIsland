@@ -172,7 +172,7 @@ export const BIOMES = {
       flowers: 0,
     },
     // wet dark stone with cool tints, little moss (stone kinds as in the jungle)
-    rocks: { colors: ['#5d6068', '#4b4e5a', '#6a6a70'], moss: '#3f6a52', mossChance: 0.45, count: 0.7,
+    rocks: { colors: ['#5d6068', '#4b4e5a', '#6a6a70'], moss: '#3f6a52', mossChance: 0.45, count: 0.16,
       kinds: [[0.98, 0.98, 1.0], [1.1, 1.0, 0.9], [0.66, 0.68, 0.78], [1.05, 1.08, 1.14]] },
     terrain: {
       sandDry: '#8a8678', sand: '#767366', sandWet: '#4f4f4a',
@@ -190,14 +190,14 @@ export const BIOMES = {
       background: '#04070a', fog: '#071118', fogNear: 3, fogFar: 46,
       top: '#101826', horizon: '#1c3038', cloud: '#2a3a46',
       sun: '#9fb8d0', sunIntensity: 0, hemiSky: '#4a6a8c', hemiGround: '#2a2038', hemiIntensity: 0.34,
-      exposure: 1.45,
+      exposure: 1.3,
     },
     // the two coves outside: a dusk, warm low sun over a teal sea (the client blends sky -> skyOutside by the
     // depth into the mountain, client/world/caveFx.js; the sky dome and the sea use this one)
     skyOutside: {
       background: '#2f4c5c', fog: '#35566a', fogNear: 35, fogFar: 300,
       top: '#182f4a', horizon: '#c7a58a', cloud: '#8fa6b4',
-      sun: '#ffc690', sunIntensity: 1.5, hemiSky: '#7ea8c4', hemiGround: '#3a4a52', hemiIntensity: 0.8,
+      sun: '#ffc690', sunIntensity: 1.5, hemiSky: '#8ab4cf', hemiGround: '#4a5a62', hemiIntensity: 1.15,
       exposure: 0.95,
     },
     water: { shallow: '#2f7f86', mid: '#16525e', deep: '#0b2a3a', foam: '#9fc4c8', sky: '#1c3038' },

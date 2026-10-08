@@ -63,6 +63,7 @@ import { ashShelter } from '../../shared/volcanoArena.js';
 import { buildVolcanoFx, ashSky } from '../world/volcanoFx.js';
 import { BIOMES } from '../../shared/levels.js';
 import { disposeIslandScenes } from './resources.js';
+import { buildCaveWorld } from '../world/caveWorld.js';
 
 /** The air over the boss arena: the volcano island's ash, darker and redder. */
 const BOSS_SKY = {
@@ -88,7 +89,7 @@ export class Game {
     this.layout = buildLayout(this.terrain);
     this.gfx = reuse?.gfx ?? new Renderer(canvas);
     if (reuse?.gfx) this.gfx.reset();
-    this.gfx.applyBiome(this.layout.biome.sky);
+    this.gfx.applyBiome(this.layout.biome.skyOutside ?? this.layout.biome.sky);   // (the Hollow Mountain starts in its daylit cove)
     this.input = reuse?.input ?? new Input(canvas);
     this.player = new PlayerController(this.terrain, this.layout.playerColliders, this.layout.rockSurfaceAt);
     // progression: the net layer keeps the newest server profile (it can arrive while the island loads), else the saved one
@@ -276,7 +277,8 @@ export class Game {
 
   #buildWorld() {
     const scene = this.gfx.scene;
-    scene.add(buildTerrainMesh(this.terrain, this.layout));
+    const terrainMesh = buildTerrainMesh(this.terrain, this.layout);
+    scene.add(terrainMesh);
 
     this.sky = buildSky(this.gfx, this.layout);
     this.water = buildWater(this.terrain, this.layout, this.gfx.sunDir);
@@ -306,7 +308,10 @@ export class Game {
       },
     });
     scene.add(this.sky.group, this.water.group, this.vegetation.group, this.rocks.group, this.fruitPlants.group, this.hut.group, this.baseView.group, this.sites.group, this.grove.group, this.logs.group, this.bossArena.group, this.swampArena.group, this.swampFx.group, this.volcanoArena.group, this.volcanoFx.group);
-    this.worldUpdaters = [this.sky, this.water, this.vegetation, this.rocks, this.fruitPlants, this.hut, this.baseView, this.sites, this.grove, this.bossArena, this.swampArena, this.swampFx, this.volcanoArena, this.volcanoFx];
+    // the Hollow Mountain: roof, cave air, decor, crystal lights, drips (world/caveWorld.js)
+    this.caveWorld = this.layout.plan.cave ? buildCaveWorld(this.terrain, this.layout, this.gfx, terrainMesh, this.water) : null;
+    if (this.caveWorld) { scene.add(this.caveWorld.group); this.caveWorld.audio = this.audio; }
+    this.worldUpdaters = [this.sky, this.water, this.vegetation, this.rocks, this.fruitPlants, this.hut, this.baseView, this.sites, this.grove, this.bossArena, this.swampArena, this.swampFx, this.volcanoArena, this.volcanoFx, ...(this.caveWorld ? [this.caveWorld] : [])];
     this.shake = 0;
     this.moodK = 0;
 
@@ -884,7 +889,7 @@ export class Game {
       this.audioWater = this.#waterSoundscape(cam.position);
       this.audioDanger = this.#inDanger();
     }
-    this.audio.update(dt, { coast, water: this.audioWater, danger: this.audioDanger, bossArea: this.bossMusicArea, ash: this.volcanoFx.ashRaining() ? 1 : 0 });
+    this.audio.update(dt, { coast, water: this.audioWater, danger: this.audioDanger, bossArea: this.bossMusicArea, ash: this.volcanoFx.ashRaining() ? 1 : 0, cave: this.caveWorld?.inside ?? 0, caveWet: this.caveWorld?.wet ?? 0 });
   }
 
   /**

@@ -25,6 +25,7 @@ migrateStorage();
 // with the team's base already standing on the first building plot.
 const DEBUG_QUERY = new URLSearchParams(location.search);
 const DEBUG_ISLAND = Math.max(0, (Number(DEBUG_QUERY.get('island')) || 1) - 1);
+const DEBUG_VARIANT = Number(DEBUG_QUERY.get('variant')) || undefined;   // ?variant=7: a fixed island layout (screenshots, bug reports)
 const DEBUG_BASE = Math.max(0, Math.min(3, Number(DEBUG_QUERY.get('base')) || 0));
 const DEBUG_RAID = Math.max(0, Number(DEBUG_QUERY.get('raid')) || 0);   // ?raid=10: first raid in 10 s (with ?base)
 document.title = BRAND.name;
@@ -199,7 +200,7 @@ async function start(mode, options = {}) {
     const profile = loadProfile();   // saved XP and skills; the host re-validates them
     if (mode === 'internet') options.url = await internetTest.start();
     net = mode === 'steam' ? await Net.steam(window.dinoSteam, options, name, outfit, profile) :
-      mode === 'online' || mode === 'internet' ? await Net.connect(websocketAddress(options.url ?? serverInput.value), name, outfit, profile) : await Net.local(name, outfit, { level: DEBUG_QUERY.has('island') ? DEBUG_ISLAND : unlockedStartingIsland(Number($('play-island').value)), baseStage: DEBUG_BASE, raidIn: DEBUG_RAID }, profile);
+      mode === 'online' || mode === 'internet' ? await Net.connect(websocketAddress(options.url ?? serverInput.value), name, outfit, profile) : await Net.local(name, outfit, { level: DEBUG_QUERY.has('island') ? DEBUG_ISLAND : unlockedStartingIsland(Number($('play-island').value)), variant: DEBUG_VARIANT, baseStage: DEBUG_BASE, raidIn: DEBUG_RAID }, profile);
   } catch (err) {
     if (mode === 'internet') internetTest.stop();
     busy = false;

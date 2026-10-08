@@ -74,9 +74,11 @@ export function buildSky(gfx, layout = null) {
   group.name = 'sky';
   const rng = makeRng(777);
   const biome = layout?.biome || {};
-  const sky = { ...DEFAULT_SKY, ...(biome.sky || {}) };
+  // (the Hollow Mountain's dome is the dusk of its coves, biome.skyOutside; inside the mountain the roof hides it)
+  const sky = { ...DEFAULT_SKY, ...(biome.skyOutside || biome.sky || {}) };
   const land = biome.terrain || {};
   const volcanic = biome.id === 'volcano';
+  const cave = biome.id === 'cave';
   const C = (hex, fb) => {
     const c = new THREE.Color();
     try { c.set(hex ?? fb); } catch { c.set(fb); }
@@ -221,7 +223,7 @@ export function buildSky(gfx, layout = null) {
       return tint(foot, '#6fae52', 0.5).lerp(tint(rockV, rockV, 0.45), THREE.MathUtils.smoothstep(c.y, -35, -10))
         .lerp(tint(rockTop, rockTop, 0.4), k * 0.8);
     });
-    farParts.push(place(g, [vx, 44, vz]));
+    if (!cave) farParts.push(place(g, [vx, 44, vz]));   // (the Hollow Mountain has no smoking volcano on its horizon)
   }
   const far = new THREE.Mesh(merge(farParts, Math.PI * 0.55), farMat);
   group.add(far);
@@ -234,6 +236,7 @@ export function buildSky(gfx, layout = null) {
   });
   const smoke = new THREE.InstancedMesh(smokeGeo, smokeMat, 14);
   smoke.frustumCulled = false;
+  smoke.visible = !cave;
   group.add(smoke);
   const puffs = [];
   for (let i = 0; i < 14; i++) puffs.push({ t: i / 14, off: rng() * 10 });

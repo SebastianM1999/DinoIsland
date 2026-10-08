@@ -8,6 +8,7 @@ import { fbm, smoothstep } from '../../shared/rng.js';
 import { BIOMES } from '../../shared/levels.js';
 import { causewayQuery } from '../../shared/bossArena.js';
 import { withSurfaceDetail, setSurfaceBiome } from './surfaceDetail.js';
+import { buildCaveTerrainMesh } from './caveTerrain.js';
 
 const JUNGLE = {
   sandDry: '#f6d08a', sand: '#efc176', sandWet: '#d9a862', seabed: '#e2bd7a', seabedDeep: '#b99a68',
@@ -28,6 +29,7 @@ const WET_MOSS = new THREE.Color('#3f6e3a');
  * @param {ReturnType<import('../../shared/layout.js').buildLayout>} layout
  */
 export function buildTerrainMesh(terrain, layout) {
+  if (layout.plan.cave) return buildCaveTerrainMesh(terrain, layout);   // the Hollow Mountain: caveTerrain.js
   const n = terrain.n, cell = terrain.cell, half = terrain.half;
   const stride = n + 1;
   const plan = layout.plan;
