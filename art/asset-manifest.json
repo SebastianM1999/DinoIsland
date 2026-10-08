@@ -8,6 +8,13 @@
       "triangles": 56296
     },
     {
+      "id": "dino-gloom-raptor",
+      "file": "assets/models/dinos/gloom-raptor.glb",
+      "source": "Project-authored Gloom Raptor; art/sources/gloom-raptor/gloom-raptor.blend (build scripts in its text blocks)",
+      "license": "Project source",
+      "triangles": 59420
+    },
+    {
       "id": "dino-trex",
       "file": "assets/models/dinos/trex.glb",
       "source": "Project-authored T-Rex; art/sources/trex/trex.blend (build scripts in its text blocks)",
