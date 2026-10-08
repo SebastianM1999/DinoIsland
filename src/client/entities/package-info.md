@@ -24,6 +24,7 @@
 - Every server dino type needs an entry in `SPECIES`. Each entry first tries the GLB model (`buildGLBDino`) and falls back to the procedural builder; per-species `extraUpdate` runs only for procedural rigs.
 - Boss attack phases carry authoritative start time, duration and sequence; clip sampling uses the interpolated server render clock, including late joins and low FPS.
 - Positions come from `net/interp.js` `InterpBuffer` sampled at render time, not from raw latest rows.
+- Dinosaur footsteps use actual interpolated grounded travel via `audio/creatureSteps.js`, independent of off-screen mesh animation throttling. All species have terrain contacts; swimming/flying, stationary, trapped and dead animals remain silent.
 - Cached geometries/materials shared across islands are marked with `retainResource` (`core/resources.js`); `DinoView.dispose()` uses `disposeIslandScenes`, which skips retained resources. Keep new caches retained or they get disposed on island change.
 - Models come from `client/models/`; this directory only places, animates and disposes them.
 
