@@ -70,7 +70,7 @@ test('spawns only on flooded cave spots of a level that sets the count, never on
     const world = new ServerWorld({ send() {} }, { variant });
     assert.equal(world.dinos.list.filter(d => d.type === TYPE).length, 0, `level ${variant} spawns none`);
   }
-  assert.ok(LEVELS.every((_, i) => !(TYPE in levelDef(i).dinos)), 'no existing level counts sump lurkers');
+  assert.deepEqual(LEVELS.map((_, i) => TYPE in levelDef(i).dinos), LEVELS.map((l) => l.biome === 'cave'), 'only the cave level counts sump lurkers');
 
   const world = poolWorld(0, 0, 8);
   const sys = world.dinos, before = sys.list.length;

@@ -428,9 +428,13 @@ test('the server caps height at the roof and the controller bumps its head', () 
 test('a server world on the cave level spawns pack hunters only, all in valid spots, with three relics and a boat to sail', () => {
   const world = new ServerWorld({ send() {} }, { level: LEVEL, variant: 2 });
   const kinds = new Set(world.dinos.list.map((d) => d.type));
-  assert.deepEqual([...kinds].sort(), ['gloom-raptor', 'raptor']);
+  const lurkers = world.dinos.list.filter((d) => d.type === 'sump-lurker');
+  assert.deepEqual([...kinds].filter((k) => k !== 'sump-lurker').sort(), ['gloom-raptor', 'raptor']);
+  const waterSpots = world.layout.caveDinoSpots.filter((c) => c.water);
+  assert.equal(lurkers.length > 0, waterSpots.length > 0, 'a lurker per flooded tunnel');
+  for (const d of lurkers) assert.ok(world.terrain.waterDepthAt(d.x, d.z) > 1, 'sump lurkers lie in deep water');
   const hallIds = new Set([world.layout.caveEntrance?.hall, world.layout.caveExit?.hall].filter((h) => h != null));
-  for (const d of world.dinos.list) {
+  for (const d of world.dinos.list.filter((d) => d.type !== 'sump-lurker')) {
     assert.ok(world.terrain.clearanceAt(d.x, d.z) > 3.4, 'raptor under a high roof');
     assert.equal(world.terrain.waterDepthAt(d.x, d.z) > 0.35, false);
   }
