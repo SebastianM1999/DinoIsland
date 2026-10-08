@@ -267,6 +267,9 @@ export class DinoView {
   }
 }
 
+/** An off-screen dinosaur closer than this (m) is still drawn: its shadow may fall into the picture. */
+const SHADOW_REACH = 60;
+
 export class DinoViews {
   constructor(game) {
     this.game = game;
@@ -381,11 +384,15 @@ export class DinoViews {
       // Three's fog uses view-space depth, not radial distance. Keep the whole
       // body visible until its nearest point is behind the fog's far plane.
       const depth = -V.copy(v.pos).applyMatrix4(camera.matrixWorldInverse).z;
-      const hidden = depth - _sphere.radius > hide;
+      // The skinned meshes opt out of Three's frustum culling (animated skins can leave their bind-pose
+      // bounds), so cull here: a view neither on screen nor close enough to throw a shadow into the
+      // picture is not drawn at all (a Gloom Raptor is ~59k triangles, drawn again for the shadow map)
+      const inView = _frustum.intersectsSphere(_sphere);
+      const hidden = depth - _sphere.radius > hide || (!inView && d2 > SHADOW_REACH * SHADOW_REACH);
       if (v.root.visible === hidden) v.root.visible = !hidden;
       // far away or off-screen dinosaurs animate at a lower rate (still
       // interpolated every frame; off-screen ones may still cast a visible shadow)
-      const far = hidden || d2 > 180 * 180 || !_frustum.intersectsSphere(_sphere);
+      const far = hidden || d2 > 180 * 180 || !inView;
       v.skip = far ? (v.skip || 0) + dt : 0;
       if (far && (hidden || v.skip < 0.1)) {
         if (hidden && !v.bar.hidden) v.bar.hidden = true;
