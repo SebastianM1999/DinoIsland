@@ -857,7 +857,7 @@ export class Game {
     if (this.stepCadence.update(p, dt)) {
       const surface = footstepSurface(p, this.terrain, this.layout, this.woodSupports);
       if (surface === 'water') {
-        this.audio.play('waterStep', { vol: Math.min(1.4, 0.55 + p.inWater * 0.8) * (p.sprinting ? 1.25 : 1) * (p.swimming ? 0.7 : 1) });
+        this.audio.play('waterStep', { movement: p.sprinting ? 'run' : 'walk', vol: Math.min(1.4, 0.55 + p.inWater * 0.8) * (p.sprinting ? 1.25 : 1) * (p.swimming ? 0.7 : 1) });
         this.water.ripple(p.pos.x, p.pos.z, Math.min(1, 0.3 + p.inWater * 0.5));
       } else this.audio.play('step', { surface, movement: p.sprinting ? 'run' : 'walk', vol: p.sprinting ? 1.3 : 1 });
     }
@@ -980,7 +980,12 @@ export class Game {
   onRoar(v) { this.audio.play(`roar_${v.type}`, { pos: v.pos }); }
   onDinoAttack(v) { if (v.type !== 'brachio') this.audio.play(v.type === 'stego' ? 'bigStep' : 'bite', { pos: v.pos }); }
   onDinoHit(v, m) { if (m.by !== this.me.id) this.audio.play('hit', { pos: v.pos, vol: 0.7 }); }
-  onDinoStep(v) { this.audio.play('bigStep', { pos: v.pos, vol: v.type === 'trex' ? 1.2 : 0.7 }); }
+  onDinoStep(v, step) {
+    const water = this.terrain.waterLevelAt(v.pos.x, v.pos.z);
+    const surface = footstepSurface({ pos: v.pos, inWater: water === null ? 0 : Math.max(0, water - v.pos.y), swimming: false }, this.terrain, this.layout, this.woodSupports);
+    this.audio.play('dinoStep', { species: v.type, surface, movement: step.movement, weight: step.weight,
+      size: v.scale, entityId: v.id, pos: v.pos, vol: step.volume });
+  }
 
   /**
    * The volcano's ash rain for the local player: sheltered at the camp or a

@@ -20,6 +20,7 @@ import { buildSarcoFallback, SARCO_ANIM } from '../models/dino/sarcoFallback.js'
 import { SarcoEffects } from './sarcoEffects.js';
 import { buildGLBDino } from '../models/dino/glbDino.js';
 import { disposeIslandScenes } from '../core/resources.js';
+import { CreatureStepCadence } from '../audio/creatureSteps.js';
 
 /** Every server species needs a visible model and its animation tuning. */
 export const SPECIES = {
@@ -52,6 +53,7 @@ export class DinoView {
     this.rig = sp.build();
     this.anim = sp.createAnimator(this.rig);
     this.sp = sp;
+    this.stepCadence = new CreatureStepCadence();
     this.root = this.rig.root;
     // oversized animals (the Primeval Grove's titan)
     this.scale = desc.sc || 1;
@@ -147,6 +149,11 @@ export class DinoView {
     this.roarT = Math.max(0, this.roarT - dt);
     this.flinch = Math.max(0, this.flinch - dt * 4);
     this.barT = Math.max(0, this.barT - dt);
+    // Interpolated every frame even when this animal's mesh is off-screen.
+    if (this.ctx?.onStep) {
+      const step = this.stepCadence.update(this, dt);
+      if (step) this.ctx.onStep(this, step);
+    }
   }
 
   update(dt, renderTime, sampled = false) {
@@ -182,12 +189,6 @@ export class DinoView {
         ? this.ctx.camera.position : null,
     });
     if (!this.rig.isGLB && this.flinch > 0) this.rig.body.rotation.z += Math.sin(this.flinch * 30) * 0.05 * this.flinch;
-    // heavy footfalls for the big ones
-    if (this.sp.heavy && this.alive) {
-      const half = Math.floor(this.anim.phase * 2);
-      if (half !== this.lastHalf && dist > 0.005) this.ctx.onStep?.(this);
-      this.lastHalf = half;
-    }
     this.sp.extraUpdate?.(this, animationDt);
     this.updateBar(dt);
   }
@@ -197,7 +198,7 @@ export class DinoView {
     if (this.type === 'ptera') {
       return this.pos.y <= this.ctx.terrain.heightAt(this.pos.x, this.pos.z) + 0.2;
     }
-    return true;
+    return this.pos.y <= this.ctx.terrain.heightAt(this.pos.x, this.pos.z) + 0.45;
   }
 
   /** Map the server state to animation pose targets. */
@@ -281,7 +282,7 @@ export class DinoViews {
     this.bodyDebugMat = new THREE.MeshBasicMaterial({ color: 0xffaa00, wireframe: true });
     this.bodyDebugGeo = new THREE.CylinderGeometry(1, 1, 1.5, 14, 1, true);
     game.gfx.scene.add(this.hitDebug);
-    this.ctx = { scene: game.gfx.scene, terrain: game.terrain, overlay: game.overlay, camera: game.gfx.camera, onStep: (v) => game.onDinoStep?.(v) };
+    this.ctx = { scene: game.gfx.scene, terrain: game.terrain, overlay: game.overlay, camera: game.gfx.camera, onStep: (v, step) => game.onDinoStep?.(v, step) };
     const net = game.net;
     net.on(`ev:${EV.DINO_ADD}`, (m) => this.add(m.dino));
     net.on(`ev:${EV.DINO_REMOVE}`, (m) => this.remove(m.id));

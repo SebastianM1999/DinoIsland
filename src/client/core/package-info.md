@@ -31,6 +31,7 @@
 ## Rules
 - `Game` never mutates authoritative state locally; it sends `net.act(ACT.*)` / `net.sendState` and applies what the server returns (only own movement is predicted).
 - Everything island-specific created by a `Game` must be released in `Game.dispose()`; the renderer, audio and input survive across islands.
+- `onDinoStep` classifies actual ground support with the player terrain helper and passes species, movement and model size to positional dinosaur audio; grounded contacts come from `DinoView` interpolation, not mesh visibility.
 - Geometry/materials/textures owned by a reusable model cache must be marked with `retainResource`/`retainObjectResources`, otherwise `disposeIslandScenes` disposes them at the next island.
 - Frame hitches are almost always shader recompiles: a program is specific to the render target (canvas vs. `WorldPost` target), the shadow setting and the number of visible lights. Never toggle a light's `visible` (keep intensity 0 instead), compile anything that can change these in `Renderer` first (`prepare`, `#compilePath`, `#compileShadowVariant`), and give things that first appear in play a hidden copy that the warm-up frame draws (see `Items`). `prepare` draws hidden objects too (not lights).
 - Graphics tier is never chosen by the player; render scale and contact shading are the only graphics sliders (`SETTING_DEFS`).

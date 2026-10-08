@@ -7,6 +7,7 @@
 - `music.js` — `IslandMusic`: owns music sources across Game instances, crossfades calm/danger/boss/menu tracks (`MUSIC_FADE`, `DANGER_HOLD`).
 - `samples.js` — `SampleBank` (deduplicated fetch + decode, failures remembered for the session) and `SamplePicker` (variation picking).
 - `steps.js` — `StepCadence`: distance-driven footstep trigger (silent when blocked or airborne; no bursts after teleports).
+- `creatureSteps.js` — `CreatureStepCadence` and `CREATURE_STEP_PROFILES`: distance-driven contacts for every dinosaur, species gait/relative sound weight and oversized titan strides; silent when dead, trapped, airborne or swimming and after teleports.
 - `surface.js` — `footstepSurface()` picks the footstep surface (wood, rock, water, sand, mud – also in swamp bogs –, dirt, gravel, leaves, grass); `woodSupports()` filters standable log colliders.
 - `region.js` — `inBossMusicArea()`: whether the player is in a boss arena (jungle lava islet or swamp kettle) or on the jungle causeway, with an exit margin.
 
