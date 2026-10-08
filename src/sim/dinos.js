@@ -17,11 +17,13 @@ import { raptorBrain } from './ai/raptor.js';
 import { gloomRaptorBrain } from './ai/gloomRaptor.js';
 import { pteraBrain } from './ai/ptera.js';
 import { trexBrain } from './ai/trex.js';
-import { sarcosuchusBrain, sarcoGroundHeight } from './ai/sarcosuchus.js';
+import { sarcosuchusBrain } from './ai/sarcosuchus.js';
+import { sumpLurkerBrain } from './ai/sumpLurker.js';
+import { aquaticGroundHeight, carcassSurface } from './ai/aquatic.js';
 import { raiderStep } from './raids.js';
 import { findPath } from './pathfind.js';
 
-const BRAINS = { brachio: brachioBrain, stego: stegoBrain, raptor: raptorBrain, 'gloom-raptor': gloomRaptorBrain, ptera: pteraBrain, trex: trexBrain, 'alpha-sarcosuchus': sarcosuchusBrain };
+const BRAINS = { brachio: brachioBrain, stego: stegoBrain, raptor: raptorBrain, 'gloom-raptor': gloomRaptorBrain, ptera: pteraBrain, trex: trexBrain, 'alpha-sarcosuchus': sarcosuchusBrain, 'sump-lurker': sumpLurkerBrain };
 const r2 = (v) => Math.round(v * 100) / 100;
 const r3 = (v) => Math.round(v * 1000) / 1000;
 const TRACK_SPACING = { brachio: 1.3, stego: 1, raptor: 2.2, 'gloom-raptor': 2.4, trex: 1.5 };
@@ -112,7 +114,7 @@ export class DinoSystem {
     if (d.scale) desc.sc = d.scale;       // oversized animal (the grove's titan)
     if (d.title) desc.name = d.title;
     if (d.butchered) desc.bu = 1;          // carved up with the knife
-    if (d.type === 'alpha-sarcosuchus') desc.phase = d.phase ? { ...d.phase } : null;
+    if (CONFIG.dinos[d.type].aquatic?.phaseClips) desc.phase = d.phase ? { ...d.phase } : null;
     return desc;
   }
 
@@ -124,7 +126,7 @@ export class DinoSystem {
     for (const d of this.list) {
       if (include && !include(d)) continue;
       const row = [d.id, r2(d.x), r2(d.y), r2(d.z), r3(d.yaw), d.st, Math.ceil(d.hp), r2(d.spd), d.fl];
-      if (d.type === 'alpha-sarcosuchus') row.push(d.phase?.clip ?? null, d.phase?.started ?? null, d.phase?.duration ?? null, d.phaseSeq ?? 0);
+      if (CONFIG.dinos[d.type].aquatic?.phaseClips) row.push(d.phase?.clip ?? null, d.phase?.started ?? null, d.phase?.duration ?? null, d.phaseSeq ?? 0);
       rows.push(row);
     }
     return rows;
@@ -190,12 +192,12 @@ export class DinoSystem {
       // everyone else stays off the boss arena's islet (the titan's home)
       return false;
     }
-    const sarco = d.type === 'alpha-sarcosuchus';
-    if (t.waterDepthAt(x, z) > (sarco ? 6 : d.type === 'brachio' ? 1.2 : 0.35)) return false;
-    if (sarco && t.seaDepthAt(x, z) > CONFIG.player.maxWadeDepth) return false;
+    const aquatic = CONFIG.dinos[d.type].aquatic;   // water animals wade/swim through deep water (sim/ai/aquatic.js)
+    if (t.waterDepthAt(x, z) > (aquatic ? aquatic.maxWaterDepth : d.type === 'brachio' ? 1.2 : 0.35)) return false;
+    if (aquatic && t.seaDepthAt(x, z) > CONFIG.player.maxWadeDepth) return false;
     // the heightfield is continuous, so there is no wall too steep to run down (move() slows the
     // descent to an along-the-surface speed); one shut in a pit below scrambles out (#detour)
-    if (!downhill && t.slopeAt(x, z) > climbSlope(d) && !(d.scrambleUntil > this.world.now) && !(sarco && t.waterDepthAt(x, z) > 0.5)) return false;
+    if (!downhill && t.slopeAt(x, z) > climbSlope(d) && !(d.scrambleUntil > this.world.now) && !(aquatic && t.waterDepthAt(x, z) > 0.5)) return false;
     if (t.lavaLevelAt(x, z) !== null) return false;
     // under the roof of the Hollow Mountain: never where a body does not fit (Infinity elsewhere)
     if (t.isCave && t.clearanceAt(x, z) < (d.type === 'raptor' ? 3.5 : 7)) return false;
@@ -290,7 +292,7 @@ export class DinoSystem {
       if (lockedHeading) { d.spd *= 0.5; this.#progress(d, 0, want, dt); return; }
       // probe left/right for a way around. Turn away faster than steer() turns back to the goal,
       // or a nimble raptor just twitches at the edge of a wall it can't climb
-      const avoid = (d.type === 'alpha-sarcosuchus' ? CONFIG.dinos[d.type].turnRate : Math.max(3, CONFIG.dinos[d.type].turnRate * 2)) * dt;
+      const avoid = (CONFIG.dinos[d.type].aquatic ? CONFIG.dinos[d.type].turnRate : Math.max(3, CONFIG.dinos[d.type].turnRate * 2)) * dt;
       let found = false;
       for (const a of [0.5, -0.5, 1.0, -1.0, 1.6, -1.6, 2.4, -2.4]) {
         const yy = d.yaw + a * (d.avoidSide || 1);
@@ -591,7 +593,7 @@ export class DinoSystem {
     d.alive = false;
     d.hp = 0;
     d.st = DS.DEAD;
-    if (d.type === 'alpha-sarcosuchus') { d.phase = null; d.phaseSeq = (d.phaseSeq ?? 0) + 1; }
+    if (CONFIG.dinos[d.type].aquatic?.phaseClips) { d.phase = null; d.phaseSeq = (d.phaseSeq ?? 0) + 1; }
     d.spd = 0;
     d.deadT = CARCASS_TIME;
     if (d.type === 'ptera') {
@@ -628,9 +630,8 @@ export class DinoSystem {
     for (let i = this.list.length - 1; i >= 0; i--) {
       const d = this.list[i];
       if (!d.alive) {
-        if (d.type === 'alpha-sarcosuchus') {
-          const ground = this.terrain.heightAt(d.x, d.z), water = this.terrain.waterLevelAt(d.x, d.z);
-          const surface = water === null ? ground : Math.max(ground, water - 0.8);
+        if (CONFIG.dinos[d.type].aquatic) {
+          const ground = this.terrain.heightAt(d.x, d.z), surface = carcassSurface(d, this.terrain);
           // Preserve the lethal-hit pose and settle slowly: no snap into the mud
           // when a surfaced or submerged boss becomes a floating carcass.
           d.y = Math.max(ground, d.y + clamp(surface - d.y, -0.45 * dt, 0.45 * dt));
@@ -681,8 +682,8 @@ export class DinoSystem {
         }
       }
 
-      if (d.type === 'alpha-sarcosuchus') {
-        d.y = sarcoGroundHeight(d, this.terrain);
+      if (CONFIG.dinos[d.type].aquatic) {
+        d.y = aquaticGroundHeight(d, this.terrain);
         d.swimOffset = d.y - this.terrain.heightAt(d.x, d.z);
       } else if (d.type !== 'ptera' || d.grounded) d.y = this.terrain.heightAt(d.x, d.z);
 
