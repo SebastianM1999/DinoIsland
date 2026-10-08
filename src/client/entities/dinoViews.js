@@ -13,7 +13,7 @@ import { InterpBuffer } from '../net/interp.js';
 import { DinoAnimator } from '../models/dino/rig.js';
 import { buildBrachio, BRACHIO_ANIM, brachioExtraUpdate } from '../models/dino/brachio.js';
 import { buildStego, STEGO_ANIM, stegoExtraUpdate } from '../models/dino/stego.js';
-import { buildRaptor, RAPTOR_ANIM, raptorExtraUpdate } from '../models/dino/raptor.js';
+import { buildRaptor, buildGloomRaptor, RAPTOR_ANIM, raptorExtraUpdate } from '../models/dino/raptor.js';
 import { buildPtera, PTERA_ANIM, pteraExtraUpdate } from '../models/dino/ptera.js';
 import { buildTrex, TREX_ANIM, trexExtraUpdate } from '../models/dino/trex.js';
 import { buildSarcoFallback, SARCO_ANIM } from '../models/dino/sarcoFallback.js';
@@ -28,6 +28,7 @@ export const SPECIES = {
   brachio: { build: buildBrachio, anim: BRACHIO_ANIM, extraUpdate: brachioExtraUpdate, barHeight: 13.8, heavy: true },
   stego: { build: buildStego, anim: STEGO_ANIM, extraUpdate: stegoExtraUpdate, barHeight: 4.2, heavy: true },
   raptor: { build: buildRaptor, anim: RAPTOR_ANIM, extraUpdate: raptorExtraUpdate, barHeight: 1.8 },
+  'gloom-raptor': { build: buildGloomRaptor, anim: RAPTOR_ANIM, extraUpdate: raptorExtraUpdate, barHeight: 2.3 },
   ptera: { build: buildPtera, anim: PTERA_ANIM, extraUpdate: pteraExtraUpdate, barHeight: 2.3 },
   trex: { build: buildTrex, anim: TREX_ANIM, extraUpdate: trexExtraUpdate, barHeight: 6.4, heavy: true },
 };

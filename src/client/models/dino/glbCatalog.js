@@ -11,7 +11,7 @@ function model(species, source, height, length, walkStride, runStride, quadruped
   return {
     url: `/assets/models/dinos/${species}.glb`, source, height, length,
     // Pack faces +Z after Blender's Y-up export; game creatures face -Z.
-    yaw: Math.PI, walkStride, runStride, runThreshold: species === 'raptor' ? 4 : 3,
+    yaw: Math.PI, walkStride, runStride, runThreshold: species === 'raptor' || species === 'gloom-raptor' ? 4 : 3,
     bones: { ...bones, legs: quadruped ? bones.legs : bones.legs.slice(0, 2),
       feet: quadruped ? bones.feet : bones.feet.slice(0, 2) },
     clips: { idle: `${source}_Idle`, walk: `${source}_Walk`, run: `${source}_Run`,
@@ -22,6 +22,8 @@ export const GLB_DINOS = {
   [SARCO_TYPE]: SARCO_MODEL,
   // Median grounded foot velocity × clip duration; see measure-dino-strides.mjs.
   raptor: model('raptor', 'Velociraptor', 1.675, 3.037, 1.818, 4.09),
+  // Cave-dwelling raptor kin (art/sources/gloom-raptor): ~25% larger than the raptor (uniform fit).
+  'gloom-raptor': model('gloom-raptor', 'GloomRaptor', 2.083, 3.9, 2.279, 5.125),
   trex: model('trex', 'TRex', 5.919, 11, 4.819, 8.095),
   stego: model('stego', 'Stegosaurus', 3.758, 7.9, 1.414, 3.414, true),
   brachio: model('brachio', 'Brachiosaurus', 13.007, 18.514, 2.714, 5.333, true),
@@ -38,6 +40,22 @@ GLB_DINOS.brachio.bones = { ...GLB_DINOS.brachio.bones,
 GLB_DINOS.raptor.bones = { ...GLB_DINOS.raptor.bones,
   jaw: 'Jaw', neck: ['Neck1', 'Neck2'], spine: ['Body', 'Torso'],
   feet: ['BackToesR', 'BackToesL'], knees: ['BackLowLegR', 'BackLowLegL'] };
+// Gloom Raptor: the raptor rig plus a hiss (Roar) and a flinch (Hurt) clip.
+GLB_DINOS['gloom-raptor'].bones = { ...GLB_DINOS.raptor.bones };
+GLB_DINOS['gloom-raptor'].clips.roar = 'GloomRaptor_Roar';
+GLB_DINOS['gloom-raptor'].clips.hurt = 'GloomRaptor_Hurt';
+// Extra hit spheres measured with hit_coverage.mjs (game metres: [zone, bone, x, y, forward, radius]): head/snout, forelimbs,
+// feet and lower legs, thick tail base that the generic joint spheres miss.
+GLB_DINOS['gloom-raptor'].extraHitZones = [
+  ['head', 'Head', -0.02, 1.69, 1.43, 0.16],
+  ['leg', 'BackFootL', -0.27, 0.11, 0.03, 0.16],
+  ['leg', 'BackFootR', 0.27, 0.11, 0.02, 0.16],
+  ['body', 'ArmLowR', 0.25, 0.77, 0.69, 0.16],
+  ['body', 'ArmLowL', -0.25, 0.8, 0.71, 0.16],
+  ['tail', 'Tail4', 0.02, 1.12, -2.19, 0.16],
+  ['leg', 'BackLowLegL', -0.24, 0.41, -0.2, 0.16],
+  ['leg', 'BackLowLegR', 0.19, 0.42, -0.14, 0.16],
+].map(([zone, bone, x, y, fwd, radius]) => ({ zone, bone, at: [x, y, fwd], radius }));
 // Project T-Rex (art/sources/trex/trex.blend): same theropod rig plus a roar clip.
 GLB_DINOS.trex.bones = { ...GLB_DINOS.raptor.bones };
 GLB_DINOS.trex.clips.roar = 'TRex_Roar';
@@ -133,6 +151,7 @@ GLB_DINOS.ptera.extraHitZones.push(...[
 ].map(([zone, bone, x, y, fwd, radius]) => ({ zone, bone, at: [x, y, fwd], radius })));
 // Cycles per second, bounded independently of unusually short source run strides.
 GLB_DINOS.raptor.maxCadence = 2.4;
+GLB_DINOS['gloom-raptor'].maxCadence = 2.4;
 GLB_DINOS.trex.maxCadence = 1.25;
 GLB_DINOS.stego.maxCadence = 2.6;
 GLB_DINOS.brachio.maxCadence = 1.25;

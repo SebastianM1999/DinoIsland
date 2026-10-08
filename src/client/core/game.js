@@ -976,7 +976,7 @@ export class Game {
       if (!v.alive || v.type === 'brachio') continue;
       const hostile = (v.fl & 1) !== 0 || v.st === DS.ATTACK || v.st === DS.CHARGE || v.st === DS.DIVE;
       if (!hostile) continue;
-      const range = v.type === 'trex' ? 75 : v.type === 'ptera' ? 45 : 40;
+      const range = v.type === 'trex' ? 75 : v.type === 'ptera' ? 45 : v.type === 'gloom-raptor' ? 36 : 40;   // the blind gloom raptor hunts by sound: closer
       if (Math.hypot(v.pos.x - p.x, v.pos.z - p.z) < range) return true;
     }
     return false;

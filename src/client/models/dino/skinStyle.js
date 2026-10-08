@@ -2,6 +2,7 @@ import * as THREE from 'three';
 
 export const DINO_PALETTES = {
   raptor: { main: '#ee8b3a', back: '#c36c30', belly: '#f6e0b5', stripe: '#793b25', iris: '#f6c84b' },
+  'gloom-raptor': { main: '#e3deec', back: '#aaa2bf', belly: '#fbfaff', stripe: '#857da0', iris: '#dfe2ea', glow: '#35f2ff' },
   trex: { main: '#d96843', back: '#a94335', belly: '#f2d8ac', stripe: '#75352d', iris: '#edb646' },
   stego: { main: '#86a03c', back: '#637f35', belly: '#f3e3b6', stripe: '#445d2c', iris: '#d99930' },
   brachio: { main: '#8089dc', back: '#5866ae', belly: '#f4e0b8', stripe: '#485591', iris: '#e7a842' },

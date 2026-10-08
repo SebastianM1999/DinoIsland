@@ -9,7 +9,7 @@ import { paint, place, merge } from '../models/kit.js';
 
 const MAX = 420;
 const ROUND = { brachio: 1.25, stego: 0.8 };
-const TOED = { raptor: 0.45, trex: 1.3 };
+const TOED = { raptor: 0.45, 'gloom-raptor': 0.55, trex: 1.3 };
 
 function roundPrintGeo() {
   const pad = new THREE.CircleGeometry(0.5, 9).rotateX(-Math.PI / 2);
