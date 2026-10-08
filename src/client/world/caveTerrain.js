@@ -78,6 +78,9 @@ export function buildCaveTerrainMesh(terrain, layout) {
     if (beachK > 0.01) k = Math.min(k, 1 - beachK + 0.0);
     // the outside is lighter, weathered, mossy on ledges, wet and dark at the sea
     if (cliffK > 0.01) {
+      // the layered stone is painted per pixel (surfaceDetail.js): the vertices carry only the broad light and dark,
+      // a band sampled once per 2.7 m cell would stripe a steep face
+      rock.lerp(tmp.copy(P.rock).lerp(P.rockWarm, 0.3 + 0.4 * noise), cliffK);
       const seaDark = 1 - smoothstep(1.5, 9, y);
       rock.multiplyScalar(0.9 + 0.35 * smoothstep(8, 60, y));
       rock.lerp(P.rockDark, seaDark * 0.5);
@@ -231,12 +234,28 @@ function buildShell({ terrain, layout, sky, geo, T, fillVertex, material }) {
     }
   }
   // cells that need the skin: all corners inside the mountain's edge, some corner lifted by more than a touch
-  const cells = [];
+  const need = new Uint8Array(n * n);
   for (let j = 0; j < n; j++) {
     for (let i = 0; i < n; i++) {
       const a = j * n1 + i, ks = [a, a + 1, a + n1, a + n1 + 1];
       if (ks.some((k) => depth[k] <= 0.5)) continue;
-      if (ks.some((k) => S[k] - terrain.h(k % n1, (k / n1) | 0) > 0.3)) cells.push([i, j]);
+      if (ks.some((k) => S[k] - terrain.h(k % n1, (k / n1) | 0) > 0.3)) need[j * n + i] = 1;
+    }
+  }
+  // the skin runs two cells beyond the lifted ones: its normals and colours come from the skin itself
+  // (a vertex on a tunnel wall's crest has the wall in its terrain normal: dark slits along the skin)
+  const cells = [];
+  for (let j = 0; j < n; j++) {
+    for (let i = 0; i < n; i++) {
+      let hit = need[j * n + i] === 1;
+      for (let dj = -2; dj <= 2 && !hit; dj++) for (let di = -2; di <= 2 && !hit; di++) {
+        const a = i + di, b = j + dj;
+        if (a >= 0 && b >= 0 && a < n && b < n && need[b * n + a]) hit = true;
+      }
+      if (!hit) continue;
+      const q = j * n1 + i;
+      if ([q, q + 1, q + n1, q + n1 + 1].some((k) => depth[k] <= 0.5)) continue;
+      cells.push([i, j]);
     }
   }
   if (!cells.length) return null;
@@ -251,16 +270,8 @@ function buildShell({ terrain, layout, sky, geo, T, fillVertex, material }) {
   const A = { pos: new Float32Array(m * 3), col: new Float32Array(m * 3), sf: new Float32Array(m * 4), sf2: new Float32Array(m * 2) };
   const nor = new Float32Array(m * 3);
   const at = (i, j) => S[Math.min(n, Math.max(0, j)) * n1 + Math.min(n, Math.max(0, i))];
-  const tn = geo.attributes.normal.array;
   order.forEach((k, v) => {
     const i = k % n1, j = (k / n1) | 0, x = -half + i * cell, z = -half + j * cell;
-    if (!lifted[k]) {
-      // a solid vertex: exactly the terrain's
-      A.pos.set(T.pos.subarray(k * 3, k * 3 + 3), v * 3); A.col.set(T.col.subarray(k * 3, k * 3 + 3), v * 3);
-      A.sf.set(T.sf.subarray(k * 4, k * 4 + 4), v * 4); A.sf2.set(T.sf2.subarray(k * 2, k * 2 + 2), v * 2);
-      nor.set(tn.subarray(k * 3, k * 3 + 3), v * 3);
-      return;
-    }
     const gx = (at(i + 1, j) - at(i - 1, j)) / (2 * cell), gz = (at(i, j + 1) - at(i, j - 1)) / (2 * cell);
     fillVertex(A, v, x, S[k], z, Math.hypot(gx, gz));
     const l = Math.hypot(gx, 1, gz);
