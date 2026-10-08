@@ -2,6 +2,7 @@
 > Pure, deterministic data and rules imported by both the client (`src/client/`) and the authoritative simulation (`src/sim/`), plus the network protocol and tunables used by `server/` and `desktop/`.
 
 ## Files
+- `torch.js` — hand-held torch: `TORCH` (respawn time, light colour/range/intensity, 4 light slots), `carriesLight(player|fl)` (reads `PF.TORCH`; for dinosaur brains), `leftHandBusy(tool, eating)` (bow/trap/rifle/eating lower the torch). `PF.TORCH` (256) lives in `protocol.js`; `layout.torchSpots` (`[{x,z,y?}]`, set by the level) is optional.
 
 ### Island generation & terrain
 - `rng.js` — seeded PRNG (`makeRng`, Mulberry32), `hash2`, `valueNoise`, `fbm`, and math helpers (`clamp`, `lerp`, `smoothstep`, `angleDiff`).

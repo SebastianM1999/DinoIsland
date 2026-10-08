@@ -2,6 +2,7 @@
 > The authoritative game simulation: one `ServerWorld` per session owns players, dinosaurs, items, missions and the team base, validates every client request and produces snapshots and events.
 
 ## Files
+- Torch (in `world.js`): `placeTorches` puts one `torch` item at each `layout.torchSpots` entry (none elsewhere); pickup sets `inv.torch` (owners do not use it up), the spot refills `TORCH.respawnTime` after being taken, torch items never expire; `onState` accepts `PF.TORCH` only while `inv.torch`. The torch stays with the player across death and islands (inventory is kept).
 - `world.js` — `ServerWorld`: island loading, players, actions, inventory, combat validation, base, skills, tick and snapshots (see map below).
 - `dinos.js` — `DinoSystem`: spawning, steering (20 % slower through swamp bogs, `Terrain.swampSpeedAt`) and lateral steps, local avoidance, stuck nudges, footprints (tracks), traps, damage, death, carcass loot, respawn, pose history; delegates behaviour to the brains in `ai/`. `walkable` also keeps dinosaurs under a roof they fit (Hollow Mountain). Swamp boss leashes permit inland swimming, constrain combat to Drowned Hollow, and bosses do not respawn. Their waterborne carcasses preserve the death position and settle slowly toward the surface.
 - `ai/` — one behaviour "brain" per species (see `ai/package-info.md`).

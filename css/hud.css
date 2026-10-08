@@ -529,6 +529,10 @@
 .hud-pill.brush::before { background: rgba(var(--navy-rgb), 0.72); border-radius: 99em; }
 .hud-pill-ic { width: 1.5em; height: 1.5em; }
 .hud-quiver.is-empty .hud-pill-num { color: var(--red); }
+.hud-torch { color: rgba(255, 255, 255, 0.7); }
+.hud-torch kbd { font-size: 0.8em; opacity: 0.85; }
+.hud-torch.is-lit { color: var(--orange); }
+.hud-torch:not(.is-lit) .hud-pill-ic { filter: grayscale(0.85) brightness(0.8); }
 .hud-fruitrow { gap: 0.2em; padding-right: 0.5em; }
 .hud-fr { width: 1.45em; height: 1.45em; }
 .hud-fr.is-empty {

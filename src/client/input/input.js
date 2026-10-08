@@ -10,6 +10,7 @@ const KEY_BINDINGS = {
   ShiftLeft: 'sprint', ShiftRight: 'sprint',
   KeyE: 'interact',
   KeyF: 'eat',
+  KeyL: 'torch',      // light / put out the hand-held torch (off hand)
   KeyG: 'give',
   KeyQ: 'dash',       // Dash skill (Endurance capstone)
   KeyR: 'reloadHint',

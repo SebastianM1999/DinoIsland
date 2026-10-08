@@ -87,6 +87,7 @@ export class RemotePlayers {
         drawing: (rp.fl & PF.DRAW) !== 0,
         eating: (rp.fl & PF.EAT) !== 0,
         attacking: (rp.fl & PF.ATTACK) !== 0,
+        torch: (rp.fl & PF.TORCH) !== 0,
         grounded: (rp.fl & PF.GROUND) !== 0 || rp.spd < 0.1,
         carry: rp.carry,
         alive: rp.alive && (rp.fl & PF.DOWNED) === 0,   // downed players lie on the ground like dead ones

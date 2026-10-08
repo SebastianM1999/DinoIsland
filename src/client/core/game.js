@@ -34,6 +34,7 @@ import { RemotePlayers } from '../entities/remotePlayers.js';
 import { Hud } from '../ui/hud.js';
 import { DinoViews } from '../entities/dinoViews.js';
 import { Tracks } from '../entities/tracks.js';
+import { Torches } from '../entities/torches.js';
 import { Items } from '../entities/items.js';
 import { Projectiles } from '../entities/projectiles.js';
 import { PlayerActions } from '../player/actions.js';
@@ -214,6 +215,9 @@ export class Game {
     this.relics = new Relics(this);
     this.systems = [this.dinos, this.tracks, this.items, this.actions, this.projectiles, this.relics];
 
+    this.torchLit = false;    // off-hand torch lit (L); sent as PF.TORCH, the server only accepts it with a torch in the pack
+    this.torches = new Torches(this);   // after the island is built, before gfx.prepare(): creates its light pool
+    this.systems.push(this.torches);
     this.#applyWelcome(w);
     this.wardrobe = new Wardrobe({
       slot: this.me.slot,
@@ -661,7 +665,7 @@ export class Game {
       yaw: +p.yaw.toFixed(3), pitch: +p.pitch.toFixed(3),
       spd: +p.moveSpeed.toFixed(2),
       eq: this.eq,
-      fl: this.flags | (p.sprinting ? PF.SPRINT : 0) | (p.onGround ? PF.GROUND : 0) | (p.knockTimer > 0 ? PF.KNOCKED : 0) | (p.dash.active ? PF.DASH : 0),
+      fl: this.flags | (p.sprinting ? PF.SPRINT : 0) | (p.onGround ? PF.GROUND : 0) | (p.knockTimer > 0 ? PF.KNOCKED : 0) | (p.dash.active ? PF.DASH : 0) | (this.torchLit && this.me.inv.torch ? PF.TORCH : 0),
     };
     this.flags &= ~PF.ATTACK; // one-shot animation pulse
     return state;

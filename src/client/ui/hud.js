@@ -206,7 +206,10 @@ export class Hud {
     this.$ash = el('div', 'hud-pill hud-ash brush');
     this.$ash.setAttribute('role', 'status');
     this.$ash.hidden = true;
-    this.$carry.append(this.$quiver, this.$fruitRow, this.$loot, this.$swamp, this.$heat, this.$ash, this.$buffs);
+    // the off-hand torch: shown once picked up (L lights or puts it out)
+    this.$torch = el('div', 'hud-pill hud-torch brush');
+    this.$torch.hidden = true;
+    this.$carry.append(this.$torch, this.$quiver, this.$fruitRow, this.$loot, this.$swamp, this.$heat, this.$ash, this.$buffs);
     this.$hotbar = el('ol', 'hud-hotbar brush');
     this.$hotbar.setAttribute('aria-label', 'Equipment');
     this._slots = [];
@@ -455,6 +458,16 @@ export class Hud {
   }
 
   /** Show the "Swamp: slowed" tag while the local player wades through a bog. */
+  /** The off-hand torch: hidden until owned, then its state and key. */
+  setTorch(owned, lit) {
+    const sig = owned ? (lit ? 'lit' : 'out') : '';
+    if (this._c.torch === sig) return;
+    this._c.torch = sig;
+    this.$torch.hidden = !owned;
+    this.$torch.classList.toggle('is-lit', !!lit);
+    if (owned) this.$torch.innerHTML = `<span class="hud-pill-ic">${icon('torch')}</span><kbd>L</kbd><span class="hud-torch-state">${lit ? 'Lit' : 'Out'}</span><span class="sr"> torch</span>`;
+  }
+
   setSwamp(on) {
     if (this._c.swamp === !!on) return;
     this._c.swamp = !!on;

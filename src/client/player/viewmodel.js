@@ -12,6 +12,8 @@ import { handGeometry } from '../models/hands.js';
 import { SPEAR_THROW, spearReleaseRotation, cameraPlaneScale } from './spearThrow.js';
 import { makeFirearm } from '../models/firearms/index.js';
 import { makeFruitMesh } from '../models/fruit.js';
+import { makeTorch, torchFlicker } from '../models/torch.js';
+import { TORCH, leftHandBusy } from '../../shared/torch.js';
 
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
 const damp = (a, b, r, dt) => a + (b - a) * (1 - Math.exp(-r * dt));
@@ -154,7 +156,49 @@ export class Viewmodel {
     this.gripArmR = this.rArm.geometry;
 
     this.rPinch.visible = false;
+    this.#buildTorchRig(skin);
     this.applyVisibility();
+  }
+
+  /**
+   * Off-hand torch: its own left arm, hand and torch model, posed in `updateTorch`
+   * independently of `this.tool` (the main tool may still use `lHand`).
+   */
+  #buildTorchRig(skin) {
+    this.torchOwned = false;
+    this.torchLit = false;
+    this.torchRaise = 0;     // 0 lowered out of view .. 1 held up
+    this.torchLevel = 0;     // 0 off, ember..1 light strength (read by entities/torches.js)
+    this.torchFlicker = 1;
+    this.tHand = new THREE.Group();
+    this.tArm = mesh(armGeometry(skin, TOPS[0], -1), MAT.standard, { cast: false });
+    this.tGrip = new THREE.Group();   // palm + torch, tilted as one
+    this.tPalm = mesh(handGeometry(skin, -1), MAT.standard, { cast: false });
+    this.torch = makeTorch();
+    this.torch.scale.setScalar(0.75);
+    this.torch.traverse((o) => { o.castShadow = false; });
+    this.tGrip.add(this.tPalm, this.torch);
+    this.tHand.add(this.tArm, this.tGrip);
+    this.tHand.visible = false;
+    this.root.add(this.tHand);
+    this.torchHeadView = V(0, 0, 0);
+    this.torchHeld = V(-0.27, -0.31, -0.52);     // raised
+    this.torchLow = V(-0.36, -0.70, -0.36);      // lowered (below the screen)
+    this.torchTilt = new THREE.Quaternion().setFromEuler(new THREE.Euler(-0.32, 0.12, -0.2));
+  }
+
+  /** The torch is owned / lit (from the inventory and the L key). */
+  setTorch(owned, lit) {
+    this.torchOwned = !!owned;
+    this.torchLit = !!owned && !!lit;
+  }
+
+  /** The torch flame's position in the world (for the light pool); updates the cached matrices. */
+  torchHeadWorld(out, camera) {
+    camera.updateMatrixWorld();
+    this.root.updateMatrixWorld(true);
+    this.torch.userData.head.getWorldPosition(out);   // viewmodel space: the view camera sits at the origin
+    return out.applyMatrix4(camera.matrixWorld);
   }
 
   /** Match the first-person sleeves to the chosen shirt/jacket. */
@@ -203,7 +247,9 @@ export class Viewmodel {
       }
       this.fruitMeshes[this.fruitType].visible = true;
     }
-    this.lHand.visible = t === 'bow' || t === 'trap' || !!this.guns[t] || this.eatT > 0;
+    // a pistol is fired one-handed while the torch is up; every other gun/tool keeps its left hand
+    const pistolFree = t === 'pistol' && this.torchRaise > 0.02;
+    this.lHand.visible = t === 'bow' || t === 'trap' || (!!this.guns[t] && !pistolFree) || this.eatT > 0;
     for (const [kind, gun] of Object.entries(this.guns)) gun.visible = t === kind;
   }
 
@@ -382,12 +428,56 @@ export class Viewmodel {
       this.rPalm.visible = true;
       this.rPinch.visible = false;
     }
+    this.updateTorch(dt, s, bx, by, breathe);
     this.aimArm(this.rArm, this.rHand, 1);
     this.aimArm(this.lArm, this.lHand, -1);
+    this.aimArm(this.tArm, this.tHand, -1);
     // Launch after the release pose is evaluated, in the same animation frame.
     if (this.throwT > 0 && !this.throwReleased && this.throwElapsed + 1e-9 >= SPEAR_THROW.release) {
       this.throwReleased = true; this.spear.visible = false;
       const release = this.throwRelease; this.throwRelease = null; release?.();
+    }
+  }
+
+  /**
+   * Off-hand torch. Held up in the left of the view while lit; lowered out of view
+   * (the light dims to an ember) while the main tool needs the left hand: bow, trap,
+   * rifle or eating. A pistol is one-handed meanwhile. Own sway, apart from the right hand.
+   */
+  updateTorch(dt, s, bx, by, breathe) {
+    const tool = this.pendingTool ?? this.tool;
+    const busy = leftHandBusy(tool, this.eatT > 0);
+    const up = this.torchOwned && this.torchLit && !busy;
+    this.torchRaise = damp(this.torchRaise, up ? 1 : 0, up ? 7 : 9, dt);
+    if (this.torchRaise < 0.002) this.torchRaise = 0;
+    const lightTarget = !this.torchLit ? 0 : busy ? TORCH.light.ember : 1;
+    this.torchLevel = damp(this.torchLevel, lightTarget, 6, dt);
+    if (this.torchLevel < 0.002) this.torchLevel = 0;
+
+    const lit = this.torchLit;
+    // flame fade follows how far the torch is raised; a lit torch below the screen needs no flame drawing
+    this.torch.userData.update(this.time, dt, lit && this.torchRaise > 0.02);
+    this.torchFlicker = torchFlicker(this.time, 0);
+    const shown = this.torchRaise > 0.002 && this.torchOwned;
+    this.tHand.visible = shown;
+    const k = this.torchRaise * this.torchRaise * (3 - 2 * this.torchRaise);
+    const p = this.tHand.position.copy(this.torchLow).lerp(this.torchHeld, k);
+    // own motion: slower breathing sway, a gentle walk bob out of phase with the right hand, camera lag at half strength
+    const t = this.time;
+    const walk = Math.min(1, s.speed / CONFIG.player.walkSpeed) * (s.grounded ? 1 : 0.2);
+    p.x += bx * -0.6 + this.sway.x * 0.7 + Math.sin(t * 1.15) * 0.004;
+    p.y += by * 0.7 + this.sway.y * 0.7 + Math.sin(t * 1.55 + 1) * 0.005 + Math.sin(this.bobT * 2 + 1.2) * 0.006 * walk - (s.sprint ? 0.03 : 0);
+    p.z += Math.sin(t * 0.9 + 2) * 0.003;
+    this.tGrip.quaternion.copy(this.torchTilt);
+    this.tGrip.rotation.z += Math.sin(t * 1.3) * 0.025 + this.sway.x * 1.5 + (s.sprint ? 0.12 : 0);
+    this.tGrip.rotation.x += Math.sin(t * 1.7 + 0.5) * 0.02 - this.sway.y * 1.2 + (1 - k) * 0.6;
+    this.tHand.quaternion.identity();
+    // the warm glow on hands and weapon follows the flame
+    const glow = this.gfx.viewTorch;
+    if (glow) {
+      this.torch.userData.head.getWorldPosition(this.torchHeadView);   // matrices are one frame old: fine for a glow
+      glow.position.copy(this.torchHeadView);
+      glow.intensity = this.torchRaise * (lit ? 1.1 : 0) * (0.8 + 0.4 * this.torchFlicker);
     }
   }
 

@@ -7,7 +7,7 @@ export const TORCH = {
   /** Seconds until a taken torch reappears at its ground spot (`layout.torchSpots`). */
   respawnTime: 60,
   /** World light of one lit torch (client `LightPool`, physical units under ACES tone mapping). */
-  light: { color: '#ff9a45', distance: 20, decay: 2, intensity: 42, ember: 0.12 },
+  light: { color: '#ff9a45', distance: 20, decay: 2, intensity: 48, ember: 0.12 },
   /** Light-pool slots: 0 is the local player, 1-3 are remote players. */
   slots: 4,
 };
@@ -20,4 +20,10 @@ export const TORCH = {
 export function carriesLight(player) {
   const fl = typeof player === 'number' ? player : player?.fl;
   return ((fl | 0) & PF.TORCH) !== 0;
+}
+
+/** Main tools that need the left hand as well (bow, trap, rifle grip); eating does too. The torch is lowered meanwhile. */
+const TWO_HANDED = new Set(['bow', 'trap', 'rifle']);
+export function leftHandBusy(tool, eating = false) {
+  return eating || TWO_HANDED.has(tool);
 }
