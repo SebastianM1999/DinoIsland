@@ -25,6 +25,7 @@ import { sanitizeOutfit, sameOutfit } from '../shared/outfits.js';
 import { planIsland } from '../shared/island.js';
 import { levelDef, LEVEL_COUNT } from '../shared/levels.js';
 import { TORCH } from '../shared/torch.js';
+import { CAVE_WALK_MAX } from '../shared/caveField.js';
 import { findUnstuckSpot, goodSpot } from './unstuck.js';
 import { nearDino, plausibleZone } from './hitCheck.js';
 import { freshBase, campStations, safeZone as baseSafeZone, hasBasePlots, PLOT_REACH, MAX_STAGE, stageCost, BUILD_TIME, BASE_STAGES, applyBaseColliders, baseSpawnPoints, TOWERS, TOWER_SLOTS, towerCost, repairCost } from '../shared/base.js';
@@ -785,7 +786,9 @@ export class ServerWorld {
     if (distance > p.moveBudget + 0.05 || Math.abs(x) > lim || Math.abs(z) > lim ||
         !Number.isFinite(ground) || y < ground - 2 || y > ground + (creative ? P.creative.maxHeight + 5 : 20) ||
         // rivers and lakes may be swum; only the open sea is off-limits
-        (!creative && this.terrain.seaDepthAt(x, z) > CONFIG.world.maxWadeDepth + 0.2) || blocked) {
+        (!creative && this.terrain.seaDepthAt(x, z) > CONFIG.world.maxWadeDepth + 0.2) || blocked ||
+        // the Hollow Mountain's rock is closed to anyone on foot: no climbing its flanks, no standing on its top
+        (this.terrain.isCave && !creative && this.terrain.heightAt(x, z) > CAVE_WALK_MAX)) {
       if (!historical) this.correct(p);
       return false;
     }

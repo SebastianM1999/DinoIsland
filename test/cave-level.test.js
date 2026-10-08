@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import { planIsland } from '../src/shared/island.js';
 import { Terrain } from '../src/shared/terrain.js';
 import { buildLayout } from '../src/shared/layout.js';
-import { caveOpenSdf } from '../src/shared/caveField.js';
+import { caveOpenSdf, caveRockTop, caveRoofBase, CAVE_WALK_MAX } from '../src/shared/caveField.js';
 import { penetration } from '../src/shared/collision.js';
 import { RELICS } from '../src/shared/relics.js';
 import { levelDef } from '../src/shared/levels.js';
@@ -149,7 +149,7 @@ test('the east beach is reachable only through the mountain, by exactly one tunn
     // ... and the cave leads through
     assert.ok(flood(terrain, spawnOf(layout)).at(layout.boat.interact.x, layout.boat.interact.z));
     // exactly one tunnel opens onto the east beach, and it is the one that leaves the exit hall
-    const east = maze.tunnels.filter((t) => t.pts.some((p) => p.x > 185 && Math.abs(p.z) < 105));
+    const east = maze.tunnels.filter((t) => t.pts.some((p) => p.x > 185 && Math.abs(p.z) < 105 && plan.cave.depthAt(p.x, p.z) < 12));
     assert.equal(east.length, 1, `variant ${variant}: one tunnel to the east beach`);
     assert.equal(east[0].kind, 'exit');
     assert.equal(maze.nodes[east[0].a].id, maze.exit.hall);
@@ -256,7 +256,7 @@ test('under every walkable cave cell the roof is at least 3.5 m up, in tunnels 5
         const roof = terrain.ceilingAt(x, z);
         // (open sky: the coves, the tunnel mouths and the false exits' ledges)
         if (roof === Infinity) {
-          assert.ok(Math.abs(x) > 160 || layout.falseExits.some((fe) => Math.hypot(fe.x - x, fe.z - z) < 40), `variant ${variant}: open sky inside the mountain at (${x.toFixed(0)}, ${z.toFixed(0)})`);
+          assert.ok(plan.cave.depthAt(x, z) < 18 || layout.falseExits.some((fe) => Math.hypot(fe.x - x, fe.z - z) < 40), `variant ${variant}: open sky inside the mountain at (${x.toFixed(0)}, ${z.toFixed(0)})`);
           continue;
         }
         cells++;
@@ -445,4 +445,91 @@ test('a server world on the cave level spawns pack hunters only, all in valid sp
   }
   assert.equal(world.relics.length, 3);
   assert.ok(world.layout.level.last);
+});
+
+test('the outside is a real mountain: ragged shore, steep flanks, two summits far above every roof', () => {
+  for (const variant of VARIANTS.slice(0, 8)) {
+    const { terrain, plan } = island(variant);
+    const D = plan.cave.depthAt;
+    // the summit and a second, separate one
+    const peaks = [];
+    let top = 0;
+    const n1 = terrain.n + 1;
+    for (let j = 2; j < terrain.n - 1; j += 1) for (let i = 2; i < terrain.n - 1; i += 1) {
+      const h = terrain.h(i, j);
+      top = Math.max(top, h);
+      if (h < 60) continue;
+      let max = true;
+      for (let dj = -4; dj <= 4 && max; dj++) for (let di = -4; di <= 4; di++) if (terrain.h(i + di, j + dj) > h) { max = false; break; }
+      if (max) peaks.push({ x: -terrain.half + i * terrain.cell, z: -terrain.half + j * terrain.cell, h });
+    }
+    assert.ok(top > 80 && top < 190, `variant ${variant}: summit ${top.toFixed(0)} m`);
+    const far = peaks.filter((p) => peaks.every((q) => q === p || q.h <= p.h || Math.hypot(p.x - q.x, p.z - q.z) > 60));
+    assert.ok(far.length >= 2, `variant ${variant}: ${far.length} separate summits`);
+    // the flank rises steeply right from the shore (nobody walks up it) and the shore line is no circle
+    let steep = 0, foot = 0;
+    for (let j = 1; j < terrain.n; j++) for (let i = 1; i < terrain.n; i++) {
+      const x = -terrain.half + i * terrain.cell, z = -terrain.half + j * terrain.cell;
+      const d = D(x, z);
+      if (d < 1 || d > 4 || caveOpenSdf(plan, x, z) < 12) continue;
+      foot++;
+      if (!terrain.isWalkable(x, z, 0.3, SLOPE)) steep++;
+    }
+    // (a thin horn's crest may be level for a cell or two; the reachability test below proves nobody gets there)
+    assert.ok(foot > 300 && steep >= foot * 0.99, `variant ${variant}: the first metres of the flank are steeper than the walk limit (${steep}/${foot})`);
+    const radii = [];
+    for (let a = 0; a < 360; a += 5) {
+      let r = 0;
+      while (r < 380 && D(Math.cos(a * Math.PI / 180) * r, Math.sin(a * Math.PI / 180) * r) > 0) r += 1;
+      radii.push(r);
+    }
+    assert.ok(Math.max(...radii) - Math.min(...radii) > 45, `variant ${variant}: shoreline radius varies ${Math.min(...radii)}..${Math.max(...radii)}`);
+  }
+});
+
+test('the rock is always above the roof, and nobody on foot reaches the flanks or the top', () => {
+  for (const variant of VARIANTS) {
+    const { terrain, plan, layout } = island(variant);
+    const n1 = terrain.n + 1;
+    // the skin lies above the roof everywhere inside, with room to spare
+    let worst = Infinity;
+    for (let j = 0; j <= terrain.n; j++) for (let i = 0; i <= terrain.n; i++) {
+      const x = -terrain.half + i * terrain.cell, z = -terrain.half + j * terrain.cell;
+      if (plan.cave.depthAt(x, z) < 22) continue;
+      worst = Math.min(worst, caveRockTop(plan, x, z) - caveRoofBase(plan, x, z));
+    }
+    assert.ok(worst > 8, `variant ${variant}: rock ${worst.toFixed(1)} m over the roof`);
+    // walking from the west cove (through the tunnels, false exits included) never leaves the floor level
+    const f = flood(terrain, spawnOf(layout));
+    let max = -Infinity;
+    for (let k = 0; k < n1 * n1; k++) if (f.seen[k]) max = Math.max(max, terrain.heights[k]);
+    assert.ok(max < CAVE_WALK_MAX - 2, `variant ${variant}: walkable ground reaches ${max.toFixed(1)} m`);
+    // ... nor from any false exit's ledge or the east beach
+    const starts = [...layout.falseExits, { x: plan.boat.x, z: plan.boat.z }];
+    const g = flood(terrain, starts);
+    for (let k = 0; k < n1 * n1; k++) if (g.seen[k]) assert.ok(terrain.heights[k] < CAVE_WALK_MAX - 2, `variant ${variant}: a flank is walkable from a false exit / the east beach`);
+  }
+});
+
+test('the server turns away a walker on the mountain top or flank (not a creative flyer)', () => {
+  const world = new ServerWorld({ send() {} }, { level: LEVEL, variant: 1 });
+  const { id } = world.join('Climber');
+  const p = world.players.get(id);
+  const { terrain } = world;
+  let best = { h: 0 };
+  for (let j = 0; j <= terrain.n; j++) for (let i = 0; i <= terrain.n; i++) if (terrain.h(i, j) > best.h) best = { h: terrain.h(i, j), x: -terrain.half + i * terrain.cell, z: -terrain.half + j * terrain.cell };
+  assert.ok(best.h > CAVE_WALK_MAX);
+  Object.assign(p, { x: best.x + 1, z: best.z, y: best.h });
+  const before = { x: p.x, z: p.z };
+  world.receive(id, { t: MSG.STATE, x: best.x, y: terrain.heightAt(best.x, best.z), z: best.z, yaw: 0, pitch: 0, k: p.epoch });
+  assert.deepEqual({ x: p.x, z: p.z }, before, 'the state on the summit is rejected');
+  // a flank point at 20 m
+  let flank = null;
+  for (let a = 0; a < 6.28 && !flank; a += 0.1) for (let r = 100; r < 300; r += 1) {
+    const x = Math.cos(a) * r, z = Math.sin(a) * r;
+    if (terrain.heightAt(x, z) > 20 && terrain.heightAt(x, z) < 24) { flank = { x, z }; break; }
+  }
+  Object.assign(p, { x: flank.x + 0.5, z: flank.z, y: terrain.heightAt(flank.x, flank.z) });
+  world.receive(id, { t: MSG.STATE, x: flank.x, y: terrain.heightAt(flank.x, flank.z), z: flank.z, yaw: 0, pitch: 0, k: p.epoch });
+  assert.ok(Math.abs(p.x - (flank.x + 0.5)) < 1e-9, 'the flank is rejected');
 });
