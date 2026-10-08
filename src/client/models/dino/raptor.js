@@ -120,6 +120,15 @@ export function buildRaptor() {
   return buildTheropod(SPEC);
 }
 
+/** Procedural fallback for the Gloom Raptor (cave raptor): the raptor body with a pale cave palette and a longer, narrower snout. */
+const GLOOM_COL = {
+  ...COL, main: '#e3deec', back: '#aaa2bf', stripe: '#857da0', belly: '#fbfaff', leg: '#bcb4cc', legDark: '#aaa2bf', pad: '#7b7390',
+  claw: '#4a4352', clawTip: '#cbc4cf', mouth: '#b0707e', tongue: '#cf8a94', throat: '#6d4658', tooth: '#efe9d8', iris: '#dfe2ea',
+};
+export function buildGloomRaptor() {
+  return buildTheropod({ ...SPEC, col: GLOOM_COL, head: { ...SPEC.head, L: 0.4, W: 0.062, H: 0.062, taper: 0.8, eye: { ...SPEC.head.eye, size: 0.012 }, nostril: 0.018 } });
+}
+
 const EXTRA = { lunge: 0.28, attackNeck: 0.55, runNeck: 0.3, runTail: 0.12, deadSide: 0.19, limp: [0.7, -1.2, 1.0, 0.3] };
 
 /** Bird-like head twitches when standing / alert, panting when running. */

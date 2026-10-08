@@ -240,6 +240,11 @@ export class GameAudio {
         this.#voice(t, out, { pitch: [620, 1150, 820], dur: 0.32, vol: 0.5, wave: 'triangle', formants: [1400, 2600], lowpass: 3600, vibrato: [11, 0.015], breath: 0.12, attack: 0.1 });
         this.#voice(t + 0.36, out, { pitch: [700, 1050, 560], dur: 0.38, vol: 0.42, wave: 'triangle', formants: [1300, 2500], lowpass: 3400, vibrato: [11, 0.015], breath: 0.12, attack: 0.1 });
         break;
+      case 'gloom-raptor':
+        // a low rasping hiss with a short rattling screech: mostly breath, pitched below the raptor
+        this.#noise(t, 0.7, out, { vol: 0.32, type: 'bandpass', f0: 3200, f1: 1800, q: 0.9, a: 0.12 });
+        this.#voice(t + 0.12, out, { pitch: [330, 520, 280], dur: 0.5, vol: 0.4, wave: 'sawtooth', formants: [900, 1900], lowpass: 2400, vibrato: [14, 0.03], rough: [31, 0.06], breath: 0.45, attack: 0.12 });
+        break;
       case 'ptera':
         this.#voice(t, out, { pitch: [900, 1150, 620], dur: 0.55, vol: 0.45, wave: 'triangle', formants: [1100, 2300], lowpass: 3000, vibrato: [7, 0.02], breath: 0.3, attack: 0.08 });
         break;
@@ -398,6 +403,7 @@ export class GameAudio {
       }
       case 'roar_trex':
       case 'roar_raptor':
+      case 'roar_gloom-raptor':
       case 'roar_stego':
       case 'roar_ptera':
       case 'roar_brachio':

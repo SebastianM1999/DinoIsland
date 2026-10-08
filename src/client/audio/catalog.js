@@ -35,6 +35,7 @@ export const EFFECTS = {
   splashBig: group('water', 2, 0.5, 0.75), plop: group('water', 2, 0.12, 1.6),
   roar_trex: group('recorded-trex-roar', 3, 0.68, 1, 0.025),
   roar_raptor: selected(['recorded-trill', 'recorded-roar-1'], .45, 1.03),
+  'roar_gloom-raptor': selected(['recorded-trill', 'recorded-roar-1'], .5, .74, .06),   // the raptor calls pitched down into a hiss
   roar_ptera: group('recorded-ptera', 1, 0.4, 1, 0.06),
   roar_stego: selected(['recorded-grunt-1', 'recorded-grunt-2'], .52, .85),
   roar_brachio: selected(['recorded-roar-2', 'recorded-roar-3'], .6, .68),
