@@ -15,6 +15,13 @@
       "triangles": 59420
     },
     {
+      "id": "dino-sump-lurker",
+      "file": "assets/models/dinos/sump-lurker.glb",
+      "source": "Project-authored Sump Lurker; art/sources/sump-lurker/sump-lurker.blend (build scripts in its text blocks)",
+      "license": "Project source",
+      "triangles": 51565
+    },
+    {
       "id": "dino-trex",
       "file": "assets/models/dinos/trex.glb",
       "source": "Project-authored T-Rex; art/sources/trex/trex.blend (build scripts in its text blocks)",
