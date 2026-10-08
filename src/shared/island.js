@@ -1181,10 +1181,10 @@ function planCave(level, variant, seed) {
     steps: [], geysers: [], fumaroles: [], treasure: null, basePlots: [], cave: null,
   };
   // hut and landing in the west cove, the escape boat on the east beach (bow to the sea)
-  plan.hut = { x: -G.shore + 84, z: rng.range(-24, 24), radius: 21, ground: HUT_GROUND };
-  plan.boat = { x: G.shore - 15, z: rng.range(-30, 30), rot: rng.range(-0.3, 0.3) };
+  plan.hut = { x: -G.shore + 28, z: rng.range(-6, 6), radius: 18, ground: HUT_GROUND };
+  plan.boat = { x: G.shore - 15, z: rng.range(-14, 14), rot: rng.range(-0.3, 0.3) };
   const side = rng() < 0.5 ? -1 : 1;
-  plan.arrival = { x: -G.shore + 14, z: side * rng.range(34, 60), rot: Math.PI + rng.range(-0.25, 0.25) };
+  plan.arrival = { x: -G.shore + 14, z: side * rng.range(20, 30), rot: Math.PI + rng.range(-0.25, 0.25) };
   plan.pads.push({ x: plan.hut.x, z: plan.hut.z + 2, r: plan.hut.radius, h: HUT_GROUND });
   plan.pads.push({ x: plan.boat.x, z: plan.boat.z, r: 9, h: 0.9 });
   // flooded stretches: the water stands a little below the dry floor beside it

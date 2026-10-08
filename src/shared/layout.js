@@ -194,7 +194,7 @@ export function buildLayout(terrain) {
   const dry = (x, z, min = 0.4) => terrain.waterLevelAt(x, z) === null && terrain.lavaLevelAt(x, z) === null && terrain.heightAt(x, z) > min;
   // (the cave level has plants and loose rocks in its two coves only)
   const inside = caveLevel
-    ? (x, z) => Math.abs(x) > 172 && Math.abs(x) < 352 && Math.abs(z) < 112
+    ? (x, z) => plan.cave.depthAt(x, z) < -3 && Math.abs(x) > 172 && Math.abs(x) < 300 && Math.abs(z) < 60
     : (x, z, k) => insideOutline(plan, x, z, k);
   // (every flow: the river, or the volcano's lava flows and crater moat)
   const riverDist = (x, z) => {
@@ -641,12 +641,14 @@ export function buildLayout(terrain) {
     ];
     const totalW = anchors.reduce((a, b) => a + b.w, 0);
     const pickAnchor = () => { let r = rc() * totalW; for (const a of anchors) { r -= a.w; if (r <= 0) return a; } return anchors[anchors.length - 1]; };
+    // (decor only under the roof: a finite ceiling and inside the mountain, never in a cove, a canyon mouth or on the outer rock)
+    const underRoof = (x, z) => Number.isFinite(terrain.ceilingAt(x, z)) && cv.depthAt(x, z) > 8;
     const sample = (pred, tries = 40) => {
       for (let k = 0; k < tries; k++) {
         const an = pickAnchor(), ang = rc() * TAU, rr = Math.sqrt(rc()) * an.rad;
         const x = an.x + Math.cos(ang) * rr, z = an.z + Math.sin(ang) * rr;
         const s = openS(x, z);
-        if (s < -0.3 && dry(x, z, 0.5) && pred(x, z, -s)) return { x, z, s: -s, an };
+        if (s < -0.3 && underRoof(x, z) && dry(x, z, 0.5) && pred(x, z, -s)) return { x, z, s: -s, an };
       }
       return null;
     };
@@ -716,7 +718,7 @@ export function buildLayout(terrain) {
           x = an.x + Math.cos(ang) * rr; z = an.z + Math.sin(ang) * rr;
         }
         const d = -openS(x, z);
-        if (d < band[0] || d > band[1] || !dry(x, z, 0.5) || !free(x, z, 0.9) || terrain.slopeAt(x, z) > 1.0) continue;
+        if (d < band[0] || d > band[1] || !underRoof(x, z) || !dry(x, z, 0.5) || !free(x, z, 0.9) || terrain.slopeAt(x, z) > 1.0) continue;
         const nrm = gradient(x, z), wall = d < 1.4, y = floorY(x, z);
         decor.crystals.push({
           x, z, y: wall ? Math.min(y + rc.range(0.3, 2.2), terrain.ceilingAt(x, z) - 1.5) : y, scale: rc.range(0.6, wall ? 1.8 : 2.4), rot: rc() * TAU,
@@ -747,7 +749,7 @@ export function buildLayout(terrain) {
       for (let i = Math.round(step / 2); i < t.pts.length - 1; i += step) {
         const p = t.pts[i], u = i / (t.pts.length - 1);
         if (t.flooded && u > t.flooded.u0 && u < t.flooded.u1) addLight(p.x, p.z, 'water', 2, 0.5, -1, 5);
-        else if (openS(p.x, p.z) < -2) addLight(p.x, p.z, 'tunnel', 3, -1, -1, 3);
+        else if (openS(p.x, p.z) < -2 && underRoof(p.x, p.z)) addLight(p.x, p.z, 'tunnel', 3, -1, -1, 3);
       }
     }
     addLight(cv.entrance.x + 18, cv.entrance.z, 'daylight', 1, 0.6, -1, 4);

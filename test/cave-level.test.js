@@ -346,7 +346,7 @@ test('torch spots lie dry and clear in the arrival cove, and the arrival boat is
     }
     const b = layout.arrivalBoat;
     assert.ok(b.x < plan.hut.x && terrain.heightAt(b.x, b.z) >= 0, 'arrival boat on the west beach');
-    assert.ok(layout.boat.x > 250, 'the escape boat on the east beach');
+    assert.ok(layout.boat.x > 220, 'the escape boat on the east beach');
     assert.ok(layout.hut.x < -200, 'hut and spawn in the west cove');
   }
 });

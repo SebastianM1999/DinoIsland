@@ -143,12 +143,12 @@ function buildField(plan) {
     const side = x < 0 ? -1 : 1;
     const inland = side < 0 ? x - sx(z, -1) : sx(z, 1) - x;
     // the cove narrows toward the sea: a bay between the two horns of the mountain
-    const half = 38 + 67 * smoothstep(0, 150, inland) + 9 * fbm(z * 0.022 + 4, x * 0.02, 2, seed + 93);
+    const half = 33 + 6 * smoothstep(0, 60, inland) + 4 * fbm(z * 0.022 + 4, x * 0.02, 2, seed + 93);
     const e = Math.abs(z) - half;
     const land = smoothstep(-3, 3, inland) * (1 - smoothstep(-6, 10, e));
     const out = Math.max(0, -inland, e);
     const shelf = Math.max(-16, -0.3 - 0.05 * out - 0.16 * Math.max(0, out - 24) + 0.6 * fbm(x * 0.03, z * 0.03, 2, seed + 5));
-    const beach = 0.35 + (G.floor - 0.35) * smoothstep(0, 45, inland) + 0.3 * fbm(x * 0.09 + 2, z * 0.09, 2, seed + 7) * smoothstep(0, 20, inland);
+    const beach = 0.35 + (G.floor - 0.35) * smoothstep(0, 60, inland) + 0.3 * fbm(x * 0.09 + 2, z * 0.09, 2, seed + 7) * smoothstep(0, 20, inland);
     let h = lerp(shelf, beach, land);
     // sea cliffs: the water at the mountain's foot is deep at once (nobody wades round the mountain)
     const dOut = Math.max(0, -d);
@@ -163,6 +163,21 @@ function buildField(plan) {
     depth,
     floorBase: (x, z) => floorBase(x, z, depth(x, z)),
     open: (x, z) => query(x, z).s,
+    /** the roof without the open-sky term (the visual roof, also inside the open canyon mouths) */
+    roofBase(x, z) {
+      const d = depth(x, z);
+      if (d <= 0) return 1e4;
+      return floorBase(x, z, d) + clamp(query(x, z).roof + 1.1 * fbm(x * 0.04 + 6, z * 0.04, 2, seed + 19), 4.6, 22);
+    },
+    /** the solid rock's height over everything (the mountain's skin; the ground itself over rock, beneath it the tunnels are carved) */
+    rockTop(x, z) {
+      const d = depth(x, z);
+      if (d <= 0) return beachH(x, z, d);
+      const h0 = beachH(x, z, d), fc = floorBase(x, z, d);
+      const fb = h0 > 0.2 ? lerp(h0, fc, smoothstep(0, 10, d)) : fc;
+      const hm = 30 + 32 * smoothstep(0, 150, d) + 6 * fbm(x * 0.02 + 8, z * 0.02, 3, seed + 13);
+      return fb + hm * (1 - Math.exp(-d / 4.5));
+    },
     height(x, z) {
       const d = depth(x, z);
       const h0 = beachH(x, z, d);
@@ -203,3 +218,5 @@ export const caveCeiling = (plan, x, z) => fieldOf(plan).ceiling(x, z);
 export const caveOpenSdf = (plan, x, z) => fieldOf(plan).open(x, z);
 export const caveDepth = (plan, x, z) => fieldOf(plan).depth(x, z);
 export const caveFloorBase = (plan, x, z) => fieldOf(plan).floorBase(x, z);
+export const caveRoofBase = (plan, x, z) => fieldOf(plan).roofBase(x, z);
+export const caveRockTop = (plan, x, z) => fieldOf(plan).rockTop(x, z);
