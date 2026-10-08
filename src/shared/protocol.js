@@ -22,7 +22,7 @@
 //   reject  { reason }
 //   pong    { c, now }
 //   snap    { now, p: [...PLAYER_FIELDS], d: [...DINO_FIELDS] }
-//   inv     { inv }                                     your private inventory changed
+//   inv     { inv }                                     your private inventory changed (inv.torch: owns the hand-held torch)
 //   prof    { prof }                                    your private progression changed: { xp, bonus, skills } (client saves it)
 //   correct { x, y, z, k, unstuck? }                    rejected movement / unstuck move; reset prediction, k = new epoch
 //   ev      { e: <event>, ...fields }                   see EV below
@@ -139,6 +139,7 @@ export const PF = {
   KNOCKED: 32,
   DOWNED: 64,   // lying downed (server ORs it into snapshots)
   DASH: 128,
+  TORCH: 256,   // carrying a lit torch in the off hand (only accepted while the server inventory has one)
 };
 
 /** Equipment slot ids (`eq`). */
