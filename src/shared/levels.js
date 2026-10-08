@@ -193,8 +193,9 @@ export const BIOMES = {
       exposure: 1.2,
     },
     water: { shallow: '#2f7f86', mid: '#16525e', deep: '#0b2a3a', foam: '#9fc4c8', sky: '#1c3038' },
-    // flyers and giants never fit under the roof; only the pack hunters live here for now
-    dinos: { brachio: 0, stego: 0, raptor: 4, ptera: 0, trex: 0 },
+    // flyers and giants never fit under the roof: one raptor pack strayed in, the
+    // pale noise-hunting gloom raptors (packs, sim/ai/gloomRaptor.js) own the dark
+    dinos: { brachio: 0, stego: 0, raptor: 1, ptera: 0, trex: 0, 'gloom-raptor': 5 },
     music: 'volcano',   // (cave music comes with the client)
   },
 };

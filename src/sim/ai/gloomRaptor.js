@@ -43,16 +43,25 @@ function hearTarget(d, sys) {
 }
 
 export const gloomRaptorBrain = {
-  /** Packs only exist where the level layout provides cave spots: `layout.caveDinoSpots = [{ x, z, radius }]`. */
+  /**
+   * Packs only exist where the level layout provides cave chambers (`layout.caveDinoSpots`).
+   * `level.dinos['gloom-raptor']` is the number of PACKS (2-3 each, like raptor zones); they take the
+   * deep chambers first (relic chambers, then the biggest), never the entrance/exit halls or pockets,
+   * and never a chamber a raptor zone already holds.
+   */
   spawnInitial(sys) {
     const layout = sys.world.layout;
     const spots = layout.caveDinoSpots;
-    const total = layout.level?.dinos?.[TYPE] ?? 0;
-    if (!Array.isArray(spots) || !spots.length || !(total > 0)) return;
-    const base = Math.floor(total / spots.length), extra = total % spots.length;
-    spots.forEach((s, i) => {
-      const n = base + (i < extra ? 1 : 0);
-      if (n > 0) spawnPack(sys, TYPE, s.x, s.z, n, { x: s.x, z: s.z }, Math.min(8, s.radius ?? 8));
+    const packs = layout.level?.dinos?.[TYPE] ?? 0;
+    if (!Array.isArray(spots) || !spots.length || !(packs > 0)) return;
+    const taken = new Set((layout.dinoZones?.raptor ?? []).map((z) => z.room).filter((r) => r != null));
+    const tags = (s) => s.tags ?? [];
+    const eligible = spots.filter((s) => (s.spawns?.length ?? 3) >= 3 && s.kind !== 'pocket'
+      && !tags(s).includes('entrance') && !tags(s).includes('exit') && !taken.has(s.id));
+    const order = [...eligible.filter((s) => tags(s).includes('relic')),
+      ...eligible.filter((s) => !tags(s).includes('relic')).sort((a, b) => (b.radius ?? 0) - (a.radius ?? 0))];
+    order.slice(0, packs).forEach((s, i) => {
+      spawnPack(sys, TYPE, s.x, s.z, 2 + (i % 2), { x: s.x, z: s.z }, Math.min(8, s.radius ?? 8));
     });
   },
   ...packHunterBrain(TYPE, C, hearTarget),
