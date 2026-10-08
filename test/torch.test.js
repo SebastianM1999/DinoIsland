@@ -26,7 +26,7 @@ test('PF.TORCH is its own bit and carriesLight reads it', () => {
 
 test('islands without torchSpots have no torch items', () => {
   const { torches, world } = setup();
-  assert.equal(world.layout.torchSpots, undefined);
+  assert.equal(world.layout.torchSpots.length, 0);
   assert.equal(torches().length, 0);
 });
 

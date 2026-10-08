@@ -45,10 +45,11 @@ test('the brain is registered and the type spawns through the dino system', () =
 test('packs spawn only where the layout lists caveDinoSpots, never on the existing levels', () => {
   for (const variant of [0, 1, 2]) {
     const world = new ServerWorld({ send() {} }, { variant });
-    assert.equal(world.layout.caveDinoSpots, undefined, `level ${variant} has no cave spots`);
+    assert.equal(world.layout.caveDinoSpots.length, 0, `level ${variant} has no cave spots`);
     assert.equal(world.dinos.list.filter(d => d.type === TYPE).length, 0, `level ${variant} spawns none`);
   }
-  assert.ok(LEVELS.every((_, i) => !(TYPE in levelDef(i).dinos)), 'no existing level counts gloom raptors');
+  // only the cave biome counts gloom raptors
+  assert.deepEqual(LEVELS.map((_, i) => TYPE in levelDef(i).dinos), LEVELS.map((l) => l.biome === 'cave'));
 
   const world = new ServerWorld({ send() {} }, { variant: 1 });
   const { id } = world.join('Gloom tester');
@@ -63,13 +64,17 @@ test('packs spawn only where the layout lists caveDinoSpots, never on the existi
   delete world.layout.level.dinos[TYPE];
   gloomRaptorBrain.spawnInitial(sys);
   assert.equal(sys.list.length, before);
-  // spots and count: the count is spread over the spots
-  world.layout.caveDinoSpots = [{ x: p.x, z: p.z, radius: 10 }, { x: p.x + 20, z: p.z + 20, radius: 10 }];
+  // spots and count: the count is the number of packs (2-3 each), entrance/exit halls stay empty
+  world.layout.caveDinoSpots = [
+    { id: 1, x: p.x, z: p.z, radius: 10, tags: [] },
+    { id: 2, x: p.x + 20, z: p.z + 20, radius: 12, tags: [] },
+    { id: 3, x: p.x - 20, z: p.z - 20, radius: 14, tags: ['entrance'] },
+  ];
   world.layout.level.dinos[TYPE] = 5;
   gloomRaptorBrain.spawnInitial(sys);
   const gloom = sys.list.filter(d => d.type === TYPE);
-  assert.equal(gloom.length, 5);
-  assert.equal(new Set(gloom.map(d => d.group)).size, 2, 'one pack per spot');
+  assert.equal(new Set(gloom.map(d => d.group)).size, 2, 'one pack per eligible chamber, at most the count');
+  assert.equal(gloom.length, 5, 'packs of 2 and 3');
 });
 
 test('gloom raptors notice players by noise, not by sight', () => {

@@ -352,10 +352,10 @@ test('torch spots lie dry and clear in the arrival cove, and the arrival boat is
 });
 
 test('dinosaurs: only species that fit, spawning dry on walkable ground under a high roof, outside colliders', () => {
-  for (const { variant, terrain, layout } of VARIANTS.map(island)) {
+  for (const { variant, terrain, plan, layout } of VARIANTS.map(island)) {
     for (const kind of ['brachio', 'stego']) assert.equal(layout.dinoZones[kind].length, 0, kind);
     assert.equal(layout.trexPatrol.length, 0);
-    assert.ok(layout.dinoZones.raptor.length >= 3, `variant ${variant}: raptor packs`);
+    assert.equal(layout.dinoZones.raptor.length, plan.level.dinos.raptor, `variant ${variant}: raptor packs`);
     assert.ok(layout.caveDinoSpots.length >= 11);
     for (const z of layout.dinoZones.raptor) {
       assert.ok(z.spawns.length >= 3);
@@ -425,13 +425,19 @@ test('the server caps height at the roof and the controller bumps its head', () 
   assert.ok(pc.pos.y + CONFIG.player.height <= roof + 1e-6, 'the roof stops a rising body');
 });
 
-test('a server world on the cave level spawns raptors only, all in valid spots, with three relics and a boat to sail', () => {
+test('a server world on the cave level spawns pack hunters only, all in valid spots, with three relics and a boat to sail', () => {
   const world = new ServerWorld({ send() {} }, { level: LEVEL, variant: 2 });
   const kinds = new Set(world.dinos.list.map((d) => d.type));
-  assert.deepEqual([...kinds], ['raptor']);
+  assert.deepEqual([...kinds].sort(), ['gloom-raptor', 'raptor']);
+  const hallIds = new Set([world.layout.caveEntrance?.hall, world.layout.caveExit?.hall].filter((h) => h != null));
   for (const d of world.dinos.list) {
     assert.ok(world.terrain.clearanceAt(d.x, d.z) > 3.4, 'raptor under a high roof');
     assert.equal(world.terrain.waterDepthAt(d.x, d.z) > 0.35, false);
+  }
+  const packs = new Set(world.dinos.list.filter((d) => d.type === 'gloom-raptor').map((d) => d.group));
+  assert.equal(packs.size, world.layout.level.dinos['gloom-raptor'], 'every gloom pack found a deep chamber');
+  for (const s of world.layout.caveDinoSpots.filter((c) => hallIds.has(c.id))) {
+    assert.ok(world.dinos.list.every((d) => Math.hypot(d.x - s.x, d.z - s.z) > s.radius), 'entrance and exit halls stay empty');
   }
   assert.equal(world.relics.length, 3);
   assert.ok(world.layout.level.last);
