@@ -17,6 +17,7 @@
 - `ptera.js` — procedural Pteranodon with dynamic wing membrane (`buildPtera`, `PTERA_ANIM`, `pteraExtraUpdate`).
 - Gloom Raptor (`gloom-raptor.glb`, source `art/sources/gloom-raptor`): raptor rig plus `Roar` and `Hurt` clips; procedural fallback `buildGloomRaptor` in `raptor.js` (pale palette, longer snout).
 - Sump Lurker (`sump-lurker.glb`, source `art/sources/sump-lurker`, contract `sumpModel.js`): the sarcosuchus rig at ~5 m (slim, low, gharial snout, pale cave hide) with `Idle` (submerged float), `Walk`, `Run`, `Swim`, `Attack`, `Bite`, `Hurt`, `Retreat`, `Ambush`, `Death`; fallback `buildSumpLurkerFallback` in `sarcoFallback.js`.
+- Crystal Plodder (`crystal-plodder.glb`, source `art/sources/crystal-plodder`): stego-style quadruped, 6-bone club tail, `Roar` + `Hurt` clips. The crystals are one separate primitive with the glTF material `PlodCrystal`; `GLB_DINOS['crystal-plodder'].glow` makes `glbDino.js` swap it for one shared unlit `MeshBasicMaterial` (vertex colours, slow brightness pulse): emissive only, no lights. Fallback `buildCrystalPlodder` (`crystalPlodder.js`): shrunk stego, repainted with its `skinStyle.js` palette, unlit crystal clusters.
 - `skinStyle.js` — `DINO_PALETTES` and `paintSkinDetails()` vertex-colour markings (used by `ptera.js` and build scripts).
 - `preview.html` — standalone dev page that loads `SPECIES` and the GLBs and shows one dino per `?type=&state=&view=` (driven by `scripts/check-dino-preview.mjs`). Sarcosuchus additionally supports direct playback of its swimming and boss attack/reposition/recovery clips.
 
@@ -30,7 +31,7 @@
 - The GLBs are authored in Blender from sources in `art/sources/<type>/` (`.blend` with build scripts). The project skill `.claude/skills/dino-blender-creator` (`SKILL.md` plus `references/modeling.md`, `animation.md`, `integration.md`, helper `scripts/`) holds the modelling, rigging, clip-baking and export rules, and its `integration.md` lists the game-side files to touch: `glbCatalog.js` entry, bone aliases, extra clips, and `barHeight` in `entities/dinoViews.js`. Use that skill for any new or changed dino model or animation.
 
 ## Rules
-- Every server species (`CONFIG.dinos`: brachio, stego, raptor, gloom-raptor, ptera, trex, alpha-sarcosuchus, sump-lurker) needs a `SPECIES` entry; all seven currently also have a `GLB_DINOS` entry. Clip names in the catalog must exist in the GLB: `registerDinoGLTF` throws on a missing clip (and that species falls back to procedural).
+- Every server species (`CONFIG.dinos`: brachio, stego, raptor, gloom-raptor, ptera, trex, alpha-sarcosuchus, sump-lurker, crystal-plodder) needs a `SPECIES` entry; all of them currently also have a `GLB_DINOS` entry. Clip names in the catalog must exist in the GLB: `registerDinoGLTF` throws on a missing clip (and that species falls back to procedural).
 - Missing art never blocks play: `buildGLBDino` returns `null` until a template is registered, and `SPECIES` then uses the procedural builder.
 - `registerDinoGLTF(type, gltf, spec)` accepts an explicit asset contract for review models outside `GLB_DINOS`; that contract is retained with the template. Alpha Sarcosuchus is registered in the gameplay catalog; its preview reports missing assets explicitly.
 - Creatures face -Z; GLB exports face +Z and are turned by `yaw: Math.PI` in the catalog.

@@ -30,8 +30,20 @@ export function registerDinoGLTF(type, gltf, spec = GLB_DINOS[type]) {
       o.frustumCulled = false; // animated skins can escape bind-pose bounds
     }
   });
+  const glow = spec.glow ? makeGlow(scene, spec.glow) : null;
   retainObjectResources(scene);
-  templates.set(type, { scene, clips, box, size, spec });
+  templates.set(type, { scene, clips, box, size, spec, glow });
+}
+
+/**
+ * Emissive-only glow (never a light: the light count is baked into the shaders). Every mesh whose glTF material
+ * is named `glow.material` gets one shared unlit vertex-colour material: it ignores the dark scene lighting, so
+ * the crystals stay readable from afar. `pulse(now)` breathes its brightness; the animators call it per frame.
+ */
+function makeGlow(scene, { material: name, level = .88, pulse = .1, period = 5 }) {
+  const mat = new THREE.MeshBasicMaterial({ name, vertexColors: true });
+  scene.traverse(o => { if (o.isMesh && o.material?.name === name) { o.material = mat; o.castShadow = false; } });
+  return { material: mat, pulse: now => mat.color.setScalar(level + pulse * Math.sin(now * Math.PI * 2 / period)) };
 }
 
 /** Cache successful loads, retry failures next launch, never block play on missing art. */
@@ -75,7 +87,7 @@ export function buildGLBDino(type) {
   model.traverse(o => byName.set(o.name.replace(/[.\s]/g, ''), o));
   const find = name => byName.get(name.replace(/[.\s]/g, ''));
   const list = names => names.map(find).filter(Boolean);
-  const rig = { root, tilt, body, model, spec, clips: template.clips, isGLB: true,
+  const rig = { root, tilt, body, model, spec, clips: template.clips, isGLB: true, glow: template.glow,
     head: find(spec.bones.head), jaw: spec.bones.jaw ? find(spec.bones.jaw) : null,
     neck: list(spec.bones.neck), tail: list(spec.bones.tail), eyelids: [],
     feet: list(spec.bones.feet), hitZones: [] };
@@ -168,6 +180,7 @@ export class GLBDinoAnimator {
     // Remove last frame's overlays before the mixer writes its base pose.
     for (const [bone, base] of this.bases) { bone.quaternion.copy(base.q); bone.position.copy(base.p); }
     this.time += dt;
+    r.glow?.pulse(performance.now() / 1000);
     this.dead = damp(this.dead, dead ? 1 : 0, dt, 4);
     this.trapped = damp(this.trapped, trapped && !dead ? 1 : 0, dt);
     for (const k of ['headDown', 'alert', 'neckRaise', 'charge', 'tailSwing', 'roar', 'attack', 'jaw'])

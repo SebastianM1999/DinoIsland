@@ -36,6 +36,7 @@ Grouped by the module area they mainly cover. Many simulation tests also check t
 - `dino-slopes.test.js` — dinosaurs run down steep slopes to players, climbing stays limited (`findPath`, `climbSlope`) over seeded island variants.
 - `dino-contact.test.js` — player-vs-dinosaur body contact (`resolveDinoContact`) and contact damage events.
 - `sump-lurker.test.js` — Sump Lurker config, flooded-spot-only spawning (never on levels 0-2), submerged lurk, edge lunge and drag back, staying near water, retreat when hurt, GLB clips (`sumpLurkerBrain`, fake pool terrain).
+- `crystal-plodder.test.js` — Crystal Plodder config, cave-only count, hall choice over 16 variants (`plodderChambers`), no stacking with gloom packs, peaceful until hurt/crowded, short charge, club sweep and hit-once strike.
 - `gloom-raptor.test.js` — Gloom Raptor config, noise hearing, cave-spot-only spawning, GLB clips.
 - `raptor-fear.test.js` — raptor retreat/hesitation behaviour and raid raiders (`raptorBrain`, `raiderStep`).
 - `stego-tail.test.js` — stegosaurus tail sweep geometry and hits (`stegoBrain`, `tailSweep`).

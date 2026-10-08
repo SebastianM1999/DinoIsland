@@ -314,6 +314,11 @@ export class GameAudio {
       case 'ptera':
         this.#voice(t, out, { pitch: [900, 1150, 620], dur: 0.55, vol: 0.45, wave: 'triangle', formants: [1100, 2300], lowpass: 3000, vibrato: [7, 0.02], breath: 0.3, attack: 0.08 });
         break;
+      case 'crystal-plodder':
+        // a deep, slow bellow with a glassy crystal chime ringing on top (three detuned partials)
+        this.#voice(t, out, { pitch: [72, 96, 64], dur: 1.5, vol: 0.85, formants: [300, 760], lowpass: 1200, vibrato: [4, 0.02], rough: [16, 0.03], breath: 0.15, attack: 0.2 });
+        for (const [dt, f] of [[0.35, 1320], [0.5, 1760], [0.68, 2217]]) this.#osc('sine', f, f * 0.995, t + dt, 0.9, out, 0.07, 0.01);
+        break;
       case 'stego':
         this.#voice(t, out, { pitch: [105, 130, 95], dur: 1.0, vol: 0.8, formants: [420, 1100], lowpass: 1600, vibrato: [5, 0.02], rough: [18, 0.02], breath: 0.15, attack: 0.15 });
         break;
@@ -479,6 +484,7 @@ export class GameAudio {
       case 'roar_raptor':
       case 'roar_gloom-raptor':
       case 'roar_sump-lurker':
+      case 'roar_crystal-plodder':
       case 'roar_stego':
       case 'roar_ptera':
       case 'roar_brachio':

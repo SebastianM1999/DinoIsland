@@ -68,7 +68,7 @@ export function buildSkillView(profile) {
   return { ...prog, trees };
 }
 
-const SHORT_NAME = { raptor: 'Raptor', 'gloom-raptor': 'Gloom Raptor', 'sump-lurker': 'Sump Lurker', stego: 'Stego', ptera: 'Ptera', brachio: 'Brachio', trex: 'T-Rex' };
+const SHORT_NAME = { raptor: 'Raptor', 'gloom-raptor': 'Gloom Raptor', 'sump-lurker': 'Sump Lurker', 'crystal-plodder': 'Crystal Plodder', stego: 'Stego', ptera: 'Ptera', brachio: 'Brachio', trex: 'T-Rex' };
 
 /** Footer line: what gives XP. */
 export function xpTableText() {

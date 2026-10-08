@@ -8,7 +8,7 @@ import { EV } from '../../shared/protocol.js';
 import { paint, place, merge } from '../models/kit.js';
 
 const MAX = 420;
-const ROUND = { brachio: 1.25, stego: 0.8 };
+const ROUND = { brachio: 1.25, stego: 0.8, 'crystal-plodder': 0.7 };
 const TOED = { raptor: 0.45, 'gloom-raptor': 0.55, trex: 1.3 };
 
 function roundPrintGeo() {
