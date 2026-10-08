@@ -31,6 +31,7 @@ export function gunAction(world, player, message) {
   if (forward.reduce((sum, n, i) => sum + n * message.dir[i], 0) < 0.94) return;
   // Carry the fractional interval across the host's 20 Hz clock, so
   // legitimate automatic fire is not dropped at tick boundaries.
+  player.lastShotAt = world.now;   // noise: blind cave dinosaurs hear shots (ai/gloomRaptor.js)
   ammo.loaded--; player.nextFireAt = Math.max(world.now, player.nextFireAt) + spec.cooldown;
   let end = shotEnd(world, message.o, message.dir, spec.range);
   const dino = world.dinos.get(message.dino);

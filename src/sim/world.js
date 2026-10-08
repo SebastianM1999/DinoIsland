@@ -973,6 +973,7 @@ export class ServerWorld {
           inv.spear = false;
           inv.spearHealth = 0;
         }
+        p.lastShotAt = this.now;   // noise: blind cave dinosaurs hear shots (ai/gloomRaptor.js)
         p.nextFireAt = this.now + (kind === 'spear' ? W.spear.throwCooldown * (1 + u.throwCooldown) : W.bow.cooldown);
         this.projectiles.set(`${p.id}:${m.pid}`, { kind, health, t: this.now, pw: Math.max(0, Math.min(1, Number(m.pw) || 0)), o: m.o.slice(), v: m.v.slice() });
         this.sendInv(p);

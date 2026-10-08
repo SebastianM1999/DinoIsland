@@ -14,16 +14,17 @@ import { insideSwampArena } from '../shared/swampArena.js';
 import { brachioBrain } from './ai/brachio.js';
 import { stegoBrain } from './ai/stego.js';
 import { raptorBrain } from './ai/raptor.js';
+import { gloomRaptorBrain } from './ai/gloomRaptor.js';
 import { pteraBrain } from './ai/ptera.js';
 import { trexBrain } from './ai/trex.js';
 import { sarcosuchusBrain, sarcoGroundHeight } from './ai/sarcosuchus.js';
 import { raiderStep } from './raids.js';
 import { findPath } from './pathfind.js';
 
-const BRAINS = { brachio: brachioBrain, stego: stegoBrain, raptor: raptorBrain, ptera: pteraBrain, trex: trexBrain, 'alpha-sarcosuchus': sarcosuchusBrain };
+const BRAINS = { brachio: brachioBrain, stego: stegoBrain, raptor: raptorBrain, 'gloom-raptor': gloomRaptorBrain, ptera: pteraBrain, trex: trexBrain, 'alpha-sarcosuchus': sarcosuchusBrain };
 const r2 = (v) => Math.round(v * 100) / 100;
 const r3 = (v) => Math.round(v * 1000) / 1000;
-const TRACK_SPACING = { brachio: 1.3, stego: 1, raptor: 2.2, trex: 1.5 };
+const TRACK_SPACING = { brachio: 1.3, stego: 1, raptor: 2.2, 'gloom-raptor': 2.4, trex: 1.5 };
 const CARCASS_TIME = 90;
 const tmp = { x: 0, z: 0, hit: false };
 const push = { x: 0, z: 0, hit: false };
@@ -37,7 +38,7 @@ const EIGHT = [0, 1, 2, 3, 4, 5, 6, 7].map((k) => (k / 8) * Math.PI * 2);
 /** Detours around a blocked straight line (see #detour): when, how often, how big, how long. */
 const DETOUR = { after: 0.8, stall: 4, retry: 2, nodes: 1500, keep: 20, regoal: 10 };
 /** Steepest ground an animal walks UP (raiders scramble up steeper ground to reach a base on high ground). */
-export const climbSlope = (d) => (d.raid ? 1.25 : d.type === 'raptor' ? 0.95 : 0.8);
+export const climbSlope = (d) => (d.raid ? 1.25 : d.type === 'raptor' || d.type === 'gloom-raptor' ? 0.95 : 0.8);
 
 export class DinoSystem {
   constructor(world) {
