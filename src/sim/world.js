@@ -36,6 +36,7 @@ import { insideGrove, mayEnterGrove } from '../shared/grove.js';
 import { RECIPE_BY_ID, upgradeMods, unlockIsland, canAfford } from '../shared/crafting.js';
 
 const P = CONFIG.player;
+const DIVE = P.dive;
 const W = CONFIG.weapons;
 const LOOT_KEYS = Object.keys(CONFIG.loot);
 const r2 = (v) => Math.round(v * 100) / 100;
@@ -99,6 +100,7 @@ export class ServerWorld {
     this.volcano = new Volcano(this); // heat, eruptions, ash rain (sim/volcano.js; idle off the volcano)
     this.dinos = new DinoSystem(this);
     this.placeTorches();
+    this.placeSumpCaches();
     this.log(`island ${level + 1} "${levelDef(level).name}" variant ${variant}`);
   }
 
@@ -114,7 +116,7 @@ export class ServerWorld {
         x: sp.x, y: this.terrain.heightAt(sp.x, sp.z), z: sp.z, yaw: sp.yaw, pitch: 0, spd: 0,
         hp: p.maxHp, alive: true, deadT: 0, eating: null, hot: null,
         downed: false, downT: 0, reviving: null, lastStandUsed: false, invulnUntil: 0,
-        lastMoveAt: this.now, moveBudget: 3.5, epoch: p.epoch + 1,
+        lastMoveAt: this.now, moveBudget: 3.5, epoch: p.epoch + 1, breath: DIVE.breath, drownT: 0,
       });
       p.inv.arrows = caps.arrows;
       p.inv.arrowUses = Array(caps.arrows).fill(W.bow.uses);
@@ -181,6 +183,8 @@ export class ServerWorld {
       lastInput: this.now,
       lastMoveAt: this.now,
       moveBudget: 3.5,
+      breath: DIVE.breath,   // seconds of air left while the head is under water (see `breathe`)
+      drownT: 0,
       epoch: 0,              // bumped by every correction/teleport (see correct())
       lastSeq: -1,           // newest state packet seen (`s`)
       knockBudgetUntil: 0,
@@ -320,6 +324,27 @@ export class ServerWorld {
     }
     this.event(EV.HURT, { id: p.id, dmg: Math.round(dmg), hp: Math.ceil(p.hp), kx: r2(kx), kz: r2(kz), down, src, from });
     if (p.hp <= 0) this.killPlayer(p, src);
+  }
+
+  /**
+   * Breath (diving): while the head is under the water the air drains one second per second, above it it refills
+   * `refill` times as fast; with none left the lungs hurt `drownDps` HP per second (every `drownTick` s) until the
+   * head is out. The client counts the same way for its meter (controller.js). Creative players never drown.
+   */
+  breathe(p, dt) {
+    if (p.creative) { p.breath = DIVE.breath; p.drownT = 0; return; }
+    if (this.terrain.headUnderwater(p.x, p.y, p.z)) {
+      p.breath = Math.max(0, p.breath - dt);
+      if (p.breath > 0) { p.drownT = 0; return; }
+      p.drownT += dt;
+      if (p.drownT >= DIVE.drownTick) {
+        p.drownT -= DIVE.drownTick;
+        this.hurtPlayer(p, DIVE.drownDps * DIVE.drownTick, { src: 'drown' });
+      }
+    } else {
+      p.breath = Math.min(DIVE.breath, p.breath + DIVE.refill * dt);
+      p.drownT = 0;
+    }
   }
 
   // ------------------------------------------------------------------ knife
@@ -722,6 +747,7 @@ export class ServerWorld {
     p.yaw = sp.yaw;
     p.lastMoveAt = this.now;
     p.moveBudget = 3.5;
+    p.breath = DIVE.breath; p.drownT = 0;
     p.knockBudgetUntil = 0;
     p.inv.arrows = Math.max(p.inv.arrows, W.bow.startArrows);
     this.normalizeArrows(p.inv);
@@ -773,6 +799,7 @@ export class ServerWorld {
     // A small distance reserve accommodates packet bunching without allowing
     // repeated state packets to move faster than the player's sprint.
     const creative = p.creative;
+    const sinceLast = Math.max(0, at - p.lastMoveAt);
     // a dash briefly lifts the cap by its distance (grantDash)
     const cap = creative ? 10 : at < p.dashUntil ? MOVE_RESERVE + DASH.distance + 1 : at < p.knockBudgetUntil ? 7 : MOVE_RESERVE;
     p.moveBudget = Math.min(cap,
@@ -783,7 +810,10 @@ export class ServerWorld {
     const ground = this.layout.groundAt(x, z, y + P.stepHeight);
     resolveCircle(x, z, P.radius, this.layout.playerColliders, collisionResult, y + 0.05, y + P.height, P.stepHeight - 0.05);
     const blocked = Math.hypot(collisionResult.x - x, collisionResult.z - z) > 0.6 || this.groveBlocks(p, x, z);
-    if (distance > p.moveBudget + 0.05 || Math.abs(x) > lim || Math.abs(z) > lim ||
+    // diving: wholly under the surface a body swims at DIVE.vertical m/s up or down at most and never below the bottom
+    const wet = !creative && this.terrain.waterDepthAt(x, z) > P.swim.depth - 0.2 && this.terrain.waterDepthAt(p.x, p.z) > P.swim.depth - 0.2;
+    const diveBad = wet && (y < ground - 0.35 || Math.abs(y - p.y) > DIVE.vertical * 1.5 * sinceLast + 1.2);
+    if (diveBad || distance > p.moveBudget + 0.05 || Math.abs(x) > lim || Math.abs(z) > lim ||
         !Number.isFinite(ground) || y < ground - 2 || y > ground + (creative ? P.creative.maxHeight + 5 : 20) ||
         // rivers and lakes may be swum; only the open sea is off-limits
         (!creative && this.terrain.seaDepthAt(x, z) > CONFIG.world.maxWadeDepth + 0.2) || blocked ||
@@ -799,6 +829,7 @@ export class ServerWorld {
     p.spd = Math.max(0, Math.min(20, num(m.spd, 0)));
     p.eq = Math.max(0, Math.min(EQUIP.length - 1, m.eq | 0));
     p.fl = (m.fl | 0) & (63 | PF.DASH | (p.inv.torch ? PF.TORCH : 0));   // DOWNED is the server's to set; a lit torch only with one in the pack
+    if (this.terrain.headUnderwater(p.x, p.y, p.z)) p.fl &= ~PF.TORCH;     // ... and it goes out under water
     if (p.fl & PF.SPRINT) {
       if (!p.sprinting) p.sprintArmed = true;   // Sprint Strike arms when a sprint starts
       p.sprinting = true;
@@ -1386,6 +1417,24 @@ export class ServerWorld {
     for (const s of this.torchSpawns) this.#spawnTorch(s, false);
   }
 
+  /**
+   * The reward of a dive: each `layout.sumps` entry has a cache of loot (teeth, claws, plates, bones, a skull) on the floor
+   * of its submerged passage, in a ring a metre or two wide. It never despawns and nothing else needs it (`keep`).
+   */
+  placeSumpCaches() {
+    for (const sm of this.layout.sumps ?? []) {
+      const entries = Object.entries(sm.cache.loot);
+      const total = entries.reduce((a, [, n]) => a + n, 0);
+      let i = 0;
+      for (const [kind, n] of entries) {
+        for (let k = 0; k < n; k++, i++) {
+          const a = (i / total) * Math.PI * 2, r = 0.5 + (i % 2) * 0.9;
+          this.spawnItem(kind, sm.cache.x + Math.cos(a) * r, sm.cache.z + Math.sin(a) * r, 1, null, null, false).keep = true;
+        }
+      }
+    }
+  }
+
   #spawnTorch(s, publish) {
     const it = this.spawnItem('torch', s.x, s.z, 1, s.y, null, false);
     it.spot = s.spot;
@@ -1472,6 +1521,8 @@ export class ServerWorld {
         }
         if (rate > 0) this.healPlayer(p, rate * dt);
       }
+      this.breathe(p, dt);
+      if (!p.alive) continue;
       // lava burns (and sets you back on your feet only if you get out)
       const lava = this.terrain.lavaLevelAt(p.x, p.z);
       if (lava !== null && p.y < lava + 0.6 && !p.creative) {
@@ -1510,7 +1561,7 @@ export class ServerWorld {
     // stale items
     for (const it of this.items.values()) {
       if (it.dino) this.updateAttachedItem(it);
-      if (it.kind === 'torch') continue;
+      if (it.kind === 'torch' || it.keep) continue;
       const life = it.kind === 'arrow' ? W.bow.arrowLifetime * 3 : it.kind === 'spear' ? Infinity : CONFIG.lootDespawn;
       if (this.now - it.t > life) this.removeItem(it.id);
     }

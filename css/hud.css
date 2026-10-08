@@ -108,6 +108,8 @@
 .is-hp .hud-bar-fill { background: linear-gradient(#ff7383, var(--red) 55%, #d63a4c); }
 .is-st .hud-bar-fill { background: linear-gradient(#9fe06a, var(--green) 55%, #5fae33); }
 .is-st .hud-bar-fill { transition-duration: 0.08s; }
+.is-br .hud-bar-fill { background: linear-gradient(#a4e8ff, #3fb3ff 55%, #1f7fc6); transition-duration: 0.1s; }
+.hud-bar[hidden] { display: none; }
 .hud-bar.is-low .hud-bar-ic { animation: hud-pulse 0.8s ease-in-out infinite; }
 
 .hud-mission {

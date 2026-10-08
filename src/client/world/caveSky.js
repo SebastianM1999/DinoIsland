@@ -166,7 +166,9 @@ const LIGHTS_BEGIN = CH.lights_fragment_begin.replace(
   'getDirectionalLightInfo( directionalLight, directLight );',
   'getDirectionalLightInfo( directionalLight, directLight );\n\t\tdirectLight.color *= cSunK;',
 );
-const FOG = CH.fog_fragment.replace('fogColor, fogFactor', 'fogColor * mix(0.07, 1.0, cVis), fogFactor');
+// (head under water, uCaveL.w = how deep under: the fog takes the water's colour, but deep in the mountain that water
+// is as dark as the cave air around it - only near the openings does daylight reach into it)
+const FOG = CH.fog_fragment.replace('fogColor, fogFactor', 'fogColor * mix(mix(0.07, 1.0, cVis), mix(0.18, 1.0, cVis), uCaveL.w), fogFactor');
 
 /**
  * Make `mat` light itself by the sky field. mode: 0 = terrain (a pixel above the roof is the
@@ -202,5 +204,10 @@ export function withCaveSky(mat, mode) {
  * of the sky light, `amb` = the scene's sky-light scale against outdoors (1 .. ambIn).
  */
 export function setCaveLights(sun, ambIn, amb) {
-  CAVE_SKY.uCaveL.value.set(1 / sun, ambIn, amb, 0);
+  CAVE_SKY.uCaveL.value.set(1 / sun, ambIn, amb, CAVE_SKY.uCaveL.value.w);
+}
+
+/** The camera's head is under water (0..1): the cave fog takes the water's colour instead of fading to black. */
+export function setCaveUnderwater(k) {
+  CAVE_SKY.uCaveL.value.w = k;
 }

@@ -53,6 +53,18 @@ export const CONFIG = {
       speed: 3.1,            // m/s, sprint does not help
       bank: 1.1,             // how high a bank you can climb out onto from the water
     },
+    // Diving (hold C while swimming, Space swims up): free 3D swimming under the surface of a river, lake or
+    // flooded cave tunnel (never the sea), bounded by the bottom and by the roof. The head under water drains the breath;
+    // empty, the lungs fill with water and hurt. Server and client run the same numbers (sim/world.js `breathe`).
+    dive: {
+      speed: 2.4,            // m/s along the look direction
+      vertical: 2.0,         // m/s down (dive key) / up (Space)
+      buoyancy: 0.6,         // m/s the water pushes you up while you do nothing
+      breath: 25,            // seconds of air in the lungs
+      refill: 10,            // seconds of air regained per second with the head above water
+      drownDps: 10,          // HP per second once the breath is gone (applied every drownTick seconds)
+      drownTick: 0.5,
+    },
     // Creative mode: invincible, endless stamina, double-tap Space to fly.
     creative: {
       flySpeed: 14,          // horizontal m/s while flying

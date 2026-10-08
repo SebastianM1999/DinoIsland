@@ -10,7 +10,7 @@
 //   caveOpenSdf(plan,x,z) -> signed distance to the open space (negative = tunnel/chamber floor)
 
 import { fbm, clamp, lerp, smoothstep } from './rng.js';
-import { CAVE_GEOM as G } from './caveMaze.js';
+import { CAVE_GEOM as G, SUMP } from './caveMaze.js';
 
 /** Roof values at or above this are "open sky" (Terrain.ceilingAt returns Infinity). */
 export const CAVE_SKY = 100;
@@ -131,13 +131,14 @@ function buildField(plan) {
     if (x === mx && z === mz) return memo;
     mx = x; mz = z;
     const list = grid.get(Math.floor(x / BUCKET) * 4096 + Math.floor(z / BUCKET));
-    let sum = 0, best = 1e9, rw = 0, rs = 0, dep = 0, fw = 0, y0 = 0;
+    let sum = 0, best = 1e9, rw = 0, rs = 0, dep = 0, fw = 0, y0 = 0, sw = 0, sy = 0, sl = 0;
     if (list) {
       for (const pr of list) {
         let d, roof;
         if (pr.type === 0) {
           const vx = pr.bx - pr.ax, vz = pr.bz - pr.az;
-          const u = clamp(((x - pr.ax) * vx + (z - pr.az) * vz) / (vx * vx + vz * vz || 1), 0, 1);
+          const raw = ((x - pr.ax) * vx + (z - pr.az) * vz) / (vx * vx + vz * vz || 1);
+          const u = clamp(raw, 0, 1);
           const dc = Math.hypot(pr.ax + vx * u - x, pr.az + vz * u - z);
           const half = lerp(pr.w0, pr.w1, u) / 2;
           d = dc - half;
@@ -146,7 +147,15 @@ function buildField(plan) {
           if (fl && dc < half * 1.8) {
             const arc = lerp(pr.u0, pr.u1, u), n = dc / half;
             const wf = smoothstep(fl.u0, fl.u0 + 0.14, arc) * (1 - smoothstep(fl.u1 - 0.14, fl.u1, arc));
-            const dp = FLOOD_DEPTH * wf * (1 - smoothstep(0.15, 1, n));
+            // the sump: the channel dips deeper and the roof comes down below the water (the roof is the absolute `sy`)
+            const sp = fl.sump;
+            // (only where the point lies beside this piece, not beyond its end: a neighbour's arc would reach ~10 m too far)
+            const sd = sp && raw > -0.5 && raw < 1.5 ? smoothstep(sp.s0 - sp.ramp, sp.s0, arc) * (1 - smoothstep(sp.s1, sp.s1 + sp.ramp, arc)) : 0;
+            if (sd > 0) {
+              const w = sd * (1 - smoothstep(1, 1.5, n));
+              if (w > sw) { sw = w; sl = fl.level; sy = sl - SUMP.clear; }
+            }
+            const dp = lerp(FLOOD_DEPTH, SUMP.depth, sd) * Math.max(wf, sd) * (1 - smoothstep(0.15, lerp(1, 1.35, sd), n));   // (in the sump the wall rises straight from the deep: no dry ledge under the low roof)
             const flat = smoothstep(fl.u0 - 0.22, fl.u0 - 0.08, arc) * (1 - smoothstep(fl.u1 + 0.08, fl.u1 + 0.22, arc)) * (1 - smoothstep(1, 1.7, n));
             if (dp > dep) dep = dp;
             if (flat > fw) { fw = flat; y0 = fl.y0; }
@@ -168,7 +177,7 @@ function buildField(plan) {
       }
     }
     const s = sum > 0 ? Math.min(best + 1e-6, -SMIN * Math.log(sum)) : best;
-    memo = { s: Math.min(s, 80), roof: rw > 0 ? rs / rw : 8, dep, fw, y0 };
+    memo = { s: Math.min(s, 80), roof: rw > 0 ? rs / rw : 8, dep, fw, y0, sw, sy, sl };
     return memo;
   };
 
@@ -236,6 +245,14 @@ function buildField(plan) {
     return y;
   };
 
+  /** The roof at (x, z) inside the mountain; over a sump it comes down below the water. */
+  const roofOf = (x, z, d, q) => {
+    const r = floorBase(x, z, d) + clamp(q.roof + 1.1 * fbm(x * 0.04 + 6, z * 0.04, 2, seed + 19), 4.6, 22);
+    if (!(q.sw > 0)) return r;
+    // (only over water that is deep enough to swim in: a shallow bank keeps its roof, nobody wades under a ceiling at their chin)
+    return lerp(r, q.sy, q.sw * smoothstep(0.2, 1.4, q.sl - field.height(x, z)));
+  };
+
   const pads = plan.pads;
   const field = {
     depth,
@@ -245,7 +262,7 @@ function buildField(plan) {
     roofBase(x, z) {
       const d = depth(x, z);
       if (d <= 0) return 1e4;
-      return floorBase(x, z, d) + clamp(query(x, z).roof + 1.1 * fbm(x * 0.04 + 6, z * 0.04, 2, seed + 19), 4.6, 22);
+      return roofOf(x, z, d, query(x, z));
     },
     /** the solid rock's height over everything (the mountain's skin; the ground itself over rock, beneath it the tunnels are carved) */
     rockTop(x, z) {
@@ -279,9 +296,7 @@ function buildField(plan) {
     ceiling(x, z) {
       const d = depth(x, z);
       if (d <= 0) return 1e4;
-      const q = query(x, z);
-      const fc = floorBase(x, z, d);
-      const roof = fc + clamp(q.roof + 1.1 * fbm(x * 0.04 + 6, z * 0.04, 2, seed + 19), 4.6, 22);
+      const roof = roofOf(x, z, d, query(x, z));
       const s = smoothstep(2, 24, d);
       return roof + 4000 * (1 - s) ** 3;
     },
