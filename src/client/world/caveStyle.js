@@ -103,10 +103,15 @@ export function buildGlowField(layout) {
         }
       }
     }
+    // many overlapping crystals must add up to a brighter glow, never to a white one: compress the strongest
+    // channel softly (hue kept) instead of clipping each channel on its own
+    const soft = (m) => (m <= 0.55 ? m : 0.55 + 0.5 * (1 - Math.exp(-(m - 0.55) / 0.5)));
     for (let k = 0; k < size * size; k++) {
-      data[k * 4] = Math.min(255, acc[k * 3] / GLOW_RANGE * 255);
-      data[k * 4 + 1] = Math.min(255, acc[k * 3 + 1] / GLOW_RANGE * 255);
-      data[k * 4 + 2] = Math.min(255, acc[k * 3 + 2] / GLOW_RANGE * 255);
+      const m = Math.max(acc[k * 3], acc[k * 3 + 1], acc[k * 3 + 2]);
+      const g = m > 0 ? soft(m) / m / GLOW_RANGE * 255 : 0;
+      data[k * 4] = Math.min(255, acc[k * 3] * g);
+      data[k * 4 + 1] = Math.min(255, acc[k * 3 + 1] * g);
+      data[k * 4 + 2] = Math.min(255, acc[k * 3 + 2] * g);
       data[k * 4 + 3] = 255;
     }
     const tex = new THREE.DataTexture(data, size, size, THREE.RGBAFormat, THREE.UnsignedByteType);

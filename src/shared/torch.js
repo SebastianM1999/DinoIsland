@@ -7,7 +7,7 @@ export const TORCH = {
   /** Seconds until a taken torch reappears at its ground spot (`layout.torchSpots`). */
   respawnTime: 60,
   /** World light of one lit torch (client `LightPool`, physical units under ACES tone mapping). */
-  light: { color: '#ff9a45', distance: 20, decay: 2, intensity: 48, ember: 0.12 },
+  light: { color: '#ffb877', distance: 15, decay: 1.35, intensity: 9.5, ember: 0.12 },
   /** Light-pool slots: 0 is the local player, 1-3 are remote players. */
   slots: 4,
 };
