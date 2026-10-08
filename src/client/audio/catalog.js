@@ -49,6 +49,8 @@ export const ISLAND_MUSIC = {
   jungle: { calm: '/assets/audio/music/jungle-calm.ogg', danger: '/assets/audio/music/jungle-danger.ogg' },
   volcano: { calm: '/assets/audio/music/volcano-calm.ogg', danger: '/assets/audio/music/volcano-danger.ogg' },
   // the swamp borrows the volcano's darker tracks until it has its own
+  // the Hollow Mountain borrows the volcano's tracks too: GameAudio darkens them (low-pass) and lays a drone under them inside the mountain
+  cave: { calm: '/assets/audio/music/volcano-calm.ogg', danger: '/assets/audio/music/volcano-danger.ogg' },
   swamp: { calm: '/assets/audio/music/volcano-calm.ogg', danger: '/assets/audio/music/volcano-danger.ogg' },
 };
 

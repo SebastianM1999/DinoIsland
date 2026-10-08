@@ -27,7 +27,13 @@ export class GameAudio {
     this.sfx.connect(this.master);
     this.musicBus = this.ctx.createGain();
     this.musicBus.gain.value = A.musicVolume;
-    this.musicBus.connect(this.master);
+    // music passes a low-pass: wide open everywhere, closed down to a muffled, dark sound on the Hollow Mountain (setIsland)
+    this.musicLP = this.ctx.createBiquadFilter();
+    this.musicLP.type = 'lowpass';
+    this.musicLP.frequency.value = 22000;
+    this.musicLP.Q.value = 0.4;
+    this.musicBus.connect(this.musicLP);
+    this.musicLP.connect(this.master);
     this.samples = new SampleBank(this.ctx);
     this.samplePicker = new SamplePicker();
     this.islandMusic = new IslandMusic(this.ctx, this.samples, this.musicBus);
@@ -41,6 +47,15 @@ export class GameAudio {
     this.ambBus = this.ctx.createGain();
     this.ambBus.gain.value = 0.35;
     this.ambBus.connect(this.master);
+    // stone reverb for the Hollow Mountain: effects and ambience feed a convolver with a generated impulse, the send opens with the depth into the mountain
+    this.reverbSend = this.ctx.createGain();
+    this.reverbSend.gain.value = 0;
+    this.reverb = this.ctx.createConvolver();
+    this.reverb.buffer = this.#makeImpulse(2.9, 2.4);
+    this.sfx.connect(this.reverbSend);
+    this.ambBus.connect(this.reverbSend);
+    this.reverbSend.connect(this.reverb).connect(this.master);
+    this.cave = { on: false, drone: null, layers: null, dripAt: 0, rumbleAt: 0, creakAt: 0 };
     // long buffers + random start offsets: loops built on them never audibly repeat
     this.noiseBuf = this.#makeNoise(6);
     this.brownBuf = this.#makeNoise(6, 'brown');
@@ -69,6 +84,7 @@ export class GameAudio {
   setIsland(island) {
     if (!this.ok) return;
     this.islandMusic.setIsland(island);
+    this.#caveMusic(island === 'cave');
     this.dangerUntil = 0;
     this.musicMode = 'calm';
     this.nextNote = 0;
@@ -78,7 +94,7 @@ export class GameAudio {
   }
 
   startMusic() {
-    if (this.ok) { this.musicOn = true; this.islandMusic.start(); }
+    if (this.ok) { this.musicOn = true; this.islandMusic.start(); this.#caveMusic(this.cave.on); }
   }
 
   startMenuMusic() {
@@ -92,12 +108,58 @@ export class GameAudio {
     if (!this.ok) return;
     this.musicOn = false;
     this.islandMusic.stop();
+    this.cave.drone?.g.gain.setTargetAtTime(0, this.ctx.currentTime, 0.3);
     this.dangerUntil = 0;
     // Scheduled fallback notes should also fade when leaving the game.
     const t = this.ctx.currentTime;
     this.calmBus.gain.setTargetAtTime(0, t, 0.15);
     this.dangerBus.gain.setTargetAtTime(0, t, 0.15);
     this.nextNote = 0;
+  }
+
+  /** A reverb impulse: decaying stereo noise whose highs die first (wet stone). */
+  #makeImpulse(seconds, decay) {
+    const len = Math.floor(this.ctx.sampleRate * seconds);
+    const buf = this.ctx.createBuffer(2, len, this.ctx.sampleRate);
+    for (let c = 0; c < 2; c++) {
+      const d = buf.getChannelData(c);
+      let lp = 0;
+      for (let i = 0; i < len; i++) {
+        const t = i / len;
+        const k = 0.9 - 0.8 * t;                  // the tail gets duller
+        lp += (Math.random() * 2 - 1 - lp) * (1 - k);
+        d[i] = lp * Math.pow(1 - t, decay) * (i < 400 ? i / 400 : 1);
+      }
+    }
+    return buf;
+  }
+
+  /** The Hollow Mountain's music: the borrowed tracks low-passed and a slow multi-voice drone beneath. */
+  #caveMusic(on) {
+    const t = this.ctx.currentTime;
+    this.cave.on = on;
+    this.musicLP.frequency.setTargetAtTime(on ? 1500 : 22000, t, 0.4);
+    if (on && !this.cave.drone) {
+      const g = this.ctx.createGain();
+      g.gain.value = 0;
+      const lp = this.ctx.createBiquadFilter();
+      lp.type = 'lowpass'; lp.frequency.value = 420;
+      const oscs = [[55, 'sine', 0.55], [82.6, 'sine', 0.3], [110.4, 'triangle', 0.16], [164.2, 'sine', 0.08]].map(([f, type, vol]) => {
+        const o = this.ctx.createOscillator();
+        o.type = type; o.frequency.value = f * (1 + (Math.random() - 0.5) * 0.004);
+        const og = this.ctx.createGain(); og.gain.value = vol;
+        // each voice breathes at its own slow rate
+        const lfo = this.ctx.createOscillator(); lfo.frequency.value = 0.04 + Math.random() * 0.09;
+        const lg = this.ctx.createGain(); lg.gain.value = vol * 0.6;
+        lfo.connect(lg).connect(og.gain);
+        o.connect(og).connect(lp);
+        o.start(); lfo.start();
+        return o;
+      });
+      lp.connect(g).connect(this.musicBus);
+      this.cave.drone = { g, oscs };
+    }
+    if (this.cave.drone) this.cave.drone.g.gain.setTargetAtTime(on && this.musicOn ? 0.16 : 0, t, 1.5);
   }
 
   /** White noise, or brown noise (deep rumble: integrated white, for big water). */
@@ -398,6 +460,14 @@ export class GameAudio {
         }
         break;
       }
+      case 'caveDrip': {
+        // a drop falling from the roof: a bright tick, a hollow ping that rings in the cave (water: a lower plink)
+        const f = (o.onWater ? 700 : 1300) + Math.random() * 700;
+        this.#osc('sine', f, f * 0.42, t, 0.1, out, 0.2, 0.002);
+        this.#osc('sine', f * 2.01, f * 1.2, t, 0.05, out, 0.06, 0.002);
+        this.#noise(t, 0.03, out, { vol: 0.05, f0: 4200, f1: 2600, q: 1.2, a: 0.002 });
+        break;
+      }
       case 'plop': {
         // a small thing dropping in (arrow, spear): the bubble's pitch drop + a tiny splash
         const f = 700 + Math.random() * 500;
@@ -695,6 +765,51 @@ export class GameAudio {
     this.#steer(W.wade, 0.18 * wade, null, t);
   }
 
+  /**
+   * Inside the Hollow Mountain (`inside` 0..1): the reverb opens, a low wind moves through the tunnels,
+   * the mountain rumbles far away, drops fall at random places and the water laps near flooded stretches
+   * (`wet` 0..1). Outside (the coves) none of it is heard and the surf and birds carry on.
+   */
+  #caveAmbience(t, inside, wet) {
+    this.reverbSend.gain.setTargetAtTime(0.62 * inside, t, 0.4);
+    if (!this.cave.layers && inside > 0.02) {
+      this.cave.layers = {
+        wind: this.#loopLayer({ brown: true, type: 'lowpass', f: 240, q: 0.6, wobble: 90, wobbleRate: 0.11, positional: false }),
+        air: this.#loopLayer({ type: 'bandpass', f: 520, q: 0.45, wobble: 240, wobbleRate: 0.07, positional: false }),
+        rumble: this.#loopLayer({ brown: true, type: 'lowpass', f: 70, q: 0.7, wobble: 18, wobbleRate: 0.05, positional: false }),
+        lap: this.#loopLayer({ type: 'bandpass', f: 850, q: 0.9, wobble: 320, wobbleRate: 0.5, positional: false }),
+      };
+    }
+    const L = this.cave.layers;
+    if (!L) return;
+    this.#steer(L.wind, 0.2 * inside, null, t);
+    this.#steer(L.air, 0.035 * inside, null, t);
+    this.#steer(L.rumble, 0.16 * inside, null, t);
+    this.#steer(L.lap, 0.05 * inside * wet, null, t);
+    if (inside < 0.25) return;
+    const lp = this.listenerPos;
+    if (t >= this.cave.dripAt) {
+      // a drop somewhere round the listener, now and then two in a row
+      const a = Math.random() * Math.PI * 2, d = 3 + Math.random() * 14;
+      this.#drip(t, { x: lp.x + Math.cos(a) * d, y: lp.y + 1 + Math.random() * 2, z: lp.z + Math.sin(a) * d }, { f: 900 + Math.random() * 1500, vol: 0.05 * inside, fall: 0.4, dur: 0.08 });
+      this.cave.dripAt = t + (Math.random() < 0.25 ? 0.18 + Math.random() * 0.2 : 1.2 + Math.random() * 3.6);
+    }
+    if (t >= this.cave.rumbleAt) {
+      // the mountain shifting far away: a long, low swell
+      this.#noise(t, 4.2, this.ambBus, { vol: 0.35 * inside, type: 'lowpass', f0: 110, f1: 48, q: 0.8, a: 1.4 });
+      this.#osc('sine', 46, 30, t + 0.2, 3.4, this.ambBus, 0.12 * inside, 1.2);
+      this.cave.rumbleAt = t + 18 + Math.random() * 30;
+    }
+    if (t >= this.cave.creakAt) {
+      // stone ticking and settling: a short dry crack, far off to one side
+      const a = Math.random() * Math.PI * 2, d = 12 + Math.random() * 20;
+      const out = this.#placed({ x: lp.x + Math.cos(a) * d, y: lp.y + 1, z: lp.z + Math.sin(a) * d });
+      out.gain.value = 0.5 * inside;
+      this.#noise(t, 0.09, out, { vol: 0.12, type: 'bandpass', f0: 1800 + Math.random() * 900, f1: 700, q: 2.2, a: 0.002 });
+      this.cave.creakAt = t + 9 + Math.random() * 22;
+    }
+  }
+
   /** A gain routed through a fixed-position panner (for one-off ambience noises). */
   #placed(pos) {
     const g = this.ctx.createGain();
@@ -709,7 +824,7 @@ export class GameAudio {
   }
 
   /** Per-frame: quiet positional ambience and calm/danger music scheduling. */
-  update(dt, { coast = 0, water = null, danger = false, bossArea = false, ash = 0 } = {}) {
+  update(dt, { coast = 0, water = null, danger = false, bossArea = false, ash = 0, cave = 0, caveWet = 0 } = {}) {
     if (!this.ok || this.ctx.state !== 'running') return;
     const t = this.ctx.currentTime;
     if (this.amb) {
@@ -724,11 +839,12 @@ export class GameAudio {
         this.amb.surfAt = t + 2.2 + Math.random() * 0.7;
       }
       if (water) this.#waterAmbience(dt, t, water);
+      if (this.cave.on) this.#caveAmbience(t, cave, caveWet);
       this.birdT -= dt;
       if (this.birdT <= 0) {
         this.birdT = 5 + Math.random() * 9;
         const out = this.ctx.createGain();
-        out.gain.value = 0.08 * (1 - coast * 0.5);
+        out.gain.value = 0.08 * (1 - coast * 0.5) * (1 - cave);
         const p = this.ctx.createStereoPanner();
         p.pan.value = Math.random() * 2 - 1;
         out.connect(p).connect(this.ambBus);
