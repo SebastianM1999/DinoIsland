@@ -6,6 +6,7 @@
 
 import { Terrain } from '../../shared/terrain.js';
 import { SWAMP_ARENA } from '../../shared/swampArena.js';
+import { buildCaveMapBase } from './caveMap.js';
 
 const TAU = Math.PI * 2;
 
@@ -36,6 +37,8 @@ const clamp01 = (v) => (v < 0 ? 0 : v > 1 ? 1 : v);
  * @param {import('../../shared/terrain.js').Terrain} terrain
  */
 export function buildMapBase(terrain, layout, res = 640) {
+  // the Hollow Mountain: its own dark palette and a fog of war over the maze (caveMap.js)
+  if (layout?.plan?.cave) return buildCaveMapBase(terrain, layout, res);
   // Keep the secret arena and its causeway out of the map's terrain as well
   // as its markers. Only this map copy changes; gameplay uses the real terrain.
   if (layout?.bossArena && terrain.plan) {
@@ -275,6 +278,8 @@ export function drawMap(ctx, base, st, view) {
     const bs = base.size * pxPerM;
     ctx.imageSmoothingEnabled = true;
     ctx.drawImage(base.canvas, toX(-base.half), toY(-base.half), bs, bs);
+    // unexplored ground inside the Hollow Mountain stays covered
+    if (base.fog) ctx.drawImage(base.fog.canvas, toX(-base.half), toY(-base.half), bs, bs);
   }
   if (!st) { ctx.restore(); return; }
 

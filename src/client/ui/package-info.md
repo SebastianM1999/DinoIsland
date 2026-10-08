@@ -5,6 +5,7 @@
 - Torch: `hud.setTorch(owned, lit)` pill beside the quiver (hidden until picked up, shows L and Lit/Out); `icons.js` `torch`, `itemInfo.js` `torch`.
 - `hud.js` — `Hud`: the in-game HUD (~1080 lines, see below).
 - `missionSummary.js` — pure compact goal copy from host mission phases/relic progress; keeps pinned contracts visible without rendering the entire checklist during play. Full objectives remain in the expedition menu and board, and the live HUD expands expedition objectives and team quests with X.
+- `caveMap.js` — fog of war for the Hollow Mountain's map: the interior is covered, `revealMap` (called from `Hud.setMinimap`) uncovers what the player has walked through; the coves show normally.
 - `minimap.js` — `buildMapBase` paints the island once to an offscreen canvas (swamp bogs and the swamp arena ring, the volcano's lava craters and crater rim included); `drawMap` blits a region plus markers each frame.
 - `icons.js` — `ICONS`, `icon(id)`, `portraitSvg()`: inline 32x32 SVG item/HUD icons with distinct equipment/material silhouettes at small sizes (every fruit kind, `flame` for heat and the volcano's warnings, `ash` for the ash rain).
 - `itemInfo.js` — `ITEM_INFO`: names and tooltip texts for inventory items, numbers taken from `CONFIG`.

@@ -9,6 +9,7 @@ import { EQUIP } from '../../shared/protocol.js';
 import { CONFIG } from '../../shared/config.js';
 import { icon, portraitSvg } from './icons.js';
 import { buildMapBase, drawMap } from './minimap.js';
+import { revealMap } from './caveMap.js';
 import { ITEM_INFO } from './itemInfo.js';
 import { CONTRACTS as BOARD_CONTRACTS } from '../../shared/missions.js';
 import { RELICS } from '../../shared/relics.js';
@@ -596,6 +597,7 @@ export class Hud {
 
   setMinimap(state) {
     this._mapState = state;
+    if (state && this._mapBase?.fog) revealMap(this._mapBase, state.x, state.z);   // Hollow Mountain: walking uncovers the map
     const now = performance.now();
     if (now - this._mapRefreshAt < 1000 / 20) return;
     this._mapRefreshAt = now;
