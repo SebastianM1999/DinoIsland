@@ -35,6 +35,7 @@ Grouped by the module area they mainly cover. Many simulation tests also check t
 - `sarcosuchus-boss.test.js` — central island 2 boss spawn, harmless telegraphs, committed lunge dodges and miss recovery, shoulder shove, swept tail knockback, low-health chains, safe-zone exclusion, arena damage boundaries and no respawn; bank targeting across fifteen variants, backwards retreats, floating corpse continuity, late-join phase synchronization, vertical strike avoidance and emergence without shore-height pops.
 - `dino-slopes.test.js` — dinosaurs run down steep slopes to players, climbing stays limited (`findPath`, `climbSlope`) over seeded island variants.
 - `dino-contact.test.js` — player-vs-dinosaur body contact (`resolveDinoContact`) and contact damage events.
+- `sump-lurker.test.js` — Sump Lurker config, flooded-spot-only spawning (never on levels 0-2), submerged lurk, edge lunge and drag back, staying near water, retreat when hurt, GLB clips (`sumpLurkerBrain`, fake pool terrain).
 - `gloom-raptor.test.js` — Gloom Raptor config, noise hearing, cave-spot-only spawning, GLB clips.
 - `raptor-fear.test.js` — raptor retreat/hesitation behaviour and raid raiders (`raptorBrain`, `raiderStep`).
 - `stego-tail.test.js` — stegosaurus tail sweep geometry and hits (`stegoBrain`, `tailSweep`).

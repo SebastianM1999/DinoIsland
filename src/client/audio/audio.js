@@ -231,6 +231,10 @@ export class GameAudio {
   /** Species calls. Small animals get short chirps/screeches, big ones deep roars. */
   #creature(type, t, out) {
     switch (type) {
+      case 'sump-lurker':
+        // a dry, rasping croak: the sarcosuchus' rumble pitched far up with more breath
+        this.#voice(t, out, { pitch: [150, 230, 170], dur: 0.6, vol: 0.5, formants: [520, 1300], lowpass: 2200, vibrato: [8, 0.03], rough: [33, 0.08], breath: 0.4, attack: 0.1 });
+        break;
       case 'alpha-sarcosuchus':
       case 'trex':
         this.#voice(t, out, { pitch: [62, 92, 80, 55], dur: 1.9, vol: 1.15, formants: [320, 820], lowpass: 1400, vibrato: [4, 0.02], rough: [27, 0.05], breath: 0.25, attack: 0.18 });
@@ -404,6 +408,7 @@ export class GameAudio {
       case 'roar_trex':
       case 'roar_raptor':
       case 'roar_gloom-raptor':
+      case 'roar_sump-lurker':
       case 'roar_stego':
       case 'roar_ptera':
       case 'roar_brachio':

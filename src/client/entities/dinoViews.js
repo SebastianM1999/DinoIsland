@@ -16,7 +16,7 @@ import { buildStego, STEGO_ANIM, stegoExtraUpdate } from '../models/dino/stego.j
 import { buildRaptor, buildGloomRaptor, RAPTOR_ANIM, raptorExtraUpdate } from '../models/dino/raptor.js';
 import { buildPtera, PTERA_ANIM, pteraExtraUpdate } from '../models/dino/ptera.js';
 import { buildTrex, TREX_ANIM, trexExtraUpdate } from '../models/dino/trex.js';
-import { buildSarcoFallback, SARCO_ANIM } from '../models/dino/sarcoFallback.js';
+import { buildSarcoFallback, buildSumpLurkerFallback, SARCO_ANIM } from '../models/dino/sarcoFallback.js';
 import { SarcoEffects } from './sarcoEffects.js';
 import { buildGLBDino } from '../models/dino/glbDino.js';
 import { disposeIslandScenes } from '../core/resources.js';
@@ -24,7 +24,9 @@ import { CreatureStepCadence } from '../audio/creatureSteps.js';
 
 /** Every server species needs a visible model and its animation tuning. */
 export const SPECIES = {
-  'alpha-sarcosuchus': { build: buildSarcoFallback, anim: SARCO_ANIM, barHeight: 3.96, heavy: true },
+  'alpha-sarcosuchus': { build: buildSarcoFallback, anim: SARCO_ANIM, barHeight: 3.96, heavy: true, aquatic: true },
+  // cave ambusher: the sarcosuchus' rig at ~5 m; state-driven clips (swim in water), no boss phases
+  'sump-lurker': { build: buildSumpLurkerFallback, anim: { ...SARCO_ANIM, walkSpeed: 1.4, runSpeed: 3.6, walkStride: .429, runStride: 1.053 }, barHeight: 1.2, aquatic: true, swimClip: true },
   brachio: { build: buildBrachio, anim: BRACHIO_ANIM, extraUpdate: brachioExtraUpdate, barHeight: 13.8, heavy: true },
   stego: { build: buildStego, anim: STEGO_ANIM, extraUpdate: stegoExtraUpdate, barHeight: 4.2, heavy: true },
   raptor: { build: buildRaptor, anim: RAPTOR_ANIM, extraUpdate: raptorExtraUpdate, barHeight: 1.8 },
@@ -195,7 +197,7 @@ export class DinoView {
   }
 
   grounded() {
-    if (this.type === 'alpha-sarcosuchus' && (this.st === DS.SWIM || this.st === DS.SUBMERGED || this.fl & 8)) return false;
+    if (SPECIES[this.type]?.aquatic && (this.st === DS.SWIM || this.st === DS.SUBMERGED || this.fl & 8)) return false;
     if (this.type === 'ptera') {
       return this.pos.y <= this.ctx.terrain.heightAt(this.pos.x, this.pos.z) + 0.2;
     }
@@ -223,6 +225,7 @@ export class DinoView {
         p.attack = 0; p.tailSwing = 0;
       }
     }
+    if (SPECIES[this.type]?.swimClip && this.st === DS.SWIM) p.clip = 'swim';   // the lurker has no boss phases: the state picks the clip
     switch (this.st) {
       case DS.GRAZE: case DS.EAT: p.headDown = 1; break;
       case DS.ALERT: p.alert = 1; p.neckRaise = 1; break;
@@ -341,6 +344,7 @@ export class DinoViews {
     if (this.map.has(desc.id) || !SPECIES[desc.type]) return;
     const view = new DinoView(desc, this.ctx);
     if (desc.type === 'alpha-sarcosuchus') view.effects = new SarcoEffects(this.game, view);
+    else if (desc.type === 'sump-lurker') view.effects = new SarcoEffects(this.game, view, { glints: false, wake: .55 });
     this.map.set(desc.id, view);
   }
 

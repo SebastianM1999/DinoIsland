@@ -3,7 +3,9 @@ import { DS } from '../../shared/protocol.js';
 
 /** Server-triggered warning glints, silt and wakes. No damage decisions here. */
 export class SarcoEffects {
-  constructor(game, view) {
+  /** `opts.glints: false` and a smaller `opts.wake` give the Sump Lurker the wakes without the boss's ambush warning. */
+  constructor(game, view, opts = {}) {
+    this.opts = { glints: true, wake: 1, ...opts };
     this.game = game; this.view = view; this.time = 0; this.warning = 0; this.effect = 0; this.wake = 0;
     this.group = new THREE.Group(); game.gfx.scene.add(this.group);
     this.geo = new THREE.SphereGeometry(1, 10, 8);
@@ -14,7 +16,7 @@ export class SarcoEffects {
     this.group.visible = false;
   }
   cue(kind, duration = 1) {
-    if (kind === 'ambush') { this.total = this.effect = duration; this.warning = duration * .85 / 1.6; }
+    if (kind === 'ambush' && this.opts.glints) { this.total = this.effect = duration; this.warning = duration * .85 / 1.6; }
   }
   update(dt) {
     const v = this.view, water = this.game.terrain.waterLevelAt(v.pos.x, v.pos.z);
@@ -28,7 +30,7 @@ export class SarcoEffects {
     }
     const swimming = v.st === DS.SWIM || v.st === DS.SUBMERGED;
     if (v.alive && water !== null && (swimming || this.warning > 0) && this.wake <= 0) {
-      this.game.water?.ripple(v.pos.x, v.pos.z, this.warning > 0 ? 1.4 : .7); this.wake = .35;
+      this.game.water?.ripple(v.pos.x, v.pos.z, (this.warning > 0 ? 1.4 : .7) * this.opts.wake); this.wake = .35;
     }
     this.group.visible = v.alive && water !== null && this.effect > 0;
     if (!this.group.visible) return;

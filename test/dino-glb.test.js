@@ -36,12 +36,12 @@ test('GLBs keep combat, independent skins, semantic clips and terrain animation 
     const animator = new DinoAnimator(a, SPECIES[type].anim), other = SPECIES[type].createAnimator(b);
     assert.notEqual(animator.mixer, other.mixer);
     // Blender-authored species have opening jaws and eyes built into their meshes.
-    const authored = ['raptor', 'gloom-raptor', 'brachio', 'trex', 'stego', 'ptera', 'alpha-sarcosuchus'].includes(type);
+    const authored = ['raptor', 'gloom-raptor', 'sump-lurker', 'brachio', 'trex', 'stego', 'ptera', 'alpha-sarcosuchus'].includes(type);
     assert.equal(!!a.jaw, authored, `${type}: preserve the existing head anatomy`);
     if (!authored) assert.ok(a.model.getObjectByName('FaceEyes'), `${type}: missing visible eyes`);
     assert.equal(a.model.getObjectByName('DetailedFace'), undefined, 'no replacement facial geometry');
     if (type !== 'brachio') {
-      const sourceTriangles = { raptor: 56296, 'gloom-raptor': 59420, trex: 50731, stego: 54588, ptera: 49351, 'alpha-sarcosuchus': 58752 };
+      const sourceTriangles = { raptor: 56296, 'gloom-raptor': 59420, 'sump-lurker': 51565, trex: 50731, stego: 54588, ptera: 49351, 'alpha-sarcosuchus': 58752 };
       let skinTriangles = 0;
       a.model.traverse(o => { if (o.isSkinnedMesh) skinTriangles += o.geometry.index.count / 3; });
       assert.equal(skinTriangles, sourceTriangles[type], 'integrated head/body surface remains complete');
