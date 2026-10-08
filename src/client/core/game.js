@@ -985,7 +985,7 @@ export class Game {
       if (!v.alive || v.type === 'brachio') continue;
       const hostile = (v.fl & 1) !== 0 || v.st === DS.ATTACK || v.st === DS.CHARGE || v.st === DS.DIVE;
       if (!hostile) continue;
-      const range = v.type === 'trex' ? 75 : v.type === 'ptera' ? 45 : v.type === 'gloom-raptor' ? 36 : v.type === 'sump-lurker' ? 24 : 40;   // the blind gloom raptor hunts by sound: closer
+      const range = v.type === 'trex' ? 75 : v.type === 'ptera' ? 45 : v.type === 'gloom-raptor' ? 36 : v.type === 'sump-lurker' ? 24 : v.type === 'crystal-plodder' ? 16 : 40;   // the blind gloom raptor hunts by sound: closer
       if (Math.hypot(v.pos.x - p.x, v.pos.z - p.z) < range) return true;
     }
     return false;
@@ -993,7 +993,7 @@ export class Game {
 
   /** Sound hooks called by the dinosaur views. */
   onRoar(v) { this.audio.play(`roar_${v.type}`, { pos: v.pos }); }
-  onDinoAttack(v) { if (v.type !== 'brachio') this.audio.play(v.type === 'stego' ? 'bigStep' : 'bite', { pos: v.pos }); }
+  onDinoAttack(v) { if (v.type !== 'brachio') this.audio.play(v.type === 'stego' || v.type === 'crystal-plodder' ? 'bigStep' : 'bite', { pos: v.pos }); }
   onDinoHit(v, m) { if (m.by !== this.me.id) this.audio.play('hit', { pos: v.pos, vol: 0.7 }); }
   onDinoStep(v, step) {
     if (!creatureStepAudible(v, this.player.pos)) return;

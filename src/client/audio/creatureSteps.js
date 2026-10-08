@@ -8,6 +8,7 @@ export const CREATURE_STEP_PROFILES = Object.freeze({
   raptor: { stride: .75, runStride: 1.4, walkSpeed: 3.2, maxSpeed: 10.2, weight: 'light', gain: .32, rate: 1.16, weightGain: 0, weightRate: 1 },
   'gloom-raptor': { stride: .7, runStride: 1.3, walkSpeed: 2.6, maxSpeed: 9, weight: 'light', gain: .22, rate: 1.08, weightGain: 0, weightRate: 1 },
   'sump-lurker': { stride: .6, runStride: 1.1, walkSpeed: 1.6, maxSpeed: 7, weight: 'light', gain: .15, rate: 1, weightGain: 0, weightRate: 1 },
+  'crystal-plodder': { stride: 1, runStride: 1.8, walkSpeed: 1.4, maxSpeed: 7, weight: 'heavy', gain: .5, rate: .88, weightGain: .2, weightRate: .95 },
   ptera: { stride: .425, runStride: .75, walkSpeed: 1.2, maxSpeed: 24, weight: 'light', gain: .2, rate: 1.22, weightGain: 0, weightRate: 1 },
   stego: { stride: 1.15, runStride: 2.1, walkSpeed: 1.6, maxSpeed: 8.8, weight: 'heavy', gain: .65, rate: .9, weightGain: .28, weightRate: .95 },
   'alpha-sarcosuchus': { stride: .84, runStride: 1.7, walkSpeed: 3, maxSpeed: 15, weight: 'heavy', gain: .7, rate: .84, weightGain: .35, weightRate: .88 },
@@ -17,7 +18,7 @@ export const CREATURE_STEP_PROFILES = Object.freeze({
 
 /** Avoid HRTF sources and ground queries for inaudible distant footfalls. */
 export function creatureStepAudible(view, listener) {
-  const ranges = { raptor: 30, 'gloom-raptor': 24, 'sump-lurker': 18, ptera: 20, stego: 45, trex: 65, brachio: 70, 'alpha-sarcosuchus': 65 };
+  const ranges = { raptor: 30, 'gloom-raptor': 24, 'sump-lurker': 18, 'crystal-plodder': 36, ptera: 20, stego: 45, trex: 65, brachio: 70, 'alpha-sarcosuchus': 65 };
   const range = Math.min(95, (ranges[view.type] || 30) * Math.sqrt(Math.max(.5, view.scale || 1)));
   return Math.hypot(view.pos.x - listener.x, view.pos.y - listener.y, view.pos.z - listener.z) <= range;
 }

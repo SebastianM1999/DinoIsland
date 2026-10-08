@@ -28,6 +28,8 @@ export const GLB_DINOS = {
   'gloom-raptor': model('gloom-raptor', 'GloomRaptor', 2.083, 3.9, 2.279, 5.125),
   trex: model('trex', 'TRex', 5.919, 11, 4.819, 8.095),
   stego: model('stego', 'Stegosaurus', 3.758, 7.9, 1.414, 3.414, true),
+  // Cave herbivore (art/sources/crystal-plodder): low, armoured, crystals on its back (glow: see glbDino.js).
+  'crystal-plodder': model('crystal-plodder', 'CrystalPlodder', 2.057, 6.0, 1.001, 1.797, true),
   brachio: model('brachio', 'Brachiosaurus', 13.007, 18.514, 2.714, 5.333, true),
   // Flyer: strides are unused (GLBDinoAnimator picks flight clips by state, not by ground speed).
   ptera: model('ptera', 'Pteranodon', 1.855, 2.56, 1, 1),
@@ -66,6 +68,71 @@ GLB_DINOS.trex.clips.roar = 'TRex_Roar';
 GLB_DINOS.stego.bones = { ...GLB_DINOS.stego.bones,
   jaw: 'Jaw', neck: ['Neck1', 'Neck2'], spine: ['Body', 'Shoulders'],
   tail: Array.from({ length: 7 }, (_, i) => `Tail${i + 1}`) };
+// Crystal Plodder: stego-style quadruped rig (6-bone club tail), plus a bellow (Roar) and a flinch (Hurt) clip.
+GLB_DINOS['crystal-plodder'].bones = { ...GLB_DINOS.stego.bones, tail: Array.from({ length: 6 }, (_, i) => `Tail${i + 1}`) };
+GLB_DINOS['crystal-plodder'].glow = { material: 'PlodCrystal' };   // crystals: unlit vertex-colour material, slow pulse
+GLB_DINOS['crystal-plodder'].clips.roar = 'CrystalPlodder_Roar';
+GLB_DINOS['crystal-plodder'].clips.hurt = 'CrystalPlodder_Hurt';
+// Extra Crystal Plodder hit spheres (hit_coverage.mjs: the generic joint spheres cover ~30 % of this broad, low body; with
+// these ~97 %). Game metres [zone, bone, x, y, forward, radius]: armoured back = plates (x0.35), flanks weak (x1.6).
+GLB_DINOS['crystal-plodder'].extraHitZones = [
+  ['head', 'Head', 0.17, 0.43, 2.71, 0.2],
+  ['head', 'Head', -0.31, 0.61, 2.76, 0.2],
+  ['head', 'Head', 0.25, 0.73, 2.81, 0.2],
+  ['body', 'Body', -0.62, 1.41, 0.12, 0.3],
+  ['body', 'Body', 0.67, 1.29, 0.13, 0.3],
+  ['head', 'Head', -0.26, 0.46, 2.39, 0.2],
+  ['head', 'Head', 0.3, 0.66, 2.45, 0.2],
+  ['plates', 'Shoulders', 0.21, 1.52, 0.67, 0.3],
+  ['plates', 'Body', -0.19, 1.56, -0.52, 0.3],
+  ['leg', 'BackFootL', -0.7, 0.16, -0.17, 0.22],
+  ['leg', 'BackFootR', 0.75, 0.15, -0.18, 0.22],
+  ['tail', 'Tail2', 0.06, 1.1, -1.16, 0.22],
+  ['head', 'Jaw', -0.13, 0.33, 2.88, 0.2],
+  ['body', 'Shoulders', -0.17, 1.41, 1.42, 0.3],
+  ['leg', 'FrontLowLegR', 0.6, 0.32, 1.13, 0.22],
+  ['leg', 'FrontFootL', -0.75, 0.32, 1.16, 0.22],
+  ['flank', 'Shoulders', -0.77, 1.22, 0.67, 0.3],
+  ['leg', 'FrontFootR', 0.87, 0.12, 0.78, 0.22],
+  ['tail', 'Tail5', 0.39, 0.67, -2.4, 0.22],
+  ['leg', 'FrontFootL', -0.74, 0.16, 0.68, 0.22],
+  ['tail', 'Tail4', -0.4, 0.6, -2.36, 0.22],
+  ['plates', 'Body', 0.43, 1.53, -0.27, 0.3],
+  ['neck', 'Neck1', 0.53, 1.01, 1.49, 0.22],
+  ['head', 'Head', -0.34, 0.78, 2.39, 0.2],
+  ['leg', 'BackFootL', -0.78, 0.02, -0.49, 0.22],
+  ['flank', 'Body', -0.91, 1.04, 0.02, 0.3],
+  ['tail', 'Tail1', -0.31, 1.26, -0.99, 0.22],
+  ['body', 'Shoulders', 0.7, 1.3, 0.93, 0.3],
+  ['leg', 'BackLowLegR', 0.75, 0.35, -0.67, 0.22],
+  ['tail', 'Tail4', -0.18, 0.89, -2.37, 0.22],
+  ['tail', 'Tail5', 0.09, 0.27, -2.41, 0.22],
+  ['leg', 'FrontFootL', -0.42, 0.14, 1.1, 0.22],
+  ['body', 'Shoulders', -0.65, 1, 1.41, 0.3],
+  ['neck', 'Neck2', 0.21, 0.47, 1.96, 0.22],
+  ['plates', 'Body', -0.06, 1.63, 0.33, 0.3],
+  ['leg', 'BackLowLegR', 0.46, 0.25, -0.38, 0.22],
+  ['flank', 'Shoulders', 0.91, 0.66, 0.62, 0.3],
+  ['leg', 'FrontFootR', 0.59, 0.01, 1.28, 0.22],
+  ['tail', 'Tail2', -0.31, 0.84, -1.27, 0.22],
+  ['body', 'Shoulders', 0.25, 1.34, 1.27, 0.3],
+  ['leg', 'BackLowLegL', -0.98, 0.54, -0.35, 0.22],
+  ['head', 'Jaw', 0, 0.29, 2.26, 0.2],
+  ['flank', 'Body', 0.95, 0.71, -0.14, 0.3],
+  ['leg', 'BackLowLegL', -0.47, 0.33, -0.42, 0.22],
+  ['neck', 'Neck1', -0.32, 0.5, 1.7, 0.22],
+  ['tail', 'Tail2', 0.33, 0.88, -1.13, 0.22],
+  ['flank', 'Body', -0.72, 0.58, 0.3, 0.3],
+  ['tail', 'Tail1', -0.81, 1.05, -0.77, 0.22],
+  ['leg', 'FrontLowLegR', 0.46, 0.35, 0.82, 0.22],
+  ['body', 'Shoulders', 0.58, 0.63, 1.35, 0.3],
+  ['leg', 'BackFootR', 0.93, 0.03, -0.62, 0.22],
+  ['neck', 'Neck1', 0.32, 1.08, 1.81, 0.22],
+  ['tail', 'Tail3', 0.28, 0.76, -2.03, 0.22],
+  ['head', 'Head', -0.07, 0.74, 2.95, 0.2],
+  ['neck', 'Neck1', -0.37, 1, 1.88, 0.22],
+  ['flank', 'Body', 1.09, 1.18, 0.3, 0.3],
+].map(([zone, bone, x, y, fwd, radius]) => ({ zone, bone, at: [x, y, fwd], radius }));
 // Extra stego hit spheres, measured from stego.blend (game metres: [zone, bone, x, y, forward, radius]):
 // armour plates (x0.35 damage) and soft flanks (x1.6) as on the old procedural stego, plus the snout,
 // lower legs/feet and the thick tail base that the generic joint spheres miss.
@@ -152,8 +219,9 @@ GLB_DINOS.ptera.extraHitZones.push(...[
   ['leg', 'BackFootR', 0.13, 0.07, -0.22, 0.11],
 ].map(([zone, bone, x, y, fwd, radius]) => ({ zone, bone, at: [x, y, fwd], radius })));
 // Cycles per second, bounded independently of unusually short source run strides.
-GLB_DINOS.raptor.maxCadence = 2.4;
-GLB_DINOS['gloom-raptor'].maxCadence = 2.4;
+GLB_DINOS.raptor.maxCadence = 2.0;
+GLB_DINOS['gloom-raptor'].maxCadence = 2.0;
 GLB_DINOS.trex.maxCadence = 1.25;
 GLB_DINOS.stego.maxCadence = 2.6;
+GLB_DINOS['crystal-plodder'].maxCadence = 1.9;
 GLB_DINOS.brachio.maxCadence = 1.25;

@@ -37,6 +37,7 @@ export const EFFECTS = {
   roar_raptor: selected(['recorded-trill', 'recorded-roar-1'], .45, 1.03),
   'roar_gloom-raptor': selected(['recorded-trill', 'recorded-roar-1'], .5, .74, .06),   // the raptor calls pitched down into a hiss
   'roar_sump-lurker': selected(['recorded-grunt-1', 'recorded-grunt-2'], .45, .6, .08),   // the stego grunts pitched down into a croak
+  'roar_crystal-plodder': selected(['recorded-grunt-1', 'recorded-grunt-2'], .5, .62, .06),   // the stego grunts pitched down
   roar_ptera: group('recorded-ptera', 1, 0.4, 1, 0.06),
   roar_stego: selected(['recorded-grunt-1', 'recorded-grunt-2'], .52, .85),
   roar_brachio: selected(['recorded-roar-2', 'recorded-roar-3'], .6, .68),

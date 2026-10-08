@@ -13,8 +13,8 @@ test('every dinosaur spawned by the server has a visible, animated client model'
     const world = new ServerWorld({ send() {} }, { level, variant: 7 });
     for (const dino of world.dinos.list) spawned.add(dino.type);
   }
-  // the gloom raptor and the sump lurker only live in cave levels (layout.caveDinoSpots) that the existing islands do not have
-  const caveOnly = ['gloom-raptor', 'sump-lurker'];
+  // the gloom raptor, the sump lurker and the crystal plodder only live in cave levels (layout.caveDinoSpots) that the existing islands do not have
+  const caveOnly = ['gloom-raptor', 'sump-lurker', 'crystal-plodder'];
   assert.deepEqual([...spawned].sort(), Object.keys(CONFIG.dinos).filter((t) => !caveOnly.includes(t)).sort());
 
   for (const type of [...spawned, ...caveOnly]) {
