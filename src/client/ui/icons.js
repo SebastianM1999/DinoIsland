@@ -44,6 +44,8 @@ export const ICONS = {
     <path d="M12.6 2c2.8 3.4 6 6 6 9.4a6 6 0 0 1-12 0c0-2 1-3.4 2-4.6.3 1.6 1 2.4 1.8 2.8C10.4 7 11 4 12.6 2z" fill="#ff9a2e" stroke="#e8631a" stroke-width="1" stroke-linejoin="round"/>
     <path d="M12.7 8c1.4 1.8 2.6 3 2.6 4.6a2.8 2.8 0 0 1-5.6 0c0-1.2.6-2 1.4-2.8.2.9.6 1.3 1 1.5.1-1.2.2-2.2.6-3.3z" fill="#ffe27a"/>`),
 
+  breath: svg(`<circle cx="12" cy="20" r="7" fill="#bfeeff" stroke="#1f7fc6" stroke-width="1.4"/><circle cx="21.5" cy="10" r="4.5" fill="#d8f6ff" stroke="#1f7fc6" stroke-width="1.3"/><circle cx="12" cy="6.5" r="2.4" fill="#e9fbff" stroke="#1f7fc6" stroke-width="1.1"/><path d="M9 18.5c.6-1.8 2-2.8 3.6-3" stroke="#fff" stroke-width="1.6" stroke-linecap="round" fill="none"/>`),
+
   bolt: svg(`<path d="M18.5 2 6 18h8l-2.5 12L26 13h-8.2L20.5 2z" fill="#ffc933" stroke="#e39a12" stroke-width="1.2" stroke-linejoin="round"/>`),
 
   spear: svg(`<path d="M5 28 L20 11" stroke="#9a5b2e" stroke-width="3.2" stroke-linecap="round"/>

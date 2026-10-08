@@ -64,6 +64,8 @@ import { buildVolcanoFx, ashSky } from '../world/volcanoFx.js';
 import { BIOMES } from '../../shared/levels.js';
 import { disposeIslandScenes } from './resources.js';
 import { buildCaveWorld } from '../world/caveWorld.js';
+import { setCaveUnderwater } from '../world/caveSky.js';
+import { buildUnderwater } from '../world/underwater.js';
 
 /** The air over the boss arena: the volcano island's ash, darker and redder. */
 const BOSS_SKY = {
@@ -73,6 +75,14 @@ const BOSS_SKY = {
   sun: '#ff8a5a', sunIntensity: 1.25, hemiSky: '#6a5a6e', hemiGround: '#8a2e1a', hemiIntensity: 1.0,
   exposure: 0.95,
 };
+
+/** The water's own look under its surface: fog colour and reach (daylight rivers and lakes / the dark cave). */
+const UW_TINT = {
+  day: { color: '#2b8f97', near: 0.5, far: 34 },
+  cave: { color: '#0e4a52', near: 0.4, far: 22 },
+};
+const _uwColor = new THREE.Color();
+const _uwDir = new THREE.Vector3();
 
 export class Game {
   /**
@@ -312,6 +322,11 @@ export class Game {
     this.caveWorld = this.layout.plan.cave ? buildCaveWorld(this.terrain, this.layout, this.gfx, terrainMesh, this.water) : null;
     if (this.caveWorld) { scene.add(this.caveWorld.group); this.caveWorld.audio = this.audio; }
     this.worldUpdaters = [this.sky, this.water, this.vegetation, this.rocks, this.fruitPlants, this.hut, this.baseView, this.sites, this.grove, this.bossArena, this.swampArena, this.swampFx, this.volcanoArena, this.volcanoFx, ...(this.caveWorld ? [this.caveWorld] : [])];
+    // under the water: tinted short fog, bubbles and motes (world/underwater.js, #underwaterView)
+    this.underwater = buildUnderwater();
+    scene.add(this.underwater.group);
+    this.uwK = 0;             // how far the camera is under the surface (0..1, eased)
+    this.uwBase = null;       // the fog/background just above the water (restored on surfacing)
     this.shake = 0;
     this.moodK = 0;
 
@@ -809,6 +824,7 @@ export class Game {
       right: canMove && input.isHeld('right'),
       jump: canMove && input.isHeld('jump'),
       sprint: canMove && input.isHeld('sprint'),
+      dive: canMove && input.isHeld('dive'),
       dash: canMove && input.isHeld('dash'),   // the controller reacts to the press edge
     });
     if (this.me.alive && !p.creative) {
@@ -839,6 +855,7 @@ export class Game {
     const cam = this.gfx.camera.position;
     this.#mood(dt, cam);
     for (const u of this.worldUpdaters) u.update?.(dt, this.time, cam);
+    this.#underwaterView(dt);
     for (const sys of this.systems) sys.update?.(dt, renderTime);
     if (!this.me.alive) this.me.deathT = Math.max(0, this.me.deathT - dt);
     this.hudTimer -= dt;
@@ -860,6 +877,50 @@ export class Game {
     this.moodK = Math.abs(k - want) < 1e-3 ? want : k;
     this.gfx.blendBiome(this.layout.biome.sky, BOSS_SKY, this.moodK);
     this.sky.mood?.(this.moodK, BOSS_SKY);
+  }
+
+  /**
+   * The camera under the water surface: the fog turns water-coloured and short (blended from whatever the air is
+   * right now, through the same fog the biome and the cave air drive – no lights), the sky is hidden, bubbles and
+   * silt drift by. Eased, so surfacing is not a hard cut.
+   */
+  #underwaterView(dt) {
+    const cam = this.gfx.camera.position, t = this.terrain, fog = this.gfx.scene.fog, bg = this.gfx.scene.background;
+    const level = t.waterLevelAt(cam.x, cam.z);
+    const under = level !== null && cam.y < level - 0.02 ? 1 : 0;
+    this.uwK += (under - this.uwK) * Math.min(1, dt * (under ? 16 : 7));
+    if (Math.abs(this.uwK - under) < 0.01) this.uwK = under;
+    const k = this.uwK, cave = !!this.caveWorld;
+    if (!fog) return;
+    // (before diving the fog is remembered; in the cave the cave air rewrote it this very frame, so that is the base)
+    if (k === 0 || cave || !this.uwBase) {
+      this.uwBase = { color: fog.color.clone(), near: fog.near, far: fog.far, bg: bg?.isColor ? bg.clone() : null };
+    }
+    if (cave) setCaveUnderwater(k);
+    if (k > 0) {
+      const b = this.uwBase;
+      const tint = UW_TINT[cave ? 'cave' : 'day'];
+      // (deep in the mountain no daylight reaches the water: its colour dims to the cave's own darkness; the cave
+      // shaders darken by the sky field themselves, this is for everything else - dinos, the water's underside)
+      _uwColor.set(tint.color);
+      if (cave) _uwColor.multiplyScalar(0.25 + 0.75 * Math.max(0, 1 - (this.caveWorld.inside ?? 1) * 1.1));
+      fog.color.copy(b.color).lerp(_uwColor, k);
+      fog.near = b.near + (tint.near - b.near) * k;
+      fog.far = b.far + (tint.far - b.far) * k;
+      if (b.bg && bg?.isColor) bg.copy(b.bg).lerp(_uwColor.set(tint.color), k);
+    } else if (this.uwWas && !cave && this.uwBase) {
+      fog.color.copy(this.uwBase.color); fog.near = this.uwBase.near; fog.far = this.uwBase.far;
+      if (this.uwBase.bg && bg?.isColor) bg.copy(this.uwBase.bg);
+    }
+    if (!!k !== !!this.uwWas && k > 0) this.underwater.burst(cam, this.#lookDir(_uwDir), level ?? cam.y + 1, 6);
+    this.uwWas = k > 0;
+    const p = this.player;
+    const day = cave ? Math.max(0, 1 - (this.caveWorld.inside ?? 1) * 1.1) : 1;
+    this.underwater.update(dt, cam, this.#lookDir(_uwDir), k, level ?? cam.y + 1, 1 - Math.min(1, p.breath / 10), day);
+  }
+
+  #lookDir(out) {
+    return out.set(0, 0, -1).applyQuaternion(this.gfx.camera.quaternion);
   }
 
   #updateAudio(dt) {
@@ -889,7 +950,7 @@ export class Game {
       this.audioWater = this.#waterSoundscape(cam.position);
       this.audioDanger = this.#inDanger();
     }
-    this.audio.update(dt, { coast, water: this.audioWater, danger: this.audioDanger, bossArea: this.bossMusicArea, ash: this.volcanoFx.ashRaining() ? 1 : 0, cave: this.caveWorld?.inside ?? 0, caveWet: this.caveWorld?.wet ?? 0 });
+    this.audio.update(dt, { coast, water: this.audioWater, danger: this.audioDanger, bossArea: this.bossMusicArea, ash: this.volcanoFx.ashRaining() ? 1 : 0, cave: this.caveWorld?.inside ?? 0, caveWet: this.caveWorld?.wet ?? 0, under: this.uwK });
   }
 
   /**
@@ -1022,6 +1083,7 @@ export class Game {
     hud.setHealth(this.me.hp, this.maxHp);
     hud.setStamina(p.stamina, p.maxStamina);
     hud.setSwamp(p.inBog && !p.flying);
+    hud.setBreath(this.me.alive && !p.creative ? p.breath : CONFIG.player.dive.breath, CONFIG.player.dive.breath, p.diving || p.submerged);
     hud.setHeat(this.me.alive ? p.heat : 0, p.buffs.heatproof > 0);
     this.#updateAsh(dt);
     hud.setBuffs(p.buffs);

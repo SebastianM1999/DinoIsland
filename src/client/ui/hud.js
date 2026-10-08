@@ -104,6 +104,9 @@ export class Hud {
     };
     this.$hp = mkBar('is-hp', 'heart', 'Health');
     this.$st = mkBar('is-st', 'bolt', 'Stamina');
+    // breath (diving): only while diving or not full
+    this.$br = mkBar('is-br', 'breath', 'Breath');
+    this.$br.row.hidden = true;
     this.$name = el('div', 'hud-name');
     // perk chips under the stamina bar (Dash cooldown, Adrenaline); hidden until the skill is owned
     this.$perks = el('div', 'hud-perks');
@@ -447,6 +450,13 @@ export class Hud {
 
   setHealth(hp, max) { this._bar(this.$hp, 'hp', hp, max); }
   setStamina(value, max) { this._bar(this.$st, 'st', value, max); }
+
+  /** Breath (seconds left of `max`): the bar shows while diving or whenever it is not full, and pulses when nearly gone. */
+  setBreath(value, max, diving = false) {
+    const show = diving || value < max - 0.05;
+    if (this._c.brShow !== show) { this._c.brShow = show; this.$br.row.hidden = !show; }
+    if (show) this._bar(this.$br, 'br', value, max);
+  }
 
   /** Fruit buffs running on the local player: { kind: seconds left } (config.js fruit.buffs). */
   setBuffs(buffs = {}) {

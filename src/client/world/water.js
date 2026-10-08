@@ -243,6 +243,29 @@ void main() {
   vec3 N = normalize(vec3(-grad.x, 1.0, -grad.y));
   vec3 V = normalize(cameraPosition - vWorld);
 
+  // seen from below (a diver looking up): a slightly wavy, bright mirror. Straight up there is a window onto the sky
+  // (Snell: ~48 degrees), further out the surface mirrors the dark water; sun caustics play in the window by day.
+  if (cameraPosition.y < vSurfY - 0.02) {
+    float upView = max(dot(vec3(N.x, -N.y, N.z), V), 0.0);
+    float win = smoothstep(0.6, 0.76, upView);
+    vec3 body = uDeep * 0.5 + vec3(0.02, 0.16, 0.17);
+    vec3 outside = mix(mix(uSky, uSkyTop, 0.55), vec3(0.08, 0.2, 0.22), uCave) * mix(1.15, 0.8, uCave);
+    vec3 ucol = mix(body, outside, win);
+    float cs = caustics(vWorld.xz * 0.8 + grad * 2.0, uTime) * (0.35 + 0.65 * win);
+    ucol += mix(uSunColor * 0.5, vec3(0.08, 0.28, 0.3), uCave) * cs;
+    ucol += uSunColor * pow(win, 3.0) * (1.0 - uCave) * 0.18;
+    ucol *= mix(1.0, 0.3, uCave);   // (inside the mountain no daylight comes through: a dim sheen, not a lit window)
+    float ualpha = 0.93 * fade * smoothstep(-0.12, 0.02, depth);
+    gl_FragColor = vec4(ucol, ualpha);
+    #include <tonemapping_fragment>
+    #include <colorspace_fragment>
+    #ifdef USE_FOG
+      float uFog = smoothstep(fogNear, fogFar, vFogDepth);
+      gl_FragColor.rgb = mix(gl_FragColor.rgb, fogColor, uFog * 0.7);
+    #endif
+    return;
+  }
+
   vec3 col = mix(uShallow, uMid, smoothstep(0.3, 3.0, depth));
   col = mix(col, uDeep, smoothstep(3.5, 16.0, depth));
   // rivers carry a little silt: greener, less clear
@@ -580,6 +603,7 @@ export function buildWater(terrain, layout = {}, sunDir = new THREE.Vector3(-0.4
         uFoamAmt: { value: foam },
       },
       transparent: true,
+      side: THREE.DoubleSide,     // (the underside is seen from below: a diver looks up at it)
       fog: true,
     });
     return m;

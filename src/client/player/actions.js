@@ -36,6 +36,16 @@ const _right = new THREE.Vector3();
 const _up = new THREE.Vector3();
 const _eye = new THREE.Vector3();
 
+/**
+ * The off-hand torch after this frame's input: pressing L lights or puts it out (only with a torch in the pack and alive),
+ * and it goes out the moment the head is under water (`extinguished`); it can be lit again once the face is out.
+ */
+export function torchState({ owns, alive, submerged, lit, toggle }) {
+  if (!owns || !alive) return { lit: false, extinguished: false };
+  if (submerged) return { lit: false, extinguished: lit };
+  return { lit: toggle ? !lit : lit, extinguished: false };
+}
+
 export class PlayerActions {
   constructor(game) {
     this.game = game;
@@ -221,13 +231,12 @@ export class PlayerActions {
       }
     }
 
-    // --- off-hand torch (L): lit or put out, independent of the selected tool
+    // --- off-hand torch (L): lit or put out, independent of the selected tool; it goes out under water
     const ownsTorch = !!this.inv.torch;
-    if (!ownsTorch || !alive) g.torchLit = false;
-    else if (!panel && input.wasPressed('torch')) {
-      g.torchLit = !g.torchLit;
-      g.audio?.play('switch');
-    }
+    const torch = torchState({ owns: ownsTorch, alive, submerged: g.player.submerged, lit: !!g.torchLit, toggle: !panel && input.wasPressed('torch') });
+    if (torch.extinguished) { g.audio?.play('plop', { vol: 0.5 }); g.hud.toast('The torch went out', 'torch'); }
+    else if (torch.lit !== !!g.torchLit && ownsTorch && alive) g.audio?.play('switch');
+    g.torchLit = torch.lit;
 
     // --- eat / give
     if (alive && !panel && input.wasPressed('eat')) this.eat();

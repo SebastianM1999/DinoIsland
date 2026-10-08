@@ -24,6 +24,7 @@ const CLIMB = P.stepHeight - FOOT;
 const STAND_MARGIN = P.radius;
 const C = P.creative;
 const SW = P.swim;
+const DV = P.dive;
 
 export class PlayerController {
   /**
@@ -68,6 +69,9 @@ export class PlayerController {
     this.landImpact = 0;
     this.inWater = 0;
     this.swimming = false;              // afloat in a river or lake
+    this.diving = false;                // swimming under the surface (hold the dive key; see CONFIG.player.dive)
+    this.submerged = false;             // eyes under the water: the breath drains, the torch goes out
+    this.breath = DV.breath;            // seconds of air left (the server counts the same way and hurts at 0)
     this.creative = false;             // invincible (server) + may fly
     this.flying = false;
     /** Fruit buffs running: { kind: seconds left } (config.js fruit.buffs, from the server's inventory). */
@@ -106,6 +110,9 @@ export class PlayerController {
     this.pitch = 0;
     this.onGround = true;
     this.flying = false;
+    this.diving = false;
+    this.submerged = false;
+    this.breath = DV.breath;
     this.stamina = this.maxStamina;
     this.dashT = 0;
     this.dashEnding = false;
@@ -150,6 +157,11 @@ export class PlayerController {
     const controllable = !this.frozen && this.knockTimer <= 0;
     const mods = this.mods;
     const ad = this.adrenaline, ds = this.dash;
+
+    // --- breath: eyes under water drain it, air refills it fast (creative: never)
+    this.submerged = t.headUnderwater?.(this.pos.x, this.pos.y, this.pos.z) ?? false;
+    if (this.submerged && !this.creative && !this.frozen) this.breath = Math.max(0, this.breath - dt);
+    else this.breath = Math.min(DV.breath, this.breath + DV.refill * dt);
 
     // --- adrenaline: low HP starts a window of free stamina, then a long cooldown
     if (ad.active) {
@@ -220,6 +232,11 @@ export class PlayerController {
     const floatY = lake !== null && lake - t.heightAt(this.pos.x, this.pos.z) > SW.depth ? lake - SW.float : null;
     this.swimming = !flying && floatY !== null && this.pos.y <= floatY + 0.3;
     if (this.swimming) this.sprinting = false;
+    // diving: the dive key (while afloat) takes you under; you stay under until you come back up to the surface
+    if (!this.swimming || flying || !controllable) this.diving = false;
+    else if (intent.dive) this.diving = true;
+    else if (this.diving && this.pos.y >= floatY - 0.05) this.diving = false;
+    const diving = this.diving;
 
     // --- dash (Q): a short burst along the input direction (or where we look); the cost is paid up front
     if (dashPress && mods.dash && controllable && !flying && !this.swimming && ds.cooldownLeft <= 0 && (free || this.stamina >= DASH.cost)) {
@@ -241,16 +258,26 @@ export class PlayerController {
     this.inBog = bog < 1;
     const waterSlow = bogMul < 1 ? bog : depth > 0.2 ? Math.max(0.55, 1 - depth * 0.35) : 1;
     let speed = flying ? C.flySpeed
+      : diving ? DV.speed * this.speedFactor
       : this.swimming ? SW.speed * this.speedFactor
       : (this.sprinting ? P.sprintSpeed : P.walkSpeed) * this.speedFactor * waterSlow * this.#buffMul('quickfoot', 'speedMul');
 
-    let wx = 0, wz = 0;
+    let wx = 0, wz = 0, wy = 0;
     if (moving) {
       const nx = ix / Math.max(1, ilen), nz = iz / Math.max(1, ilen);
       const sin = Math.sin(this.yaw), cos = Math.cos(this.yaw);
+      // diving: the look direction carries you (up and down with the camera's pitch); strafing stays level
+      const lookK = diving ? Math.cos(this.pitch) : 1;
+      if (diving) wy = -nz * Math.sin(this.pitch) * speed;
       // rotate local (x right, z back) into world by yaw
-      wx = (nx * cos + nz * sin) * speed;
-      wz = (-nx * sin + nz * cos) * speed;
+      wx = (nx * cos + nz * lookK * sin) * speed;
+      wz = (-nx * sin + nz * lookK * cos) * speed;
+    }
+    if (diving) {
+      // dive key down, Space up; with no input at all the water lifts you gently
+      wy += ((controllable && intent.jump ? 1 : 0) - (controllable && intent.dive ? 1 : 0)) * DV.vertical;
+      if (!moving && !intent.jump && !intent.dive) wy += DV.buoyancy;
+      wy = Math.max(-DV.vertical * 1.5, Math.min(DV.vertical * 1.5, wy));
     }
 
     const accel = (this.onGround || flying ? P.accel : this.swimming ? P.accel * 0.4 : P.accel * P.airControl) * dt;
@@ -310,7 +337,7 @@ export class PlayerController {
     // --- jump (Light Feet: free; Adrenaline: free for a while). Jump height goes with v^2, so the
     // "+10% / +20% height" of Springy Legs scales the speed by its square root.
     const jumpCost = free || mods.lightFeet ? 0 : P.jumpStaminaCost;
-    if (controllable && !flying && intent.jump && this.onGround && !this.sliding && (jumpCost === 0 || this.stamina > jumpCost)) {
+    if (controllable && !flying && !diving && intent.jump && this.onGround && !this.sliding && (jumpCost === 0 || this.stamina > jumpCost)) {
       this.vel.y = P.jumpSpeed * Math.sqrt(mods.jumpMul) * (depth > 0.8 ? 0.6 : 1);
       this.onGround = false;
       if (jumpCost > 0) {
@@ -324,6 +351,8 @@ export class PlayerController {
       const want = ((intent.jump ? 1 : 0) - (intent.sprint ? 1 : 0)) * C.flyVertical;
       const dv = want - this.vel.y, max = P.accel * dt;
       this.vel.y += Math.max(-max, Math.min(max, dv));
+    } else if (diving) {
+      this.vel.y += (wy - this.vel.y) * Math.min(1, dt * 4);
     } else if (this.swimming) {
       const bob = Math.sin(this.clock * 2.2) * 0.04;
       this.vel.y += ((floatY + bob - this.pos.y) * 4 - this.vel.y) * Math.min(1, dt * 6);
@@ -353,6 +382,8 @@ export class PlayerController {
     // head bump (Hollow Mountain): the roof stops a jump or a flight (Infinity outdoors and on other islands)
     const roofY = (this.terrain.ceilingAt?.(this.pos.x, this.pos.z) ?? Infinity) - P.height - 0.05;
     if (this.pos.y > roofY) { this.pos.y = roofY; if (this.vel.y > 0) this.vel.y = 0; }
+    // a diver rises only up to the surface (then floats there like any swimmer)
+    if (diving && this.pos.y > floatY) { this.pos.y = floatY; if (this.vel.y > 0) this.vel.y = 0; }
     // Falling can enter a trunk slice or wall that was above the body's span
     // during the horizontal pass. Resolve again at the integrated height.
     this.#collide(oldX, oldZ, groundNow);
@@ -448,6 +479,9 @@ export class PlayerController {
   #canStep(fx, fz, nx, nz, groundNow) {
     const t = this.terrain;
     const dx = nx - fx, dz = nz - fz;
+    // swimmers and divers don't swim into a roof lower than their head (a sump's mouth: dive under it first)
+    if ((this.swimming || this.diving) && (t.ceilingAt?.(nx, nz) ?? Infinity) < this.pos.y + P.height + 0.05 &&
+        (t.ceilingAt?.(nx, nz) ?? Infinity) <= (t.ceilingAt?.(fx, fz) ?? Infinity) + 0.05) return false;
     // the Primeval Grove's barrier (see shared/grove.js): no step that ends inside and doesn't lead out
     const b = this.barrier;
     if (b && !b.mayEnter()) {

@@ -7,6 +7,7 @@ const KEY_BINDINGS = {
   KeyA: 'left', ArrowLeft: 'left',
   KeyD: 'right', ArrowRight: 'right',
   Space: 'jump',
+  KeyC: 'dive',   // hold while swimming to dive (Space swims up); never Ctrl: Ctrl+W would close the browser tab
   ShiftLeft: 'sprint', ShiftRight: 'sprint',
   KeyE: 'interact',
   KeyF: 'eat',

@@ -21,6 +21,21 @@ const LEVEL = 3;
 const VARIANTS = Array.from({ length: 16 }, (_, i) => i + 1);
 const SLOPE = CONFIG.player.maxWalkSlope;
 const cache = new Map();
+/** Is (x, z) beside the stretch of the sump tunnel that dives (its ramps included)? */
+function inSumpReach(maze, x, z) {
+  for (const t of maze.tunnels) {
+    const sp = t.flooded?.sump;
+    if (!sp) continue;
+    let acc = 0;
+    for (let i = 1; i < t.pts.length; i++) {
+      acc += Math.hypot(t.pts[i].x - t.pts[i - 1].x, t.pts[i].z - t.pts[i - 1].z);
+      const u = acc / t.length;
+      if (u >= sp.s0 - sp.ramp - 0.02 && u <= sp.s1 + sp.ramp + 0.02 && Math.hypot(t.pts[i].x - x, t.pts[i].z - z) < t.pts[i].w) return true;
+    }
+  }
+  return false;
+}
+
 function island(variant) {
   if (!cache.has(variant)) {
     const terrain = new Terrain(planIsland(LEVEL, variant));
@@ -295,7 +310,8 @@ test('flooded tunnels: swimmable in the middle, an air gap above, shallow banks,
         const level = terrain.inlandWaterLevelAt(x, z);
         if (level === null) continue;
         assert.ok(near(x, z), `variant ${variant}: inland water outside a flooded tunnel at (${x.toFixed(0)}, ${z.toFixed(0)})`);
-        assert.ok(terrain.ceilingAt(x, z) - level >= 2.5, `variant ${variant}: air gap over the water`);
+        // (the one sump has no air gap over its dive: see cave-diving.test.js)
+        if (!inSumpReach(maze, x, z)) assert.ok(terrain.ceilingAt(x, z) - level >= 2.5, `variant ${variant}: air gap over the water`);
         for (const [di, dj] of [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, -1], [1, -1], [-1, 1]]) {
           const a = x + di * terrain.cell, b = z + dj * terrain.cell;
           if (terrain.inlandWaterLevelAt(a, b) !== null) continue;

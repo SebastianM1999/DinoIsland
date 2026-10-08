@@ -15,7 +15,8 @@
 //          tags: 'entrance' 'exit' 'relic' 'crystal' 'water' 'farthest' 'deadend'
 //   tunnel { id, a, b, kind, pts[{x,z,w,roof}], width, roof, length, flooded, tags[] }
 //          kind: 'mouth' | 'exit' | 'tree' | 'loop' | 'pocket' | 'falseExit'
-//          flooded: null | { u0, u1 } (arc fractions of the swimmable stretch)
+//          flooded: null | { u0, u1, sump? } (arc fractions of the swimmable stretch; `sump` = { s0, s1, ramp } arc
+//                   fractions of the fully submerged stretch and its ramp, see SUMP; at most one tunnel per maze)
 //   route  node ids of the direct entrance -> exit way
 // Coordinates are world metres. Gameplay data derived from it: island.js
 // (plan.cave), layout.js (relics, caveDinoSpots, caveDecor, caveLights).
@@ -32,6 +33,15 @@ export const CAVE_GEOM = {
   floor: 2.8,           // floor level of the coves and the tunnel mouths
   rockMargin: 30,       // solid rock between a chamber/tunnel and the outside
 };
+
+/**
+ * Sumps (cave diving): one flooded tunnel per variant, where it is long enough, has a stretch whose roof lies BELOW
+ * the water (the player has to dive through it; an optional shortcut, never on the dry route to a relic or the exit).
+ * `len` m of full submersion (the roof ramps down over `ramp` m on each side), the roof `clear` m below the water,
+ * the channel dips `depth` m below the surrounding water-side floor (so >= 2.5 m of headroom over a >= 4 m wide channel);
+ * `cache` is the loot lying on its floor (the reward for the dive).
+ */
+export const SUMP = { len: [9.5, 14], ramp: 7, clear: 0.6, depth: 5.8, edge: 0.05, cache: { teeth: 4, claws: 4, plates: 2, bones: 3, skull: 1 } };
 
 const dist = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
 
@@ -267,6 +277,29 @@ function tryMaze(seed, depthAt, G, attempt) {
   if (!flooded.some((t) => t.a === rB.id || t.b === rB.id)) rB.tags = rB.tags.filter((t) => t !== 'water');
   // the water chamber's hint ("by the underground water") needs a flooded way into it
   if (!rB.tags.includes('water')) return null;
+
+  // --- the sump: one flooded tunnel whose middle stretch dives under the roof (an optional shortcut between its two chambers; every
+  // flooded branch is a loop, so the dry route to each relic and the exit stays whole). Own random stream: nothing else moves.
+  {
+    const sr = makeRng((seed ^ 0x5a3c) + attempt * 131);
+    const fits = (t) => {
+      const room = ((t.flooded.u1 - t.flooded.u0 - 2 * SUMP.edge) * t.length - 2 * SUMP.ramp);
+      return room >= SUMP.len[0];
+    };
+    const options = tunnels.filter((t) => t.flooded && fits(t));
+    // (prefer a branch that is not the water chamber's own way in: it stays a plain swim)
+    const preferred = options.filter((t) => t.a !== rB.id && t.b !== rB.id);
+    const pool = preferred.length ? preferred : options;
+    const t = pool.length ? pool[sr.int(0, pool.length - 1)] : null;
+    if (t) {
+      const room = (t.flooded.u1 - t.flooded.u0 - 2 * SUMP.edge) * t.length - 2 * SUMP.ramp;
+      const len = Math.min(sr.range(SUMP.len[0], SUMP.len[1]), room);
+      const free = room - len;
+      const start = t.flooded.u0 + SUMP.edge + (SUMP.ramp + free * sr.range(0.2, 0.8)) / t.length;
+      t.flooded.sump = { s0: start, s1: start + len / t.length, ramp: SUMP.ramp / t.length };
+      t.tags.push('sump');
+    }
+  }
 
   // --- crystal halls: the relic hall and one or two big chambers
   for (const n of real.filter((m) => m.kind === 'hub' && !m.tags.includes('crystal')).sort((p, q) => q.r - p.r).slice(0, 2)) {

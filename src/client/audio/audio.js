@@ -21,7 +21,15 @@ export class GameAudio {
     this.ctx = new Ctx();
     this.master = this.ctx.createGain();
     this.master.gain.value = A.masterVolume;
-    this.master.connect(this.ctx.destination);
+    // everything passes a low-pass on its way out: wide open, closed to a muffled hum with the head under water (`update({ under })`)
+    this.underLP = this.ctx.createBiquadFilter();
+    this.underLP.type = 'lowpass';
+    this.underLP.frequency.value = 22000;
+    this.underLP.Q.value = 0.5;
+    this.master.connect(this.underLP);
+    this.underLP.connect(this.ctx.destination);
+    this.under = 0;
+    this.underLayers = null;
     this.sfx = this.ctx.createGain();
     this.sfx.gain.value = A.sfxVolume;
     this.sfx.connect(this.master);
@@ -816,6 +824,26 @@ export class GameAudio {
     }
   }
 
+  /**
+   * Head under water (`under` 0..1): the whole mix closes to a dull hum and a slow, deep wash of water fills the ambience;
+   * wide open again (and the layers silent) at the surface.
+   */
+  #underwater(t, under) {
+    if (under === this.under && !this.underLayers) return;
+    this.under = under;
+    this.underLP.frequency.setTargetAtTime(22000 - (22000 - 480) * Math.min(1, under * 1.2), t, 0.08);
+    if (!this.underLayers && under > 0.02) {
+      this.underLayers = {
+        hum: this.#loopLayer({ brown: true, type: 'lowpass', f: 150, q: 0.7, wobble: 40, wobbleRate: 0.13, positional: false }),
+        wash: this.#loopLayer({ type: 'bandpass', f: 330, q: 0.6, wobble: 120, wobbleRate: 0.21, positional: false }),
+      };
+    }
+    if (this.underLayers) {
+      this.#steer(this.underLayers.hum, 0.5 * under, null, t);
+      this.#steer(this.underLayers.wash, 0.12 * under, null, t);
+    }
+  }
+
   /** A gain routed through a fixed-position panner (for one-off ambience noises). */
   #placed(pos) {
     const g = this.ctx.createGain();
@@ -830,9 +858,10 @@ export class GameAudio {
   }
 
   /** Per-frame: quiet positional ambience and calm/danger music scheduling. */
-  update(dt, { coast = 0, water = null, danger = false, bossArea = false, ash = 0, cave = 0, caveWet = 0 } = {}) {
+  update(dt, { coast = 0, water = null, danger = false, bossArea = false, ash = 0, cave = 0, caveWet = 0, under = 0 } = {}) {
     if (!this.ok || this.ctx.state !== 'running') return;
     const t = this.ctx.currentTime;
+    this.#underwater(t, under);
     if (this.amb) {
       // the volcano's ash rain: a low, gusting wind hiss all round (built on first use)
       if (ash > 0 || this.ashWind) {

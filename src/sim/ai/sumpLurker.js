@@ -12,6 +12,8 @@ const C = () => CONFIG.dinos[TYPE];
 /** Seconds, synchronized with SumpLurker_Attack (jaws snap at ~0.67 s of its 1.33 s). */
 export const LURKER_TIMING = { windup: 0.6, strike: 0.7, recover: 0.9, missRecover: 1.4, calm: 3 };
 const DEEP = 1.2;   // water deeper than this hides the lurker and counts as "its water"
+/** A lurker rides the water's surface (aquatic.js); divers can be this far below it and still be bitten, or 4 m above. */
+const DIVER_REACH = 5.5;
 const EIGHT = [0, 1, 2, 3, 4, 5, 6, 7].map((k) => (k / 8) * Math.PI * 2);
 
 /** Is (x, z) water the lurker can lie in? */
@@ -28,8 +30,10 @@ function atWater(sys, p) {
   const edge = C().edge;
   return EIGHT.some((a) => wet(sys, p.x + Math.cos(a) * edge, p.z + Math.sin(a) * edge));
 }
+/** Is player `p` within the lurker's vertical reach? (Divers go down to the bottom of a sump, so far more below than above.) */
+const reaches = (d, p, up = 4) => p.y - d.y < up && d.y - p.y < DIVER_REACH;
 function prey(d, sys, p) {
-  return p.alive && !sys.inSafeZone(p) && Math.abs(p.y - d.y) < 4 && atWater(sys, p);
+  return p.alive && !sys.inSafeZone(p) && reaches(d, p) && atWater(sys, p);
 }
 
 /** A deep, walkable water point within the leash: the one nearest to `near` (the player, or the lurker itself). */
@@ -129,7 +133,7 @@ export const sumpLurkerBrain = {
         sys.move(d, c.lungeSpeed, dt, 25, true);
         d.yaw = d.strikeYaw;
         for (const q of sys.players()) {
-          if (d.victims.has(q.id) || !q.alive || sys.inSafeZone(q) || Math.abs(q.y - d.y) > 3) continue;
+          if (d.victims.has(q.id) || !q.alive || sys.inSafeZone(q) || !reaches(d, q, 3)) continue;
           if (!mouthCapsuleHit(d, q, from, 2.2, { lengthScale: 1, half: 0.85, back: 0 })) continue;
           d.victims.add(q.id); d.hitAttack = true;
           sys.hitPlayer(d, q, c.biteDamage, c.knockback, 0.4);

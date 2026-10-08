@@ -14,6 +14,7 @@
 - `caveStyle.js` — crystal colours and the baked glow field (painted into a texture).
 - `sky.js` — `buildSky`: gradient dome, sun, drifting clouds, distant islands; `mood()` for darker air.
 - `water.js` — `buildWater`: one shared shader for sea, pools, rivers and the swamp's bogs (`bogGeometry`: murky, dull sheet per field level; depth from a terrain height texture, foam, rapids, waterfall plunge) and lava (crust plates and molten lava; the volcano's lava lakes and craters glow molten almost to the rim); `ripple()` / `splash()`.
+- `underwater.js` — `buildUnderwater`: what floats round a diver's head (silt motes, the diver's bubbles; points only, never a light). `core/game.js` `#underwaterView` tints the fog by the water (dimmed deep in the mountain), `caveSky.js` `setCaveUnderwater` keeps the cave shaders' fog dark by the sky field, `water.js` draws the surface's underside (a dim sheen inside the mountain).
 - `rivers.js` — geometry helpers for water surfaces: `riverGeometry`, `discGeometry`, `withSheetAttrs` (common `aFlow`/`aRiver` attributes).
 - `vegetation.js` — `buildVegetation`: instanced trees, bushes, ferns, grass and flowers per biome with wind, per-kind biome tints (`biome.vegetation.tints`), chunks past the fog culled; `setQuality`/`setDensity`; `VEG_TUNING`.
 - `rocks.js` — `buildRocks` / `rockGeo`: boulders from `shared/rockShapes.js` tables (stone kind per rock from `biome.rocks.kinds`, clustered by region) and sea stacks (with palms on green islands).

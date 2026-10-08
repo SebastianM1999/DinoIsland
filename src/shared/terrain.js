@@ -235,6 +235,12 @@ export class Terrain {
     return w === null ? 0 : w - this.heightAt(x, z);
   }
 
+  /** Is a body standing with its feet at `y` at (x, z) with the eyes under the water surface? (Breath, torch, muffled sound.) */
+  headUnderwater(x, y, z) {
+    const w = this.waterLevelAt(x, z);
+    return w !== null && y + CONFIG.player.eyeHeight < w - 0.05;
+  }
+
   /** Surface of the island's own water (river, lake, pools – not the sea) at (x, z), or null. */
   inlandWaterLevelAt(x, z) {
     return this.#flowLevelAt(x, z, this.heightAt(x, z), 'water');

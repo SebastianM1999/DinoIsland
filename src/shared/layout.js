@@ -18,6 +18,7 @@ import { insideVolcanoArena, entranceOffset, VOLCANO_ARENA } from './volcanoAren
 import { CONFIG } from './config.js';
 import { insideOutline, halfWidthAt, flowsOf } from './island.js';
 import { caveOpenSdf } from './caveField.js';
+import { SUMP } from './caveMaze.js';
 import { SPRING_LIP_OFFSET, SPRING_FLOOR, springColliders } from './springShape.js';
 
 const TAU = Math.PI * 2;
@@ -87,6 +88,7 @@ export function buildLayout(terrain) {
     caveEntrance: null,     // { x, y, z, dir, hall } just outside the tunnel mouth (west cove)
     caveExit: null,         // { x, y, z, dir, hall } just outside the exit tunnel (east beach)
     falseExits: [],         // tunnels that end in daylight at a sea cliff: { x, y, z, a }
+    sumps: [],              // dive-only shortcuts: { tunnel, level, len, a:{x,z}, b:{x,z}, cache:{x,z,y,loot} } (see shared/caveMaze.js SUMP)
     arrivalBoat: null,      // the boat the team came on (west cove, decoration only): { x, y, z, rot }
     logs: [],               // fallen trees: { x, z, rot, len, r, yA, yB, roots, dead }
   };
@@ -615,20 +617,58 @@ export function buildLayout(terrain) {
       }
       for (const c of layout.caveDinoSpots) for (const p of c.spawns) reserve(p.x, p.z, 2);
     }
-    // flooded tunnels: one water spot at the deepest point of each (sump lurkers; no land spawns)
+    // a point on a tunnel's centre line at arc fraction u
+    const tunnelAt = (t, u) => {
+      const cum = [0];
+      for (let i = 1; i < t.pts.length; i++) cum.push(cum[i - 1] + Math.hypot(t.pts[i].x - t.pts[i - 1].x, t.pts[i].z - t.pts[i - 1].z));
+      const d = u * cum[cum.length - 1];
+      let i = 1;
+      while (i < cum.length - 1 && cum[i] < d) i++;
+      const f = Math.max(0, Math.min(1, (d - cum[i - 1]) / ((cum[i] - cum[i - 1]) || 1)));
+      return { x: t.pts[i - 1].x + (t.pts[i].x - t.pts[i - 1].x) * f, z: t.pts[i - 1].z + (t.pts[i].z - t.pts[i - 1].z) * f };
+    };
+    // sumps: the dive-only shortcut, with a cache of loot on the floor of its deepest point (never required: nothing a relic or the exit needs)
+    for (const t of mz.tunnels) {
+      const sp = t.flooded?.sump;
+      if (!sp) continue;
+      const mid = tunnelAt(t, (sp.s0 + sp.s1) / 2);
+      layout.sumps.push({
+        tunnel: t.id, level: t.flooded.level, len: (sp.s1 - sp.s0) * t.length,
+        a: tunnelAt(t, sp.s0 - sp.ramp), b: tunnelAt(t, sp.s1 + sp.ramp),
+        cache: { x: mid.x, z: mid.z, y: floorY(mid.x, mid.z), loot: { ...SUMP.cache } },
+      });
+      reserve(mid.x, mid.z, 4);
+    }
+    // flooded tunnels: one water spot at the deepest point of each (sump lurkers; no land spawns). A sump's lurker lies at its
+    // mouth, in the open water before the dive, not inside the diving passage.
     for (const t of mz.tunnels) {
       if (!t.flooded) continue;
       let best = null;
-      for (let i = 0; i < t.pts.length; i++) {
-        const u = i / (t.pts.length - 1);
-        if (u <= t.flooded.u0 || u >= t.flooded.u1) continue;
-        const p = t.pts[i], depth = terrain.waterDepthAt(p.x, p.z);
-        if (!best || depth > best.depth) best = { x: p.x, z: p.z, depth };
+      if (t.flooded.sump) {
+        // the deepest open water (an air gap above it) at either mouth of the dive
+        const sp = t.flooded.sump;
+        for (let u = t.flooded.u0 + 0.02; u < t.flooded.u1; u += 0.01) {
+          if (u > sp.s0 - sp.ramp - 0.005 && u < sp.s1 + sp.ramp + 0.005) continue;
+          const p = tunnelAt(t, u), depth = terrain.waterDepthAt(p.x, p.z);
+          if (terrain.ceilingAt(p.x, p.z) - (terrain.waterLevelAt(p.x, p.z) ?? 0) > 3 && (!best || depth > best.depth)) best = { x: p.x, z: p.z, depth };
+        }
+        // (a short open stretch is too shallow to hide in: then it waits where the roof begins to dip)
+        if (!best || best.depth < 1.2) {
+          const p = tunnelAt(t, sp.s0 - sp.ramp * 0.55);
+          best = { x: p.x, z: p.z, depth: terrain.waterDepthAt(p.x, p.z) };
+        }
+      } else {
+        for (let i = 0; i < t.pts.length; i++) {
+          const u = i / (t.pts.length - 1);
+          if (u <= t.flooded.u0 || u >= t.flooded.u1) continue;
+          const p = t.pts[i], depth = terrain.waterDepthAt(p.x, p.z);
+          if (!best || depth > best.depth) best = { x: p.x, z: p.z, depth };
+        }
       }
       if (!best || best.depth < 1.2) continue;
       const len = t.length * (t.flooded.u1 - t.flooded.u0);
       layout.caveDinoSpots.push({
-        id: `water-${t.id}`, x: best.x, z: best.z, y: floorY(best.x, best.z), radius: Math.max(9, Math.min(14, len / 2)),
+        id: `water-${t.id}`, x: best.x, z: best.z, y: floorY(best.x, best.z), radius: t.flooded.sump ? 9 : Math.max(9, Math.min(14, len / 2)),
         ceiling: terrain.ceilingAt(best.x, best.z), clearance: terrain.clearanceAt(best.x, best.z),
         tags: ['water'], kind: 'water', water: true, tunnel: t.id, spawns: [],
       });
@@ -742,6 +782,7 @@ export function buildLayout(terrain) {
       L.push({ x, z, y: Math.min(y + up, Number.isFinite(ceil) ? ceil - 1.2 : y + up), floor: y, r: kind === 'chamber' || kind === 'crystal' ? 26 : 18, kind, priority, hue, room });
     };
     for (const r of layout.relics) addLight(r.x, r.z, 'relic', 0, 0.5, -1, 2.2);
+    for (const sm of layout.sumps) addLight(sm.cache.x, sm.cache.z, 'crystal', 0, 0.5, -1, 1.6);
     for (const h of decor.halls) addLight(h.x, h.z, 'crystal', 1, h.hue, h.id, 4);
     for (const n of rooms) if (!decor.halls.some((h) => h.id === n.id) && n.kind !== 'pocket') addLight(n.x, n.z, 'chamber', 2, -1, n.id, 4);
     for (const t of mz.tunnels) {
