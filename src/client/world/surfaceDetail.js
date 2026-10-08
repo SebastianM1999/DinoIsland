@@ -326,9 +326,35 @@ const FRAG = {
       vec3 rockC = c * (0.8 + 0.36 * smoothstep(-0.3, 0.7, pat.x)) * (1.0 - 0.3 * pat.y);
       rockC *= mix(vec3(1.07, 0.98, 0.9), vec3(0.9, 1.0, 1.1), tintSwap);
       rockC *= 1.0 + 0.07 * strata * wallK;
+      // --- the mountain's outside: irregular layers of tan, rust, grey and violet stone that follow the strata
+      //     horizontally (pixel-exact: the vertex colours only carry the light and dark of the mass),
+      //     moss on the ledges, grey scree and wet dark rock at the foot
+      if (wCliff > 0.01) {
+        float yy = p.y + 5.0 * sdFbm(p.xz * 0.018 + 3.0) + 1.4 * sdNoise(p.xz * 0.13);
+        float L = yy * 0.19 + 1.3 * sdNoise(vec2(yy * 0.07, 3.0)) + 0.25 * sdNoise(vec2(yy * 0.6, 8.0));
+        float li = floor(L), lf = fract(L);
+        float h1 = sdHash(vec2(li, 7.0)), h2 = sdHash(vec2(li, 19.0)), h3 = sdHash(vec2(li, 31.0));
+        vec3 warm = mix(vec3(0.5, 0.4, 0.31), vec3(0.42, 0.28, 0.22), h1);
+        vec3 cool = mix(vec3(0.36, 0.38, 0.44), vec3(0.35, 0.31, 0.42), h1);
+        vec3 ochre = vec3(0.54, 0.47, 0.32);
+        vec3 lay = mix(mix(warm, cool, step(0.5, h2)), ochre, step(0.86, h3));
+        lay *= 0.9 + 0.16 * sdHash(vec2(li, 43.0));
+        lay *= 0.8 + 0.2 * smoothstep(0.0, 0.18, lf) * (1.0 - 0.5 * smoothstep(0.82, 1.0, lf));   // each layer's lit lip and shadowed foot
+        float tone = dot(c, vec3(0.33)) / 0.3;
+        vec3 cl = lay * clamp(tone, 0.55, 1.5) * (0.85 + 0.3 * smoothstep(-0.3, 0.7, pat.x));
+        cl *= 1.0 - 0.25 * pat.y;
+        float ledgeUp = smoothstep(0.62, 0.86, n.y);
+        float mossL = ledgeUp * smoothstep(0.58, 0.66, sdFbm(p.xz * 0.16 + 11.0) + 0.1 * sdNoise(p.xz * 2.0)) * (1.0 - smoothstep(35.0, 90.0, p.y));
+        cl = mix(cl, vec3(0.22, 0.36, 0.2) * (0.8 + 0.4 * sdNoise(p.xz * 3.0)), mossL * 0.85);
+        float scree = (1.0 - smoothstep(4.0, 13.0, p.y)) * smoothstep(0.2, 0.7, sdFbm(p.xz * 0.3 + 5.0));
+        vec3 scr = vec3(0.46, 0.42, 0.38) * (0.7 + 0.5 * sdNoise(p.xz * 2.6 + p.y));
+        cl = mix(cl, scr, scree * 0.6);
+        cl *= mix(0.55, 1.0, smoothstep(0.5, 3.5, p.y));    // wet dark rock at the waterline
+        rockC = mix(rockC, cl, wCliff);
+      }
       // drips: vertical dark wet streaks down the walls
       float drip = smoothstep(0.55, 0.85, sdNoise(vec2((p.x + p.z) * 3.1, p.y * 0.22 + sdNoise(p.xz * 0.5) * 2.0)));
-      rockC *= 1.0 - 0.16 * drip * wallK * near;
+      rockC *= 1.0 - 0.16 * drip * wallK * near * (1.0 - 0.8 * wCliff);
       // --- ground: gravel pebbles, dried mud cracks
       vec3 pv = sdVoronoi(p.xz * 2.4 + vec2(sdNoise(p.xz * 1.4), sdNoise(p.xz * 1.4 + 4.0)) * 0.6);
       float peb = 1.0 - smoothstep(0.15, 0.45, pv.x);
