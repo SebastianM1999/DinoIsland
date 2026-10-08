@@ -350,6 +350,9 @@ export class PlayerController {
 
     // --- vertical
     this.pos.y += this.vel.y * dt;
+    // head bump (Hollow Mountain): the roof stops a jump or a flight (Infinity outdoors and on other islands)
+    const roofY = (this.terrain.ceilingAt?.(this.pos.x, this.pos.z) ?? Infinity) - P.height - 0.05;
+    if (this.pos.y > roofY) { this.pos.y = roofY; if (this.vel.y > 0) this.vel.y = 0; }
     // Falling can enter a trunk slice or wall that was above the body's span
     // during the horizontal pass. Resolve again at the integrated height.
     this.#collide(oldX, oldZ, groundNow);

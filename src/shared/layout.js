@@ -11,12 +11,13 @@ import { caveColliders, caveInterior, caveMouth, caveRockPiles } from './caveSha
 import { ruinsColliders, ruinsCenter, RUINS_ALTAR_TOP } from './ruinsShape.js';
 import { boatColliders, boatInteractPoint } from './boatShape.js';
 import { insideGrove } from './grove.js';
-import { standTop } from './collision.js';
+import { standTop, penetration } from './collision.js';
 import { causewayQuery, insideBossArena } from './bossArena.js';
 import { insideSwampArena, arenaWallColliders, waistWalls, waistWallColliders, gateOffset, SWAMP_ARENA } from './swampArena.js';
 import { insideVolcanoArena, entranceOffset, VOLCANO_ARENA } from './volcanoArena.js';
 import { CONFIG } from './config.js';
 import { insideOutline, halfWidthAt, flowsOf } from './island.js';
+import { caveOpenSdf } from './caveField.js';
 import { SPRING_LIP_OFFSET, SPRING_FLOOR, springColliders } from './springShape.js';
 
 const TAU = Math.PI * 2;
@@ -44,6 +45,7 @@ export function buildLayout(terrain) {
   const veg = biome.vegetation;
   const lowGround = (veg.minTreeHeight ?? 2.2) < 2;   // the swamp's lowland lies low
   const volcanic = biome.id === 'volcano';
+  const caveLevel = !!plan.cave;      // the Hollow Mountain (shared/caveMaze.js, caveField.js)
   const S = plan.seed;
   const rng = makeRng(S ^ 0x51f15e);
   const layout = {
@@ -77,6 +79,15 @@ export function buildLayout(terrain) {
     bossArena: null,        // the lava islet beside the boat (first island), see shared/bossArena.js
     swampArena: null,       // the root-walled kettle in the swamp's waist, see shared/swampArena.js
     volcanoArena: null,     // the crater floor on top of the volcano, see shared/volcanoArena.js
+    // Hollow Mountain only (empty elsewhere), see the cave section below
+    torchSpots: [],         // { x, z, y }: dry clear spots in the arrival cove for torch pickups
+    caveDinoSpots: [],      // chambers: { id, x, z, y, radius, ceiling, clearance, tags, spawns[{x,z}] }
+    caveDecor: null,        // { stalactites, stalagmites, columns, crystals, halls }
+    caveLights: [],         // pooled-light candidates: { x, y, z, r, kind, priority, hue, room }
+    caveEntrance: null,     // { x, y, z, dir, hall } just outside the tunnel mouth (west cove)
+    caveExit: null,         // { x, y, z, dir, hall } just outside the exit tunnel (east beach)
+    falseExits: [],         // tunnels that end in daylight at a sea cliff: { x, y, z, a }
+    arrivalBoat: null,      // the boat the team came on (west cove, decoration only): { x, y, z, rot }
     logs: [],               // fallen trees: { x, z, rot, len, r, yA, yB, roots, dead }
   };
   const circles = layout.colliders.circles;
@@ -181,7 +192,10 @@ export function buildLayout(terrain) {
     || layout.basePlots.some((p) => Math.hypot(x - p.x, z - p.z) < p.r + 2 + Math.min(pad, 12));
   const nearBoat = (x, z, pad = 0) => Math.hypot(x - plan.boat.x, z - plan.boat.z) < 10 + pad;
   const dry = (x, z, min = 0.4) => terrain.waterLevelAt(x, z) === null && terrain.lavaLevelAt(x, z) === null && terrain.heightAt(x, z) > min;
-  const inside = (x, z, k) => insideOutline(plan, x, z, k);
+  // (the cave level has plants and loose rocks in its two coves only)
+  const inside = caveLevel
+    ? (x, z) => Math.abs(x) > 172 && Math.abs(x) < 352 && Math.abs(z) < 112
+    : (x, z, k) => insideOutline(plan, x, z, k);
   // (every flow: the river, or the volcano's lava flows and crater moat)
   const riverDist = (x, z) => {
     let best = Infinity;
@@ -484,9 +498,18 @@ export function buildLayout(terrain) {
     }
     return { x: cx, z: cz };
   };
+  // a dry, flat, clear spot well inside a chamber of the maze (Hollow Mountain)
+  const roomSpot = (id) => {
+    const n = plan.cave.maze.nodes[id];
+    return findDryNear(n.x, n.z, n.r * 0.55, (x, z) => terrain.clearanceAt(x, z) > 6 && terrain.slopeAt(x, z) < 0.3 && -caveOpenSdf(plan, x, z) > 5);
+  };
   const relicSpot = (site) => {
     switch (site) {
-      case 'cave': return layout.caves.length ? layout.caves[0].inner : null;
+      case 'cave':
+        if (caveLevel) return roomSpot(plan.cave.rooms.cave);
+        return layout.caves.length ? layout.caves[0].inner : null;
+      case 'lake': return caveLevel ? roomSpot(plan.cave.rooms.lake) : null;
+      case 'abyss': return caveLevel ? roomSpot(plan.cave.rooms.abyss) : null;
       case 'ruins': return layout.ruins ? ruinsCenter(layout.ruins) : null;
       case 'nest': return layout.nest ? { x: layout.nest.x, z: layout.nest.z } : null;
       case 'peak': return plan.sites.peak ? { x: plan.sites.peak.x, z: plan.sites.peak.z } : null;
@@ -516,6 +539,201 @@ export function buildLayout(terrain) {
     const y = terrain.heightAt(spot.x, spot.z) + (site === 'ruins' ? RUINS_ALTAR_TOP : site === 'nest' ? 0.3 * (layout.nest?.size ?? 1) : 0);
     layout.relics.push({ id: layout.relics.length, kind, site, x: spot.x, z: spot.z, y });
     reserve(spot.x, spot.z, 3.5);          // no trees, bushes or rocks on top of a boat part
+  }
+
+  // ------------------------------------------------ Hollow Mountain (cave)
+  // Everything inside the mountain: where the dinosaurs live, the dressing of
+  // the tunnels (stalactites, stalagmites, columns, crystals), the pooled-light
+  // candidates, the torch spots in the arrival cove, the exits. All
+  // deterministic (own random stream); big colliders keep >= 4 m clear.
+  if (caveLevel) {
+    const cv = plan.cave, mz = cv.maze;
+    const rc = makeRng(S ^ 0xca7e1);
+    const floorY = (x, z) => terrain.heightAt(x, z);
+    const openS = (x, z) => caveOpenSdf(plan, x, z);                    // negative inside the tunnels and chambers
+    const rooms = mz.nodes.filter((n) => !n.outside);
+    const flat = (x, z, slope = 0.45) => dry(x, z, 1) && terrain.slopeAt(x, z) < slope;
+    const clearOfColliders = (x, z, r) => penetration(x, z, r, { circles, boxes }, -1e9, 1e9, 0) <= 0;
+    const clamp01 = (v) => (v < 0 ? v + 1 : v > 1 ? v - 1 : v);
+
+    layout.caveEntrance = { ...cv.entrance, y: floorY(cv.entrance.x, cv.entrance.z) };
+    layout.caveExit = { ...cv.exit, y: floorY(cv.exit.x, cv.exit.z) };
+    layout.falseExits = mz.falseExits.map((f) => ({ ...f, y: floorY(f.x, f.z) }));
+    {
+      // (the boat lies where the sand begins: its stern a few metres up the beach)
+      const a = plan.arrival;
+      let ax = a.x;
+      for (let k = 0; k < 80 && floorY(ax, a.z) < 0.7; k++) ax += 1;
+      a.x = ax + 5;
+      layout.arrivalBoat = { x: a.x, z: a.z, y: Math.max(0.15, floorY(a.x, a.z)), rot: a.rot };
+      reserve(a.x, a.z, 8);
+    }
+    reserve(cv.entrance.x + 8, cv.entrance.z, 8);
+    reserve(cv.exit.x - 8, cv.exit.z, 8);
+
+    // --- torch spots: dry, clear ground round the camp and the way to the tunnel mouth
+    {
+      const camp = hut.campfire, a = plan.arrival;
+      const spots = [
+        { x: camp.x, z: camp.z, r0: 4, r1: 11, n: 2 },
+        { x: a.x + 7, z: a.z, r0: 3, r1: 9, n: 2 },
+        { x: cv.entrance.x - 24, z: cv.entrance.z, r0: 2, r1: 8, n: 2 },
+      ];
+      for (const an of spots) {
+        let n = 0;
+        for (let k = 0; k < 400 && n < an.n; k++) {
+          const ang = rc() * TAU, rr = rc.range(an.r0, an.r1);
+          const x = an.x + Math.cos(ang) * rr, z = an.z + Math.sin(ang) * rr;
+          if (!flat(x, z, 0.25) || !free(x, z, 2.2) || !clearOfColliders(x, z, 1.2) || layout.torchSpots.some((t) => Math.hypot(t.x - x, t.z - z) < 5)) continue;
+          layout.torchSpots.push({ x, z, y: floorY(x, z) });
+          reserve(x, z, 2);
+          n++;
+        }
+      }
+    }
+
+    // --- chambers: where the dinosaurs live (caveDinoSpots), raptor packs in some of them
+    for (const n of rooms) {
+      const spawns = [];
+      for (let k = 0; k < 300 && spawns.length < 8; k++) {
+        const ang = rc() * TAU, rr = Math.sqrt(rc()) * n.r * 0.7;
+        const x = n.x + Math.cos(ang) * rr, z = n.z + Math.sin(ang) * rr;
+        if (flat(x, z) && terrain.clearanceAt(x, z) > 5 && -openS(x, z) > 3 && clearOfColliders(x, z, 1) && !layout.relics.some((r) => Math.hypot(r.x - x, r.z - z) < 4)) spawns.push({ x, z });
+      }
+      layout.caveDinoSpots.push({
+        id: n.id, x: n.x, z: n.z, y: floorY(n.x, n.z), radius: n.r, ceiling: terrain.ceilingAt(n.x, n.z),
+        clearance: terrain.clearanceAt(n.x, n.z), tags: [...n.tags], kind: n.kind, spawns,
+      });
+    }
+    // (only species that fit under the roof: raptors for now; layout.dinoZones.<kind> takes new species the same way)
+    {
+      const eligible = layout.caveDinoSpots.filter((c) => c.spawns.length >= 3 && !c.tags.includes('entrance') && !c.tags.includes('exit') && c.kind !== 'pocket');
+      const order = [...eligible.filter((c) => c.tags.includes('relic')), ...eligible.filter((c) => !c.tags.includes('relic')).sort((p, q) => q.radius - p.radius)];
+      for (let i = 0; i < Math.min(plan.level.dinos.raptor, order.length); i++) {
+        const c = order[i];
+        layout.dinoZones.raptor.push({ x: c.x, z: c.z, radius: Math.min(34, c.radius * 1.5), spawns: c.spawns.slice(0, 5), size: c.tags.includes('relic') ? 3 : 2, room: c.id });
+      }
+      for (const c of layout.caveDinoSpots) for (const p of c.spawns) reserve(p.x, p.z, 2);
+    }
+
+    // --- dressing (visual; the big columns and stalagmites also block, always leaving >= 4 m)
+    const anchors = [
+      ...rooms.map((n) => ({ x: n.x, z: n.z, rad: n.r * 1.15, w: n.r * n.r, room: n })),
+      ...mz.tunnels.flatMap((t) => t.pts.filter((_, i) => i % 2 === 0).map((p) => ({ x: p.x, z: p.z, rad: p.w * 0.6, w: p.w * 5, room: null }))),
+    ];
+    const totalW = anchors.reduce((a, b) => a + b.w, 0);
+    const pickAnchor = () => { let r = rc() * totalW; for (const a of anchors) { r -= a.w; if (r <= 0) return a; } return anchors[anchors.length - 1]; };
+    const sample = (pred, tries = 40) => {
+      for (let k = 0; k < tries; k++) {
+        const an = pickAnchor(), ang = rc() * TAU, rr = Math.sqrt(rc()) * an.rad;
+        const x = an.x + Math.cos(ang) * rr, z = an.z + Math.sin(ang) * rr;
+        const s = openS(x, z);
+        if (s < -0.3 && dry(x, z, 0.5) && pred(x, z, -s)) return { x, z, s: -s, an };
+      }
+      return null;
+    };
+    const decor = { stalactites: [], stalagmites: [], columns: [], crystals: [], halls: [] };
+    layout.caveDecor = decor;
+    // hanging from the roof
+    for (let i = 0, n = 0; i < 4000 && n < 280; i++) {
+      const p = sample((x, z) => terrain.clearanceAt(x, z) > 4.5);
+      if (!p) continue;
+      const ceil = terrain.ceilingAt(p.x, p.z), clear = ceil - floorY(p.x, p.z);
+      decor.stalactites.push({ x: p.x, z: p.z, y: ceil, len: Math.min(rc.range(0.8, 4.4) * (clear > 12 ? 1.5 : 1), clear - 3), r: rc.range(0.22, 0.75), rot: rc() * TAU, hue: rc() });
+      n++;
+    }
+    // standing on the floor: small ones (in a tunnel along its walls, never on the walking line)
+    const centerDist = (x, z) => {
+      let best = Infinity;
+      for (const t of mz.tunnels) for (let i = 0; i < t.pts.length - 1; i++) {
+        const a = t.pts[i], b = t.pts[i + 1], vx = b.x - a.x, vz = b.z - a.z;
+        const u = Math.max(0, Math.min(1, ((x - a.x) * vx + (z - a.z) * vz) / (vx * vx + vz * vz || 1)));
+        best = Math.min(best, Math.hypot(a.x + vx * u - x, a.z + vz * u - z) / (a.w / 2));
+      }
+      return best;
+    };
+    for (let i = 0, n = 0; i < 5000 && n < 220; i++) {
+      const p = sample(() => true, 30);
+      if (!p || !free(p.x, p.z, 1.4) || terrain.slopeAt(p.x, p.z) > 0.7) continue;
+      if (!p.an.room && centerDist(p.x, p.z) < 0.55) continue;
+      const r = rc.range(0.25, 0.7), h = rc.range(0.5, 1.4) * (p.an.room ? 1.6 : 1);
+      decor.stalagmites.push({ x: p.x, z: p.z, y: floorY(p.x, p.z), r, h, rot: rc() * TAU, hue: rc(), solid: false });
+      reserve(p.x, p.z, r + 0.3);
+      n++;
+    }
+    // tall stalagmites and floor-to-roof columns: only deep inside chambers (>= 4.5 m clear all round)
+    for (const n of rooms.filter((m) => m.r >= 14 && m.kind !== 'pocket')) {
+      let placed = 0;
+      for (let k = 0; k < 120 && placed < (n.r > 20 ? 4 : 2); k++) {
+        const ang = rc() * TAU, rr = rc.range(0.25, 0.7) * n.r;
+        const x = n.x + Math.cos(ang) * rr, z = n.z + Math.sin(ang) * rr;
+        const column = placed === 0 && n.r > 18 && !n.tags.includes('entrance') && !n.tags.includes('exit');
+        const r = column ? rc.range(1.3, 2.0) : rc.range(0.7, 1.3);
+        if (-openS(x, z) < r + 4.5 || !flat(x, z, 0.35) || !free(x, z, r + 2.2) || !clearOfColliders(x, z, r + 1.5)) continue;
+        // chamber entrances stay open: nothing in a tunnel's way
+        if (centerDist(x, z) < 1.1 + r / 4.5 && Math.hypot(x - n.x, z - n.z) > n.r * 0.55) continue;
+        const y = floorY(x, z), ceil = terrain.ceilingAt(x, z);
+        if (!Number.isFinite(ceil)) continue;
+        const h = column ? ceil - y + 0.5 : rc.range(2.2, 5.2);
+        const c = { x, z, y, r, h, rot: rc() * TAU, hue: rc(), column, solid: true };
+        (column ? decor.columns : decor.stalagmites).push(c);
+        circles.push({ x, z, r: r * 0.85, bottom: y - 1, top: y + h, kind: column ? 'column' : 'stalagmite' });
+        reserve(x, z, r + 2.2);
+        placed++;
+      }
+    }
+    // crystals: halls glow in their own hue, a few more are sprinkled along other walls
+    const gradient = (x, z) => {
+      const e = 0.8, gx = openS(x + e, z) - openS(x - e, z), gz = openS(x, z + e) - openS(x, z - e), l = Math.hypot(gx, gz) || 1;
+      return { x: -gx / l, z: -gz / l };     // points into the cave
+    };
+    const addCrystals = (hall, hue, want, band) => {
+      for (let i = 0, k = 0; i < want * 40 && k < want; i++) {
+        let x, z;
+        if (hall) {
+          const ang = rc() * TAU, rr = rc.range(0.45, 1.0) * hall.r;
+          x = hall.x + Math.cos(ang) * rr; z = hall.z + Math.sin(ang) * rr;
+        } else {
+          const an = pickAnchor(), ang = rc() * TAU, rr = Math.sqrt(rc()) * an.rad;
+          x = an.x + Math.cos(ang) * rr; z = an.z + Math.sin(ang) * rr;
+        }
+        const d = -openS(x, z);
+        if (d < band[0] || d > band[1] || !dry(x, z, 0.5) || !free(x, z, 0.9) || terrain.slopeAt(x, z) > 1.0) continue;
+        const nrm = gradient(x, z), wall = d < 1.4, y = floorY(x, z);
+        decor.crystals.push({
+          x, z, y: wall ? Math.min(y + rc.range(0.3, 2.2), terrain.ceilingAt(x, z) - 1.5) : y, scale: rc.range(0.6, wall ? 1.8 : 2.4), rot: rc() * TAU,
+          hue: clamp01(hue + rc.range(-0.06, 0.06)), nx: nrm.x, nz: nrm.z, wall, hall: hall ? hall.id : -1, big: rc() < 0.18,
+        });
+        reserve(x, z, 0.8);
+        k++;
+      }
+    };
+    for (const n of rooms.filter((m) => m.tags.includes('crystal'))) {
+      const hall = { id: n.id, x: n.x, z: n.z, r: n.r, hue: rc() };
+      decor.halls.push(hall);
+      addCrystals(hall, hall.hue, 26, [0.3, 7]);
+    }
+    addCrystals(null, 0.55, 46, [0.3, 3]);
+
+    // --- pooled-light candidates (a few of them lit at a time by the client)
+    const L = layout.caveLights;
+    const addLight = (x, z, kind, priority, hue, room, up = 3.2) => {
+      const y = floorY(x, z), ceil = terrain.ceilingAt(x, z);
+      L.push({ x, z, y: Math.min(y + up, Number.isFinite(ceil) ? ceil - 1.2 : y + up), floor: y, r: kind === 'chamber' || kind === 'crystal' ? 26 : 18, kind, priority, hue, room });
+    };
+    for (const r of layout.relics) addLight(r.x, r.z, 'relic', 0, 0.5, -1, 2.2);
+    for (const h of decor.halls) addLight(h.x, h.z, 'crystal', 1, h.hue, h.id, 4);
+    for (const n of rooms) if (!decor.halls.some((h) => h.id === n.id) && n.kind !== 'pocket') addLight(n.x, n.z, 'chamber', 2, -1, n.id, 4);
+    for (const t of mz.tunnels) {
+      const per = t.length / (t.pts.length - 1), step = Math.max(1, Math.round(38 / per));
+      for (let i = Math.round(step / 2); i < t.pts.length - 1; i += step) {
+        const p = t.pts[i], u = i / (t.pts.length - 1);
+        if (t.flooded && u > t.flooded.u0 && u < t.flooded.u1) addLight(p.x, p.z, 'water', 2, 0.5, -1, 5);
+        else if (openS(p.x, p.z) < -2) addLight(p.x, p.z, 'tunnel', 3, -1, -1, 3);
+      }
+    }
+    addLight(cv.entrance.x + 18, cv.entrance.z, 'daylight', 1, 0.6, -1, 4);
+    addLight(cv.exit.x - 18, cv.exit.z, 'daylight', 1, 0.6, -1, 4);
   }
 
   // ---------------------------------------------------- jungle density
@@ -641,7 +859,7 @@ export function buildLayout(terrain) {
   // (collision.js standTop) – plus the torn-up root plate.
   {
     const rl = makeRng(S ^ 0x10c5);
-    const want = volcanic ? 14 : 24;
+    const want = caveLevel ? 0 : volcanic ? 14 : 24;
     for (let i = 0; i < 6000 && layout.logs.length < want; i++) {
       const x = rl.range(-plan.A * 0.9, plan.A * 0.9), z = rl.range(-plan.B * 0.9, plan.B * 0.9);
       if (!inside(x, z, 0.9) || nearHut(x, z, 10) || nearBoat(x, z, 6) || !outsideGrove(x, z, 12)) continue;
@@ -722,7 +940,7 @@ export function buildLayout(terrain) {
     if (free(x, z, 1.5) && distToPath(x, z) > 2.5 && dry(x, z, 0.3)) addRock(x, z, rng.range(0.6, 1.2));
   }
   // Sea stacks (tall rocks in the water) – landmarks and Pteranodon perches.
-  for (let k = 0; k < 7; k++) {
+  for (let k = 0; k < (caveLevel ? 0 : 7); k++) {
     const a = (k / 7) * TAU + rng.range(-0.25, 0.25);
     if (Math.abs(Math.cos(a)) > 0.92) continue;           // keep the hut and boat views open
     const f = rng.range(1.12, 1.26);
@@ -751,7 +969,7 @@ export function buildLayout(terrain) {
   };
   // which fruit grows here: one kind per role (config.js fruit.types, levels.js biome.fruit)
   const FRUIT = { bush: 'berry', tree: 'mango', plant: 'dragon', ...(biome.fruit || {}) };
-  const fruitCounts = volcanic ? { berry: 14, mango: 5, dragon: 3 } : { berry: 20, mango: 9, dragon: 3 };
+  const fruitCounts = caveLevel ? { berry: 0, mango: 0, dragon: 0 } : volcanic ? { berry: 14, mango: 5, dragon: 3 } : { berry: 20, mango: 9, dragon: 3 };
   // warm ground (volcano): near lava or a fumarole, but not hot
   const warm = (x, z) => { const h = terrain.heatAt(x, z); return h > 0.15 && h < 0.45; };
   // shore of a bog (swamp): dry ground with bog within a few metres
@@ -846,7 +1064,7 @@ export function buildLayout(terrain) {
     const m = meadows[(i + 1) % meadows.length];
     layout.dinoZones.stego.push({ x: m.x, z: m.z, radius: 26, spawns: pickDry(m.x, m.z, 12, 4) });
   }
-  for (let i = 0; i < D.raptor; i++) {
+  for (let i = 0; i < (caveLevel ? 0 : D.raptor); i++) {
     // the first pack guards the nest
     const separated = (x, z) => layout.dinoZones.raptor.every((zone) => Math.hypot(x - zone.x, z - zone.z) >= 48);
     const c = i === 0 && layout.nest && !volcanic ? { x: layout.nest.x, z: layout.nest.z }

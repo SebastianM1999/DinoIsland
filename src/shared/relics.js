@@ -9,6 +9,8 @@ export const RELICS = {
   wheel: { name: "Ship's Wheel", site: 'peak', hint: 'on the highest peak', color: '#9a6632' },
   anchor: { name: 'Old Anchor', site: 'river', hint: 'on a sand island in the middle of the river', color: '#7d8796' },
   sail: { name: 'Patched Sail', site: 'ruins', hint: 'in the old ruins', color: '#f2e6c8' },
+  bell: { name: "Ship's Bell", site: 'lake', hint: 'in a chamber beside the underground water', color: '#e0b24a' },
+  compass: { name: 'Brass Compass', site: 'abyss', hint: 'in the farthest chamber of the mountain', color: '#c9a45a' },
   rudder: { name: 'Obsidian Rudder', site: 'lava', hint: 'beside the lava flow', color: '#3b2f4a' },
 };
 

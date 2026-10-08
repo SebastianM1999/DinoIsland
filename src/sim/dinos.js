@@ -196,6 +196,8 @@ export class DinoSystem {
     // descent to an along-the-surface speed); one shut in a pit below scrambles out (#detour)
     if (!downhill && t.slopeAt(x, z) > climbSlope(d) && !(d.scrambleUntil > this.world.now) && !(sarco && t.waterDepthAt(x, z) > 0.5)) return false;
     if (t.lavaLevelAt(x, z) !== null) return false;
+    // under the roof of the Hollow Mountain: never where a body does not fit (Infinity elsewhere)
+    if (t.isCave && t.clearanceAt(x, z) < (d.type === 'raptor' ? 3.5 : 7)) return false;
     // the hut / the team's base (shared/base.js safeZone): dinosaurs keep out
     const zone = this.world.safeZone();
     if (zone && !d.raid && (x - zone.x) ** 2 + (z - zone.z) ** 2 < (zone.r + 10) ** 2) return false;

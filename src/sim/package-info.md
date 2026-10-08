@@ -3,7 +3,7 @@
 
 ## Files
 - `world.js` — `ServerWorld`: island loading, players, actions, inventory, combat validation, base, skills, tick and snapshots (see map below).
-- `dinos.js` — `DinoSystem`: spawning, steering (20 % slower through swamp bogs, `Terrain.swampSpeedAt`) and lateral steps, local avoidance, stuck nudges, footprints (tracks), traps, damage, death, carcass loot, respawn, pose history; delegates behaviour to the brains in `ai/`. Swamp boss leashes permit inland swimming, constrain combat to Drowned Hollow, and bosses do not respawn. Their waterborne carcasses preserve the death position and settle slowly toward the surface.
+- `dinos.js` — `DinoSystem`: spawning, steering (20 % slower through swamp bogs, `Terrain.swampSpeedAt`) and lateral steps, local avoidance, stuck nudges, footprints (tracks), traps, damage, death, carcass loot, respawn, pose history; delegates behaviour to the brains in `ai/`. `walkable` also keeps dinosaurs under a roof they fit (Hollow Mountain). Swamp boss leashes permit inland swimming, constrain combat to Drowned Hollow, and bosses do not respawn. Their waterborne carcasses preserve the death position and settle slowly toward the surface.
 - `ai/` — one behaviour "brain" per species (see `ai/package-info.md`).
 - `pathfind.js` — `findPath`: coarse A* over walkable ground (4 m cells, cached directed segment checks between centers to avoid narrow water channels and ridges, bog cells weighted by their slower going, hot ground on the volcano avoided) for detours and raiders.
 - `hitCheck.js` — `nearDino`, `plausibleZone`: plausibility checks for client-reported dinosaur hits.

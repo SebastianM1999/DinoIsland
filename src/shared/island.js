@@ -16,6 +16,8 @@ import { planBossArena, bossArenaHeight } from './bossArena.js';
 import { planSwampArena, SWAMP_ARENA, ambushPocket } from './swampArena.js';
 import { planVolcanoArena, moatFlow, VOLCANO_ARENA } from './volcanoArena.js';
 import { BASE_PLOT_RADIUS } from './base.js';
+import { planCaveMaze, CAVE_GEOM } from './caveMaze.js';
+import { caveHeight, mountainDepth, floorLevel, FLOOD_LEVEL } from './caveField.js';
 
 const TAU = Math.PI * 2;
 
@@ -436,6 +438,8 @@ function inWaterPool(plan, x, z) {
 
 /** Final analytic island height at (x, z). */
 export function islandHeight(plan, x, z) {
+  // the Hollow Mountain: a heightfield of its own (shared/caveField.js)
+  if (plan.cave) return caveHeight(plan, x, z);
   let h = naturalHeight(plan, x, z);
   h = poolEffect(plan, x, z, h);
   if (plan.flows) h = ventEffect(plan, x, z, h);
@@ -562,6 +566,7 @@ export function planIsland(levelIndex = 0, variant = 1) {
   const level = levelDef(levelIndex);
   const biome = level.biome;
   const seed = islandSeed(level.seedIndex, variant);
+  if (biome.id === 'cave') return planCave(level, variant, seed);
   const rng = makeRng(seed);
   const volcanic = biome.id === 'volcano';
   const swamp = biome.id === 'swamp';
@@ -1152,6 +1157,86 @@ export function planIsland(levelIndex = 0, variant = 1) {
   if (volcanic) lavaTreasure(plan, makeRng(seed ^ 0x7ea5));
   plan.steps?.forEach((st, i) => { st.id = i; });
 
+  return plan;
+}
+
+// ------------------------------------------------------------------ the Hollow Mountain
+
+/**
+ * Plan of the cave level (level 4): a round mountain between two coves. The
+ * team lands in the west cove (hut, spawn, torches, a decorative arrival
+ * boat), crosses the mountain's tunnel maze (shared/caveMaze.js) and leaves it
+ * through the one exit tunnel onto the east beach, where the escape boat is.
+ * The height itself is shared/caveField.js; `plan.cave` holds the maze.
+ */
+function planCave(level, variant, seed) {
+  const G = CAVE_GEOM;
+  const rng = makeRng(seed);
+  const depthAt = mountainDepth(seed);
+  const maze = planCaveMaze(seed, depthAt);
+  const plan = {
+    level, biome: level.biome, seed, variant, k: 1, shape: 'cave', A: G.radius[0], B: G.radius[1],
+    ramps: [], rolling: 0, lowland: null, bogs: [], paths: [], hills: [], volcano: null, pools: [], pads: [],
+    river: null, waterfall: null, meadows: [], sites: { caves: [] }, trail: [], flows: [], bridges: [], fields: [],
+    steps: [], geysers: [], fumaroles: [], treasure: null, basePlots: [], cave: null,
+  };
+  // hut and landing in the west cove, the escape boat on the east beach (bow to the sea)
+  plan.hut = { x: -G.shore + 84, z: rng.range(-24, 24), radius: 21, ground: HUT_GROUND };
+  plan.boat = { x: G.shore - 15, z: rng.range(-30, 30), rot: rng.range(-0.3, 0.3) };
+  const side = rng() < 0.5 ? -1 : 1;
+  plan.arrival = { x: -G.shore + 14, z: side * rng.range(34, 60), rot: Math.PI + rng.range(-0.25, 0.25) };
+  plan.pads.push({ x: plan.hut.x, z: plan.hut.z + 2, r: plan.hut.radius, h: HUT_GROUND });
+  plan.pads.push({ x: plan.boat.x, z: plan.boat.z, r: 9, h: 0.9 });
+  // flooded stretches: the water stands a little below the dry floor beside it
+  const tunnels = maze.tunnels;
+  for (const t of tunnels) {
+    if (!t.flooded) continue;
+    const cum = [0];
+    for (let i = 1; i < t.pts.length; i++) cum.push(cum[i - 1] + Math.hypot(t.pts[i].x - t.pts[i - 1].x, t.pts[i].z - t.pts[i - 1].z));
+    const total = cum[cum.length - 1];
+    // the dry floor beside the water is level, and no lower than the natural floor round it: the water never lies above dry ground
+    let lowest = Infinity;
+    t.pts.forEach((p, i) => {
+      const u = cum[i] / total;
+      if (u < t.flooded.u0 - 0.3 || u > t.flooded.u1 + 0.3) return;
+      for (const [ox, oz] of [[0, 0], [7, 0], [-7, 0], [0, 7], [0, -7]]) lowest = Math.min(lowest, floorLevel(seed, p.x + ox, p.z + oz, depthAt(p.x + ox, p.z + oz)));
+    });
+    t.flooded.level = lowest - 0.15;
+    t.flooded.y0 = t.flooded.level + FLOOD_LEVEL;
+    // the water's course: the swimmable stretch plus a little beyond it, every ~4 m
+    const at = (u) => {
+      const d = u * total;
+      let i = 1;
+      while (i < cum.length - 1 && cum[i] < d) i++;
+      const f = clamp((d - cum[i - 1]) / ((cum[i] - cum[i - 1]) || 1), 0, 1), A = t.pts[i - 1], B = t.pts[i];
+      return { x: lerp(A.x, B.x, f), z: lerp(A.z, B.z, f), w: lerp(A.w, B.w, f) };
+    };
+    const pts = [];
+    const from = t.flooded.u0 - 0.04, to = t.flooded.u1 + 0.04, n = Math.max(4, Math.ceil((to - from) * total / 4));
+    for (let k = 0; k <= n; k++) {
+      const p = at(from + (to - from) * k / n);
+      pts.push({ x: p.x, z: p.z, y: t.flooded.level, w: p.w + 4 });   // (the water's reach is a little wider than the dip: the rest lies above it)
+    }
+    const flow = { kind: 'water', pts, cave: true, tunnel: t.id };
+    plan.flows.push(flow);
+  }
+  for (const f of plan.flows) indexRiver(f);
+  plan.river = plan.flows[0] ?? null;
+  // the sites that hide the relics: each in a side chamber of the maze
+  const roleNode = (tag) => maze.nodes.find((n) => n.tags.includes('relic') && n.tags.includes(tag));
+  const rooms = { cave: roleNode('crystal'), lake: roleNode('water'), abyss: roleNode('farthest') };
+  plan.relicSites = ['cave', 'lake', 'abyss'];
+  plan.cave = {
+    maze, depthAt, rooms: Object.fromEntries(Object.entries(rooms).map(([k, n]) => [k, n.id])),
+    entrance: { ...maze.entrance }, exit: { ...maze.exit },
+  };
+  // a short way from the hut to the tunnel mouth, from the exit tunnel to the boat (nothing inside the mountain)
+  const lane = (x0, z0, x1, z1, wobble) => Array.from({ length: 9 }, (_, i) => {
+    const t = i / 8;
+    return { x: lerp(x0, x1, t), z: lerp(z0, z1, t) + valueNoise(t * 3 + 2, 0.4, seed + 77) * wobble * Math.sin(Math.PI * t) };
+  });
+  plan.trail = lane(plan.hut.x + 8, plan.hut.z - 6, maze.entrance.x, maze.entrance.z, 7);
+  plan.paths = [lane(maze.exit.x, maze.exit.z, plan.boat.x - 10, plan.boat.z, 6)];
   return plan;
 }
 

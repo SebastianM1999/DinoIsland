@@ -8,6 +8,8 @@ export function lineBlocked(eye, target, terrain, layout) {
   for (let i = 1; i < 16; i++) {
     const t = i / 16;
     if (terrain.heightAt(eye.x + dx * t, eye.z + dz * t) > eye.y + dy * t - 0.25) return true;
+    // the roof of the Hollow Mountain blocks too (Infinity elsewhere)
+    if (eye.y + dy * t > (terrain.ceilingAt?.(eye.x + dx * t, eye.z + dz * t) ?? Infinity)) return true;
   }
 
   const length2 = dx * dx + dz * dz;

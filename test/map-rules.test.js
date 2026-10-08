@@ -8,6 +8,7 @@ import { buildLayout } from '../src/shared/layout.js';
 import { TRUNKS } from '../src/shared/treeShapes.js';
 import { CONFIG } from '../src/shared/config.js';
 
+// (the Hollow Mountain, level 3, has no rivers, trees, hills or mountain paths: its own rules are checked in cave-level.test.js)
 const islands = [];
 for (const level of [0, 1, 2]) {
   for (let variant = 1; variant <= 16; variant++) {
