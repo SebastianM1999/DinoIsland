@@ -13,6 +13,13 @@ export const CREATURE_STEP_PROFILES = Object.freeze({
   brachio: { stride: 2.2, runStride: 3.75, walkSpeed: 2.2, maxSpeed: 6.4, weight: 'heavy', gain: .7, rate: .82, weightGain: .7, weightRate: .8 },
 });
 
+/** Avoid HRTF sources and ground queries for inaudible distant footfalls. */
+export function creatureStepAudible(view, listener) {
+  const ranges = { raptor: 30, ptera: 20, stego: 45, trex: 65, brachio: 70, 'alpha-sarcosuchus': 65 };
+  const range = Math.min(95, (ranges[view.type] || 30) * Math.sqrt(Math.max(.5, view.scale || 1)));
+  return Math.hypot(view.pos.x - listener.x, view.pos.y - listener.y, view.pos.z - listener.z) <= range;
+}
+
 /** Independent of render/animation throttling: only actual grounded travel counts. */
 export class CreatureStepCadence {
   constructor() { this.previous = null; this.distance = 0; }

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { CreatureStepCadence, CREATURE_STEP_PROFILES } from '../src/client/audio/creatureSteps.js';
+import { CreatureStepCadence, CREATURE_STEP_PROFILES, creatureStepAudible } from '../src/client/audio/creatureSteps.js';
 import { DS } from '../src/shared/protocol.js';
 import * as THREE from 'three';
 import { DinoView } from '../src/client/entities/dinoViews.js';
@@ -9,6 +9,20 @@ function animal(type = 'trex', scale = 1) {
   return { type, scale, pos: { x: 0, y: 0, z: 0 }, alive: true, st: DS.WALK, onGround: true,
     grounded() { return this.onGround; } };
 }
+
+test('footstep audibility scales with mass/size and rejects distant contacts before ground queries', () => {
+  const listener = { x: 0, y: 0, z: 0 };
+  const light = animal('raptor'); light.pos.x = 40;
+  assert.equal(creatureStepAudible(light, listener), false);
+  const heavy = animal('trex'); heavy.pos.x = 40;
+  assert.equal(creatureStepAudible(heavy, listener), true);
+  const titan = animal('brachio', 2); titan.pos.x = 90;
+  assert.equal(creatureStepAudible(titan, listener), true);
+  titan.pos.x = 96;
+  assert.equal(creatureStepAudible(titan, listener), false);
+  heavy.pos.x = 0; heavy.pos.y = 70;
+  assert.equal(creatureStepAudible(heavy, listener), false);
+});
 function travel(view, cadence, speed, seconds, dt = .025) {
   const steps = [];
   for (let time = 0; time < seconds - dt / 2; time += dt) {

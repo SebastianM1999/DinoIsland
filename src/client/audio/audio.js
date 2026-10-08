@@ -5,7 +5,8 @@
 
 import { CONFIG } from '../../shared/config.js';
 import { onSettings, audioGains } from '../core/settings.js';
-import { EFFECTS, FOOTSTEPS, effectGroup } from './catalog.js';
+import { SAMPLE_GROUPS, STEP_TEXTURES, DINO_WEIGHT, effectGroup } from './catalog.js';
+import { CREATURE_STEP_PROFILES } from './creatureSteps.js';
 import { SampleBank, SamplePicker } from './samples.js';
 import { IslandMusic } from './music.js';
 
@@ -30,7 +31,7 @@ export class GameAudio {
     this.samples = new SampleBank(this.ctx);
     this.samplePicker = new SamplePicker();
     this.islandMusic = new IslandMusic(this.ctx, this.samples, this.musicBus);
-    void this.samples.preload([...Object.values(EFFECTS), ...Object.values(FOOTSTEPS)]);
+    void this.samples.preload(SAMPLE_GROUPS);
     this.calmBus = this.ctx.createGain();
     this.dangerBus = this.ctx.createGain();
     this.calmBus.gain.value = 1;
@@ -72,6 +73,8 @@ export class GameAudio {
     this.musicMode = 'calm';
     this.nextNote = 0;
     this.step = 0;
+    this.lastPlay.clear();
+    this.samplePicker.last.clear();
   }
 
   startMusic() {
@@ -253,31 +256,19 @@ export class GameAudio {
 
   /**
    * @param {string} name
-   * @param {{pos?:{x:number,y:number,z:number}, vol?:number, surface?:string, movement?:string}} [o]
+   * @param {{pos?:{x:number,y:number,z:number}, vol?:number, surface?:string, movement?:string, species?:string, size?:number, entityId?:string}} [o]
    */
   play(name, o = {}) {
     if (!this.ok || this.ctx.state !== 'running') return;
     // throttle identical sounds
     const now = this.ctx.currentTime;
-    const last = this.lastPlay.get(name) || 0;
+    const key = o.entityId === undefined ? name : `${name}:${o.entityId}`;
+    const last = this.lastPlay.get(key) ?? -Infinity;
     if (now - last < 0.04) return;
-    this.lastPlay.set(name, now);
+    this.lastPlay.set(key, now);
     const t = now + 0.005;
+    if (this.#recorded(name, o, t)) return;
     const out = this.#out(o.pos, o.vol ?? 1);
-    const group = effectGroup(name, o);
-    if (group) {
-      const sample = this.samplePicker.pick(`${name}:${o.surface || ''}`, group, this.samples);
-      if (sample) {
-        const source = this.ctx.createBufferSource();
-        source.buffer = sample.buffer;
-        source.playbackRate.value = sample.rate * (o.movement === 'run' ? 1.04 : 1);
-        out.gain.value *= sample.gain;
-        source.connect(out);
-        source.onended = () => { source.disconnect(); out.disconnect(); out.samplePanner?.disconnect(); };
-        source.start(t);
-        return;
-      }
-    }
     switch (name) {
       case 'sarco_lunge':
         this.#voice(t, out, { pitch: [45, 76, 52], dur: .7, vol: .9, formants: [220, 650], lowpass: 1000, breath: .3 });
@@ -365,6 +356,11 @@ export class GameAudio {
         break;
       case 'step':
         this.#noise(t, 0.045, out, { vol: 0.05 * (o.vol ?? 1), type: 'lowpass', f0: 650 + Math.random() * 180 });
+        break;
+      case 'dinoStep':
+        this.#noise(t, .07, out, { vol: .08, type: 'lowpass', f0: 600 });
+        if ((CREATURE_STEP_PROFILES[o.species]?.weightGain ?? 0) > 0)
+          this.#osc('sine', 70, 38, t, .2, out, .3);
         break;
       case 'bigStep':
         this.#osc('sine', 55, 35, t, 0.3, out, 0.7);
@@ -457,6 +453,57 @@ export class GameAudio {
         this.#osc('triangle', 1175, 1175, t + 0.12, 0.25, out, 0.3);
         break;
     }
+  }
+
+  /** One positional output per layer, cleaned up when its source ends. */
+  #sample(key, group, options, t) {
+    const sample = this.samplePicker.pick(key, group, this.samples);
+    if (!sample) return false;
+    const out = this.#out(options.pos, (options.vol ?? 1) * sample.gain);
+    const source = this.ctx.createBufferSource();
+    source.buffer = sample.buffer;
+    source.playbackRate.value = sample.rate;
+    let filter;
+    if (group.lowpass) {
+      filter = this.ctx.createBiquadFilter();
+      filter.type = 'lowpass'; filter.frequency.value = group.lowpass;
+      source.connect(filter); filter.connect(out);
+    } else source.connect(out);
+    source.onended = () => {
+      source.disconnect(); filter?.disconnect(); out.disconnect(); out.samplePanner?.disconnect();
+    };
+    source.start(t);
+    return true;
+  }
+
+  #recorded(name, o, t) {
+    const surface = o.surface || 'grass';
+    // Walk/run share the approved contacts; keep one history across gait
+    // changes and a separate history for each creature.
+    const pickerKey = `${name}:${surface}:${o.species || ''}:${o.entityId ?? ''}`;
+    if (name === 'dinoStep') {
+      const profile = CREATURE_STEP_PROFILES[o.species];
+      if (!profile) return false;
+      const size = Math.max(.5, Math.min(4, o.size || 1));
+      const pitch = Math.pow(size, -.18);
+      const base = effectGroup('step', o);
+      if (!this.#sample(pickerKey, { ...base, gain: base.gain * profile.gain,
+        rate: base.rate * profile.rate * pitch }, o, t)) return false;
+      if (profile.weightGain > 0) {
+        // Only T-Rex uses the selected W2 body thump. Other creatures layer
+        // low-passed approved grass thuds, with a separate species treatment.
+        const weight = o.species === 'trex' ? DINO_WEIGHT.trex : DINO_WEIGHT.ground;
+        this.#sample(`${pickerKey}:weight:${o.species}`, { ...weight,
+          gain: weight.gain * profile.weightGain * Math.sqrt(size),
+          rate: weight.rate * profile.weightRate * pitch }, o, t);
+      }
+      return true;
+    }
+    const group = effectGroup(name, o);
+    if (!group || !this.#sample(pickerKey, group, o, t)) return false;
+    if (name === 'step' && STEP_TEXTURES[surface])
+      this.#sample(`${pickerKey}:texture`, STEP_TEXTURES[surface], o, t);
+    return true;
   }
 
   setListener(pos, forward, up) {

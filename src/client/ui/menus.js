@@ -83,7 +83,10 @@ export function initSettings({ onClose } = {}) {
     Music level balanced and encoded as Ogg Vorbis. Scott Buckley tracks crossfaded for looping;
     Forest Exploration uses the original loop.
     <a href="/assets/audio/CREDITS.md" target="_blank" rel="noopener">All sound effect credits and modification notices</a>.</p>
-    <p>Pistol, M4, spear throw, bow release and weapon impact generated with
+    <p>Pistol/rifle shots, terrain footsteps and creature calls use recorded or performed
+    <a href="https://creativecommons.org/publicdomain/zero/1.0/" target="_blank" rel="noopener">CC0 sounds</a>.
+    See the credits above for creators, sources and edits.</p>
+    <p>Spear throw, bow release and weapon impact generated with
     <a href="https://elevenlabs.io/sound-effects" target="_blank" rel="noopener">ElevenLabs Sound Effects</a>,
     under the generating account's <a href="https://elevenlabs.io/terms-of-use" target="_blank" rel="noopener">ElevenLabs terms</a>.</p>`;
   panel.append(credits);

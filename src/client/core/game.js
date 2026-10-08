@@ -40,6 +40,7 @@ import { PlayerActions } from '../player/actions.js';
 import { GameAudio } from '../audio/audio.js';
 import { inBossMusicArea } from '../audio/region.js';
 import { footstepSurface, woodSupports } from '../audio/surface.js';
+import { creatureStepAudible } from '../audio/creatureSteps.js';
 import { StepCadence } from '../audio/steps.js';
 import { settings, setSetting, onSettings, FPS_LIMITS } from './settings.js';
 import { PerfStats } from '../ui/perfStats.js';
@@ -981,6 +982,7 @@ export class Game {
   onDinoAttack(v) { if (v.type !== 'brachio') this.audio.play(v.type === 'stego' ? 'bigStep' : 'bite', { pos: v.pos }); }
   onDinoHit(v, m) { if (m.by !== this.me.id) this.audio.play('hit', { pos: v.pos, vol: 0.7 }); }
   onDinoStep(v, step) {
+    if (!creatureStepAudible(v, this.player.pos)) return;
     const water = this.terrain.waterLevelAt(v.pos.x, v.pos.z);
     const surface = footstepSurface({ pos: v.pos, inWater: water === null ? 0 : Math.max(0, water - v.pos.y), swimming: false }, this.terrain, this.layout, this.woodSupports);
     this.audio.play('dinoStep', { species: v.type, surface, movement: step.movement, weight: step.weight,

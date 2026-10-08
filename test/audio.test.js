@@ -3,7 +3,9 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import { SampleBank, SamplePicker } from '../src/client/audio/samples.js';
 import { IslandMusic, MUSIC_FADE } from '../src/client/audio/music.js';
-import { EFFECTS, FOOTSTEPS, ISLAND_MUSIC, MENU_MUSIC, BOSS_MUSIC, musicLoopStart } from '../src/client/audio/catalog.js';
+import { EFFECTS, FOOTSTEPS, SAMPLE_GROUPS, RUN_FOOTSTEPS, DINO_WEIGHT, effectGroup, ISLAND_MUSIC, MENU_MUSIC, BOSS_MUSIC, musicLoopStart } from '../src/client/audio/catalog.js';
+import { GameAudio } from '../src/client/audio/audio.js';
+import { settings, setSetting } from '../src/client/core/settings.js';
 import { inBossMusicArea } from '../src/client/audio/region.js';
 import { planBossArena } from '../src/shared/bossArena.js';
 import { footstepSurface, woodSupports } from '../src/client/audio/surface.js';
@@ -37,7 +39,7 @@ function context() {
 
 test('every selected asset is bundled with provenance and the expected audio header', async () => {
   const registry = JSON.parse(await fs.readFile(new URL('../assets/audio/sources.json', import.meta.url)));
-  const expected = new Set([...Object.values(EFFECTS), ...Object.values(FOOTSTEPS)].flatMap(group => group.files));
+  const expected = new Set(SAMPLE_GROUPS.flatMap(group => group.files));
   for (const music of Object.values(ISLAND_MUSIC)) for (const url of Object.values(music)) expected.add(url);
   expected.add(MENU_MUSIC); expected.add(BOSS_MUSIC);
   const documented = new Map(registry.assets.map(asset => ['/assets/audio/'+asset.file, asset]));
@@ -100,6 +102,83 @@ test('sample choice avoids immediate repeats and ignores unavailable variations'
   assert.equal(picker.pick('grass',group,bank).buffer,'B');
   assert.equal(picker.pick('grass',group,bank).buffer,'A');
   assert.equal(picker.pick('none',{ ...group, files: ['missing'] },bank),null);
+});
+
+test('approved recordings replace shots and voices; rejected previews never enter active groups', () => {
+  assert.match(EFFECTS.pistol.files[0], /recorded-pistol/);
+  assert.match(EFFECTS.rifle.files[0], /recorded-rifle/);
+  assert.match(DINO_WEIGHT.trex.files[0], /recorded-trex-step/);
+  assert.notDeepEqual(EFFECTS.roar_trex.files, EFFECTS['roar_alpha-sarcosuchus'].files);
+  assert.notDeepEqual(EFFECTS.roar_raptor.files, EFFECTS.roar_ptera.files);
+  assert.ok(RUN_FOOTSTEPS.grass.gain > FOOTSTEPS.grass.gain);
+  assert.equal(effectGroup('step', { surface: 'mud', movement: 'run' }), RUN_FOOTSTEPS.mud);
+  assert.equal(effectGroup('waterStep', { movement: 'run' }), RUN_FOOTSTEPS.water);
+});
+
+function effectContext() {
+  const param = value => ({ value, setTargetAtTime(v) { this.value = v; }, setValueAtTime(v) { this.value = v; },
+    exponentialRampToValueAtTime() {}, linearRampToValueAtTime() {} });
+  const ctx = { currentTime: 1, state: 'running', sampleRate: 1000, destination: {}, sources: [], panners: [], filters: [], oscillators: [] };
+  const node = extras => ({ ...extras, connect(to) { this.output = to; return to; }, disconnect() { this.disconnected = true; } });
+  ctx.createGain = () => node({ gain: param(1) });
+  ctx.createBuffer = (_, length) => ({ getChannelData: () => new Float32Array(length) });
+  ctx.decodeAudioData = async bytes => ({ bytes });
+  ctx.createBufferSource = () => { const s = node({ playbackRate: param(1), start(t) { this.started = t; }, stop() {} }); ctx.sources.push(s); return s; };
+  ctx.createPanner = () => { const p = node({ positionX: param(0), positionY: param(0), positionZ: param(0) }); ctx.panners.push(p); return p; };
+  ctx.createBiquadFilter = () => { const f = node({ frequency: param(0), Q: param(0) }); ctx.filters.push(f); return f; };
+  ctx.createOscillator = () => { const o = node({ frequency: param(0), start() {}, stop() {} }); ctx.oscillators.push(o); return o; };
+  return ctx;
+}
+
+test('recorded creature steps layer weight positionally, preserve mute, release nodes and retain loading fallback', async () => {
+  const oldWindow = globalThis.window, oldFetch = globalThis.fetch;
+  const previousSfx = settings.sfx;
+  const ctx = effectContext();
+  globalThis.window = { AudioContext: class { constructor() { return ctx; } } };
+  globalThis.fetch = async () => ({ ok: true, arrayBuffer: async () => new ArrayBuffer(4) });
+  try {
+    const audio = new GameAudio();
+    await audio.samples.preload(SAMPLE_GROUPS);
+    const pos = { x: 3, y: 4, z: -5 };
+    audio.play('dinoStep', { species: 'trex', entityId: 'one', pos, surface: 'rock' });
+    assert.equal(ctx.sources.length, 2);
+    assert.ok(DINO_WEIGHT.trex.files.some(url => audio.samples.buffers.get(url) === ctx.sources[1].buffer));
+    assert.equal(ctx.panners[0].positionX.value, 3);
+    assert.equal(ctx.panners[1].positionZ.value, -5);
+    // Separate animals may take a step in the same render frame.
+    audio.play('dinoStep', { species: 'raptor', entityId: 'two', pos, surface: 'rock' });
+    assert.equal(ctx.sources.length, 3);
+    assert.ok(ctx.sources[2].playbackRate.value > ctx.sources[0].playbackRate.value);
+    audio.play('dinoStep', { species: 'brachio', entityId: 'three', size: 2, pos, surface: 'rock' });
+    assert.equal(ctx.sources.length, 5);
+    assert.equal(ctx.filters.at(-1).frequency.value, 380);
+    for (const source of ctx.sources) source.onended();
+    assert.ok(ctx.sources.every(s => s.disconnected));
+    assert.ok(ctx.panners.every(p => p.disconnected));
+    audio.samplePicker.random = () => 0;
+    ctx.currentTime += 1;
+    let next = ctx.sources.length;
+    audio.play('dinoStep', { species: 'raptor', entityId: 'a', surface: 'rock' });
+    const first = ctx.sources[next].buffer;
+    audio.play('dinoStep', { species: 'raptor', entityId: 'b', surface: 'rock' });
+    ctx.currentTime += .1; next = ctx.sources.length;
+    audio.play('dinoStep', { species: 'raptor', entityId: 'a', surface: 'rock', movement: 'run' });
+    assert.notEqual(ctx.sources[next].buffer, first, 'another animal and gait switch cannot reset variation history');
+    ctx.currentTime += .1; next = ctx.sources.length;
+    audio.play('step', { surface: 'wood' });
+    const walk = ctx.sources[next].buffer;
+    ctx.currentTime += .1; next = ctx.sources.length;
+    audio.play('step', { surface: 'wood', movement: 'run' });
+    assert.notEqual(ctx.sources[next].buffer, walk, 'player walk/run share a no-repeat history');
+    setSetting('sfx', 0); assert.equal(audio.sfx.gain.value, 0);
+    audio.samples.buffers.clear();
+    ctx.currentTime += 1;
+    audio.play('dinoStep', { species: 'trex', entityId: 'one', pos });
+    assert.ok(ctx.oscillators.length > 0, 'missing samples use the synthesized weight fallback');
+  } finally {
+    setSetting('sfx', previousSfx);
+    globalThis.window = oldWindow; globalThis.fetch = oldFetch;
+  }
 });
 
 test('island music rejects stale loads and stopping cannot be undone by a late decode', async () => {
@@ -250,7 +329,7 @@ test('HTTP server delivers WAV, Ogg music and credit notices with correct types'
   await new Promise(resolve => httpServer.listen(0,'127.0.0.1',resolve));
   t.after(() => { host.stop(); httpServer.close(); });
   const base = `http://127.0.0.1:${httpServer.address().port}`;
-  for (const [path,type] of [['sfx/bow-1.wav','audio/wav'],['music/volcano-calm.ogg','audio/ogg'],['CREDITS.md','text/plain; charset=utf-8']]) {
+  for (const [path,type] of [['sfx/recorded-pistol-1.wav','audio/wav'],['sfx/recorded-trex-step-1.wav','audio/wav'],['music/volcano-calm.ogg','audio/ogg'],['CREDITS.md','text/plain; charset=utf-8']]) {
     const response = await fetch(`${base}/assets/audio/${path}`);
     assert.equal(response.status,200); assert.equal(response.headers.get('content-type'),type);
     assert.ok((await response.arrayBuffer()).byteLength>100);

@@ -54,7 +54,7 @@ Grouped by the module area they mainly cover. Many simulation tests also check t
 - `sarco-client.test.js` — boss state/clip selection, authoritative phase sampling at late joins and five FPS, retrigger timing, directional size fitting, level torso/grounded feet and authored pose protection, missing-asset crocodile fallback and deep ambush hollows with dry causeway across 15 variants.
 - `dino-glb.test.js` — GLB dinosaur loading, fallback and retry, clips and animation (`src/client/models/dino/*`).
 - `dino-skin.test.js` — procedural skin loft faces outward.
-- `audio.test.js` — audio catalog/samples, music transitions and boss-area music, footstep surfaces and cadence; HTTP serving of audio files.
+- `audio.test.js` — complete audio catalog/provenance, sample variation/failures, positional creature layers and cleanup, mute and synthesized fallbacks, music transitions and boss-area music, footstep surfaces and cadence; HTTP serving of audio files.
 - `creature-steps.test.js` — dinosaur species stride/weight profiles, walking/running cadence, oversized titan contacts, grounded gating, teleport cancellation and frame-rate independence.
 - `graphics-tier.test.js` — automatic graphics tier choice and auto-tune.
 - `frame-hitches.test.js` — frame-freeze guards: `requestPrograms` waits for linked programs, `WorldPost.compile` targets, `usesPost`, and no client code toggles a light's `visible`.
