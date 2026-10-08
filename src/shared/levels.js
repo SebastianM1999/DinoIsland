@@ -204,7 +204,7 @@ export const BIOMES = {
     // flyers and giants never fit under the roof: one raptor pack strayed in, the
     // pale noise-hunting gloom raptors (packs, sim/ai/gloomRaptor.js) own the dark
     // and a sump lurker waits in every flooded tunnel (sim/ai/sumpLurker.js)
-    dinos: { brachio: 0, stego: 0, raptor: 1, ptera: 0, trex: 0, 'gloom-raptor': 5, 'sump-lurker': 2 },
+    dinos: { brachio: 0, stego: 0, raptor: 1, ptera: 0, trex: 0, 'gloom-raptor': 5, 'sump-lurker': 2, 'crystal-plodder': 3 },
     music: 'volcano',   // (cave music comes with the client)
   },
 };
