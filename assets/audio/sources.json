@@ -174,6 +174,204 @@
       "duration_seconds": 0.7,
       "prompt_influence": 0.75,
       "loop": false
+    },
+    "approved-G1": {
+      "author": "michorvath",
+      "license": "CC0-1.0",
+      "page": "https://freesound.org/people/michorvath/sounds/427592/",
+      "download": "https://cdn.freesound.org/previews/427/427592_3094998-hq.mp3",
+      "verified": "2026-10-08",
+      "originalSha256": "8b7f20ce7c150556c49ad11bfbd0e014a68666991b5b3c063e47020d211a92b8",
+      "notes": "Short single shot; recording setup not documented."
+    },
+    "approved-G4": {
+      "author": "GeneralSigma",
+      "license": "CC0-1.0",
+      "page": "https://freesound.org/people/GeneralSigma/sounds/515322/",
+      "download": "https://cdn.freesound.org/previews/515/515322_11324935-hq.mp3",
+      "verified": "2026-10-08",
+      "originalSha256": "b1b4e1ce1e79065e461580c7e968f7ed3f6f13fe5918b46df360411d94a5f16e",
+      "notes": "Cut from SuperPhat 432366; both creator pages publish CC0."
+    },
+    "approved-W2": {
+      "author": "Breviceps",
+      "license": "CC0-1.0",
+      "page": "https://freesound.org/people/Breviceps/sounds/457531/",
+      "download": "https://cdn.freesound.org/previews/457/457531_9159316-hq.mp3",
+      "verified": "2026-10-08",
+      "originalSha256": "c358a76e53f50ae549161b6f995be5b7a594df8132875d2fc5550b3afc1912b8",
+      "notes": "Creator duffel/laundry bag, couch and plastic-bag foley with EQ. Landing/body impact; use only the initial thump for a possible step layer."
+    },
+    "approved-F1": {
+      "author": "Nox_Sound",
+      "license": "CC0-1.0",
+      "page": "https://freesound.org/people/Nox_Sound/sounds/556042/",
+      "download": "https://cdn.freesound.org/previews/556/556042_9250976-hq.mp3",
+      "verified": "2026-10-08",
+      "originalSha256": "7d4be74dac83b41f25ef1fc22065f6a2611bf730a07265b5c6db26941b2bbcef",
+      "notes": "19 walking and 22 running steps, plus jumps, scrapes and scuffs. Rode NTG4+ recording."
+    },
+    "approved-F2": {
+      "author": "Nox_Sound",
+      "license": "CC0-1.0",
+      "page": "https://freesound.org/people/Nox_Sound/sounds/556002/",
+      "download": "https://cdn.freesound.org/previews/556/556002_9250976-hq.mp3",
+      "verified": "2026-10-08",
+      "originalSha256": "0510a7626e5e4c7c87283c4cfb879530ac960af3767b0c3df947fe86eb715c64",
+      "notes": "11 walking and 10 running steps, plus jumps, scrapes and scuffs."
+    },
+    "approved-F3": {
+      "author": "Nox_Sound",
+      "license": "CC0-1.0",
+      "page": "https://freesound.org/people/Nox_Sound/sounds/558812/",
+      "download": "https://cdn.freesound.org/previews/558/558812_9250976-hq.mp3",
+      "verified": "2026-10-08",
+      "originalSha256": "a0afca457d75bf464ccb770f1723e0234f6780ba178e2be3b2c4629fb0536ba3",
+      "notes": "20 walking steps, running/sprinting sequences and landings."
+    },
+    "approved-F4": {
+      "author": "Nox_Sound",
+      "license": "CC0-1.0",
+      "page": "https://freesound.org/people/Nox_Sound/sounds/564893/",
+      "download": "https://cdn.freesound.org/previews/564/564893_9250976-hq.mp3",
+      "verified": "2026-10-08",
+      "originalSha256": "da9cb13fc63f9cc19842dbd0e32d97ba4e95b64eceaf15c717c678f2f656e7d8",
+      "notes": "24 walking steps, running sequence, jumps and scuffs; beach/bank candidate."
+    },
+    "approved-F5": {
+      "author": "Nox_Sound",
+      "license": "CC0-1.0",
+      "page": "https://freesound.org/people/Nox_Sound/sounds/548384/",
+      "download": "https://cdn.freesound.org/previews/548/548384_9250976-hq.mp3",
+      "verified": "2026-10-08",
+      "originalSha256": "f3544b967eea6c616137f1d2cc9cd57815ff97e28a17d76d793d288585bae8c7",
+      "notes": "5 walking, 5 running and 3 landing sounds; Tascam DR-05 recording."
+    },
+    "approved-F7": {
+      "author": "Fission9",
+      "license": "CC0-1.0",
+      "page": "https://freesound.org/people/Fission9/sounds/521589/",
+      "download": "https://cdn.freesound.org/previews/521/521589_9395330-hq.mp3",
+      "verified": "2026-10-08",
+      "originalSha256": "f85c345b33d91da886f6c118d1c0c080c39b074c0ac053bcce58f46a6e407e86",
+      "notes": "Six hiking-boot steps; Zoom H4n Pro recording. Bridges/platforms candidate."
+    },
+    "approved-F8": {
+      "author": "spenceomatic",
+      "license": "CC0-1.0",
+      "page": "https://freesound.org/people/spenceomatic/sounds/119765/",
+      "download": "https://cdn.freesound.org/previews/119/119765_2123118-hq.mp3",
+      "verified": "2026-10-08",
+      "originalSha256": "edba0c91023ad8085c97c4392c6cc49ae3e4208c0e5f692d309c3a709d5b6b2f",
+      "notes": "Outdoor leaf recording; jungle litter candidate."
+    },
+    "approved-F6": {
+      "author": "Nox_Sound",
+      "license": "CC0-1.0",
+      "page": "https://freesound.org/people/Nox_Sound/sounds/490951/",
+      "download": "https://cdn.freesound.org/previews/490/490951_9250976-hq.mp3",
+      "verified": "2026-10-08",
+      "originalSha256": "51cff806618c3c1b1a94fe1a9260eb4f1092385f3ca058a183037fdd3968c98c",
+      "notes": "Collection includes dirty ground, tile, barefoot water, water and snow; select the appropriate section."
+    },
+    "approved-F11": {
+      "author": "simonjeffery13",
+      "license": "CC0-1.0",
+      "page": "https://freesound.org/people/simonjeffery13/sounds/750796/",
+      "download": "https://cdn.freesound.org/previews/750/750796_1326393-hq.mp3",
+      "verified": "2026-10-08",
+      "originalSha256": "c4705b0a6f21391bdb0fdc21c86ca7f775d40766e8d8110d8a3401281167fcec",
+      "notes": "Outdoor Zoom H6 recording with steps, scuffs and stomps."
+    },
+    "approved-F10": {
+      "author": "Fission9",
+      "license": "CC0-1.0",
+      "page": "https://freesound.org/people/Fission9/sounds/521587/",
+      "download": "https://cdn.freesound.org/previews/521/521587_9395330-hq.mp3",
+      "verified": "2026-10-08",
+      "originalSha256": "13657d6ebcce7616163ff2aae46c8f55bf337ea92e7ce8f1d710a5b2c4a96f36",
+      "notes": "Six grass steps with thud layers; useful comparison to F1."
+    },
+    "approved-F9": {
+      "author": "Nox_Sound",
+      "license": "CC0-1.0",
+      "page": "https://freesound.org/people/Nox_Sound/sounds/559082/",
+      "download": "https://cdn.freesound.org/previews/559/559082_9250976-hq.mp3",
+      "verified": "2026-10-08",
+      "originalSha256": "d5b6bf78f5c21da041e317093d3b7ca13fee2c3403da66c9ea0fff2e9cf1c256",
+      "notes": "Nine rustling movement takes; texture layer rather than standalone footfalls."
+    },
+    "approved-R1": {
+      "author": "CaveboyTup",
+      "license": "CC0-1.0",
+      "page": "https://opengameart.org/content/t-rex-calls",
+      "download": "https://opengameart.org/sites/default/files/t-rex_calls.mp3",
+      "verified": "2026-10-08",
+      "originalSha256": "2465991ee2e6fc6b8a1275c08f6ca8eb5a60c9c09a9e43102f3eb8531be9c7a5",
+      "notes": "Finished T-Rex sound design made from CC0 alligator, lion and elk samples. Full creator MP3; several calls in one recording."
+    },
+    "approved-R3": {
+      "author": "dinodilopho",
+      "license": "CC0-1.0",
+      "page": "https://freesound.org/people/dinodilopho/sounds/263530/",
+      "download": "https://cdn.freesound.org/previews/263/263530_4732572-hq.mp3",
+      "verified": "2026-10-08",
+      "originalSha256": "7086fbf4e91dda9caa776744d95d7c0d15eeaa0dca6ff0335adc7a197a116c9f",
+      "notes": "Creator made this short pterosaur-style call with their voice. Public HQ MP3 preview."
+    },
+    "approved-R4": {
+      "author": "JhennaSide",
+      "license": "CC0-1.0",
+      "page": "https://freesound.org/people/JhennaSide/sounds/455906/",
+      "download": "https://cdn.freesound.org/previews/455/455906_2468652-hq.mp3",
+      "verified": "2026-10-08",
+      "originalSha256": "6e0a09513b08f41c7aa711acbfb6e4aa72260ee8174ed2cb806094bbb2fa67fe",
+      "notes": "Creator-performed dinosaur trill, tagged dilophosaurus. Smaller dinosaur candidate; public HQ MP3 preview."
+    },
+    "approved-R5": {
+      "author": "rubberduck",
+      "license": "CC0-1.0",
+      "page": "https://opengameart.org/content/80-cc0-creature-sfx",
+      "download": "https://opengameart.org/sites/default/files/80-CC0-creature-SFX_0.zip#grunt_01.ogg",
+      "verified": "2026-10-08",
+      "originalSha256": "73ee84f2bb3e1b371a72dd66a09f150c98c9000bcb735c3bdd7f607e59385206",
+      "notes": "Finished filtered creature vocalization; creator says most sounds were performed with their mouth. Extracted unchanged from the CC0 creature ZIP."
+    },
+    "approved-R6": {
+      "author": "rubberduck",
+      "license": "CC0-1.0",
+      "page": "https://opengameart.org/content/80-cc0-creature-sfx",
+      "download": "https://opengameart.org/sites/default/files/80-CC0-creature-SFX_0.zip#grunt_02.ogg",
+      "verified": "2026-10-08",
+      "originalSha256": "76d78154f2f22b3f373bd3ec4ff0edabb459322f72adabfa285b738f37987cbb",
+      "notes": "Finished filtered creature vocalization; creator says most sounds were performed with their mouth. Extracted unchanged from the CC0 creature ZIP."
+    },
+    "approved-R7": {
+      "author": "rubberduck",
+      "license": "CC0-1.0",
+      "page": "https://opengameart.org/content/80-cc0-creature-sfx",
+      "download": "https://opengameart.org/sites/default/files/80-CC0-creature-SFX_0.zip#roar_01.ogg",
+      "verified": "2026-10-08",
+      "originalSha256": "e9d44326860a1c3aba917684faccfd967a4fefa284d7df773e05ae890ec242e0",
+      "notes": "Finished filtered creature vocalization; creator says most sounds were performed with their mouth. Extracted unchanged from the CC0 creature ZIP."
+    },
+    "approved-R8": {
+      "author": "rubberduck",
+      "license": "CC0-1.0",
+      "page": "https://opengameart.org/content/80-cc0-creature-sfx",
+      "download": "https://opengameart.org/sites/default/files/80-CC0-creature-SFX_0.zip#roar_02.ogg",
+      "verified": "2026-10-08",
+      "originalSha256": "ceb532ee0fe775d6f86a821099b75f1790ab8022b963cb837c8c1fa4fffee5c2",
+      "notes": "Finished filtered creature vocalization; creator says most sounds were performed with their mouth. Extracted unchanged from the CC0 creature ZIP."
+    },
+    "approved-R9": {
+      "author": "rubberduck",
+      "license": "CC0-1.0",
+      "page": "https://opengameart.org/content/80-cc0-creature-sfx",
+      "download": "https://opengameart.org/sites/default/files/80-CC0-creature-SFX_0.zip#roar_03.ogg",
+      "verified": "2026-10-08",
+      "originalSha256": "983396c808eb658ed3bd223ffaf9ea7f756dba7bc45ecc3fde117083026a4556",
+      "notes": "Finished filtered creature vocalization; creator says most sounds were performed with their mouth. Extracted unchanged from the CC0 creature ZIP."
     }
   },
   "assets": [
@@ -882,6 +1080,1007 @@
         0.45294784580498865
       ],
       "edits": "Mono, silence trimmed, peak balanced to 0.65, 2ms edge fades, PCM16 WAV."
+    },
+    {
+      "file": "sfx/recorded-pistol-1.wav",
+      "source": "approved-G1",
+      "original": "audio/G1-427592.mp3",
+      "segment": [
+        0.08,
+        1.15
+      ],
+      "edits": "Mono, DC removed, peak balanced to 0.85, 0.5ms gun / 2ms other attack and 20ms tail fades; unchanged source pitch.",
+      "duration": 1.07,
+      "sampleRate": 44100,
+      "peakLimit": 0.85
+    },
+    {
+      "file": "sfx/recorded-rifle-1.wav",
+      "source": "approved-G4",
+      "original": "audio/G4-515322.mp3",
+      "segment": [
+        0,
+        0.68
+      ],
+      "edits": "Mono, DC removed, peak balanced to 0.85, 0.5ms gun / 2ms other attack and 20ms tail fades; unchanged source pitch.",
+      "duration": 0.68,
+      "sampleRate": 44100,
+      "peakLimit": 0.85
+    },
+    {
+      "file": "sfx/recorded-trex-step-1.wav",
+      "source": "approved-W2",
+      "original": "audio/W2-457531.mp3",
+      "segment": [
+        0,
+        0.82
+      ],
+      "edits": "Mono, DC removed, peak balanced to 0.65, 0.5ms gun / 2ms other attack and 20ms tail fades; unchanged source pitch.",
+      "duration": 0.82,
+      "sampleRate": 48000,
+      "peakLimit": 0.65
+    },
+    {
+      "file": "sfx/recorded-grass-walk-1.wav",
+      "source": "approved-F1",
+      "original": "audio/F1-556042.mp3",
+      "segment": [
+        1.05,
+        1.36
+      ],
+      "edits": "Mono, DC removed, peak balanced to 0.6, 0.5ms gun / 2ms other attack and 20ms tail fades; unchanged source pitch.",
+      "duration": 0.31,
+      "sampleRate": 48000,
+      "peakLimit": 0.6
+    },
+    {
+      "file": "sfx/recorded-grass-walk-2.wav",
+      "source": "approved-F1",
+      "original": "audio/F1-556042.mp3",
+      "segment": [
+        2.15,
+        2.64
+      ],
+      "edits": "Mono, DC removed, peak balanced to 0.6, 0.5ms gun / 2ms other attack and 20ms tail fades; unchanged source pitch.",
+      "duration": 0.49,
+      "sampleRate": 48000,
+      "peakLimit": 0.6
+    },
+    {
+      "file": "sfx/recorded-grass-walk-3.wav",
+      "source": "approved-F1",
+      "original": "audio/F1-556042.mp3",
+      "segment": [
+        3.26,
+        3.53
+      ],
+      "edits": "Mono, DC removed, peak balanced to 0.6, 0.5ms gun / 2ms other attack and 20ms tail fades; unchanged source pitch.",
+      "duration": 0.27,
+      "sampleRate": 48000,
+      "peakLimit": 0.6
+    },
+    {
+      "file": "sfx/recorded-grass-walk-4.wav",
+      "source": "approved-F1",
+      "original": "audio/F1-556042.mp3",
+      "segment": [
+        4.24,
+        4.53
+      ],
+      "edits": "Mono, DC removed, peak balanced to 0.6, 0.5ms gun / 2ms other attack and 20ms tail fades; unchanged source pitch.",
+      "duration": 0.29,
+      "sampleRate": 48000,
+      "peakLimit": 0.6
+    },
+    {
+      "file": "sfx/recorded-grass-walk-5.wav",
+      "source": "approved-F1",
+      "original": "audio/F1-556042.mp3",
+      "segment": [
+        5.27,
+        5.57
+      ],
+      "edits": "Mono, DC removed, peak balanced to 0.6, 0.5ms gun / 2ms other attack and 20ms tail fades; unchanged source pitch.",
+      "duration": 0.3,
+      "sampleRate": 48000,
+      "peakLimit": 0.6
+    },
+    {
+      "file": "sfx/recorded-grass-walk-6.wav",
+      "source": "approved-F1",
+      "original": "audio/F1-556042.mp3",
+      "segment": [
+        6.31,
+        6.79
+      ],
+      "edits": "Mono, DC removed, peak balanced to 0.6, 0.5ms gun / 2ms other attack and 20ms tail fades; unchanged source pitch.",
+      "duration": 0.48,
+      "sampleRate": 48000,
+      "peakLimit": 0.6
+    },
+    {
+      "file": "sfx/recorded-gravel-walk-1.wav",
+      "source": "approved-F2",
+      "original": "audio/F2-556002.mp3",
+      "segment": [
+        0.44,
+        0.91
+      ],
+      "edits": "Mono, DC removed, peak balanced to 0.6, 0.5ms gun / 2ms other attack and 20ms tail fades; unchanged source pitch.",
+      "duration": 0.47,
+      "sampleRate": 48000,
+      "peakLimit": 0.6
+    },
+    {
+      "file": "sfx/recorded-gravel-walk-2.wav",
+      "source": "approved-F2",
+      "original": "audio/F2-556002.mp3",
+      "segment": [
+        1.56,
+        2.05
+      ],
+      "edits": "Mono, DC removed, peak balanced to 0.6, 0.5ms gun / 2ms other attack and 20ms tail fades; unchanged source pitch.",
+      "duration": 0.49,
+      "sampleRate": 48000,
+      "peakLimit": 0.6
+    },
+    {
+      "file": "sfx/recorded-gravel-walk-3.wav",
+      "source": "approved-F2",
+      "original": "audio/F2-556002.mp3",
+      "segment": [
+        2.53,
+        2.96
+      ],
+      "edits": "Mono, DC removed, peak balanced to 0.6, 0.5ms gun / 2ms other attack and 20ms tail fades; unchanged source pitch.",
+      "duration": 0.43,
+      "sampleRate": 48000,
+      "peakLimit": 0.6
+    },
+    {
+      "file": "sfx/recorded-gravel-walk-4.wav",
+      "source": "approved-F2",
+      "original": "audio/F2-556002.mp3",
+      "segment": [
+        3.66,
+        4.08
+      ],
+      "edits": "Mono, DC removed, peak balanced to 0.6, 0.5ms gun / 2ms other attack and 20ms tail fades; unchanged source pitch.",
+      "duration": 0.42,
+      "sampleRate": 48000,
+      "peakLimit": 0.6
+    },
+    {
+      "file": "sfx/recorded-gravel-walk-5.wav",
+      "source": "approved-F2",
+      "original": "audio/F2-556002.mp3",
+      "segment": [
+        4.73,
+        5.16
+      ],
+      "edits": "Mono, DC removed, peak balanced to 0.6, 0.5ms gun / 2ms other attack and 20ms tail fades; unchanged source pitch.",
+      "duration": 0.43,
+      "sampleRate": 48000,
+      "peakLimit": 0.6
+    },
+    {
+      "file": "sfx/recorded-gravel-walk-6.wav",
+      "source": "approved-F2",
+      "original": "audio/F2-556002.mp3",
+      "segment": [
+        5.85,
+        6.45
+      ],
+      "edits": "Mono, DC removed, peak balanced to 0.6, 0.5ms gun / 2ms other attack and 20ms tail fades; unchanged source pitch.",
+      "duration": 0.6,
+      "sampleRate": 48000,
+      "peakLimit": 0.6
+    },
+    {
+      "file": "sfx/recorded-rock-walk-1.wav",
+      "source": "approved-F3",
+      "original": "audio/F3-558812.mp3",
+      "segment": [
+        0.9,
+        1.34
+      ],
+      "edits": "Mono, DC removed, peak balanced to 0.6, 0.5ms gun / 2ms other attack and 20ms tail fades; unchanged source pitch.",
+      "duration": 0.44,
+      "sampleRate": 48000,
+      "peakLimit": 0.6
+    },
+    {
+      "file": "sfx/recorded-rock-walk-2.wav",
+      "source": "approved-F3",
+      "original": "audio/F3-558812.mp3",
+      "segment": [
+        1.82,
+        2.13
+      ],
+      "edits": "Mono, DC removed, peak balanced to 0.6, 0.5ms gun / 2ms other attack and 20ms tail fades; unchanged source pitch.",
+      "duration": 0.31,
+      "sampleRate": 48000,
+      "peakLimit": 0.6
+    },
+    {
+      "file": "sfx/recorded-rock-walk-3.wav",
+      "source": "approved-F3",
+      "original": "audio/F3-558812.mp3",
+      "segment": [
+        2.75,
+        3.18
+      ],
+      "edits": "Mono, DC removed, peak balanced to 0.6, 0.5ms gun / 2ms other attack and 20ms tail fades; unchanged source pitch.",
+      "duration": 0.43,
+      "sampleRate": 48000,
+      "peakLimit": 0.6
+    },
+    {
+      "file": "sfx/recorded-rock-walk-4.wav",
+      "source": "approved-F3",
+      "original": "audio/F3-558812.mp3",
+      "segment": [
+        3.7,
+        4.23
+      ],
+      "edits": "Mono, DC removed, peak balanced to 0.6, 0.5ms gun / 2ms other attack and 20ms tail fades; unchanged source pitch.",
+      "duration": 0.53,
+      "sampleRate": 48000,
+      "peakLimit": 0.6
+    },
+    {
+      "file": "sfx/recorded-rock-walk-5.wav",
+      "source": "approved-F3",
+      "original": "audio/F3-558812.mp3",
+      "segment": [
+        4.66,
+        5.1
+      ],
+      "edits": "Mono, DC removed, peak balanced to 0.6, 0.5ms gun / 2ms other attack and 20ms tail fades; unchanged source pitch.",
+      "duration": 0.44,
+      "sampleRate": 48000,
+      "peakLimit": 0.6
+    },
+    {
+      "file": "sfx/recorded-rock-walk-6.wav",
+      "source": "approved-F3",
+      "original": "audio/F3-558812.mp3",
+      "segment": [
+        5.58,
+        5.94
+      ],
+      "edits": "Mono, DC removed, peak balanced to 0.6, 0.5ms gun / 2ms other attack and 20ms tail fades; unchanged source pitch.",
+      "duration": 0.36,
+      "sampleRate": 48000,
+      "peakLimit": 0.6
+    },
+    {
+      "file": "sfx/recorded-sand-walk-1.wav",
+      "source": "approved-F4",
+      "original": "audio/F4-564893.mp3",
+      "segment": [
+        0.97,
+        1.53
+      ],
+      "edits": "Mono, DC removed, peak balanced to 0.6, 0.5ms gun / 2ms other attack and 20ms tail fades; unchanged source pitch.",
+      "duration": 0.56,
+      "sampleRate": 48000,
+      "peakLimit": 0.6
+    },
+    {
+      "file": "sfx/recorded-sand-walk-2.wav",
+      "source": "approved-F4",
+      "original": "audio/F4-564893.mp3",
+      "segment": [
+        2.15,
+        2.77
+      ],
+      "edits": "Mono, DC removed, peak balanced to 0.6, 0.5ms gun / 2ms other attack and 20ms tail fades; unchanged source pitch.",
+      "duration": 0.62,
+      "sampleRate": 48000,
+      "peakLimit": 0.6
+    },
+    {
+      "file": "sfx/recorded-sand-walk-3.wav",
+      "source": "approved-F4",
+      "original": "audio/F4-564893.mp3",
+      "segment": [
+        3.36,
+        4.1
+      ],
+      "edits": "Mono, DC removed, peak balanced to 0.6, 0.5ms gun / 2ms other attack and 20ms tail fades; unchanged source pitch.",
+      "duration": 0.74,
+      "sampleRate": 48000,
+      "peakLimit": 0.6
+    },
+    {
+      "file": "sfx/recorded-sand-walk-4.wav",
+      "source": "approved-F4",
+      "original": "audio/F4-564893.mp3",
+      "segment": [
+        4.57,
+        5.17
+      ],
+      "edits": "Mono, DC removed, peak balanced to 0.6, 0.5ms gun / 2ms other attack and 20ms tail fades; unchanged source pitch.",
+      "duration": 0.6,
+      "sampleRate": 48000,
+      "peakLimit": 0.6
+    },
+    {
+      "file": "sfx/recorded-sand-walk-5.wav",
+      "source": "approved-F4",
+      "original": "audio/F4-564893.mp3",
+      "segment": [
+        5.72,
+        6.17
+      ],
+      "edits": "Mono, DC removed, peak balanced to 0.6, 0.5ms gun / 2ms other attack and 20ms tail fades; unchanged source pitch.",
+      "duration": 0.45,
+      "sampleRate": 48000,
+      "peakLimit": 0.6
+    },
+    {
+      "file": "sfx/recorded-sand-walk-6.wav",
+      "source": "approved-F4",
+      "original": "audio/F4-564893.mp3",
+      "segment": [
+        6.7,
+        7.24
+      ],
+      "edits": "Mono, DC removed, peak balanced to 0.6, 0.5ms gun / 2ms other attack and 20ms tail fades; unchanged source pitch.",
+      "duration": 0.54,
+      "sampleRate": 48000,
+      "peakLimit": 0.6
+    },
+    {
+      "file": "sfx/recorded-mud-walk-1.wav",
+      "source": "approved-F5",
+      "original": "audio/F5-548384.mp3",
+      "segment": [
+        0.96,
+        1.33
+      ],
+      "edits": "Mono, DC removed, peak balanced to 0.6, 0.5ms gun / 2ms other attack and 20ms tail fades; unchanged source pitch.",
+      "duration": 0.37,
+      "sampleRate": 48000,
+      "peakLimit": 0.6
+    },
+    {
+      "file": "sfx/recorded-mud-walk-2.wav",
+      "source": "approved-F5",
+      "original": "audio/F5-548384.mp3",
+      "segment": [
+        2.06,
+        2.42
+      ],
+      "edits": "Mono, DC removed, peak balanced to 0.6, 0.5ms gun / 2ms other attack and 20ms tail fades; unchanged source pitch.",
+      "duration": 0.36,
+      "sampleRate": 48000,
+      "peakLimit": 0.6
+    },
+    {
+      "file": "sfx/recorded-mud-walk-3.wav",
+      "source": "approved-F5",
+      "original": "audio/F5-548384.mp3",
+      "segment": [
+        3.03,
+        3.65
+      ],
+      "edits": "Mono, DC removed, peak balanced to 0.6, 0.5ms gun / 2ms other attack and 20ms tail fades; unchanged source pitch.",
+      "duration": 0.62,
+      "sampleRate": 48000,
+      "peakLimit": 0.6
+    },
+    {
+      "file": "sfx/recorded-mud-walk-4.wav",
+      "source": "approved-F5",
+      "original": "audio/F5-548384.mp3",
+      "segment": [
+        4.19,
+        4.57
+      ],
+      "edits": "Mono, DC removed, peak balanced to 0.6, 0.5ms gun / 2ms other attack and 20ms tail fades; unchanged source pitch.",
+      "duration": 0.38,
+      "sampleRate": 48000,
+      "peakLimit": 0.6
+    },
+    {
+      "file": "sfx/recorded-wood-walk-1.wav",
+      "source": "approved-F7",
+      "original": "audio/F7-521589.mp3",
+      "segment": [
+        0.05,
+        0.35
+      ],
+      "edits": "Mono, DC removed, peak balanced to 0.6, 0.5ms gun / 2ms other attack and 20ms tail fades; unchanged source pitch.",
+      "duration": 0.3,
+      "sampleRate": 48000,
+      "peakLimit": 0.6
+    },
+    {
+      "file": "sfx/recorded-wood-walk-2.wav",
+      "source": "approved-F7",
+      "original": "audio/F7-521589.mp3",
+      "segment": [
+        0.48,
+        0.74
+      ],
+      "edits": "Mono, DC removed, peak balanced to 0.6, 0.5ms gun / 2ms other attack and 20ms tail fades; unchanged source pitch.",
+      "duration": 0.26,
+      "sampleRate": 48000,
+      "peakLimit": 0.6
+    },
+    {
+      "file": "sfx/recorded-wood-walk-3.wav",
+      "source": "approved-F7",
+      "original": "audio/F7-521589.mp3",
+      "segment": [
+        0.88,
+        1.15
+      ],
+      "edits": "Mono, DC removed, peak balanced to 0.6, 0.5ms gun / 2ms other attack and 20ms tail fades; unchanged source pitch.",
+      "duration": 0.27,
+      "sampleRate": 48000,
+      "peakLimit": 0.6
+    },
+    {
+      "file": "sfx/recorded-wood-walk-4.wav",
+      "source": "approved-F7",
+      "original": "audio/F7-521589.mp3",
+      "segment": [
+        1.35,
+        1.62
+      ],
+      "edits": "Mono, DC removed, peak balanced to 0.6, 0.5ms gun / 2ms other attack and 20ms tail fades; unchanged source pitch.",
+      "duration": 0.27,
+      "sampleRate": 48000,
+      "peakLimit": 0.6
+    },
+    {
+      "file": "sfx/recorded-wood-walk-5.wav",
+      "source": "approved-F7",
+      "original": "audio/F7-521589.mp3",
+      "segment": [
+        1.77,
+        2.08
+      ],
+      "edits": "Mono, DC removed, peak balanced to 0.6, 0.5ms gun / 2ms other attack and 20ms tail fades; unchanged source pitch.",
+      "duration": 0.31,
+      "sampleRate": 48000,
+      "peakLimit": 0.6
+    },
+    {
+      "file": "sfx/recorded-wood-walk-6.wav",
+      "source": "approved-F7",
+      "original": "audio/F7-521589.mp3",
+      "segment": [
+        2.21,
+        2.46
+      ],
+      "edits": "Mono, DC removed, peak balanced to 0.6, 0.5ms gun / 2ms other attack and 20ms tail fades; unchanged source pitch.",
+      "duration": 0.25,
+      "sampleRate": 48000,
+      "peakLimit": 0.6
+    },
+    {
+      "file": "sfx/recorded-leaves-walk-1.wav",
+      "source": "approved-F8",
+      "original": "audio/F8-119765.mp3",
+      "segment": [
+        0.71,
+        1.27
+      ],
+      "edits": "Mono, DC removed, peak balanced to 0.6, 0.5ms gun / 2ms other attack and 20ms tail fades; unchanged source pitch.",
+      "duration": 0.56,
+      "sampleRate": 48000,
+      "peakLimit": 0.6
+    },
+    {
+      "file": "sfx/recorded-leaves-walk-2.wav",
+      "source": "approved-F8",
+      "original": "audio/F8-119765.mp3",
+      "segment": [
+        1.32,
+        1.84
+      ],
+      "edits": "Mono, DC removed, peak balanced to 0.6, 0.5ms gun / 2ms other attack and 20ms tail fades; unchanged source pitch.",
+      "duration": 0.52,
+      "sampleRate": 48000,
+      "peakLimit": 0.6
+    },
+    {
+      "file": "sfx/recorded-leaves-walk-3.wav",
+      "source": "approved-F8",
+      "original": "audio/F8-119765.mp3",
+      "segment": [
+        2.06,
+        2.65
+      ],
+      "edits": "Mono, DC removed, peak balanced to 0.6, 0.5ms gun / 2ms other attack and 20ms tail fades; unchanged source pitch.",
+      "duration": 0.59,
+      "sampleRate": 48000,
+      "peakLimit": 0.6
+    },
+    {
+      "file": "sfx/recorded-leaves-walk-4.wav",
+      "source": "approved-F8",
+      "original": "audio/F8-119765.mp3",
+      "segment": [
+        2.86,
+        3.47
+      ],
+      "edits": "Mono, DC removed, peak balanced to 0.6, 0.5ms gun / 2ms other attack and 20ms tail fades; unchanged source pitch.",
+      "duration": 0.61,
+      "sampleRate": 48000,
+      "peakLimit": 0.6
+    },
+    {
+      "file": "sfx/recorded-leaves-walk-5.wav",
+      "source": "approved-F8",
+      "original": "audio/F8-119765.mp3",
+      "segment": [
+        3.53,
+        4.02
+      ],
+      "edits": "Mono, DC removed, peak balanced to 0.6, 0.5ms gun / 2ms other attack and 20ms tail fades; unchanged source pitch.",
+      "duration": 0.49,
+      "sampleRate": 48000,
+      "peakLimit": 0.6
+    },
+    {
+      "file": "sfx/recorded-leaves-walk-6.wav",
+      "source": "approved-F8",
+      "original": "audio/F8-119765.mp3",
+      "segment": [
+        4.23,
+        4.82
+      ],
+      "edits": "Mono, DC removed, peak balanced to 0.6, 0.5ms gun / 2ms other attack and 20ms tail fades; unchanged source pitch.",
+      "duration": 0.59,
+      "sampleRate": 48000,
+      "peakLimit": 0.6
+    },
+    {
+      "file": "sfx/recorded-dirt-walk-1.wav",
+      "source": "approved-F6",
+      "original": "audio/F6-490951.mp3",
+      "segment": [
+        0.96,
+        1.28
+      ],
+      "edits": "Mono, DC removed, peak balanced to 0.6, 0.5ms gun / 2ms other attack and 20ms tail fades; unchanged source pitch.",
+      "duration": 0.32,
+      "sampleRate": 48000,
+      "peakLimit": 0.6
+    },
+    {
+      "file": "sfx/recorded-dirt-walk-2.wav",
+      "source": "approved-F6",
+      "original": "audio/F6-490951.mp3",
+      "segment": [
+        1.96,
+        2.26
+      ],
+      "edits": "Mono, DC removed, peak balanced to 0.6, 0.5ms gun / 2ms other attack and 20ms tail fades; unchanged source pitch.",
+      "duration": 0.3,
+      "sampleRate": 48000,
+      "peakLimit": 0.6
+    },
+    {
+      "file": "sfx/recorded-dirt-walk-3.wav",
+      "source": "approved-F6",
+      "original": "audio/F6-490951.mp3",
+      "segment": [
+        2.96,
+        3.3
+      ],
+      "edits": "Mono, DC removed, peak balanced to 0.6, 0.5ms gun / 2ms other attack and 20ms tail fades; unchanged source pitch.",
+      "duration": 0.34,
+      "sampleRate": 48000,
+      "peakLimit": 0.6
+    },
+    {
+      "file": "sfx/recorded-dirt-walk-4.wav",
+      "source": "approved-F11",
+      "original": "audio/F11-750796.mp3",
+      "segment": [
+        1.22,
+        1.9
+      ],
+      "edits": "Mono, DC removed, peak balanced to 0.6, 0.5ms gun / 2ms other attack and 20ms tail fades; unchanged source pitch.",
+      "duration": 0.68,
+      "sampleRate": 48000,
+      "peakLimit": 0.6
+    },
+    {
+      "file": "sfx/recorded-dirt-walk-5.wav",
+      "source": "approved-F11",
+      "original": "audio/F11-750796.mp3",
+      "segment": [
+        2.63,
+        3.43
+      ],
+      "edits": "Mono, DC removed, peak balanced to 0.6, 0.5ms gun / 2ms other attack and 20ms tail fades; unchanged source pitch.",
+      "duration": 0.8,
+      "sampleRate": 48000,
+      "peakLimit": 0.6
+    },
+    {
+      "file": "sfx/recorded-dirt-walk-6.wav",
+      "source": "approved-F11",
+      "original": "audio/F11-750796.mp3",
+      "segment": [
+        3.49,
+        4.04
+      ],
+      "edits": "Mono, DC removed, peak balanced to 0.6, 0.5ms gun / 2ms other attack and 20ms tail fades; unchanged source pitch.",
+      "duration": 0.55,
+      "sampleRate": 48000,
+      "peakLimit": 0.6
+    },
+    {
+      "file": "sfx/recorded-water-walk-1.wav",
+      "source": "approved-F6",
+      "original": "audio/F6-490951.mp3",
+      "segment": [
+        11.45,
+        11.94
+      ],
+      "edits": "Mono, DC removed, peak balanced to 0.6, 0.5ms gun / 2ms other attack and 20ms tail fades; unchanged source pitch.",
+      "duration": 0.49,
+      "sampleRate": 48000,
+      "peakLimit": 0.6
+    },
+    {
+      "file": "sfx/recorded-water-walk-2.wav",
+      "source": "approved-F6",
+      "original": "audio/F6-490951.mp3",
+      "segment": [
+        12.69,
+        13.16
+      ],
+      "edits": "Mono, DC removed, peak balanced to 0.6, 0.5ms gun / 2ms other attack and 20ms tail fades; unchanged source pitch.",
+      "duration": 0.47,
+      "sampleRate": 48000,
+      "peakLimit": 0.6
+    },
+    {
+      "file": "sfx/recorded-water-walk-3.wav",
+      "source": "approved-F6",
+      "original": "audio/F6-490951.mp3",
+      "segment": [
+        13.93,
+        14.34
+      ],
+      "edits": "Mono, DC removed, peak balanced to 0.6, 0.5ms gun / 2ms other attack and 20ms tail fades; unchanged source pitch.",
+      "duration": 0.41,
+      "sampleRate": 48000,
+      "peakLimit": 0.6
+    },
+    {
+      "file": "sfx/recorded-water-walk-4.wav",
+      "source": "approved-F6",
+      "original": "audio/F6-490951.mp3",
+      "segment": [
+        15.3,
+        15.68
+      ],
+      "edits": "Mono, DC removed, peak balanced to 0.6, 0.5ms gun / 2ms other attack and 20ms tail fades; unchanged source pitch.",
+      "duration": 0.38,
+      "sampleRate": 48000,
+      "peakLimit": 0.6
+    },
+    {
+      "file": "sfx/recorded-water-walk-5.wav",
+      "source": "approved-F6",
+      "original": "audio/F6-490951.mp3",
+      "segment": [
+        16.48,
+        16.97
+      ],
+      "edits": "Mono, DC removed, peak balanced to 0.6, 0.5ms gun / 2ms other attack and 20ms tail fades; unchanged source pitch.",
+      "duration": 0.49,
+      "sampleRate": 48000,
+      "peakLimit": 0.6
+    },
+    {
+      "file": "sfx/recorded-water-walk-6.wav",
+      "source": "approved-F6",
+      "original": "audio/F6-490951.mp3",
+      "segment": [
+        18.45,
+        19.51
+      ],
+      "edits": "Mono, DC removed, peak balanced to 0.6, 0.5ms gun / 2ms other attack and 20ms tail fades; unchanged source pitch.",
+      "duration": 1.06,
+      "sampleRate": 48000,
+      "peakLimit": 0.6
+    },
+    {
+      "file": "sfx/recorded-grass-alt-1.wav",
+      "source": "approved-F10",
+      "original": "audio/F10-521587.mp3",
+      "segment": [
+        0.05,
+        0.48
+      ],
+      "edits": "Mono, DC removed, peak balanced to 0.6, 0.5ms gun / 2ms other attack and 20ms tail fades; unchanged source pitch.",
+      "duration": 0.43,
+      "sampleRate": 48000,
+      "peakLimit": 0.6
+    },
+    {
+      "file": "sfx/recorded-grass-alt-2.wav",
+      "source": "approved-F10",
+      "original": "audio/F10-521587.mp3",
+      "segment": [
+        0.76,
+        1.1
+      ],
+      "edits": "Mono, DC removed, peak balanced to 0.6, 0.5ms gun / 2ms other attack and 20ms tail fades; unchanged source pitch.",
+      "duration": 0.34,
+      "sampleRate": 48000,
+      "peakLimit": 0.6
+    },
+    {
+      "file": "sfx/recorded-grass-alt-3.wav",
+      "source": "approved-F10",
+      "original": "audio/F10-521587.mp3",
+      "segment": [
+        1.44,
+        1.74
+      ],
+      "edits": "Mono, DC removed, peak balanced to 0.6, 0.5ms gun / 2ms other attack and 20ms tail fades; unchanged source pitch.",
+      "duration": 0.3,
+      "sampleRate": 48000,
+      "peakLimit": 0.6
+    },
+    {
+      "file": "sfx/recorded-grass-alt-4.wav",
+      "source": "approved-F10",
+      "original": "audio/F10-521587.mp3",
+      "segment": [
+        2.23,
+        2.56
+      ],
+      "edits": "Mono, DC removed, peak balanced to 0.6, 0.5ms gun / 2ms other attack and 20ms tail fades; unchanged source pitch.",
+      "duration": 0.33,
+      "sampleRate": 48000,
+      "peakLimit": 0.6
+    },
+    {
+      "file": "sfx/recorded-grass-alt-5.wav",
+      "source": "approved-F10",
+      "original": "audio/F10-521587.mp3",
+      "segment": [
+        3.01,
+        3.38
+      ],
+      "edits": "Mono, DC removed, peak balanced to 0.6, 0.5ms gun / 2ms other attack and 20ms tail fades; unchanged source pitch.",
+      "duration": 0.37,
+      "sampleRate": 48000,
+      "peakLimit": 0.6
+    },
+    {
+      "file": "sfx/recorded-grass-alt-6.wav",
+      "source": "approved-F10",
+      "original": "audio/F10-521587.mp3",
+      "segment": [
+        3.75,
+        4.11
+      ],
+      "edits": "Mono, DC removed, peak balanced to 0.6, 0.5ms gun / 2ms other attack and 20ms tail fades; unchanged source pitch.",
+      "duration": 0.36,
+      "sampleRate": 48000,
+      "peakLimit": 0.6
+    },
+    {
+      "file": "sfx/recorded-brush-1.wav",
+      "source": "approved-F9",
+      "original": "audio/F9-559082.mp3",
+      "segment": [
+        0.01,
+        1.21
+      ],
+      "edits": "Mono, DC removed, peak balanced to 0.6, 0.5ms gun / 2ms other attack and 20ms tail fades; unchanged source pitch.",
+      "duration": 1.2,
+      "sampleRate": 48000,
+      "peakLimit": 0.6
+    },
+    {
+      "file": "sfx/recorded-brush-2.wav",
+      "source": "approved-F9",
+      "original": "audio/F9-559082.mp3",
+      "segment": [
+        1.79,
+        2.98
+      ],
+      "edits": "Mono, DC removed, peak balanced to 0.6, 0.5ms gun / 2ms other attack and 20ms tail fades; unchanged source pitch.",
+      "duration": 1.19,
+      "sampleRate": 48000,
+      "peakLimit": 0.6
+    },
+    {
+      "file": "sfx/recorded-brush-3.wav",
+      "source": "approved-F9",
+      "original": "audio/F9-559082.mp3",
+      "segment": [
+        3.77,
+        4.86
+      ],
+      "edits": "Mono, DC removed, peak balanced to 0.6, 0.5ms gun / 2ms other attack and 20ms tail fades; unchanged source pitch.",
+      "duration": 1.09,
+      "sampleRate": 48000,
+      "peakLimit": 0.6
+    },
+    {
+      "file": "sfx/recorded-trex-roar-1.wav",
+      "source": "approved-R1",
+      "original": "roars/R1.mp3",
+      "segment": [
+        4.1,
+        9.28
+      ],
+      "edits": "Mono, DC removed, peak balanced to 0.6, 0.5ms gun / 2ms other attack and 20ms tail fades; unchanged source pitch.",
+      "duration": 5.18,
+      "sampleRate": 48000,
+      "peakLimit": 0.6
+    },
+    {
+      "file": "sfx/recorded-trex-roar-2.wav",
+      "source": "approved-R1",
+      "original": "roars/R1.mp3",
+      "segment": [
+        10.36,
+        15.5
+      ],
+      "edits": "Mono, DC removed, peak balanced to 0.6, 0.5ms gun / 2ms other attack and 20ms tail fades; unchanged source pitch.",
+      "duration": 5.14,
+      "sampleRate": 48000,
+      "peakLimit": 0.6
+    },
+    {
+      "file": "sfx/recorded-trex-roar-3.wav",
+      "source": "approved-R1",
+      "original": "roars/R1.mp3",
+      "segment": [
+        15.69,
+        18.87
+      ],
+      "edits": "Mono, DC removed, peak balanced to 0.6, 0.5ms gun / 2ms other attack and 20ms tail fades; unchanged source pitch.",
+      "duration": 3.18,
+      "sampleRate": 48000,
+      "peakLimit": 0.6
+    },
+    {
+      "file": "sfx/recorded-sarco-growl-1.wav",
+      "source": "approved-R1",
+      "original": "roars/R1.mp3",
+      "segment": [
+        0.2,
+        1.65
+      ],
+      "edits": "Mono, DC removed, peak balanced to 0.6, 0.5ms gun / 2ms other attack and 20ms tail fades; unchanged source pitch.",
+      "duration": 1.45,
+      "sampleRate": 48000,
+      "peakLimit": 0.6
+    },
+    {
+      "file": "sfx/recorded-sarco-growl-2.wav",
+      "source": "approved-R1",
+      "original": "roars/R1.mp3",
+      "segment": [
+        2.37,
+        3.47
+      ],
+      "edits": "Mono, DC removed, peak balanced to 0.6, 0.5ms gun / 2ms other attack and 20ms tail fades; unchanged source pitch.",
+      "duration": 1.1,
+      "sampleRate": 48000,
+      "peakLimit": 0.6
+    },
+    {
+      "file": "sfx/recorded-sarco-growl-3.wav",
+      "source": "approved-R1",
+      "original": "roars/R1.mp3",
+      "segment": [
+        23.01,
+        25.66
+      ],
+      "edits": "Mono, DC removed, peak balanced to 0.6, 0.5ms gun / 2ms other attack and 20ms tail fades; unchanged source pitch.",
+      "duration": 2.65,
+      "sampleRate": 48000,
+      "peakLimit": 0.6
+    },
+    {
+      "file": "sfx/recorded-ptera-1.wav",
+      "source": "approved-R3",
+      "original": "roars/R3.mp3",
+      "segment": [
+        0,
+        0.7040136054421768
+      ],
+      "edits": "Mono, DC removed, peak balanced to 0.7, 0.5ms gun / 2ms other attack and 20ms tail fades; unchanged source pitch.",
+      "duration": 0.704,
+      "sampleRate": 44100,
+      "peakLimit": 0.7
+    },
+    {
+      "file": "sfx/recorded-trill.wav",
+      "source": "approved-R4",
+      "original": "roars/R4.mp3",
+      "segment": [
+        0.39,
+        3.2653061224489797
+      ],
+      "edits": "Mono, DC removed, peak balanced to 0.7, 0.5ms gun / 2ms other attack and 20ms tail fades; unchanged source pitch.",
+      "duration": 2.8753,
+      "sampleRate": 44100,
+      "peakLimit": 0.7
+    },
+    {
+      "file": "sfx/recorded-grunt-1.wav",
+      "source": "approved-R5",
+      "original": "roars/R5.ogg",
+      "segment": [
+        0.03,
+        0.9327708333333333
+      ],
+      "edits": "Mono, DC removed, peak balanced to 0.7, 0.5ms gun / 2ms other attack and 20ms tail fades; unchanged source pitch.",
+      "duration": 0.9028,
+      "sampleRate": 48000,
+      "peakLimit": 0.7
+    },
+    {
+      "file": "sfx/recorded-grunt-2.wav",
+      "source": "approved-R6",
+      "original": "roars/R6.ogg",
+      "segment": [
+        0,
+        0.5349583333333333
+      ],
+      "edits": "Mono, DC removed, peak balanced to 0.7, 0.5ms gun / 2ms other attack and 20ms tail fades; unchanged source pitch.",
+      "duration": 0.535,
+      "sampleRate": 48000,
+      "peakLimit": 0.7
+    },
+    {
+      "file": "sfx/recorded-roar-1.wav",
+      "source": "approved-R7",
+      "original": "roars/R7.ogg",
+      "segment": [
+        0.03,
+        0.37335416666666665
+      ],
+      "edits": "Mono, DC removed, peak balanced to 0.7, 0.5ms gun / 2ms other attack and 20ms tail fades; unchanged source pitch.",
+      "duration": 0.3434,
+      "sampleRate": 48000,
+      "peakLimit": 0.7
+    },
+    {
+      "file": "sfx/recorded-roar-2.wav",
+      "source": "approved-R8",
+      "original": "roars/R8.ogg",
+      "segment": [
+        0,
+        0.9026666666666666
+      ],
+      "edits": "Mono, DC removed, peak balanced to 0.7, 0.5ms gun / 2ms other attack and 20ms tail fades; unchanged source pitch.",
+      "duration": 0.9027,
+      "sampleRate": 48000,
+      "peakLimit": 0.7
+    },
+    {
+      "file": "sfx/recorded-roar-3.wav",
+      "source": "approved-R9",
+      "original": "roars/R9.ogg",
+      "segment": [
+        0,
+        0.45841666666666664
+      ],
+      "edits": "Mono, DC removed, peak balanced to 0.7, 0.5ms gun / 2ms other attack and 20ms tail fades; unchanged source pitch.",
+      "duration": 0.4584,
+      "sampleRate": 48000,
+      "peakLimit": 0.7
     }
   ]
 }

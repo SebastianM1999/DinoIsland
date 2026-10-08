@@ -1,16 +1,31 @@
 const files = (prefix, count) => Array.from({ length: count }, (_, i) => `/assets/audio/sfx/${prefix}-${i + 1}.wav`);
 const group = (prefix, count, gain, rate = 1, variation = 0.05) => ({ files: files(prefix, count), gain, rate, variation });
+const selected = (names, gain, rate = 1, variation = .04) => ({ files: names.map(n => `/assets/audio/sfx/${n}.wav`), gain, rate, variation });
 
 export const FOOTSTEPS = {
-  grass: group('grass', 5, 0.17), sand: group('sand', 6, 0.2),
-  rock: group('rock', 6, 0.19), wood: group('wood', 3, 0.2),
-  leaves: group('leaves', 2, 0.19), dirt: group('dirt', 2, 0.2),
-  mud: group('mud', 1, 0.19, 1, 0.09), gravel: group('gravel', 1, 0.19, 1, 0.09),
-  water: group('water', 2, 0.2),
+  grass: group('recorded-grass-walk', 6, 0.22), sand: group('recorded-sand-walk', 6, 0.22),
+  rock: group('recorded-rock-walk', 6, 0.22), wood: group('recorded-wood-walk', 6, 0.22),
+  leaves: group('recorded-leaves-walk', 6, 0.22), dirt: group('recorded-dirt-walk', 6, 0.22),
+  mud: group('recorded-mud-walk', 4, 0.22), gravel: group('recorded-gravel-walk', 6, 0.22),
+  water: group('recorded-water-walk', 6, 0.24),
+};
+
+// Use the approved opening takes for both gaits: cadence follows actual travel;
+// running adds weight and a small pitch variation without a second loop.
+export const RUN_FOOTSTEPS = Object.fromEntries(Object.entries(FOOTSTEPS).map(([surface, walk]) =>
+  [surface, { ...walk, gain: .27, rate: 1.04 }]));
+// Approved alternative grass and vegetation takes remain independent layers.
+export const STEP_TEXTURES = {
+  grass: group('recorded-grass-alt', 6, .07),
+  leaves: group('recorded-brush', 3, .055),
+};
+export const DINO_WEIGHT = {
+  trex: group('recorded-trex-step', 1, .5, 1, .05),
+  ground: { ...STEP_TEXTURES.grass, gain: .18, rate: .7, lowpass: 380 },
 };
 
 export const EFFECTS = {
-  pistol: group('el-pistol', 1, 0.8, 1, 0.015), rifle: group('el-m4', 1, 0.85, 1, 0.015),
+  pistol: group('recorded-pistol', 1, 0.8, 1, 0.015), rifle: group('recorded-rifle', 1, 0.85, 1, 0.015),
   empty: group('empty', 1, 0.25), reload: group('reload', 2, 0.3),
   bow: group('el-bow', 1, 0.5), bowDraw: group('bow-draw', 2, 0.22),
   swing: group('swish', 3, 0.4, 1.1), throw: group('el-spear', 1, 0.45, 1),
@@ -18,12 +33,14 @@ export const EFFECTS = {
   thunk: group('el-impact', 1, 0.35, 0.9), bite: group('hit', 3, 0.45, 0.8),
   waterStep: FOOTSTEPS.water, splash: group('water', 2, 0.35),
   splashBig: group('water', 2, 0.5, 0.75), plop: group('water', 2, 0.12, 1.6),
-  roar_trex: group('trex', 3, 0.75, 0.85, 0.04),
-  roar_raptor: group('raptor', 2, 0.55, 1.2, 0.08),
-  roar_ptera: group('ptera', 2, 0.35, 1.8, 0.09),
-  roar_stego: group('stego', 2, 0.5, 0.72, 0.06),
-  roar_brachio: group('brachio', 2, 0.55, 0.6, 0.04),
-  bigStep: group('thunk', 3, 0.6, 0.45),
+  roar_trex: group('recorded-trex-roar', 3, 0.68, 1, 0.025),
+  roar_raptor: selected(['recorded-trill', 'recorded-roar-1'], .45, 1.03),
+  roar_ptera: group('recorded-ptera', 1, 0.4, 1, 0.06),
+  roar_stego: selected(['recorded-grunt-1', 'recorded-grunt-2'], .52, .85),
+  roar_brachio: selected(['recorded-roar-2', 'recorded-roar-3'], .6, .68),
+  'roar_alpha-sarcosuchus': group('recorded-sarco-growl', 3, .6, .85),
+  sarco_enrage: group('recorded-sarco-growl', 3, .7, .75),
+  bigStep: DINO_WEIGHT.ground,
 };
 
 export const ISLAND_MUSIC = {
@@ -39,6 +56,14 @@ export const BOSS_MUSIC = '/assets/audio/music/boss.ogg';
 // opening on first play and crossfade the tail into the first two seconds.
 export const musicLoopStart = url => url === ISLAND_MUSIC.jungle.calm ? 0 : 2;
 
-export function effectGroup(name, { surface = 'grass' } = {}) {
-  return name === 'step' ? FOOTSTEPS[surface] || FOOTSTEPS.grass : EFFECTS[name];
+export function effectGroup(name, { surface = 'grass', movement = 'walk' } = {}) {
+  if (name === 'step' || name === 'waterStep') {
+    const steps = movement === 'run' ? RUN_FOOTSTEPS : FOOTSTEPS;
+    return steps[name === 'waterStep' ? 'water' : surface] || steps.grass;
+  }
+  return EFFECTS[name];
 }
+
+/** Shared preload list also makes layered samples visible to provenance checks. */
+export const SAMPLE_GROUPS = [...Object.values(EFFECTS), ...Object.values(FOOTSTEPS),
+  ...Object.values(RUN_FOOTSTEPS), ...Object.values(STEP_TEXTURES), ...Object.values(DINO_WEIGHT)];
