@@ -185,12 +185,20 @@ export const BIOMES = {
       // flowstone (pale, banded), moss on wet ledges, cave mud
       flowstone: '#a79fa6', moss: '#3f6a52', mud: '#4a4038',
     },
-    // very dark, cold teal and violet: lamps and crystals do the lighting
+    // inside the mountain: very dark, cold teal and violet, the torch and the crystals do the lighting
     sky: {
-      background: '#0a1016', fog: '#0c1820', fogNear: 15, fogFar: 70,
+      background: '#04070a', fog: '#071118', fogNear: 3, fogFar: 46,
       top: '#101826', horizon: '#1c3038', cloud: '#2a3a46',
-      sun: '#9fb8d0', sunIntensity: 0.25, hemiSky: '#4a6a8a', hemiGround: '#2a2438', hemiIntensity: 0.55,
-      exposure: 1.2,
+      sun: '#9fb8d0', sunIntensity: 0, hemiSky: '#4a6a8c', hemiGround: '#2a2038', hemiIntensity: 0.34,
+      exposure: 1.45,
+    },
+    // the two coves outside: a dusk, warm low sun over a teal sea (the client blends sky -> skyOutside by the
+    // depth into the mountain, client/world/caveFx.js; the sky dome and the sea use this one)
+    skyOutside: {
+      background: '#2f4c5c', fog: '#35566a', fogNear: 35, fogFar: 300,
+      top: '#182f4a', horizon: '#c7a58a', cloud: '#8fa6b4',
+      sun: '#ffc690', sunIntensity: 1.5, hemiSky: '#7ea8c4', hemiGround: '#3a4a52', hemiIntensity: 0.8,
+      exposure: 0.95,
     },
     water: { shallow: '#2f7f86', mid: '#16525e', deep: '#0b2a3a', foam: '#9fc4c8', sky: '#1c3038' },
     // flyers and giants never fit under the roof: one raptor pack strayed in, the

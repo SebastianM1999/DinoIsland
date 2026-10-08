@@ -26,8 +26,8 @@ import { makeRng, valueNoise, clamp } from './rng.js';
 export const CAVE_GEOM = {
   radius: [300, 290],   // mountain footprint semi-axes (x, z), before the outline wobble
   face: 180,            // |x| of the mountain face in the two coves
-  coveHalf: 105,        // half width (z) of each cove
-  shore: 335,           // |x| of the shoreline in the coves
+  coveHalf: 46,         // half width (z) of each cove (small bays: room for the camp / the boat only)
+  shore: 255,           // |x| of the shoreline in the coves (the beach is ~75 m long)
   hallX: 112,           // |x| of the entrance / exit hall centres
   floor: 2.8,           // floor level of the coves and the tunnel mouths
   rockMargin: 30,       // solid rock between a chamber/tunnel and the outside
