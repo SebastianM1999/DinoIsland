@@ -17,7 +17,7 @@ export const TREES = ['fighting', 'endurance', 'durability'];
 export const TREE_NAMES = { fighting: 'Fighting', endurance: 'Endurance', durability: 'Durability' };
 
 /** XP granted to every player when a dinosaur of this type dies (anywhere on the island). */
-export const XP_BY_TYPE = { raptor: 20, stego: 40, ptera: 60, brachio: 80, trex: 400, 'alpha-sarcosuchus': 800 };
+export const XP_BY_TYPE = { raptor: 20, 'gloom-raptor': 30, stego: 40, ptera: 60, brachio: 80, trex: 400, 'alpha-sarcosuchus': 800 };
 /** A required item (boat part): XP for everyone plus one bonus skill point. */
 export const RELIC_XP = 150;
 export const RELIC_POINTS = 1;

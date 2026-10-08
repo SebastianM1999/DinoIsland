@@ -296,6 +296,31 @@ export const CONFIG = {
       butcher: { time: 5, loot: { bones: 2, skull: 1 } },
       respawn: 90,
     },
+    // Cave raptor kin (Hollow Mountain tunnels): blind, hunts by noise. Spawns only where the layout lists
+    // `caveDinoSpots`; the per-level count is `level.dinos['gloom-raptor']`.
+    'gloom-raptor': {
+      name: 'Gloom Raptor',
+      health: 85,
+      groupSize: 4,
+      walkSpeed: 3.4,
+      runSpeed: 11.4,
+      turnRate: 5,
+      sightRadius: 12,        // nearly blind: short sight (shortened further by ash rain)
+      senseRadius: 7,         // anything this close is felt/smelled even when silent
+      hearingRadius: 46,      // long hearing: the base distance at noise level 1 (sprinting)
+      walkNoise: 0.4,         // noise levels x hearingRadius: walking / sprinting / gunfire + arrows
+      sprintNoise: 1,
+      shotNoise: 1.5,
+      attackRange: 2.1,
+      attackDamage: 10,
+      attackCooldown: 1.4,
+      giveUpRadius: 70,
+      radius: 0.8,
+      body: [[0, 0.28], [0.7, 0.2]],
+      loot: { meat: 1, teeth: 2 },
+      butcher: { time: 5, loot: { bones: 2, skull: 1 } },
+      respawn: 90,
+    },
     ptera: {
       name: 'Pteranodon',
       health: 45,
