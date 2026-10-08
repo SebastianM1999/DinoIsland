@@ -60,8 +60,8 @@ function tryMaze(seed, depthAt, G, attempt) {
   const nodes = [];
   const addNode = (n) => { n.id = nodes.length; n.tags ??= []; n.aspect ??= 1; n.rot ??= 0; n.wob ??= [rng() * 6.28, rng() * 6.28]; nodes.push(n); return n; };
 
-  const E = addNode({ kind: 'entrance', x: -G.hallX, z: rng.range(-30, 30), r: 22, roof: 14, tags: ['entrance'] });
-  const X = addNode({ kind: 'exit', x: G.hallX, z: rng.range(-30, 30), r: 21, roof: 13, tags: ['exit'] });
+  const E = addNode({ kind: 'entrance', x: -G.hallX, z: rng.range(-24, 24), r: 22, roof: 14, tags: ['entrance'] });
+  const X = addNode({ kind: 'exit', x: G.hallX, z: rng.range(-24, 24), r: 21, roof: 13, tags: ['exit'] });
   E.aspect = 1.25; E.rot = Math.PI / 2;
   X.aspect = 1.25; X.rot = Math.PI / 2;
 

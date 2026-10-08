@@ -14,6 +14,8 @@ import { CAVE_GEOM as G } from './caveMaze.js';
 
 /** Roof values at or above this are "open sky" (Terrain.ceilingAt returns Infinity). */
 export const CAVE_SKY = 100;
+/** Nobody on foot is ever higher than this on the Hollow Mountain (floors and beaches stay below 8 m): the server rejects a walking player above it (the mountain's flanks and top are not for climbing). */
+export const CAVE_WALK_MAX = 12;
 /** Walls rise from the floor to the rock over this many metres. */
 const WALL = 4.5;
 /** Smoothing of the union of tunnels and chambers (metres): round junctions. */
@@ -25,23 +27,56 @@ export const FLOOD_LEVEL = 0.35;
 const BUCKET = 32;
 const REACH = 38;
 
-const sdRoundBox = (px, pz, hx, hz, r) => {
-  const qx = Math.abs(px) - (hx - r), qz = Math.abs(pz) - (hz - r);
-  return Math.hypot(Math.max(qx, 0), Math.max(qz, 0)) + Math.min(Math.max(qx, qz), 0) - r;
-};
+const smax = (a, b, k) => 0.5 * (a + b + Math.sqrt((a - b) * (a - b) + k * k));
+const smin = (a, b, k) => 0.5 * (a + b - Math.sqrt((a - b) * (a - b) + k * k));
 
-/** Distance to the mountain's outside (positive inside), ignoring the wobble of the coves. */
-export function mountainDepth(seed) {
-  const p1 = (seed % 628) / 100, p2 = ((seed >>> 8) % 628) / 100;
-  const [ax, az] = G.radius;
-  return (x, z) => {
-    const ang = Math.atan2(z / az, x / ax);
-    const warp = 1 + 0.045 * Math.sin(3 * ang + p1) + 0.03 * Math.sin(5 * ang + p2);
-    const dEll = (warp - Math.hypot(x / ax, z / az)) * Math.min(ax, az);
-    const wob = 10 * fbm(z * 0.016 + 9, x * 0.004, 2, seed + 71);
-    const cove = (s) => sdRoundBox(x - s * (G.face + 210), z, 210, G.coveHalf, 24) + wob;
-    return Math.min(dEll, cove(-1), cove(1));
+/**
+ * One cove (s = -1 west, +1 east) as a signed distance (negative inside the water/beach pocket, positive in the
+ * rock). A bay that narrows toward the mountain, with a rounded head, a wandering side wall and a couple of small
+ * rocky nooks cut into it. `side(x, z)` is how far inside the side walls a point lies (the beach's room).
+ */
+function coveOf(seed, s) {
+  const k = s < 0 ? 0 : 1;
+  const ph = ((seed >>> (k * 5)) % 628) / 100;
+  const face = (z) => G.face + 11 * fbm(z * 0.022 + 9 + k * 7, 3.1, 3, seed + 71 + k);
+  const half = (u) => G.coveHalf * (0.82 + 0.2 * smoothstep(0, 70, u)) + 8 * fbm(u * 0.035 + 2, 5 + k * 3, 3, seed + 72 + k) + 4 * Math.sin(u * 0.06 + ph);
+  // nooks: small round inlets just outside the side walls
+  const nooks = [0, 1].map((i) => {
+    const r = 9 + 7 * (((seed >>> (3 + i * 4 + k)) % 97) / 97);
+    const u = 26 + 46 * i + 14 * (((seed >>> (9 + i * 3 + k)) % 89) / 89);
+    const sgn = (((seed >>> (2 + i + k * 2)) & 1) ? 1 : -1) * (i ? -1 : 1);
+    return { r, u, z: sgn * (half(u) + r * 0.35) };
+  });
+  const base = (x, z) => {
+    const u = s * x - face(z);
+    return smax(-u, Math.abs(z) - half(Math.max(u, 0)), 14);
   };
+  return {
+    sdf(x, z) {
+      let d = base(x, z);
+      const u = s * x - face(z);
+      for (const n of nooks) d = smin(d, Math.hypot(u - n.u, z - n.z) - n.r, 7);
+      return d;
+    },
+    side(x, z) { const u = s * x - face(z); return half(Math.max(u, 0)) - Math.abs(z); },
+  };
+}
+
+/** Distance to the mountain's outside (positive inside): a ragged, lobed outline with two natural coves. */
+export function mountainDepth(seed) {
+  const p1 = (seed % 628) / 100, p2 = ((seed >>> 8) % 628) / 100, p3 = ((seed >>> 4) % 628) / 100, p4 = ((seed >>> 12) % 628) / 100;
+  const [ax, az] = G.radius;
+  const west = coveOf(seed, -1), east = coveOf(seed, 1);
+  const f = (x, z) => {
+    const ang = Math.atan2(z / az, x / ax);
+    const warp = 1 + 0.05 * Math.sin(3 * ang + p1) + 0.034 * Math.sin(5 * ang + p2) + 0.026 * Math.sin(2 * ang + p3) + 0.018 * Math.sin(8 * ang + p4);
+    const dEll = (warp - Math.hypot(x / ax, z / az)) * Math.min(ax, az);
+    // headlands and bays along the shore, small rocky points on top
+    const rag = 17 * fbm(x * 0.011 + 3, z * 0.011 - 5, 3, seed + 61) + 5 * fbm(x * 0.04 + 8, z * 0.04, 2, seed + 62);
+    return Math.min(dEll + rag, west.sdf(x, z), east.sdf(x, z));
+  };
+  f.coveSide = (x, z) => (x < 0 ? west : east).side(x, z);
+  return f;
 }
 
 /** Floor level of the tunnels before flooding (gently rolling, flat at the coves). */
@@ -142,9 +177,8 @@ function buildField(plan) {
   const beachH = (x, z, d) => {
     const side = x < 0 ? -1 : 1;
     const inland = side < 0 ? x - sx(z, -1) : sx(z, 1) - x;
-    // the cove narrows toward the sea: a bay between the two horns of the mountain
-    const half = 33 + 6 * smoothstep(0, 60, inland) + 4 * fbm(z * 0.022 + 4, x * 0.02, 2, seed + 93);
-    const e = Math.abs(z) - half;
+    // the cove's own walls (a tapering, wandering bay: shared/caveField coveOf) leave a margin of shallows
+    const e = 8 - depth.coveSide(x, z);
     const land = smoothstep(-3, 3, inland) * (1 - smoothstep(-6, 10, e));
     const out = Math.max(0, -inland, e);
     const shelf = Math.max(-16, -0.3 - 0.05 * out - 0.16 * Math.max(0, out - 24) + 0.6 * fbm(x * 0.03, z * 0.03, 2, seed + 5));
@@ -157,6 +191,50 @@ function buildField(plan) {
     return h;
   };
   const floorBase = (x, z, d) => floorLevel(seed, x, z, d);
+
+  // --- the mountain's mass above the floor: steep flanks with buttresses, gullies and ledges, a few crags, two summits
+  const pk = ((seed >>> 3) % 97) / 97, pq = ((seed >>> 11) % 89) / 89, pr = ((seed >>> 17) % 83) / 83;
+  const peakA = { x: (pk - 0.5) * 120, z: (pq - 0.5) * 200, h: 52 + 12 * pr, r: 85 };
+  const aAng = 0.9 + 4.4 * pr + pk;
+  const peakB = { x: -peakA.x * 0.6 + Math.cos(aAng) * 135, z: peakA.z * 0.5 + Math.sin(aAng) * 150, h: 30 + 10 * pk, r: 62 };
+  for (const p of [peakA, peakB]) {   // (a summit sits in the core, well away from the rim)
+    for (let i = 0; i < 12 && depth(p.x, p.z) < 95; i++) { p.x *= 0.85; p.z *= 0.85; }
+  }
+  /** rise (m) at depth d: 2.4 m per m over the first 6 m (67 deg: nobody climbs), easing to 0.5 by 22 m, then 0.4 */
+  const belt = (d) => {
+    const foot = 4 * (1 - Math.exp(-d / 1.8));   // (a sea cliff's first steps: 75 deg right at the water)
+    const u = clamp((d - 6) / 16, 0, 1);
+    const K = Math.min(d, 6) + 16 * (u - (u * u * u - u * u * u * u / 2));
+    return 0.5 * Math.min(d, 22) + 1.9 * K + 0.4 * Math.max(0, d - 22) + foot;
+  };
+  const summit = (x, z) => {
+    let h = 0;
+    for (const p of [peakA, peakB]) {
+      const r = Math.hypot(x - p.x, z - p.z) / p.r;
+      h += p.h * (0.55 * Math.exp(-r * r * 1.1) + 0.45 * Math.exp(-r * 1.9));
+    }
+    return h;
+  };
+  const rise = (x, z, d) => {
+    // buttresses and gullies: the flank climbs sooner or later along the shore
+    const bw = fbm(x * 0.018 + 13, z * 0.018 - 4, 3, seed + 31);
+    // radial ribs running down from the summit
+    const ang = Math.atan2(z - peakA.z, x - peakA.x);
+    const rib = 1 - Math.abs(fbm(ang * 11 + 5, Math.hypot(x - peakA.x, z - peakA.z) * 0.012, 3, seed + 32));
+    const de = d * (1 + 0.12 * bw * smoothstep(0, 14, d));
+    const deep = smoothstep(7, 45, d);
+    let y = belt(Math.max(de, 0));
+    y += summit(x, z) * (0.88 + 0.24 * rib);
+    // spurs and valleys (big ridged lumps) and crags (small ones), more of both higher up
+    const spur = 1 - Math.abs(fbm(x * 0.011 + 2, z * 0.011 + 6, 3, seed + 33));
+    const crag = 1 - Math.abs(fbm(x * 0.035 + 7, z * 0.035 - 2, 2, seed + 37));
+    y += smoothstep(22, 90, d) * (30 * spur * spur - 14) + deep * (10 * crag * crag - 4);
+    // strata ledges: flat shelves with short drops, wandering with the rock's own layers (high up only)
+    const T = 8 + 4 * fbm(x * 0.012 + 1, z * 0.012 + 9, 2, seed + 35), ph = 3 * fbm(x * 0.02 + 5, z * 0.02 + 1, 2, seed + 34);
+    const patch = smoothstep(0.0, 0.45, fbm(x * 0.014 + 3, z * 0.014 - 8, 2, seed + 36));
+    y += 1.2 * patch * smoothstep(38, 52, y) * Math.sin(y * (Math.PI * 2 / T) + ph);
+    return y;
+  };
 
   const pads = plan.pads;
   const field = {
@@ -175,8 +253,7 @@ function buildField(plan) {
       if (d <= 0) return beachH(x, z, d);
       const h0 = beachH(x, z, d), fc = floorBase(x, z, d);
       const fb = h0 > 0.2 ? lerp(h0, fc, smoothstep(0, 10, d)) : fc;
-      const hm = 30 + 32 * smoothstep(0, 150, d) + 6 * fbm(x * 0.02 + 8, z * 0.02, 3, seed + 13);
-      return fb + hm * (1 - Math.exp(-d / 4.5));
+      return fb + rise(x, z, d);
     },
     height(x, z) {
       const d = depth(x, z);
@@ -189,8 +266,7 @@ function buildField(plan) {
         let fb = h0 > 0.2 ? lerp(h0, fc, smoothstep(0, 10, d)) : fc;
         if (q.fw > 0) fb = lerp(fb, q.y0, q.fw);
         const floor = fb - q.dep;
-        const hm = 30 + 32 * smoothstep(0, 150, d) + 6 * fbm(x * 0.02 + 8, z * 0.02, 3, seed + 13);
-        const top = fb + hm * (1 - Math.exp(-d / 4.5));
+        const top = fb + rise(x, z, d);
         const s = (q.s + 1.0 * fbm(x * 0.025 + 3, z * 0.025 + 7, 2, seed + 17)) * 1.6;
         h = lerp(floor, top, smoothstep(0, WALL, s));
       }
