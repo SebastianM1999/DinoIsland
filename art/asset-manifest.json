@@ -15,6 +15,13 @@
       "triangles": 59420
     },
     {
+      "id": "dino-crystal-plodder",
+      "file": "assets/models/dinos/crystal-plodder.glb",
+      "source": "Project-authored Crystal Plodder; art/sources/crystal-plodder/crystal-plodder.blend (build scripts in its text blocks)",
+      "license": "Project source",
+      "triangles": 57687
+    },
+    {
       "id": "dino-sump-lurker",
       "file": "assets/models/dinos/sump-lurker.glb",
       "source": "Project-authored Sump Lurker; art/sources/sump-lurker/sump-lurker.blend (build scripts in its text blocks)",
