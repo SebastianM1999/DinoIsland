@@ -388,7 +388,8 @@ export class DinoViews {
       // bounds), so cull here: a view neither on screen nor close enough to throw a shadow into the
       // picture is not drawn at all (a Gloom Raptor is ~59k triangles, drawn again for the shadow map)
       const inView = _frustum.intersectsSphere(_sphere);
-      const hidden = depth - _sphere.radius > hide || (!inView && d2 > SHADOW_REACH * SHADOW_REACH);
+      const reach = this.game.gfx.sun.intensity > 0.3 ? SHADOW_REACH : 12;   // (under the mountain the sun throws no shadows worth drawing)
+      const hidden = depth - _sphere.radius > hide || (!inView && d2 > reach * reach);
       if (v.root.visible === hidden) v.root.visible = !hidden;
       // far away or off-screen dinosaurs animate at a lower rate (still
       // interpolated every frame; off-screen ones may still cast a visible shadow)
