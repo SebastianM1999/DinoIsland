@@ -176,9 +176,10 @@ varying float vA;
 void main() {
   vec4 mv = modelViewMatrix * vec4(position, 1.0);
   float pulse = 0.82 + 0.18 * sin(uTime * (0.7 + aSeed * 0.9) + aSeed * 40.0);
-  gl_PointSize = aSize * uScale * pulse / max(0.5, -mv.z);
+  gl_PointSize = min(aSize * uScale * pulse / max(0.5, -mv.z), 520.0);
   vCol = aColor;
-  vA = uFade * smoothstep(uRange.y, uRange.x, -mv.z);
+  // (a halo fades out when the camera is right at it: no screen-filling blob clipped by the wall)
+  vA = uFade * smoothstep(uRange.y, uRange.x, -mv.z) * smoothstep(1.5, 8.0, -mv.z);
   gl_Position = projectionMatrix * mv;
 }`;
 const HALO_FRAG = /* glsl */`

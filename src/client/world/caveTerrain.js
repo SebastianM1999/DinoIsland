@@ -169,7 +169,7 @@ export function buildCaveTerrainMesh(terrain, layout) {
   for (let j = 0; j < n; j++) {
     for (let i = 0; i < n; i++) {
       const a = j * stride + i, b = a + 1, c = a + stride, d = c + 1;
-      if (pos[a * 3 + 1] < -13 && pos[b * 3 + 1] < -13 && pos[c * 3 + 1] < -13 && pos[d * 3 + 1] < -13) continue;
+      if (pos[a * 3 + 1] < -15.8 && pos[b * 3 + 1] < -15.8 && pos[c * 3 + 1] < -15.8 && pos[d * 3 + 1] < -15.8) continue;   // (the shelf bottoms out at -16: the seabed reaches out until it is flat)
       idx.push(a, c, b, b, c, d);
     }
   }
