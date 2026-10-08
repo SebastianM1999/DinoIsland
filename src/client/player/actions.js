@@ -30,7 +30,7 @@ const P = CONFIG.player;
 /** Warn about dinosaurs (all but the Brachiosaurus) closer than this (m). */
 const DINO_ALERT_RANGE = 50;
 const LOOT_KEYS = Object.keys(CONFIG.loot);
-const SLOT_LABEL = { spear: 'Spear', bow: 'Bow', trap: 'Trap', fruit: 'Fruit', pistol: 'P-19 pistol', rifle: 'M4A1 rifle' };
+const SLOT_LABEL = { torch: 'Torch', spear: 'Spear', bow: 'Bow', trap: 'Trap', fruit: 'Fruit', pistol: 'P-19 pistol', rifle: 'M4A1 rifle' };
 const _fwd = new THREE.Vector3();
 const _right = new THREE.Vector3();
 const _up = new THREE.Vector3();
@@ -221,6 +221,14 @@ export class PlayerActions {
       }
     }
 
+    // --- off-hand torch (L): lit or put out, independent of the selected tool
+    const ownsTorch = !!this.inv.torch;
+    if (!ownsTorch || !alive) g.torchLit = false;
+    else if (!panel && input.wasPressed('torch')) {
+      g.torchLit = !g.torchLit;
+      g.audio?.play('switch');
+    }
+
     // --- eat / give
     if (alive && !panel && input.wasPressed('eat')) this.eat();
     if (alive && !panel && input.wasPressed('give')) this.give();
@@ -248,6 +256,7 @@ export class PlayerActions {
     this.vm.setTool(tool, { hasSpear: this.inv.spear, fruitType, hasArrow: this.inv.arrows > 0 });
     const knifeProgress = this.knifeProgress();
     this.vm.setKnife(knifeProgress != null, knifeProgress ?? 0);
+    this.vm.setTorch(ownsTorch && alive, !!g.torchLit);
     this.vm.root.visible = alive && (knifeProgress != null || eating || this.inv.guns?.[tool]?.owned !== false);
     this.vm.update(dt, { speed: g.player.moveSpeed, sprint: g.player.sprinting, grounded: g.player.onGround, lookX: g.lastMouse?.x || 0, lookY: g.lastMouse?.y || 0 });
 
@@ -614,6 +623,8 @@ export class PlayerActions {
       let full = null;
       if (it.kind === 'arrow') {
         if (this.inv.arrows >= caps.arrows) full = ['Your quiver is full', 'arrow'];
+      } else if (it.kind === 'torch') {
+        if (this.inv.torch) continue;   // one torch per player, the spot keeps its own
       } else if (it.kind === 'spear') {
         if (this.inv.spear) continue;
       } else if (it.kind === 'pistol' || it.kind === 'rifle') {
@@ -678,6 +689,7 @@ export class PlayerActions {
       store: g.store,
       traps: inv.traps,
     });
+    hud.setTorch(!!inv.torch, !!g.torchLit);
     const tool = this.tool;
     hud.setCrosshair({
       draw: this.drawing ? this.drawT / W.bow.maxDrawTime : 0,

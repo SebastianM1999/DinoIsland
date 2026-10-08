@@ -38,6 +38,12 @@ export const ICONS = {
     <path d="M9 23.5 27 4.5c.8 3.8-.6 8.7-4.4 12.5L12.5 26.5z" fill="#c5cbd0" stroke="${OUT}" stroke-width="1" stroke-linejoin="round"/>
     <path d="M12 23.5 25 9.5" stroke="#eef1f3" stroke-width="1.1" stroke-linecap="round"/>`),
 
+  torch: svg(`<path d="M12.5 15.5 9 29.5" stroke="#6b4228" stroke-width="4.2" stroke-linecap="round"/>
+    <path d="M12.5 15.5 9 29.5" stroke="#b77a45" stroke-width="1.4" stroke-linecap="round" stroke-dasharray="2.2 2"/>
+    <path d="M9 14.5c0-2 1.6-3.4 3.6-3.4s3.6 1.4 3.6 3.4-.6 3.4-3.6 3.4S9 16.5 9 14.5z" fill="#4a3322" stroke="${OUT}" stroke-width="1"/>
+    <path d="M12.6 2c2.8 3.4 6 6 6 9.4a6 6 0 0 1-12 0c0-2 1-3.4 2-4.6.3 1.6 1 2.4 1.8 2.8C10.4 7 11 4 12.6 2z" fill="#ff9a2e" stroke="#e8631a" stroke-width="1" stroke-linejoin="round"/>
+    <path d="M12.7 8c1.4 1.8 2.6 3 2.6 4.6a2.8 2.8 0 0 1-5.6 0c0-1.2.6-2 1.4-2.8.2.9.6 1.3 1 1.5.1-1.2.2-2.2.6-3.3z" fill="#ffe27a"/>`),
+
   bolt: svg(`<path d="M18.5 2 6 18h8l-2.5 12L26 13h-8.2L20.5 2z" fill="#ffc933" stroke="#e39a12" stroke-width="1.2" stroke-linejoin="round"/>`),
 
   spear: svg(`<path d="M5 28 L20 11" stroke="#9a5b2e" stroke-width="3.2" stroke-linecap="round"/>

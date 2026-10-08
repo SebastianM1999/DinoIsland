@@ -15,6 +15,11 @@ export const ITEM_INFO = {
     text: `Stab or throw, then recover it. Each successful stab or throw removes ${W.spear.useWear}% health; it breaks at zero. Recovery keeps its current health.`,
     use: 'Slot 1 · left click to stab · right click to throw · replace a broken spear at the hut',
   },
+  torch: {
+    name: 'Torch', kind: 'Tool',
+    text: 'A pitch-soaked torch for dark places. It lives in your off hand, so your weapon stays ready – bow, trap and rifle need both hands and lower it while you use them. A lit torch tells everyone, including dinosaurs, where you are.',
+    use: 'L to light or put out · picked up at the boat landing, keep it across respawns',
+  },
   pistol: { name: 'P-19 pistol', kind: 'Firearm', text: `Semi-automatic pistol. ${W.pistol.damage} base damage, ${W.pistol.magazine} rounds per magazine.`, use: 'Slot 5 - click to fire - right click to aim - R to reload - refill at hut workbench' },
   rifle: { name: 'M4A1 assault rifle', kind: 'Firearm', text: `Automatic rifle. ${W.rifle.damage} base damage, ${W.rifle.magazine} rounds per magazine.`, use: 'Slot 6 - hold left click to fire - right click to aim - R to reload - refill at hut workbench' },
   arrow: {

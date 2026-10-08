@@ -9,6 +9,7 @@ import { EV } from '../../shared/protocol.js';
 import { MAT, paint, place, part, merge, mesh, blob, spike, tube, deform, jitter } from '../models/kit.js';
 import { spearGeometry, arrowGeometry, trapGeometry, meatGeometry } from '../models/weapons.js';
 import { makeFruitMesh } from '../models/fruit.js';
+import { makeTorch } from '../models/torch.js';
 
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
 const geoCache = new Map();
@@ -74,7 +75,7 @@ function glowRing(color) {
   return r;
 }
 
-const RING = { meat: '#ff6a5a', hide: '#ffc46a', teeth: '#fff4d0', plates: '#ff8a4a', claws: '#fff4d0', bones: '#fff4d0', skull: '#fff4d0', arrow: '#ffe07a', spear: '#ffe07a' };
+const RING = { meat: '#ff6a5a', hide: '#ffc46a', teeth: '#fff4d0', plates: '#ff8a4a', claws: '#fff4d0', bones: '#fff4d0', skull: '#fff4d0', arrow: '#ffe07a', spear: '#ffe07a', torch: '#ffb347' };
 
 export class Items {
   constructor(game) {
@@ -96,6 +97,7 @@ export class Items {
   #model(kind) {
     const make = LOOT_GEO[kind];
     if (kind === 'pistol' || kind === 'rifle') return makeFirearm(kind);
+    if (kind === 'torch') return makeTorch();   // burning on the ground: visible from afar in the dark
     if (Object.hasOwn(CONFIG.fruit.types, kind)) return makeFruitMesh(kind);
     return make ? mesh(make(), kind === 'meat' ? MAT.glossy : MAT.standard) : null;
   }
@@ -109,7 +111,7 @@ export class Items {
     const group = new THREE.Group();
     group.visible = false;
     group.position.y = -1000;
-    for (const kind of [...Object.keys(LOOT_GEO), 'pistol', 'rifle', ...Object.keys(CONFIG.fruit.types)]) {
+    for (const kind of [...Object.keys(LOOT_GEO), 'pistol', 'rifle', 'torch', ...Object.keys(CONFIG.fruit.types)]) {
       const m = this.#model(kind);
       if (m) group.add(m);
     }
@@ -137,7 +139,7 @@ export class Items {
     obj.add(spin, glowRing(RING[it.kind] || '#fff'));
     obj.position.set(it.x, it.y ?? this.game.layout.groundAt(it.x, it.z) + 0.05, it.z);
     if (it.pose) { obj.position.fromArray(it.pose.p); obj.quaternion.fromArray(it.pose.q).normalize(); }
-    obj.userData = { spin, phase: Math.random() * 6, flat: it.kind === 'arrow' || it.kind === 'spear', popT: it.dino || it.pose ? 1 : 0 };
+    obj.userData = { spin, torch: it.kind === 'torch' ? m.userData : null, phase: Math.random() * 6, flat: it.kind === 'arrow' || it.kind === 'spear', popT: it.dino || it.pose ? 1 : 0 };
     obj.children[1].visible = !it.dino && !it.pose;
     this.scene.add(obj);
     this.items.set(it.id, { data: it, obj });
@@ -207,6 +209,7 @@ export class Items {
         }
         continue;
       }
+      u.torch?.update(this.time, dt, true);
       u.popT = Math.min(1, u.popT + dt * 3);
       const s = u.popT < 1 ? 0.3 + 0.7 * Math.sin(u.popT * Math.PI * 0.5) * 1.1 : 1;
       obj.scale.setScalar(s);

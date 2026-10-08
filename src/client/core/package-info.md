@@ -2,6 +2,7 @@
 > The client's game shell and rendering foundation: the per-island `Game` that wires every client subsystem together and runs the frame loop, plus renderer, graphics tiering, settings, saved profile and GPU-resource lifetime.
 
 ## Files
+- `lightPool.js` — `LightPool` (fixed PointLights, `set(i,x,y,z,intensity)`, `off(i)`); `Renderer.addLightPool(name, opts)` must be called while the island is built, before `prepare()` (returns null and warns later); `gfx.lightPools` (Map). The viewmodel scene always has one torch glow light (`gfx.viewTorch`). Other agents (crystals) add pools the same way.
 - `game.js` — `Game`: one instance per island; builds the world view, owns player, systems, HUD panels, audio and the `requestAnimationFrame` loop (see map below).
 - `renderer.js` — `Renderer`: Three.js WebGL renderer (ACES tone mapping, sRGB, shadows), sun + hemisphere lights, biome sky/fog blending, world pass (optionally scaled + contact AO via `WorldPost`) and a second viewmodel pass; `prepare` (shader precompile against the real render target, then one hidden warm-up frame); live switches of render scale / contact shading / shadow tier compile their programs in the background first.
 - `worldPost.js` — `WorldPost`: offscreen world render target with upscaling/sharpening and depth-based contact AO (`compile` warms its two passes); `usesPost(scale, ao)`: whether the world draws into that target.

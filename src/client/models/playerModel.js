@@ -10,6 +10,8 @@ import { makeFirearm } from './firearms/index.js';
 import { CONFIG } from '../../shared/config.js';
 import { HATS, TOPS, PANTS, defaultOutfit, sanitizeOutfit } from '../../shared/outfits.js';
 import { MAT, deform, paint, place, part, merge, mesh, blob, jitter } from './kit.js';
+import { makeTorch, torchFlicker } from './torch.js';
+import { TORCH, leftHandBusy } from '../../shared/torch.js';
 import { spearGeometry, bowGeometry, trapGeometry, meatGeometry, arrowGeometry, makeBowString, BOW_REST } from './weapons.js';
 
 const PACKS = [
@@ -485,6 +487,20 @@ export class PlayerModel {
     this.hand.position.set(0, -0.46, 0);
     this.armR.add(this.hand);
 
+    // Off-hand torch in the left hand (see animate): follows the left hand point, stays upright
+    this.torchRig = new THREE.Group();
+    this.torch = makeTorch();
+    this.torch.scale.setScalar(0.9);
+    this.torch.rotation.set(-0.25, 0, 0.15);
+    this.torchRig.add(this.torch);
+    this.torchRig.visible = false;
+    this.hips.add(this.torchRig);
+    this.torchRaise = 0;   // 0 tucked .. 1 held up
+    this.torchLevel = 0;   // light strength 0 .. 1 (ember while tucked), read by entities/torches.js
+    this.torchFlicker = 1;
+    this.torchHand = new THREE.Vector3();
+    this.torchTarget = new THREE.Vector3();
+
     this.legL = new THREE.Group();
     this.legR = new THREE.Group();
     this.legL.position.set(-0.13, 0, 0);
@@ -631,5 +647,39 @@ export class PlayerModel {
         this.fitArm(this.armR, this.gripTarget);
       }
     }
+    this.#animateTorch(dt, s);
+  }
+
+  /**
+   * Lit torch (`s.torch`): the left arm lifts it forward while the left hand is free
+   * (not bow/trap/rifle/eating; a pistol is one-handed then). Otherwise it is tucked
+   * away and the light drops to an ember.
+   */
+  #animateTorch(dt, s) {
+    const lit = !!s.torch && s.alive !== false;
+    const busy = leftHandBusy(s.eq, s.eating);
+    const k = 1 - Math.exp(-dt * 8);
+    this.torchRaise += ((lit && !busy ? 1 : 0) - this.torchRaise) * k;
+    this.torchLevel += ((lit ? (busy ? TORCH.light.ember : 1) : 0) - this.torchLevel) * (1 - Math.exp(-dt * 6));
+    if (this.torchLevel < 0.002) this.torchLevel = 0;
+    if (this.torchRaise < 0.002) this.torchRaise = 0;
+    this.torchFlicker = torchFlicker(this.time, this.slot + 1);
+    this.torch.userData.update(this.time, dt, lit && this.torchRaise > 0.05);
+    this.torchRig.visible = this.torchRaise > 0.02;
+    if (this.torchRaise <= 0) return;
+    const u = this.torchRaise * this.torchRaise * (3 - 2 * this.torchRaise);
+    // where the left hand is now (walk swing, bow or gun grip), and where it holds the torch
+    this.torchHand.set(0, -0.46 * this.armL.scale.y, 0).applyQuaternion(this.armL.quaternion).add(this.armL.position);
+    this.torchTarget.set(-0.3, 0.1, -0.95).normalize().multiplyScalar(0.46).add(this.armL.position);
+    this.torchTarget.y += Math.sin(this.time * 1.4) * 0.01;
+    this.torchHand.lerp(this.torchTarget, u);
+    this.fitArm(this.armL, this.torchHand);
+    this.torchRig.position.copy(this.torchHand);
+  }
+
+  /** World position of the flame (for the light pool). */
+  torchHead(out) {
+    this.torch.userData.head.getWorldPosition(out);
+    return out;
   }
 }

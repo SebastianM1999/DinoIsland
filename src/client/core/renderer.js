@@ -7,6 +7,7 @@ import { onSettings, settings, FPS_LIMITS } from './settings.js';
 import { GpuTimer } from './gpuTimer.js';
 import { WorldPost, usesPost } from './worldPost.js';
 import { requestPrograms } from './programs.js';
+import { LightPool } from './lightPool.js';
 import { TIERS, GraphicsAutoTune, gpuName } from './graphicsTier.js';
 
 const R = CONFIG.render;
@@ -184,9 +185,27 @@ export class Renderer {
     this.viewScene = new THREE.Scene();
     this.viewCamera = new THREE.PerspectiveCamera(62, 1, 0.01, 10);
     this.viewScene.add(this.viewCamera);
+    this.lightPools = new Map();      // name -> LightPool (see addLightPool)
     this.#setupLights();
     this.resize();
     this.renderer.renderLists.dispose();
+  }
+
+  /**
+   * A pool of moving point lights (torches, crystals) in the world scene. Call it
+   * while the island is built, BEFORE `prepare()`: the light count is part of every
+   * lit program, so a light added later would recompile the whole island (a
+   * multi-second freeze). Drive the pool by intensity only. Returns null (and
+   * warns) when called too late. Pools are dropped with the island (`reset`).
+   * @param {string} name
+   * @param {{ count:number, color:(string|number), distance:number, decay:number }} opts
+   */
+  addLightPool(name, opts) {
+    if (this.prepared) { console.warn(`Light pool "${name}" must be created before Renderer.prepare()`); return null; }
+    if (this.lightPools.has(name)) return this.lightPools.get(name);
+    const pool = new LightPool(this.scene, opts);
+    this.lightPools.set(name, pool);
+    return pool;
   }
 
   /** Biome look: fog, background, sun and sky light (biome.sky from shared/levels.js). */
@@ -249,6 +268,10 @@ export class Renderer {
     vSun.position.set(-0.4, 1, 0.6);
     this.viewScene.add(vSun, new THREE.HemisphereLight(0xb4e2ff, 0xc9a66b, 1.3));
     this.viewSun = vSun;
+    // Warm glow of the off-hand torch on the hands and weapon; always present, driven by
+    // intensity (the viewmodel moves it to the flame). Adding it later would recompile the viewmodel.
+    this.viewTorch = new THREE.PointLight(0xff9a45, 0, 2.2, 2);
+    this.viewScene.add(this.viewTorch);
   }
 
   /** Keep the shadow frustum centred on the player. */
