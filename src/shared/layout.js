@@ -615,6 +615,24 @@ export function buildLayout(terrain) {
       }
       for (const c of layout.caveDinoSpots) for (const p of c.spawns) reserve(p.x, p.z, 2);
     }
+    // flooded tunnels: one water spot at the deepest point of each (sump lurkers; no land spawns)
+    for (const t of mz.tunnels) {
+      if (!t.flooded) continue;
+      let best = null;
+      for (let i = 0; i < t.pts.length; i++) {
+        const u = i / (t.pts.length - 1);
+        if (u <= t.flooded.u0 || u >= t.flooded.u1) continue;
+        const p = t.pts[i], depth = terrain.waterDepthAt(p.x, p.z);
+        if (!best || depth > best.depth) best = { x: p.x, z: p.z, depth };
+      }
+      if (!best || best.depth < 1.2) continue;
+      const len = t.length * (t.flooded.u1 - t.flooded.u0);
+      layout.caveDinoSpots.push({
+        id: `water-${t.id}`, x: best.x, z: best.z, y: floorY(best.x, best.z), radius: Math.max(9, Math.min(14, len / 2)),
+        ceiling: terrain.ceilingAt(best.x, best.z), clearance: terrain.clearanceAt(best.x, best.z),
+        tags: ['water'], kind: 'water', water: true, tunnel: t.id, spawns: [],
+      });
+    }
 
     // --- dressing (visual; the big columns and stalagmites also block, always leaving >= 4 m)
     const anchors = [
