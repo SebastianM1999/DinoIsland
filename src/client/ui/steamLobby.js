@@ -112,8 +112,8 @@ export function initSteamLobby({ join, isPlaying, leaveToJoin, notifyInvite = ()
     available = state.available;
     $('btn-host').textContent = available ? 'Host game' : 'Host LAN game';
     $('btn-host').hidden = !available;
-    $('btn-host-internet').classList.toggle('btn-primary', !available);
     $('btn-friends').disabled = !available;
+    $('home-steam-note').textContent = available ? 'Join a friend or browse public Steam expeditions.' : 'Steam friends and public games are available in the Steam desktop build. Use an invitation address below to join from a browser.';
     $('lobby-visibility').hidden = $('visibility-label').hidden = !available;
     $('steam-status').textContent = available ? `Connected to Steam as ${state.name}. Up to 4 explorers.` : state.reason;
     if (available) {

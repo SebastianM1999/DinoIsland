@@ -10,6 +10,8 @@ import { GameAudio } from './audio/audio.js';
 import { initSteamLobby } from './ui/steamLobby.js';
 import { initLanAddress, websocketAddress } from './net/lan.js';
 import { initInternetTest } from './ui/internetTest.js';
+import { initHomeMenu } from './ui/homeMenu.js';
+import { initHomeExplorer } from './ui/homeExplorer.js';
 import { BRAND, storageKey, migrateStorage } from '../shared/brand.js';
 
 migrateStorage();
@@ -41,6 +43,8 @@ const nameInput = $('player-name');
 const serverInput = $('server-url');
 const buttons = [$('btn-join'), $('btn-solo'), $('btn-host'), $('btn-host-lan'), $('btn-friends'), $('btn-host-internet'), $('btn-join-internet')];
 const internetTest = initInternetTest();
+const homeMenu = initHomeMenu();
+const homeExplorer = initHomeExplorer();
 let busy = false;
 
 let game = null;
@@ -132,6 +136,8 @@ function setBusy(busy, text = '') {
   for (const b of buttons) b.disabled = busy;
   $('btn-friends').disabled = busy || !steamLobby.available;
   status.textContent = text;
+  homeMenu.feedback(text);
+  for (const button of document.querySelectorAll('[data-home-panel], #btn-explorer')) button.disabled = busy;
   if (text) delete status.dataset.auto;
 }
 
@@ -156,6 +162,8 @@ async function start(mode, options = {}) {
     return;
   }
   menu.hidden = true;
+  homeMenu.close();
+  homeExplorer.close();
   stopMenuTour();
   steamLobby.updateSession(net.steamSession);
   menuAudio?.stopMusic();
@@ -299,6 +307,9 @@ leaveBtn.addEventListener('click', () => {
 });
 
 try { nameInput.value = localStorage.getItem(storageKey('name')) || ''; } catch { /* ignore */ }
+nameInput.addEventListener('input', () => {
+  try { localStorage.setItem(storageKey('name'), nameInput.value.slice(0, 14)); } catch { /* storage may be blocked */ }
+});
 serverInput.value = served ? `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}` : `ws://localhost:${CONFIG.net.port}`;
 const hashMsg = new URLSearchParams(location.hash.slice(1)).get('msg');
 if (hashMsg) {

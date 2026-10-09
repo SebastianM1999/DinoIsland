@@ -1,5 +1,6 @@
 // Home-menu outfit customization and a read-only view of the saved explorer.
 import { loadProfile } from '../core/profile.js';
+import { disposeIslandScenes } from '../core/resources.js';
 import { progress, SKILLS } from '../../shared/skills.js';
 
 const esc = value => String(value).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -7,6 +8,8 @@ const esc = value => String(value).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<'
 /** Reuses the camp wardrobe; skill purchases remain in the authoritative game. */
 export function initHomeExplorer() {
   const trigger = document.getElementById('btn-explorer');
+  const savedProgress = progress(loadProfile());
+  document.getElementById('home-progress').textContent = `Level ${savedProgress.level} · ${savedProgress.free} skill ${savedProgress.free === 1 ? 'point' : 'points'} available`;
   const root = document.createElement('div');
   root.id = 'home-explorer-root';
   root.className = 'home-dialog screen';
@@ -30,21 +33,12 @@ export function initHomeExplorer() {
   function stopPreview() {
     if (!wardrobe) return;
     wardrobe.onClosed();
-    // Everything in this preview is owned by this wardrobe instance.
-    const disposed = new Set();
-    const release = resource => {
-      if (resource && !disposed.has(resource)) { disposed.add(resource); resource.dispose(); }
-    };
-    wardrobe.scene?.traverse(object => {
-      release(object.geometry);
-      for (const material of Array.isArray(object.material) ? object.material : [object.material]) {
-        if (!material) continue;
-        for (const value of Object.values(material)) if (value?.isTexture) release(value);
-        release(material);
-      }
-    });
+    // The player model shares cached geometry/materials with the island renderer.
+    disposeIslandScenes(wardrobe.scene);
     wardrobe.dispose();
-    wardrobe.scene = wardrobe.model = wardrobe.camera = null;
+    wardrobe.el.remove();
+    wardrobe = null;
+    loading = null;
   }
 
   function renderProfile() {
@@ -103,6 +97,7 @@ export function initHomeExplorer() {
     background = [...document.body.children].filter(element => element !== root && element instanceof HTMLElement).map(element => [element, element.inert]);
     for (const [element] of background) element.inert = true;
     card.focus({ preventScroll: true });
+    if (!wardrobe) mount.innerHTML = '<p role="status">Preparing your explorer…</p>';
     try {
       await loadWardrobe();
       if (current === request && !root.hidden) {
