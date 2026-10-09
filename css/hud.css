@@ -3,9 +3,11 @@
    viewport (1280×720 → 2560×1440). */
 
 .hud {
-  --hud-fs: clamp(11px, min(0.98vw, 1.75vh), 26px);
+  --hud-fs: clamp(14px, min(0.98vw, 1.75vh), 24px);
+  --hud-safe-x: max(1.2em, 3.5vw);
+  --hud-safe-y: max(1.2em, 3.5vh);
   --gap: 1.6em;
-  --slot: 6.1em;
+  --slot: 4.1em;
   --panel-rim: rgba(255, 255, 255, 0.07);
   --slot-bg: #2a3757;
   --slot-rim: #3a4b74;
@@ -45,13 +47,13 @@
 /* ------------------------------------------------------------ top-left */
 .hud-tl {
   position: absolute;
-  left: 1.3em;
-  top: 1.3em;
+  left: var(--hud-safe-x);
+  top: var(--hud-safe-y);
   display: grid;
   gap: 0.9em;
   justify-items: start;
 }
-.hud-status { display: flex; align-items: center; }
+.hud-status { position: absolute; left: var(--hud-safe-x); bottom: var(--hud-safe-y); display: flex; align-items: center; }
 .hud-portrait {
   position: relative;
   z-index: 1;
@@ -65,22 +67,36 @@
 }
 .hud-portrait svg { width: 108%; height: 108%; margin: -2% 0 0 -4%; }
 .hud-bars {
-  margin-left: -0.9em;
-  padding: 0.55em 0.9em 0.55em 1.5em;
+  margin-left: 0.65em;
+  padding: 0.6em 0.75em;
   display: grid;
-  gap: 0.45em;
-  width: 17em;
+  gap: 0.3em;
+  width: 15.2em;
 }
 .hud-bar { display: flex; align-items: center; gap: 0.5em; }
 .hud-bar-ic { width: 1.8em; height: 1.8em; flex: none; filter: drop-shadow(0 0.08em 0 rgba(0,0,0,.3)); }
 .hud-bar-track {
+  position: relative;
   flex: 1;
-  height: 1.4em;
-  border-radius: 99em;
+  height: 1.7em;
+  border-radius: 0.3em;
   background: var(--track);
   overflow: hidden;
   box-shadow: inset 0 0.1em 0.15em rgba(0, 0, 0, 0.4);
 }
+.is-hp .hud-bar-track { height: 2.1em; }
+.hud-name { font-weight: 800; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+.hud-bar-label, .hud-bar-value {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  font-weight: 800;
+  color: #fff8ea;
+  text-shadow: 0 1px 2px #101827, 0 0 4px #101827;
+}
+.hud-bar-label { left: 0.45em; font-size: 1em; }
+.hud-bar-value { right: 0.35em; font-size: 1em; font-variant-numeric: tabular-nums; }
+.is-hp .hud-bar-value { font-size: 1.7em; }
 .hud-bar-fill {
   display: block;
   height: 100%;
@@ -95,14 +111,16 @@
 .hud-bar.is-low .hud-bar-ic { animation: hud-pulse 0.8s ease-in-out infinite; }
 
 .hud-mission {
-  width: 22em;
-  padding: 0.85em 1.2em 1em;
+  width: 21em;
+  max-width: 31vw;
+  padding: 0.8em 1em;
+  border-left: 0.25em solid var(--yellow);
 }
 .hud-mission-title {
   display: flex;
   align-items: center;
   gap: 0.55em;
-  font-size: 1.5em;
+  font-size: 1.25em;
   font-weight: 800;
   line-height: 1.1;
   padding-bottom: 0.4em;
@@ -131,7 +149,7 @@
   display: flex;
   align-items: center;
   gap: 0.65em;
-  font-size: 1.12em;
+  font-size: 1em;
   font-weight: 600;
 }
 .hud-mission-list li.is-done { color: var(--ink-dim); }
@@ -152,15 +170,15 @@
 .hud-tc {
   position: absolute;
   left: 50%;
-  top: 1.7em;
+  top: var(--hud-safe-y);
   transform: translateX(-50%);
   display: grid;
   justify-items: center;
-  gap: 1.9em;
+  gap: 1.4em;
 }
 .hud-compass {
   position: relative;
-  width: 38em;
+  width: min(28em, 33vw);
   height: 3.1em;
 }
 .hud-compass.brush::before { border-radius: 99em; }
@@ -279,18 +297,18 @@
 /* ------------------------------------------------------------ minimap */
 .hud-tr {
   position: absolute;
-  right: 2em;
-  top: 1.8em;
+  right: var(--hud-safe-x);
+  top: calc(var(--hud-safe-y) + 0.6em);
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  gap: 1.4em;
-  width: 24em;
+  gap: 1.2em;
+  width: 20em;
 }
 .hud-minimap {
   position: relative;
-  width: 15.5em;
-  height: 15.5em;
+  width: 11.5em;
+  height: 11.5em;
   border-radius: 50%;
   background: #265f9c;
   box-shadow: 0 0 0 0.45em var(--navy), 0 0 0 0.6em rgba(255, 255, 255, 0.06), 0 0.4em 0.8em 0.4em rgba(0, 0, 0, 0.2);
@@ -407,39 +425,40 @@
 /* ------------------------------------------------------------ bottom-left key hints */
 .hud-keys {
   position: absolute;
-  left: 1.8em;
-  bottom: 2.4em;
+  left: var(--hud-safe-x);
+  bottom: calc(var(--hud-safe-y) + 8.5em);
   display: grid;
-  gap: 0.55em;
+  grid-template-columns: repeat(2, max-content);
+  gap: 0.4em 0.55em;
 }
 .hud-keys li { display: flex; align-items: center; gap: 0; }
 .hud-keys-ic {
   z-index: 1;
   display: grid;
   place-items: center;
-  width: 4em;
-  height: 3.8em;
-  padding: 0.7em;
+  width: 1.9em;
+  height: 2em;
+  padding: 0.3em;
   color: #fff;
 }
 .hud-keys-lab {
   display: flex;
   align-items: center;
   gap: 0.5em;
-  /* a small gap, not an overlap: both backgrounds are translucent, so overlapping shows a dark seam */
-  margin-left: 0.3em;
-  padding: 0.4em 0.9em 0.4em 0.65em;
+  /* The icon and label meet without overlapping their translucent backgrounds. */
+  margin-left: 0;
+  padding: 0.25em 0.5em;
   font-weight: 700;
   font-size: 1em;
 }
-.hud-keys-lab kbd { font-size: 0.85em; }
+.hud-keys-lab kbd { font-size: 1em; }
 .hud-keys-lab.brush::before { background: rgba(var(--navy-rgb), 0.78); }
 
 /* ------------------------------------------------------------ bottom-center */
 .hud-bc {
   position: absolute;
   left: 50%;
-  bottom: 2.2em;
+  bottom: var(--hud-safe-y);
   transform: translateX(-50%);
   display: grid;
   justify-items: center;
@@ -447,8 +466,8 @@
 }
 .hud-hotbar {
   display: flex;
-  gap: 0.5em;
-  padding: 0.55em;
+  gap: 0.4em;
+  padding: 0.4em;
 }
 .hud-slot {
   position: relative;
@@ -460,7 +479,7 @@
   transition: transform 0.12s ease-out;
 }
 .hud-slot.is-sel {
-  box-shadow: inset 0 0 0 0.24em var(--yellow), 0 0 0.6em rgba(255, 201, 51, 0.35);
+  box-shadow: inset 0 0 0 0.2em var(--yellow);
   transform: translateY(-0.2em);
 }
 .hud-slot-key {
@@ -484,7 +503,7 @@
 }
 .hud-slot-ic {
   position: absolute;
-  inset: 0.85em;
+  inset: 0.7em;
   filter: drop-shadow(0 0.1em 0 rgba(0, 0, 0, 0.25));
 }
 .hud-slot-count {
@@ -498,14 +517,14 @@
 .hud-slot.is-off .hud-slot-ic { opacity: 0.35; filter: grayscale(0.9); }
 .hud-slot.is-off .hud-slot-count { color: var(--red); }
 
-.hud-carry { display: flex; gap: 0.5em; align-items: center; }
+.hud-carry { display: flex; flex-wrap: wrap; justify-content: center; max-width: min(40em, 46vw); gap: 0.4em; align-items: center; }
 .hud-pill {
   display: flex;
   align-items: center;
   gap: 0.35em;
   padding: 0.25em 0.75em 0.25em 0.45em;
   font-weight: 800;
-  font-size: 0.95em;
+  font-size: 1em;
 }
 .hud-pill.brush::before { background: rgba(var(--navy-rgb), 0.72); border-radius: 99em; }
 .hud-pill-ic { width: 1.5em; height: 1.5em; }
@@ -547,14 +566,14 @@
 /* ------------------------------------------------------------ bottom-right */
 .hud-br {
   position: absolute;
-  right: 1.4em;
-  bottom: 8.2em;
+  right: var(--hud-safe-x);
+  bottom: var(--hud-safe-y);
 }
 .hud-team {
   display: grid;
   gap: 0.5em;
   padding: 0.75em 0.9em 0.75em 0.7em;
-  width: 16em;
+  width: 15em;
 }
 .hud-mate {
   display: grid;
@@ -1232,11 +1251,11 @@
 }
 
 /* ------------------------------------------------------------ XP ring, perks, downed (skill tree) */
-.hud-portrait-wrap { position: relative; z-index: 1; width: 7.4em; height: 7.4em; flex: none; }
+.hud-portrait-wrap { position: relative; z-index: 1; width: 5.2em; height: 5.2em; flex: none; }
 .hud-portrait-wrap .hud-portrait { position: absolute; inset: 0; width: auto; height: auto; }
 /* `.hud .hud-xpring`: the generic `.hud svg { width: 100% }` would otherwise shrink the ring to the portrait and leave it off-centre */
 .hud .hud-xpring {
-  position: absolute; left: -0.7em; top: -0.7em; width: 8.8em; height: 8.8em;
+  position: absolute; left: -0.5em; top: -0.5em; width: 6.2em; height: 6.2em;
   z-index: 2; pointer-events: none; overflow: visible;
 }
 .hud-xpring circle { fill: none; stroke-width: 5.5; }
@@ -1268,7 +1287,7 @@
   50% { transform: scale(1.14); box-shadow: 0 0 0 0.45em rgba(255, 154, 46, 0); }
 }
 .hud-xp-pops {
-  position: absolute; left: 0.6em; top: calc(100% + 0.7em); z-index: 4;
+  position: absolute; left: 0.6em; bottom: calc(100% + 0.7em); z-index: 4;
   display: grid; gap: 0.2em; justify-items: start; pointer-events: none; white-space: nowrap;
 }
 .hud-xp-pop {
@@ -1276,7 +1295,7 @@
   color: var(--yellow); background: rgba(var(--navy-rgb), 0.85); text-shadow: var(--shadow-text);
 }
 
-.hud-perks { display: flex; gap: 0.5em; padding-left: 2.3em; }
+.hud-perks { display: flex; flex-wrap: wrap; gap: 0.5em; }
 .hud-perk {
   position: relative; display: inline-flex; align-items: center; gap: 0.35em; overflow: hidden;
   padding: 0.12em 0.7em 0.12em 0.4em; border-radius: 99em; background: var(--track);
@@ -1315,4 +1334,27 @@
 .hud-assist-bar i { display: block; height: 100%; background: var(--green); transform-origin: left center; transform: scaleX(0); transition: transform 0.1s linear; }
 @media (prefers-reduced-motion: reduce) {
   .hud-points, .is-adren[data-state='active'], .hud-mate.is-downed .hud-mate-ic { animation: none; }
+}
+
+/* Keep the equipment strip clear of the vitals on handheld-width screens.
+   All six slots remain visible; panels retain their existing full-screen layout. */
+@media (max-width: 1000px) {
+  .hud-bc { left: auto; right: var(--hud-safe-x); bottom: calc(var(--hud-safe-y) + 9em); transform: none; }
+  .hud-carry { justify-content: flex-end; }
+  .hud-tc { top: calc(var(--hud-safe-y) + 3.8em); }
+  .hud-team { width: 13em; }
+}
+@media (max-width: 640px) {
+  .hud-hotbar { display: grid; grid-template-columns: repeat(3, var(--slot)); }
+  .hud-bars { width: 13em; }
+  .hud-keys { grid-template-columns: 1fr; }
+  .hud-keys-ic { display: none; }
+  .hud-mission { max-width: 48vw; }
+  .hud-minimap { width: 8em; height: 8em; }
+  .hud-tc { top: calc(var(--hud-safe-y) + 10em); }
+  .hud-prompt { max-width: 88vw; white-space: normal; width: max-content; }
+  .hud-team { width: 12em; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hud-bar.is-low .hud-bar-ic { animation: none; }
 }
