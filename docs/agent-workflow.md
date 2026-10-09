@@ -55,6 +55,11 @@ need preserving; a rebase changes commit IDs, so ancestry checks alone are insuf
 
 ## Repository setup
 
+The shared `.claude/skills/test-coverage/SKILL.md` gives Dinosaur Island-specific
+guidance for behavioral tests and Node coverage measurement. Use it for coverage
+gaps or test-quality work. It documents the current test setup; it does not add
+coverage thresholds to CI.
+
 1. Enable GitHub Actions. Protect `main`: require `Node 22 tests` from GitHub Actions
    (app ID 15368), require up-to-date branches, enforce the rule for administrators,
    require PRs with zero approving reviews, and disable force pushes/deletions.
