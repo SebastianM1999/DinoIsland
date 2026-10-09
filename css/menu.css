@@ -1,0 +1,61 @@
+/* Main menu only: keep the right side open for the live island tour. */
+#menu {
+  display: block;
+  place-items: start;
+  padding: clamp(24px, 5vh, 64px) clamp(24px, 5vw, 96px);
+  background: #162d30;
+  isolation: isolate;
+  scrollbar-width: thin;
+}
+#menu-tour { position: fixed; inset: 0; width: 100%; height: 100%; z-index: -2; pointer-events: none; }
+#menu::before {
+  content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none;
+  background: linear-gradient(90deg, rgba(12, 27, 30, .96), rgba(12, 27, 30, .85) 25%, rgba(12, 27, 30, .35) 49%, transparent 74%), linear-gradient(0deg, rgba(12, 27, 30, .65), transparent 35%);
+}
+#menu .menu-card { width: min(380px, 100%); padding: 0; margin: 0; text-align: left; }
+.menu-eyebrow { font-size: .85rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: #d5dfc9; margin: 0 0 16px; }
+#menu .logo { font-size: clamp(3rem, 5vw, 4.8rem); color: #fff1d0; line-height: .94; letter-spacing: -.025em; }
+#menu .logo-foot { width: .65em; height: .65em; }
+#menu .tagline { margin: 14px 0 28px; font-size: 1.15rem; color: #e0e5d8; }
+#menu #join-form { gap: 7px; }
+#menu #join-form label { color: #d5dfc9; }
+#menu #join-form input, #menu #join-form select { background: rgba(12, 27, 30, .8); border-color: #63766e; border-radius: 6px; min-height: 44px; }
+#menu .menu-buttons { gap: 7px; margin: 12px 0 14px; }
+#menu .btn { text-align: left; min-height: 48px; padding: 11px 18px; background: rgba(25, 46, 45, .88); border: 1px solid #75867b; border-radius: 6px; box-shadow: none; color: #fff1d0; }
+#menu .btn:hover { background: #3b5548; }
+#menu .btn:disabled { opacity: .5; }
+#menu .btn-primary { background: #ffc933; border-color: #ffc933; color: #243321; padding: 13px 18px; font-size: 1.35rem; }
+#menu .btn-primary:hover { background: #ffda65; }
+.action-note { display: block; font-size: .85rem; font-weight: 500; }
+#menu .controls-help { margin-top: 10px; font-size: .95rem; color: #d5dfc9; }
+#menu .controls-help summary { min-height: 44px; padding: 10px 0; border-bottom: 1px solid rgba(213, 223, 201, .25); }
+#menu .controls-help summary:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
+.connection-options > summary span { display: block; margin-left: 16px; font-size: .8rem; color: #aebdb3; }
+#menu .connection-options[open] { padding-bottom: 12px; }
+#menu .internet-test { margin: 10px 0 18px; }
+#menu .lobby-status { margin: 6px 0; color: #e0e5d8; font-size: .9rem; }
+#menu .lobby-players:empty { display: none; }
+.menu-footnote { color: #aebdb3; margin: 24px 0 0; font-size: .85rem; }
+.tour-info { position: fixed; right: 5vw; bottom: 5vh; width: min(330px, 36vw); text-shadow: 0 2px 8px #10272b; }
+.tour-info .menu-eyebrow { margin-bottom: 5px; }
+.tour-info h2 { margin: 0; font-size: clamp(1.6rem, 3vw, 2.5rem); color: #fff1d0; line-height: 1.1; }
+.tour-info > p:not(.menu-eyebrow) { color: #f1f3e9; margin: 10px 0 14px; }
+.tour-controls { display: flex; justify-content: space-between; align-items: center; gap: 8px; border-top: 1px solid #c3d0bd80; padding-top: 10px; }
+.tour-stop { font: inherit; background: #132b2dcc; color: #fff1d0; border: 1px solid #b3c6b7; border-radius: 5px; padding: 8px 14px; min-height: 44px; }
+.tour-stop:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
+#tour-count { font-variant-numeric: tabular-nums; color: #fff1d0; }
+#menu-tour { transition: opacity 600ms ease; }
+@media (max-width: 760px) {
+  #menu { padding: 28px 24px; }
+  #menu::before { background: linear-gradient(90deg, #0c1b1eef, #0c1b1ec4 55%, #0c1b1e55); }
+  #menu .menu-card { width: min(360px, 82%); }
+  .tour-info { position: relative; right: auto; bottom: auto; width: min(360px, 82%); margin-top: 40px; }
+}
+@media (max-height: 760px) and (min-width: 761px) {
+  #menu { padding-top: 24px; padding-bottom: 24px; }
+  #menu .logo { font-size: 3.2rem; }
+  #menu .tagline { margin-bottom: 16px; }
+  #menu .menu-eyebrow { margin-bottom: 10px; }
+  .menu-footnote { margin-top: 14px; }
+}
+@media (prefers-reduced-motion: reduce) { #menu-tour { transition: none; } }
