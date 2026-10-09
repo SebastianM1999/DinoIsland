@@ -6,6 +6,7 @@
 import * as THREE from 'three';
 import { CONFIG } from '../../shared/config.js';
 import { ACT, EV, PF, EQUIP } from '../../shared/protocol.js';
+import { WALL_TORCH } from '../../shared/torch.js';
 import { shotEnd } from '../../shared/gunshots.js';
 import { insideGrove } from '../../shared/grove.js';
 import { segmentColliders } from '../../shared/collision.js';
@@ -531,6 +532,19 @@ export class PlayerActions {
     // (items on the ground are looted automatically – see autoLoot())
     // 0. a downed teammate: reviving beats everything else on E
     if (g.reviveTarget) return { text: this.reviving ? `Reviving ${g.reviveTarget.name}…` : `Hold to revive ${g.reviveTarget.name}`, run: null };
+    // 0b. an unlit wall torch in the Hollow Mountain: light it with the burning hand torch
+    if (g.layout.wallTorches?.length) {
+      let wt = null, wd = WALL_TORCH.reach;
+      for (const t of g.layout.wallTorches) {
+        if (g.wallTorchesLit?.has(t.id)) continue;
+        const d = Math.hypot(t.x - pos.x, t.z - pos.z);
+        if (d < wd) { wd = d; wt = t; }
+      }
+      if (wt) {
+        if (g.torchLit && inv.torch && !g.player.submerged) return { text: 'Light the wall torch', run: () => net.act(ACT.LIGHT, { torch: wt.id }) };
+        return { text: inv.torch ? 'Wall torch – light your torch first (L)' : 'Wall torch – you need a burning torch', run: null };
+      }
+    }
     // Dropping a carried item never picks it straight back up; retrieve it deliberately.
     let dropped = null, dropDistance = CONFIG.pickupRange;
     for (const { data: it } of g.items.items.values()) {

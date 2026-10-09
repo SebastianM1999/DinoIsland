@@ -71,6 +71,7 @@ export const ACT = {
   SKILL: 'skill',       // { op: 'buy', id } | { op: 'reset' }  spend a point / reset all points (only at camp)
   REVIVE: 'revive',     // { to } start reviving a downed teammate (hold E) | { stop: true }
   DASH: 'dash',         // {}                                   Dash skill used (client moves, server grants the distance + checks cooldown)
+  LIGHT: 'light',       // { torch }                              light a Hollow Mountain wall torch with the lit hand torch (within reach)
 };
 
 /** Server events (msg.e). */
@@ -80,6 +81,7 @@ export const EV = {
   ITEM_ADD: 'item+',        // { item }
   ITEM_REMOVE: 'item-',     // { id, by }
   FRUIT: 'fruit',           // { spot, count } (0..4 fruit left on the plant)
+  WALL_TORCH: 'wtorch',     // { torch, by }  a wall torch was lit (it stays lit for the island)
   SHOT: 'shot',             // { by, kind, o, end } remote gun effects
   FIRE: 'fire',             // { by, kind, o, v, pid }            remote projectile visuals
   HURT: 'hurt',             // { id, dmg, hp, kx, kz, down, src }

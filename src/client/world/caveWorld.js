@@ -4,6 +4,7 @@
 //   caveDecor.js  stalactites, stalagmites, columns, crystals, mushrooms, glow halos
 //   caveFx.js     pooled crystal lights, the cave air (sun / fog / exposure by depth into the
 //                 mountain), water lamps, drips, dust, daylight lures
+//   wallTorches.js the sconces the team lights one by one (flames, halos, a small light pool)
 //   caveCoves.js  the two outdoor coves (the arrival boat, dune grass; nothing man-made at the mountain)
 // `update(dt, time, cam)` runs every frame; `audio` is set by Game.
 
@@ -12,6 +13,7 @@ import { buildCaveRoof } from './caveMesh.js';
 import { buildCaveDecor } from './caveDecor.js';
 import { buildCaveFx, caveTier } from './caveFx.js';
 import { buildCaveCoves } from './caveCoves.js';
+import { buildWallTorches } from './wallTorches.js';
 
 export function buildCaveWorld(terrain, layout, gfx, terrainMesh, water) {
   const group = new THREE.Group();
@@ -27,15 +29,18 @@ export function buildCaveWorld(terrain, layout, gfx, terrainMesh, water) {
   group.add(fx.group);
   const coves = buildCaveCoves(terrain, layout, { roofY });
   group.add(coves.group);
+  const wallTorches = buildWallTorches(terrain, layout, gfx);
+  group.add(wallTorches.group);
 
   const api = {
-    group, roof, decor, fx, coves, sky: terrainMesh.userData.sky, audio: null,
+    group, roof, decor, fx, coves, wallTorches, sky: terrainMesh.userData.sky, audio: null,
     get inside() { return fx.inside; },
     get wet() { return fx.wet; },
     update(dt, time, cam) {
       fx.update(dt, time, cam, { audio: api.audio });
       decor.update(dt, time, cam);
       coves.update?.(dt, time, cam);
+      wallTorches.update(dt, time, cam);
     },
   };
   return api;

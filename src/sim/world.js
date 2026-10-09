@@ -24,7 +24,7 @@ import { lineBlocked, DINO_SIGHTING } from '../shared/visibility.js';
 import { sanitizeOutfit, sameOutfit } from '../shared/outfits.js';
 import { planIsland } from '../shared/island.js';
 import { levelDef, LEVEL_COUNT } from '../shared/levels.js';
-import { TORCH } from '../shared/torch.js';
+import { TORCH, WALL_TORCH } from '../shared/torch.js';
 import { CAVE_WALK_MAX } from '../shared/caveField.js';
 import { findUnstuckSpot, goodSpot } from './unstuck.js';
 import { nearDino, plausibleZone } from './hitCheck.js';
@@ -100,6 +100,7 @@ export class ServerWorld {
     this.volcano = new Volcano(this); // heat, eruptions, ash rain (sim/volcano.js; idle off the volcano)
     this.dinos = new DinoSystem(this);
     this.placeTorches();
+    this.wallTorchesLit = new Set();   // Hollow Mountain wall torches the team has lit (ids into layout.wallTorches)
     this.placeSumpCaches();
     this.log(`island ${level + 1} "${levelDef(level).name}" variant ${variant}`);
   }
@@ -1124,6 +1125,15 @@ export class ServerWorld {
         this.mission.onLootChanged();
         return;
       }
+      case ACT.LIGHT: {
+        // a wall torch, lit with the hand torch: it must be burning (PF.TORCH: owned, raised, not under water) and near
+        const wt = this.layout.wallTorches?.[m.torch | 0];
+        if (!p.alive || !wt || this.wallTorchesLit.has(wt.id) || !(p.fl & PF.TORCH)) return;
+        if (!this.near(p, wt.x, wt.z, WALL_TORCH.reach + 1)) return;
+        this.wallTorchesLit.add(wt.id);
+        this.event(EV.WALL_TORCH, { torch: wt.id, by: p.id });
+        return;
+      }
       case ACT.HARVEST: {
         if (!p.alive) return;
         const f = this.fruit[m.spot | 0];
@@ -1625,6 +1635,7 @@ export class ServerWorld {
       dinos: this.dinos.describeAll(),
       items: [...this.items.values()],
       fruit: this.fruit.map((f) => f.count),
+      wallTorches: [...(this.wallTorchesLit ?? [])],
       spottedDinos: [...this.spottedDinos],
       traps: [...this.traps.values()],
       tracks: this.tracks.slice(-200),
