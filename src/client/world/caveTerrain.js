@@ -253,8 +253,11 @@ function buildShell({ terrain, layout, sky, geo, T, fillVertex, material }) {
         if (a >= 0 && b >= 0 && a < n && b < n && need[b * n + a]) hit = true;
       }
       if (!hit) continue;
-      const q = j * n1 + i;
-      if ([q, q + 1, q + n1, q + n1 + 1].some((k) => depth[k] <= 0.5)) continue;
+      const q = j * n1 + i, corners = [q, q + 1, q + n1, q + n1 + 1];
+      if (corners.some((k) => depth[k] <= 0.5)) continue;
+      // (a cell with no lifted corner lies exactly on the terrain: drawn twice, with the shell's outdoor light, it
+      // shows as bright zigzag slivers on the walls - the terrain draws it; the normals below still use the whole skin)
+      if (!corners.some((k) => lifted[k])) continue;
       cells.push([i, j]);
     }
   }

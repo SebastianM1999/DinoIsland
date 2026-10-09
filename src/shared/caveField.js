@@ -18,6 +18,11 @@ export const CAVE_SKY = 100;
 export const CAVE_WALK_MAX = 12;
 /** Walls rise from the floor to the rock over this many metres. */
 const WALL = 4.5;
+/**
+ * The rock sill at the end of a false exit: `h` m high, rising between `end1` and `end0` m (measured along the tunnel)
+ * before its open end - steeper than any walk or jump, daylight falls in over it.
+ */
+export const FALSE_SILL = { h: 9, end0: 14, end1: 15 };
 /** Smoothing of the union of tunnels and chambers (metres): round junctions. */
 const SMIN = 3;
 /** How far below the dry floor the swimmable stretch of a flooded tunnel dips. */
@@ -111,7 +116,7 @@ function buildField(plan) {
     for (let i = 1; i < t.pts.length; i++) { acc += Math.hypot(t.pts[i].x - t.pts[i - 1].x, t.pts[i].z - t.pts[i - 1].z); cum.push(acc); }
     for (let i = 0; i < t.pts.length - 1; i++) {
       const a = t.pts[i], b = t.pts[i + 1];
-      const pr = { type: 0, ax: a.x, az: a.z, bx: b.x, bz: b.z, w0: a.w, w1: b.w, r0: a.roof, r1: b.roof, u0: cum[i] / acc, u1: cum[i + 1] / acc, t };
+      const pr = { type: 0, ax: a.x, az: a.z, bx: b.x, bz: b.z, w0: a.w, w1: b.w, r0: a.roof, r1: b.roof, u0: cum[i] / acc, u1: cum[i + 1] / acc, len: acc, t };
       prims.push(pr);
       put(pr, Math.min(a.x, b.x) - a.w, Math.min(a.z, b.z) - a.w, Math.max(a.x, b.x) + a.w, Math.max(a.z, b.z) + a.w);
     }
@@ -131,7 +136,7 @@ function buildField(plan) {
     if (x === mx && z === mz) return memo;
     mx = x; mz = z;
     const list = grid.get(Math.floor(x / BUCKET) * 4096 + Math.floor(z / BUCKET));
-    let sum = 0, best = 1e9, rw = 0, rs = 0, dep = 0, fw = 0, y0 = 0, sw = 0, sy = 0, sl = 0;
+    let sum = 0, best = 1e9, rw = 0, rs = 0, dep = 0, fw = 0, y0 = 0, sw = 0, sy = 0, sl = 0, fx = 0;
     if (list) {
       for (const pr of list) {
         let d, roof;
@@ -143,6 +148,11 @@ function buildField(plan) {
           const half = lerp(pr.w0, pr.w1, u) / 2;
           d = dc - half;
           roof = lerp(pr.r0, pr.r1, u);
+          // (a false exit: how much this point belongs to its floor, for the rock sill at its end, see FALSE_SILL)
+          if (pr.t.kind === 'falseExit' && dc < half * 1.8 && raw > -0.02 && raw < 1.02) {   // (beside this piece, not before or past it)
+            const toEnd = (1 - lerp(pr.u0, pr.u1, u)) * pr.len;   // metres along the tunnel to its open end
+            fx = Math.max(fx, (1 - smoothstep(1.1, 1.8, dc / half)) * (1 - smoothstep(FALSE_SILL.end0, FALSE_SILL.end1, toEnd)));
+          }
           const fl = pr.t.flooded;
           if (fl && dc < half * 1.8) {
             const arc = lerp(pr.u0, pr.u1, u), n = dc / half;
@@ -177,7 +187,7 @@ function buildField(plan) {
       }
     }
     const s = sum > 0 ? Math.min(best + 1e-6, -SMIN * Math.log(sum)) : best;
-    memo = { s: Math.min(s, 80), roof: rw > 0 ? rs / rw : 8, dep, fw, y0, sw, sy, sl };
+    memo = { s: Math.min(s, 80), roof: rw > 0 ? rs / rw : 8, dep, fw, y0, sw, sy, sl, fx };
     return memo;
   };
 
@@ -282,7 +292,10 @@ function buildField(plan) {
         const fc = floorBase(x, z, d);
         let fb = h0 > 0.2 ? lerp(h0, fc, smoothstep(0, 10, d)) : fc;
         if (q.fw > 0) fb = lerp(fb, q.y0, q.fw);
-        const floor = fb - q.dep;
+        // a false exit ends in a rock sill a few metres before the sea cliff: too steep and too high to climb or jump,
+        // daylight still falls in over it (nobody falls down the cliff)
+        const sill = FALSE_SILL.h * q.fx;
+        const floor = fb - q.dep + sill;
         const top = fb + rise(x, z, d);
         const s = (q.s + 1.0 * fbm(x * 0.025 + 3, z * 0.025 + 7, 2, seed + 17)) * 1.6;
         h = lerp(floor, top, smoothstep(0, WALL, s));
