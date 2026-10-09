@@ -195,3 +195,13 @@
   .preview-placeholder { inset: 15% 8% 30%; }
 }
 @media (prefers-reduced-motion: reduce) { .menu-preview-image { animation: none; transition: none; } }
+
+/* Broad scenery fills the screen, with a stable readable action rail. */
+#menu-preview { position: fixed; inset: 0; width: 100%; height: 100%; }
+#menu-preview::after { background: linear-gradient(90deg, #111c28f5 0%, #111c28e8 24%, #111c2870 42%, transparent 68%), linear-gradient(0deg, #111c28c9, transparent 45%); z-index: 2; }
+#menu-tour { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1; opacity: 0; transition: opacity .25s ease; }
+#menu-preview.has-live-tour #menu-tour { opacity: 1; }
+#menu-preview.has-live-tour .menu-preview-image { opacity: 0; animation: none; }
+.preview-placeholder { left: 52%; right: 8%; }
+@media (max-width: 800px) { #menu-preview { top: 0; } .preview-placeholder { left: 8%; } }
+@media (prefers-reduced-motion: reduce) { #menu-tour { transition: none; } }

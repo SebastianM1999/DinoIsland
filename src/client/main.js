@@ -69,6 +69,7 @@ const settingsUi = initSettings();
 
 // Load the real island backdrop after the interactive menu has painted.
 let menuTour = null;
+let menuPostcards = null;
 let tourAbort = null;
 let tourIsland = 0;
 let tourRequest = 0;
@@ -82,9 +83,24 @@ async function startMenuTour() {
   tourAbort?.abort();
   tourAbort = new AbortController();
   try {
+    const { createMenuPostcards } = await import('./ui/menuPostcards.js');
+    const postcards = await createMenuPostcards($('menu-preview'), island => {
+      if (request !== tourRequest || menuTour !== menuPostcards || !menuTour) return;
+      tourIsland = island.index;
+      $('play-island').value = String(unlockedStartingIsland(island.index));
+      $('tour-title').textContent = island.name;
+      $('tour-description').textContent = tourDescriptions[island.index];
+      $('tour-count').textContent = `${String(island.index + 1).padStart(2, '0')} / 03`;
+      for (const button of document.querySelectorAll('[data-island]')) button.setAttribute('aria-pressed', String(Number(button.dataset.island) === island.index));
+      $('tour-motion').textContent = island.motionEnabled ? 'Pause tour' : 'Play tour';
+      $('tour-motion').setAttribute('aria-pressed', String(!island.motionEnabled));
+    }, { signal: tourAbort.signal });
+    if (request !== tourRequest || menu.hidden) { postcards.dispose(); return; }
+    menuPostcards = postcards;
+    syncTourSuspension();
     const { createMenuTour } = await import('./ui/menuTour.js');
     if (request !== tourRequest || menu.hidden) return;
-    const tour = await createMenuTour($('menu-preview'), island => {
+    const tour = await createMenuTour($('menu-tour'), island => {
       if (request !== tourRequest) return;
       tourIsland = island.index;
       $('play-island').value = String(unlockedStartingIsland(island.index));
@@ -96,13 +112,16 @@ async function startMenuTour() {
       $('tour-title').textContent = island.name;
       $('tour-description').textContent = tourDescriptions[island.index];
       $('tour-count').textContent = `${String(island.index + 1).padStart(2, '0')} / 03`;
-      $('tour-state').textContent = island.loading ? 'Preloading all island postcards…' : 'Solo expedition starts here';
+      $('tour-state').textContent = island.loading ? 'Preparing the live island tour…' : 'Live tour · solo expedition starts here';
       $('menu-preview').classList.toggle('is-loading', !!island.loading);
-      $('preview-placeholder-copy').textContent = island.loading ? 'Unfolding the island postcards…' : 'Reconnaissance photos unavailable. Your expedition is still ready.';
+      $('preview-placeholder-copy').textContent = island.loading ? 'Scouting a route for the live tour…' : 'Reconnaissance photos unavailable. Your expedition is still ready.';
       $('tour-motion').textContent = island.motionEnabled ? 'Pause tour' : 'Play tour';
       $('tour-motion').setAttribute('aria-pressed', String(!island.motionEnabled));
     }, { signal: tourAbort.signal });
     if (request !== tourRequest || menu.hidden) { tour.dispose(); return; }
+    menuPostcards?.dispose();
+    menuPostcards = null;
+    $('menu-preview').classList.add('has-live-tour');
     menuTour = tour;
     if (DEBUG_QUERY.has('debug')) window.__menuTour = tour;
     syncTourSuspension();
@@ -111,7 +130,10 @@ async function startMenuTour() {
   } catch (error) {
     if (request !== tourRequest || error.name === 'AbortError') return;
     console.warn('Island tour unavailable', error);
-    $('tour-state').textContent = 'Welcome, explorer';
+    menuTour = menuPostcards;
+    $('tour-state').textContent = 'Photo lookout · live tour unavailable';
+    for (const button of document.querySelectorAll('[data-island]')) button.disabled = Number(button.dataset.island) > availableStartingIsland();
+    $('tour-next').disabled = $('tour-motion').disabled = false;
     $('tour-description').textContent = 'Start an expedition to discover the islands.';
   }
 }
@@ -119,6 +141,9 @@ function stopMenuTour() {
   ++tourRequest;
   tourAbort?.abort();
   menuTour?.dispose();
+  menuPostcards?.dispose();
+  menuPostcards = null;
+  $('menu-preview').classList.remove('has-live-tour');
   menuTour = null;
   $('tour-motion').disabled = true;
   $('tour-next').disabled = true;
@@ -134,7 +159,9 @@ $('tour-islands').addEventListener('click', event => {
   if (button && !button.disabled) void selectPreviewIsland(Number(button.dataset.island));
 });
 function syncTourSuspension() {
-  menuTour?.setSuspended?.([...document.querySelectorAll('.home-dialog, #settings, #steam-friends')].some(root => !root.hidden));
+  const suspended = [...document.querySelectorAll('.home-dialog, #settings, #steam-friends')].some(root => !root.hidden);
+  menuTour?.setSuspended?.(suspended);
+  menuPostcards?.setSuspended?.(suspended);
 }
 const tourOverlayObserver = new MutationObserver(syncTourSuspension);
 for (const root of document.querySelectorAll('.home-dialog, #settings, #steam-friends')) {
