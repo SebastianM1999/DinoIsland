@@ -1,61 +1,103 @@
-/* Main menu only: keep the right side open for the live island tour. */
-#menu {
-  display: block;
-  place-items: start;
-  padding: clamp(24px, 5vh, 64px) clamp(24px, 5vw, 96px);
-  background: #162d30;
-  isolation: isolate;
-  scrollbar-width: thin;
-}
+/* Home screen: expedition actions on the left, live island scenery on the right. */
+#menu { display: flex; flex-direction: column; align-items: flex-start; justify-content: flex-start; padding: clamp(24px, 5vh, 64px) clamp(24px, 5vw, 96px); background: #162d30; isolation: isolate; scrollbar-width: thin; }
 #menu-tour { position: fixed; inset: 0; width: 100%; height: 100%; z-index: -2; pointer-events: none; }
-#menu::before {
-  content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none;
-  background: linear-gradient(90deg, rgba(12, 27, 30, .96), rgba(12, 27, 30, .85) 25%, rgba(12, 27, 30, .35) 49%, transparent 74%), linear-gradient(0deg, rgba(12, 27, 30, .65), transparent 35%);
-}
-#menu .menu-card { width: min(380px, 100%); padding: 0; margin: 0; text-align: left; }
-.menu-eyebrow { font-size: .85rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: #d5dfc9; margin: 0 0 16px; }
-#menu .logo { font-size: clamp(3rem, 5vw, 4.8rem); color: #fff1d0; line-height: .94; letter-spacing: -.025em; }
-#menu .logo-foot { width: .65em; height: .65em; }
-#menu .tagline { margin: 14px 0 28px; font-size: 1.15rem; color: #e0e5d8; }
-#menu #join-form { gap: 7px; }
-#menu #join-form label { color: #d5dfc9; }
-#menu #join-form input, #menu #join-form select { background: rgba(12, 27, 30, .8); border-color: #63766e; border-radius: 6px; min-height: 44px; }
-#menu .menu-buttons { gap: 7px; margin: 12px 0 14px; }
-#menu .btn { text-align: left; min-height: 48px; padding: 11px 18px; background: rgba(25, 46, 45, .88); border: 1px solid #75867b; border-radius: 6px; box-shadow: none; color: #fff1d0; }
-#menu .btn:hover { background: #3b5548; }
-#menu .btn:disabled { opacity: .5; }
-#menu .btn-primary { background: #ffc933; border-color: #ffc933; color: #243321; padding: 13px 18px; font-size: 1.35rem; }
-#menu .btn-primary:hover { background: #ffda65; }
-.action-note { display: block; font-size: .85rem; font-weight: 500; }
-#menu .controls-help { margin-top: 10px; font-size: .95rem; color: #d5dfc9; }
-#menu .controls-help summary { min-height: 44px; padding: 10px 0; border-bottom: 1px solid rgba(213, 223, 201, .25); }
-#menu .controls-help summary:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
-.connection-options > summary span { display: block; margin-left: 16px; font-size: .8rem; color: #aebdb3; }
-#menu .connection-options[open] { padding-bottom: 12px; }
-#menu .internet-test { margin: 10px 0 18px; }
-#menu .lobby-status { margin: 6px 0; color: #e0e5d8; font-size: .9rem; }
+#menu::before { content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none; background: linear-gradient(90deg, #0c1b1ef5, #0c1b1ed9 25%, #0c1b1e59 49%, transparent 74%), linear-gradient(0deg, #0c1b1ea6, transparent 35%); }
+#menu .menu-card { width: min(440px, 42vw); padding: 0; margin: auto 0; text-align: left; }
+.menu-eyebrow { font-size: .8rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: #d5dfc9; margin: 0 0 12px; }
+.menu-kicker { margin-bottom: 32px; }
+#menu .logo { font-size: clamp(3rem, 5vw, 5.2rem); color: #fff1d0; line-height: .94; letter-spacing: -.025em; }
+#menu .logo-foot { width: .6em; height: .6em; }
+.menu-goal { margin: 22px 0 26px; font-size: 1.1rem; line-height: 1.5; color: #e0e5d8; }
+.explorer-card { display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 14px; border: 1px solid #97aa9255; border-radius: 8px; background: #132b2dcc; }
+.explorer-mark { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 50%; background: #d5dfc91a; color: #ffc933; }
+.explorer-mark svg { width: 26px; height: 26px; }
+.explorer-card label { display: block; color: #cad6c7; font-size: .8rem; }
+#player-name { font: inherit; font-weight: 700; color: #fff1d0; width: 100%; min-width: 0; border: 0; border-bottom: 1px solid #97aa9266; background: transparent; border-radius: 0; padding: 2px 0; }
+#home-progress { display: block; font-size: .8rem; color: #b9c8b4; margin-top: 4px; }
+#menu .menu-buttons { gap: 10px; margin: 16px 0 14px; }
+#menu .btn, .home-dialog .btn { min-height: 48px; padding: 12px 16px; background: #192e2de0; border: 1px solid #75867b; border-radius: 6px; box-shadow: none; color: #fff1d0; }
+#menu .btn:hover, .home-dialog .btn:hover { background: #3b5548; }
+#menu .btn:disabled, .home-dialog .btn:disabled { opacity: .5; }
+#menu .btn-primary, .home-dialog .btn-primary { background: #ffc933; border-color: #ffc933; color: #243321; }
+#menu #btn-solo { display: grid; grid-template-columns: 1fr auto; text-align: left; padding: 16px 20px; font-size: 1.5rem; }
+#menu #btn-solo:hover, .home-dialog .btn-primary:hover { background: #ffda65; }
+.action-note { grid-column: 1 / -1; display: block; font-size: .85rem; font-weight: 500; }
+.menu-play-options { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.menu-play-options .btn { display: flex; justify-content: center; align-items: center; gap: 8px; font-size: 1rem; }
+.menu-play-options svg { width: 18px; height: 18px; }
+#menu .lobby-status { min-height: 1.4em; margin: 8px 0; color: #cad6c7; font-size: .85rem; }
 #menu .lobby-players:empty { display: none; }
-.menu-footnote { color: #aebdb3; margin: 24px 0 0; font-size: .85rem; }
-.tour-info { position: fixed; right: 5vw; bottom: 5vh; width: min(330px, 36vw); text-shadow: 0 2px 8px #10272b; }
+.menu-footnote { color: #b9c8b4; margin: 20px 0 0; font-size: .85rem; letter-spacing: .1em; text-transform: uppercase; }
+.menu-link { font: inherit; font-weight: 700; font-size: .95rem; min-height: 44px; padding: 8px 12px; background: transparent; border: 1px solid transparent; border-radius: 5px; color: #fff1d0; }
+.menu-link:hover { background: #d5dfc91a; border-color: #97aa9255; }
+.menu-link:focus-visible, .home-dialog input:focus-visible, .home-dialog select:focus-visible, #player-name:focus-visible, .tour-stop:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
+.menu-utilities { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 32px; }
+.menu-utilities .menu-link { color: #d5dfc9; padding-left: 0; padding-right: 14px; }
+.tour-info { position: fixed; right: 5vw; bottom: 5vh; width: min(330px, 30vw); text-shadow: 0 2px 8px #10272b; }
 .tour-info .menu-eyebrow { margin-bottom: 5px; }
 .tour-info h2 { margin: 0; font-size: clamp(1.6rem, 3vw, 2.5rem); color: #fff1d0; line-height: 1.1; }
 .tour-info > p:not(.menu-eyebrow) { color: #f1f3e9; margin: 10px 0 14px; }
 .tour-controls { display: flex; justify-content: space-between; align-items: center; gap: 8px; border-top: 1px solid #c3d0bd80; padding-top: 10px; }
-.tour-stop { font: inherit; background: #132b2dcc; color: #fff1d0; border: 1px solid #b3c6b7; border-radius: 5px; padding: 8px 14px; min-height: 44px; }
-.tour-stop:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
-#tour-count { font-variant-numeric: tabular-nums; color: #fff1d0; }
-#menu-tour { transition: opacity 600ms ease; }
-@media (max-width: 760px) {
+.tour-stop { font: inherit; background: #132b2dcc; color: #fff1d0; border: 1px solid #b3c6b7; border-radius: 5px; padding: 8px 12px; min-height: 44px; }
+#tour-count { font-variant-numeric: tabular-nums; color: #fff1d0; white-space: nowrap; }
+/* Dedicated create/join/information panels keep the main screen uncluttered. */
+.home-dialog { z-index: 55; background: #0c1b1e55; display: flex; align-items: center; justify-content: flex-start; padding: 5vh 5vw; }
+.home-panel, .home-dialog-card { width: min(540px, 100%); max-height: 90dvh; overflow-y: auto; scrollbar-width: thin; background: #152b2cf5; border: 1px solid #8d9e8b66; border-radius: 12px; padding: 24px 28px; box-shadow: 0 16px 60px #0005; }
+.home-panel-head, .home-dialog-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 16px; }
+.home-panel h2, .home-dialog-head h2 { margin: 0; color: #fff1d0; font-size: 2rem; line-height: 1.1; }
+.home-panel-head .menu-eyebrow, .home-dialog-head .menu-eyebrow { margin-bottom: 6px; }
+.home-panel-head > button { font-size: 1.8rem; line-height: 1; }
+.home-panel p { color: #cad6c7; }
+.home-option { display: grid; gap: 8px; padding: 18px 0; border-top: 1px solid #97aa9244; }
+.home-option h3 { margin: 0; font-size: 1.1rem; color: #fff1d0; }
+.home-option p { margin: 0 0 6px; }
+.home-option label { font-size: .85rem; color: #d5dfc9; }
+.home-dialog input, .home-dialog select { width: 100%; min-width: 0; min-height: 44px; font: inherit; padding: 8px 12px; color: #fff1d0; background: #0d1e21; border: 1px solid #6c8172; border-radius: 6px; }
+.home-dialog .btn { width: 100%; text-align: left; }
+.home-dialog .copy-address { width: 44px; flex: 0 0 44px; padding: 8px; }
+.home-dialog footer { display: flex; justify-content: space-between; gap: 12px; margin-top: 14px; }
+.home-dialog footer .btn { width: auto; }
+.home-dialog a { color: #ffd75e; }
+.home-feedback { margin: 8px 0; font-weight: 700; }
+.home-feedback:empty { display: none; }
+.home-guide-steps { padding-left: 26px; }
+.home-guide-steps li { padding-left: 8px; margin: 20px 0; }
+.home-guide-steps h3 { margin: 0; color: #fff1d0; }
+.home-guide-steps p { margin: 6px 0; }
+/* The existing outfit picker, integrated into a saved-explorer dialog. */
+#home-explorer-root .home-dialog-card { width: min(800px, 100%); }
+#home-explorer-root .home-dialog-card::before { display: none; }
+.home-explorer-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+.home-explorer-stats span { color: #b9c8b4; font-size: .8rem; }
+.home-explorer-stats strong { display: block; color: #fff1d0; font-size: 1.3rem; }
+.home-explorer-summary progress { width: 100%; height: 8px; accent-color: #ffc933; margin-top: 12px; }
+.home-explorer-progress { color: #b9c8b4; font-size: .85rem; margin: 8px 0 16px; }
+.home-explorer-skills ul { padding: 0; list-style: none; }
+.home-explorer-skills li { margin: 10px 0; }
+.home-explorer-skills span { display: block; color: #b9c8b4; font-size: .85rem; }
+#home-explorer-root .hud-panel { position: static; inset: auto; transform: none; width: 100%; padding: 16px 0 0; animation: none; border-top: 1px solid #97aa9244; }
+#home-explorer-root .hud-panel::before { display: none; }
+#home-explorer-root .wd-body { grid-template-columns: minmax(180px, .8fr) minmax(0, 1fr); gap: 20px; }
+#home-explorer-root .wd-name { min-width: 0; }
+#home-explorer-root .wd-canvas { height: 300px; }
+#home-explorer-root .wd-slot { background: #0d1e2180; }
+#home-explorer-root .wd-stage { background: radial-gradient(ellipse at 50% 85%, #ffc93333, transparent 65%), #38574f; }
+@media (max-width: 800px) {
   #menu { padding: 28px 24px; }
-  #menu::before { background: linear-gradient(90deg, #0c1b1eef, #0c1b1ec4 55%, #0c1b1e55); }
-  #menu .menu-card { width: min(360px, 82%); }
-  .tour-info { position: relative; right: auto; bottom: auto; width: min(360px, 82%); margin-top: 40px; }
+  #menu .menu-card { width: min(420px, 100%); margin: 24px 0 0; }
+  #menu::before { background: linear-gradient(90deg, #0c1b1eef, #0c1b1eb8 60%, #0c1b1e55); }
+  .tour-info { position: relative; right: auto; bottom: auto; width: min(420px, 100%); margin-top: 40px; }
+  .home-dialog { padding: 20px; }
+  .home-panel, .home-dialog-card { max-height: calc(100dvh - 40px); padding: 20px; }
+  #home-explorer-root .wd-body { grid-template-columns: 1fr; }
+  #home-explorer-root .wd-canvas { height: 220px; }
 }
-@media (max-height: 760px) and (min-width: 761px) {
+@media (max-height: 760px) and (min-width: 801px) {
   #menu { padding-top: 24px; padding-bottom: 24px; }
-  #menu .logo { font-size: 3.2rem; }
-  #menu .tagline { margin-bottom: 16px; }
-  #menu .menu-eyebrow { margin-bottom: 10px; }
-  .menu-footnote { margin-top: 14px; }
+  .menu-kicker { margin-bottom: 24px; }
+  #menu .logo { font-size: 3.5rem; }
+  .menu-goal { margin: 14px 0 20px; }
+  .menu-footnote { margin-top: 12px; }
+  .menu-utilities { margin-top: 20px; }
 }
-@media (prefers-reduced-motion: reduce) { #menu-tour { transition: none; } }
+@media (max-width: 420px) { .explorer-card { grid-template-columns: minmax(0, 1fr) auto; gap: 8px; } .explorer-mark { display: none; } .home-explorer-stats { gap: 8px; } .home-explorer-stats strong { font-size: 1.1rem; } }

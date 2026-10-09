@@ -27,89 +27,32 @@
   <!-- Title / lobby screen -->
   <main id="menu" class="screen">
     <canvas id="menu-tour" aria-hidden="true"></canvas>
+    <p class="menu-eyebrow menu-kicker">Co-op dinosaur survival · 1–4 explorers</p>
     <div class="menu-card">
-      <p class="menu-eyebrow">A co-op expedition · 1–4 explorers</p>
       <h1 class="logo">Dinosaur<br>Island <span class="logo-foot" aria-hidden="true"></span></h1>
-      <p class="tagline">Track. Hunt. Survive.</p>
-      <form id="join-form" autocomplete="off">
-        <label for="player-name">Your name</label>
-        <input id="player-name" name="name" maxlength="14" placeholder="Explorer">
-        <label for="lobby-visibility" id="visibility-label" hidden>Who can join?</label>
-        <select id="lobby-visibility" hidden>
-          <option value="friends">Friends only</option>
-          <option value="private">Invite only</option>
-          <option value="public">Anyone</option>
-        </select>
-        <div class="menu-buttons">
-          <button type="button" class="btn btn-primary" id="btn-solo">Play solo <span class="action-note">Your own expedition</span></button>
-          <button type="button" class="btn" id="btn-host">Host game</button>
-          <button type="button" class="btn" id="btn-friends" disabled>Join friend</button>
-          <button type="button" class="btn" data-open-settings>Settings</button>
+      <p class="menu-goal">Explore the islands. Hunt together.<br>Repair your boat and sail into the unknown.</p>
+      <div class="explorer-card">
+        <span class="explorer-mark" aria-hidden="true"><svg viewBox="0 0 24 24"><use href="#i-wing"/></svg></span>
+        <div><label for="player-name">Playing as</label><input id="player-name" name="name" maxlength="14" placeholder="Explorer" autocomplete="off"><span id="home-progress">Explorer · Level 1</span></div>
+        <button type="button" id="btn-explorer" class="menu-link">Customize</button>
+      </div>
+      <nav class="menu-buttons" aria-label="Start an expedition">
+        <button type="button" class="btn btn-primary" id="btn-solo"><span>Play solo</span><span aria-hidden="true">→</span><span class="action-note">An offline expedition of your own</span></button>
+        <div class="menu-play-options">
+          <button type="button" class="btn" data-home-panel="host"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-play"/></svg>Create game</button>
+          <button type="button" class="btn" data-home-panel="join"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-door"/></svg>Join game</button>
         </div>
-        <details class="controls-help connection-options">
-          <summary>Play with friends <span>Steam · Internet · LAN</span></summary>
-        <p id="steam-status" class="lobby-note" role="status">Checking Steam…</p>
-        <section class="internet-test" aria-label="Internet co-op test">
-          <button type="button" class="btn" id="btn-host-internet">Host internet test</button>
-          <label for="internet-address">Address to send your friends</label>
-          <div class="host-address-row">
-            <input id="internet-address" readonly spellcheck="false" placeholder="Host an internet test to get an address">
-            <button type="button" class="btn copy-address" id="btn-copy-internet" aria-label="Copy internet address" title="Copy internet address" disabled>
-              <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V4a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h4"/></svg>
-            </button>
-          </div>
-          <p id="internet-status" class="lobby-note" role="status" aria-live="polite">Temporary Cloudflare tunnel. No router setup. First start downloads the tunnel helper.</p>
-          <button type="button" class="btn" id="btn-stop-internet" hidden>Stop internet test</button>
-          <label for="friend-internet-address">Friend’s internet address</label>
-          <input id="friend-internet-address" spellcheck="false" placeholder="Paste the wss:// address your friend sent">
-          <button type="button" class="btn" id="btn-join-internet">Join internet test</button>
-        </section>
-        <details class="controls-help lan-options">
-          <summary>LAN / direct connection</summary>
-          <button type="button" class="btn" id="btn-host-lan">Host LAN game</button>
-          <label for="host-address">Your host address</label>
-          <div class="host-address-row">
-            <input id="host-address" readonly spellcheck="false" placeholder="Finding your LAN address…">
-            <button type="button" class="btn copy-address" id="btn-copy-address" aria-label="Copy host address" title="Copy host address" disabled>
-              <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V4a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h4"/></svg>
-            </button>
-          </div>
-          <label for="host-network" id="host-network-label" hidden>Network to share</label>
-          <select id="host-network" hidden></select>
-          <p id="lan-status" class="lobby-note" role="status" aria-live="polite"></p>
-          <label for="server-url">Friend’s IP or WebSocket address</label>
-          <input id="server-url" name="server" spellcheck="false" placeholder="ws://192.168.1.10:8080">
-          <button type="submit" class="btn" id="btn-join">Join LAN game</button>
-          <p class="lobby-note">Same network: share the address above. Other networks: use the host’s public IP with port forwarding.</p>
-        </details>
-        </details>
-        <p id="lobby-status" class="lobby-status" role="status" aria-live="polite"></p>
-        <ul id="lobby-players" class="lobby-players" aria-label="Players on the server"></ul>
-      </form>
-      <details class="controls-help">
-        <summary>Controls</summary>
-        <dl>
-          <dt>WASD</dt><dd>Move</dd>
-          <dt>Shift</dt><dd>Sprint</dd>
-          <dt>Space</dt><dd>Jump</dd>
-          <dt>Mouse</dt><dd>Look</dd>
-          <dt>R</dt><dd>Reload pistol or rifle</dd>
-          <dt>Left click</dt><dd>Attack / hold to draw bow / place</dd>
-          <dt>Right click</dt><dd>Throw spear</dd>
-          <dt>1 – 6</dt><dd>Spear, bow, trap, fruit, pistol, rifle</dd>
-          <dt>E</dt><dd>Interact</dd>
-          <dt>F</dt><dd>Eat fruit</dd>
-          <dt>G</dt><dd>Give fruit to teammate</dd>
-          <dt>V (hold)</dt><dd>Butcher a carcass</dd>
-          <dt>Tab</dt><dd>Inventory</dd>
-          <dt>M</dt><dd>Map</dd>
-          <dt>K</dt><dd>Skills</dd>
-          <dt>U</dt><dd>Get unstuck</dd>
-          <dt>Esc</dt><dd>Pause menu</dd>
-        </dl>
-      </details>
-      <p class="menu-footnote">Find your crew. Leave your footprints.</p>
+      </nav>
+      <p id="lobby-status" class="lobby-status" role="status" aria-live="polite"></p>
+      <ul id="lobby-players" class="lobby-players" aria-label="Players on the server"></ul>
+      <p class="menu-footnote">Track. Hunt. Survive.</p>
     </div>
+    <nav class="menu-utilities" aria-label="Game information and preferences">
+      <button type="button" class="menu-link" data-home-panel="guide">How to play</button>
+      <button type="button" class="menu-link" data-open-settings="controls">Controls</button>
+      <button type="button" class="menu-link" data-open-settings>Settings</button>
+      <button type="button" class="menu-link" data-home-panel="credits">Credits</button>
+    </nav>
     <aside class="tour-info" aria-label="Island preview">
       <p class="menu-eyebrow" id="tour-state">Exploring the archipelago</p>
       <h2 id="tour-title">Dinosaur Island</h2>
@@ -121,6 +64,44 @@
       </div>
     </aside>
   </main>
+
+  <div id="home-host" class="screen home-dialog" hidden>
+    <section class="home-panel" role="dialog" aria-modal="true" aria-labelledby="home-host-title">
+      <header class="home-panel-head"><div><p class="menu-eyebrow">Gather your crew</p><h2 id="home-host-title">Create an expedition</h2></div><button type="button" class="menu-link" data-home-close aria-label="Close create game">×</button></header>
+      <p>Explore together with up to four players. Choose how your friends will connect.</p>
+      <section class="home-option"><h3>Steam friends</h3><p id="steam-status" class="lobby-note" role="status">Checking Steam…</p><label for="lobby-visibility" id="visibility-label" hidden>Who can join?</label><select id="lobby-visibility" hidden><option value="friends">Friends only</option><option value="private">Invite only</option><option value="public">Anyone</option></select><button type="button" class="btn" id="btn-host">Host game</button></section>
+      <section class="home-option internet-test"><h3>Over the internet</h3><p class="lobby-note">Host a temporary room and send its address to your friends.</p><button type="button" class="btn" id="btn-host-internet">Host internet game</button><label for="internet-address">Address to share</label><div class="host-address-row"><input id="internet-address" readonly spellcheck="false" placeholder="Start hosting to get an address"><button type="button" class="btn copy-address" id="btn-copy-internet" aria-label="Copy internet address" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V4a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h4"/></svg></button></div><p id="internet-status" class="lobby-note" role="status" aria-live="polite">The first start downloads the tunnel helper. Keep the host game open while friends play.</p><button type="button" class="btn" id="btn-stop-internet" hidden>Stop internet game</button></section>
+      <section class="home-option"><h3>On the same network</h3><button type="button" class="btn" id="btn-host-lan">Host LAN game</button><label for="host-address">Your host address</label><div class="host-address-row"><input id="host-address" readonly spellcheck="false" placeholder="Finding your LAN address…"><button type="button" class="btn copy-address" id="btn-copy-address" aria-label="Copy host address" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V4a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h4"/></svg></button></div><label for="host-network" id="host-network-label" hidden>Network to share</label><select id="host-network" hidden></select><p id="lan-status" class="lobby-note" role="status" aria-live="polite"></p></section>
+      <p class="home-feedback" role="status" aria-live="polite"></p>
+      <footer><button type="button" class="menu-link" data-home-close>Back to menu</button></footer>
+    </section>
+  </div>
+  <div id="home-join" class="screen home-dialog" hidden>
+    <section class="home-panel" role="dialog" aria-modal="true" aria-labelledby="home-join-title">
+      <header class="home-panel-head"><div><p class="menu-eyebrow">Find your crew</p><h2 id="home-join-title">Join an expedition</h2></div><button type="button" class="menu-link" data-home-close aria-label="Close join game">×</button></header>
+      <section class="home-option"><h3>Steam games</h3><p class="lobby-note" id="home-steam-note">Steam friends and public games are available in the Steam desktop build.</p><button type="button" class="btn" id="btn-friends" disabled>Friends &amp; public games</button></section>
+      <form id="join-form" autocomplete="off">
+        <section class="home-option"><h3>Internet invitation</h3><label for="friend-internet-address">Your friend’s room address</label><input id="friend-internet-address" spellcheck="false" placeholder="Paste the wss:// address your friend sent"><button type="button" class="btn btn-primary" id="btn-join-internet">Join internet game</button></section>
+        <section class="home-option"><h3>LAN / direct connection</h3><label for="server-url">IP or WebSocket address</label><input id="server-url" name="server" spellcheck="false" placeholder="ws://192.168.1.10:8081"><button type="submit" class="btn" id="btn-join">Join LAN game</button><p class="lobby-note">On the same network, ask the host for their LAN address.</p></section>
+      </form>
+      <p class="home-feedback" role="status" aria-live="polite"></p>
+      <footer><button type="button" class="menu-link" data-home-close>Back to menu</button></footer>
+    </section>
+  </div>
+  <div id="home-guide" class="screen home-dialog" hidden>
+    <section class="home-panel" role="dialog" aria-modal="true" aria-labelledby="home-guide-title">
+      <header class="home-panel-head"><div><p class="menu-eyebrow">Your first expedition</p><h2 id="home-guide-title">How to play</h2></div><button type="button" class="menu-link" data-home-close aria-label="Close how to play">×</button></header>
+      <ol class="home-guide-steps"><li><h3>Explore and prepare</h3><p>Follow the trails, gather fruit, and use the camp workbench to craft supplies. Fruit restores health.</p></li><li><h3>Hunt as a team</h3><p>Track dinosaurs, choose your moment, and keep an eye on your crew. Harvest fallen dinosaurs for resources.</p></li><li><h3>Find the boat parts</h3><p>Your mission board lists the missing parts. Search the island, repair the boat, and gather everyone to set sail.</p></li><li><h3>Grow stronger</h3><p>Hunts and recovered boat parts earn experience. Open Skills with K and spend your points near camp.</p></li></ol>
+      <footer><button type="button" class="btn" data-open-settings="controls">See controls</button><button type="button" class="menu-link" data-home-close>Back to menu</button></footer>
+    </section>
+  </div>
+  <div id="home-credits" class="screen home-dialog" hidden>
+    <section class="home-panel" role="dialog" aria-modal="true" aria-labelledby="home-credits-title">
+      <header class="home-panel-head"><div><p class="menu-eyebrow">Behind the expedition</p><h2 id="home-credits-title">Credits</h2></div><button type="button" class="menu-link" data-home-close aria-label="Close credits">×</button></header>
+      <p>Dinosaur Island · A co-op dinosaur hunting game.</p><section class="home-option"><h3>Music &amp; sound</h3><p>Music by Scott Buckley and Tsorthan Grove. Recorded and performed sound effects are credited with their sources and licenses.</p><p><a href="/assets/audio/CREDITS.md" target="_blank" rel="noopener">View sound credits</a></p><button type="button" class="btn" data-open-settings>Music attribution &amp; settings</button></section><section class="home-option"><h3>Built with</h3><p>Three.js, Node.js and Electron. Steam co-op uses Steamworks.</p></section>
+      <footer><button type="button" class="menu-link" data-home-close>Back to menu</button></footer>
+    </section>
+  </div>
 
   <!-- Shown while pointer lock is released during play -->
   <div id="paused" class="screen" hidden>

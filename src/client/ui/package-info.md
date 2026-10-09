@@ -16,6 +16,8 @@
 - `skillIcons.js` — 24x24 stroke SVG icons per skill and tree, plus lock/tick/close glyphs.
 - `menus.js` — `ICON_SPRITE`, `initSettings()` (settings dialog) and `renderPause(game)` (pause screen contents).
 - `menuTour.js` — lazily loaded `createMenuTour(canvas, onIsland)`: live home-menu camera tour through all three seeded island layouts; owns its scenery renderer, reduced-motion and visibility handling, island selection and disposal.
+- `homeMenu.js` — `initHomeMenu()`: create/join expedition, how-to-play and credits dialogs; focus handling and connection status feedback. Keeps the title screen focused on player identity and play actions.
+- `homeExplorer.js` — `initHomeExplorer()`: saved level/XP/skills summary and lazy outfit customization with the existing wardrobe; no skill purchases, preview GPU resources are released on close.
 - `perfStats.js` — `PerfStats` / `FrameSamples`: FPS and ping overlay (off / compact / detailed).
 - `internetTest.js` — `initInternetTest()`: UI for the server's `/internet` start/stop/status endpoint and the shareable address.
 - `steamLobby.js` — `initSteamLobby()`: Steam friends/invite panel over the Electron bridge `window.dinoSteam`.
