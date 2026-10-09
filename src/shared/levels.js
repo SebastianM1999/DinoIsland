@@ -223,7 +223,7 @@ export const LEVELS = [
   // for its boss (shared/volcanoArena.js)
   { name: 'Ashfall Isle', biome: 'volcano', scale: 0.65, seedIndex: 1, variant: 1 },
   // the last level: through the mountain from the west cove to the east beach (shared/caveMaze.js)
-  { name: 'Hollow Mountain', biome: 'cave', scale: 1, seedIndex: 3, variant: 1 },
+  { name: 'Hollow Mountain', biome: 'cave', scale: 1, seedIndex: 3, variant: 7 },
 ];
 
 export const LEVEL_COUNT = LEVELS.length;
