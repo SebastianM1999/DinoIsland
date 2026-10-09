@@ -19,11 +19,6 @@ import { caveOpenSdf, caveRoofBase } from '../../shared/caveField.js';
 
 /** How far into the mountain a mouth's daylight counts as open sky (metres): the sky field's sources. */
 export const ARCH_DEPTH = 2;
-/**
- * Where roof and shell begin at a mouth (metres into the mountain): right at the rim, the same line for both,
- * so from inside the roof always covers the shell's rising lintel (no gap to see the cliff through).
- */
-export const ROOF_EDGE = 0.5;
 /** The mouth's daylight reaches this far (metres through the tunnel) before it is dark. */
 const DAYLIGHT_REACH = 13;
 
@@ -153,15 +148,15 @@ float caveSkyVis() {
   vec2 t = texture2D(uSkyTex, (vCaveW.xz - uSkyRect.xy) * uSkyRect.z).rg;
   float v = t.r;
   if (uSkyMode < 0.5) v = mix(v, 1.0, smoothstep(t.g + 0.1, t.g + 1.4, vCaveW.y));   // above the roof: the mountain's skin
-  else if (uSkyMode > 1.5) v = gl_FrontFacing ? 1.0 : 0.0;
+  else if (uSkyMode > 1.5) v = mix(v, 1.0, smoothstep(t.g + 1.0, t.g + 2.6, vCaveW.y));   // the volume: its roof lies at t.g (+- the noise), the skin well above it
   else if (!gl_FrontFacing) v = 0.0;
   return v;
 }
 /** The baked crystal glow lights what is under the roof, never the mountain's skin above it. */
 float caveGlowK() {
-  if (uSkyMode > 1.5) return 0.0;
-  if (uSkyMode > 0.5) return gl_FrontFacing ? 1.0 : 0.0;
+  if (uSkyMode > 0.5 && uSkyMode < 1.5) return gl_FrontFacing ? 1.0 : 0.0;
   float roofY = texture2D(uSkyTex, (vCaveW.xz - uSkyRect.xy) * uSkyRect.z).g;
+  if (uSkyMode > 1.5) return 1.0 - smoothstep(roofY + 1.0, roofY + 2.6, vCaveW.y);
   return 1.0 - smoothstep(roofY + 0.1, roofY + 1.4, vCaveW.y);
 }
 `;
@@ -178,7 +173,7 @@ const FOG = CH.fog_fragment.replace('fogColor, fogFactor', 'fogColor * mix(mix(0
 /**
  * Make `mat` light itself by the sky field. mode: 0 = terrain (a pixel above the roof is the
  * mountain's skin, 1 outside), 1 = under the roof (always the field: roof, stalactites, columns),
- * 2 = the shell over the tunnels (the skin; its back, seen through a slit, is dark).
+ * 2 = the volume mesh (the whole mountain: roof, walls, floors under the roof line, the skin above it).
  * Call BEFORE `withSurfaceDetail` (that one wraps this hook).
  */
 export function withCaveSky(mat, mode) {

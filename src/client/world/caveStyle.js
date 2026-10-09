@@ -1,7 +1,7 @@
 // Shared look of the Hollow Mountain (biome 'cave'): how far inside the mountain a
 // point is, the crystal / daylight colours, the baked glow field that tints the
 // terrain and the roof, and the two air moods (cove daylight, mountain dark).
-// Pure data and maths (THREE colours only): used by terrainMesh, caveMesh,
+// Pure data and maths (THREE colours only): used by terrainMesh, caveTerrain,
 // caveDecor, caveFx and the audio / minimap.
 
 import * as THREE from 'three';
