@@ -13,6 +13,10 @@ const tmp = { x: 0, z: 0, hit: false };
 const tmp2 = { x: 0, z: 0, hit: false };
 /** Rock sides steeper than this (tan) can't be walked up once they are higher than a step. */
 const ROCK_WALK_SLOPE = 0.45;
+/** a cave floor sample this far above the feet within the slide probe is a wall, not a slope (m) */
+const WALL_RISE = 0.9;
+/** the body stops this far (m) before the foot of a cave wall's ramp in the walk grid */
+const WALL_GAP = 0.2;
 /** Collision span starts this far above the feet; `stand` colliders up to a step higher are walked onto. */
 const FOOT = 0.05;
 const CLIMB = P.stepHeight - FOOT;
@@ -304,7 +308,9 @@ export class PlayerController {
       if (this.pos.y - gT < 0.05 && this.rockSurfaceAt(x, z).h < gT + 0.05) {
         const g = this.terrain.gradientAt(x, z, 0.6);
         const s = Math.hypot(g.x, g.z);
-        if (s > P.maxWalkSlope) {
+        // (inside the Hollow Mountain a wall node's floor is the top of the rock: within 0.6 m of a wall the sampled
+        // "slope" is a cliff of metres, not ground to slide down. That is a wall: the step rules stop the body, nothing pushes it)
+        if (s > P.maxWalkSlope && !(this.terrain.isCave && this.#wallRise(x, z, 0.6) > this.pos.y + WALL_RISE)) {
           this.sliding = true;
           const k = Math.min(1, dt * 7);
           const slide = 4 + (s - P.maxWalkSlope) * 6;
@@ -467,6 +473,12 @@ export class PlayerController {
     }
   }
 
+  /** The highest floor sample within e metres of (x, z) (the Hollow Mountain's walk grid: a wall node's floor is the top of the rock). */
+  #wallRise(x, z, e) {
+    const t = this.terrain;
+    return Math.max(t.heightAt(x + e, z), t.heightAt(x - e, z), t.heightAt(x, z + e), t.heightAt(x, z - e));
+  }
+
   #tryMove(dx, dz, groundNow) {
     if (dx === 0 && dz === 0) return;
     const nx = this.pos.x + dx, nz = this.pos.z + dz;
@@ -488,6 +500,12 @@ export class PlayerController {
       const R = b.r + P.radius;
       const dn = (nx - b.x) ** 2 + (nz - b.z) ** 2;
       if (dn < R * R && dn <= (fx - b.x) ** 2 + (fz - b.z) ** 2) { this.barrierHit = true; return false; }
+    }
+    // the foot of a cave wall (the walk grid ramps up to the rock top within one cell) is not ground: do not creep closer to it
+    // (sliding along it is fine, creeping into a corner is not)
+    if (t.isCave) {
+      const wn = this.#wallRise(nx, nz, WALL_GAP);
+      if (wn > this.pos.y + WALL_RISE && wn > this.#wallRise(fx, fz, WALL_GAP) + 0.05) return false;
     }
     const base = Math.max(groundNow, this.pos.y - 0.05);
     const gTerrain = t.heightAt(nx, nz);
