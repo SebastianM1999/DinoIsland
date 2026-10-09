@@ -27,7 +27,7 @@ export const FALSE_SILL = { h: 9, end0: 14, end1: 15 };
 /** Smoothing of the union of tunnels and chambers (metres): round junctions. */
 const SMIN = 3;
 /** How far below the dry floor the swimmable stretch of a flooded tunnel dips. */
-export const FLOOD_DEPTH = 3.4;
+const FLOOD_DEPTH = 3.4;
 /** Water surface below the dry floor beside it. */
 export const FLOOD_LEVEL = 0.35;
 const BUCKET = 32;
