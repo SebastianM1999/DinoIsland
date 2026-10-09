@@ -250,6 +250,40 @@ export class Hud {
     this.$invPanel = el('section', 'hud-panel hud-inv brush');
     this.$invPanel.setAttribute('aria-label', 'Inventory');
     this.$invPanel.hidden = true;
+    this.$invPanel.addEventListener('click', e => {
+      const cell = e.target.closest('[data-inventory-item]');
+      if (cell) { this._selectInventoryItem(cell.dataset.inventoryItem); return; }
+      const action = e.target.closest('[data-inventory-action]')?.dataset.inventoryAction;
+      if (action === 'close') { this.onCloseInventory?.(); return; }
+      const item = this._inventoryItems?.get(this._inventorySelection);
+      if (!item?.drop || (action !== 'drop' && action !== 'deposit')) return;
+      if (action === 'deposit' && !CONFIG.loot[item.kind]) return;
+      this.onInventoryDrop?.(item.kind, action === 'deposit');
+    });
+    this.$invPanel.addEventListener('focusin', e => {
+      const cell = e.target.closest('[data-inventory-item]');
+      if (cell) this._selectInventoryItem(cell.dataset.inventoryItem);
+    });
+    this.$invPanel.addEventListener('change', e => {
+      if (!e.target.matches('[data-inventory-empty]')) return;
+      this._showEmptyConsumables = e.target.checked;
+      this._renderInventory();
+    });
+    this.$invPanel.addEventListener('keydown', e => {
+      if (e.key === 'Tab') {
+        e.stopPropagation(); // Tab navigates this panel; Escape still closes it.
+        const controls = [...this.$invPanel.querySelectorAll('button:not(:disabled), input')];
+        const i = controls.indexOf(document.activeElement);
+        if ((e.shiftKey && i <= 0) || (!e.shiftKey && i === controls.length - 1)) {
+          e.preventDefault(); controls[e.shiftKey ? controls.length - 1 : 0]?.focus();
+        }
+      } else if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key)) {
+        const controls = [...this.$invPanel.querySelectorAll('button:not(:disabled), input')];
+        const i = controls.indexOf(document.activeElement);
+        e.preventDefault(); e.stopPropagation();
+        controls[(i + (['ArrowLeft', 'ArrowUp'].includes(e.key) ? -1 : 1) + controls.length) % controls.length]?.focus();
+      }
+    });
     this.$invPanel.addEventListener('wheel', (e) => {
       if (!e.deltaY || e.target.closest('.hud-inv-body')?.scrollHeight > e.target.closest('.hud-inv-body')?.clientHeight) return;
       e.preventDefault();
@@ -634,10 +668,19 @@ export class Hud {
     // Only rebuild when the contents change – rebuilding every frame would
     // break hover tooltips.
     const maxCarry = inv.maxCarry ?? CONFIG.player.maxCarryWeight;
-    const sig = JSON.stringify([inv.guns, inv.reloading, inv.spear, inv.spearHealth, inv.arrowUses, inv.arrows, inv.maxArrows, inv.maxFruit, maxCarry, inv.traps, inv.fruit, inv.loot, inv.store, Math.round((inv.carryWeight || 0) * 10), Math.round((inv.speedFactor ?? 1) * 100)]);
+    const sig = JSON.stringify([this._showEmptyConsumables, inv.guns, inv.reloading, inv.spear, inv.spearHealth, inv.arrowUses, inv.arrows, inv.maxArrows, inv.maxFruit, maxCarry, inv.traps, inv.fruit, inv.loot, inv.store, Math.round((inv.carryWeight || 0) * 10), Math.round((inv.speedFactor ?? 1) * 100)]);
     if (this._c.invSig === sig) return;
     this._c.invSig = sig;
-    const cell = (ic, n, name, tip = ic, drop = null) => `<li class="hud-cell${n ? '' : ' is-zero'}" data-tip="${tip}" ${drop ? `draggable="true" data-drop-kind="${drop}"` : ''} tabindex="-1"><span class="hud-cell-ic">${icon(ic)}</span><span class="hud-cell-n">${n ?? ''}</span><span class="sr">${esc(name)}</span></li>`;
+    const focused = this.$invPanel.contains(document.activeElement) ? document.activeElement.dataset.inventoryItem : null;
+    const focusedAction = this.$invPanel.contains(document.activeElement) ? document.activeElement.dataset.inventoryAction : null;
+    const focusedFilter = document.activeElement.hasAttribute('data-inventory-empty');
+    const scroll = this.$invPanel.querySelector('.hud-inv-items')?.scrollTop || 0;
+    this._inventoryItems = new Map();
+    const cell = (ic, n, name, tip = ic, drop = null, stored = false) => {
+      const key = `${stored ? 'store' : 'carry'}:${tip}`;
+      this._inventoryItems.set(key, { kind: tip, icon: ic, count: n, name, drop, stored });
+      return `<li><button type="button" class="hud-cell${(stored ? n > 0 : drop) ? '' : ' is-zero'}" data-inventory-item="${key}" aria-pressed="false" aria-label="${esc(name)}, ${esc(n ?? 0)}${stored ? ', stored at hut' : ''}" ${drop ? `draggable="true" data-drop-kind="${drop}"` : ''}><span class="hud-cell-ic">${icon(ic)}</span><span class="hud-cell-n">${esc(n ?? '')}</span><span class="hud-cell-name">${esc(name)}</span></button></li>`;
+    };
     const fruitCounts = {};
     for (const f of inv.fruit || []) fruitCounts[f] = (fruitCounts[f] || 0) + 1;
     const loot = inv.loot || {}, store = inv.store || {};
@@ -646,27 +689,53 @@ export class Hud {
       ...['pistol', 'rifle'].map(k => cell(k, inv.guns?.[k]?.owned === false ? 0 : `${inv.guns?.[k]?.loaded ?? 0}/${inv.guns?.[k]?.reserve ?? 0}`, k === 'pistol' ? 'Pistol' : 'Assault rifle', k, inv.guns?.[k] && inv.guns[k].owned !== false ? k : null)),
       cell('arrow', `${inv.arrows ?? 0}/${inv.maxArrows ?? CONFIG.weapons.bow.maxArrows}`, 'Arrows', 'arrow', inv.arrows > 0 ? 'arrow' : null),
       cell('trap', inv.traps ?? 0, 'Traps', 'trap', inv.traps > 0 ? 'trap' : null),
-      ...FRUIT_KEYS.map((k) => cell(k, fruitCounts[k] || 0, fruitName(k), k, fruitCounts[k] > 0 ? k : null)),
     ].join('');
+    const consumables = FRUIT_KEYS.filter(k => this._showEmptyConsumables || fruitCounts[k] > 0).map(k => cell(k, fruitCounts[k] || 0, fruitName(k), k, fruitCounts[k] > 0 ? k : null)).join('');
     const carried = LOOT_KEYS.map((k) => cell(k, loot[k] || 0, lootName(k), k, loot[k] > 0 ? k : null)).join('');
-    const stored = LOOT_KEYS.map((k) => cell(k, store[k] || 0, lootName(k))).join('');
+    const stored = LOOT_KEYS.map((k) => cell(k, store[k] || 0, lootName(k), k, null, true)).join('');
     const sf = inv.speedFactor ?? 1;
-    const need = CONFIG.mission || {};
     this.$invPanel.innerHTML = `
-      <header class="hud-panel-head"><h2>Inventory</h2><span class="hud-panel-close"><kbd>Tab</kbd> Close</span></header>
+      <header class="hud-panel-head"><h2>Inventory</h2><button type="button" class="wd-btn" data-inventory-action="close">Close <kbd>Esc</kbd></button></header>
       <div class="hud-inv-body">
-        <div>
-          <h3>Gear &amp; fruit</h3><ul class="hud-grid">${gear}</ul>
-          <h3>Carried loot</h3><ul class="hud-grid">${carried}</ul>
+        <div class="hud-inv-items">
+          <h3>Equipment &amp; supplies</h3><ul class="hud-grid">${gear}</ul>
+          <h3>Consumables</h3><label class="hud-inv-filter"><input type="checkbox" data-inventory-empty ${this._showEmptyConsumables ? 'checked' : ''}> Show empty consumables</label>
+          ${consumables ? `<ul class="hud-grid">${consumables}</ul>` : '<p class="hud-inv-note">No fruit carried. Gather fruit on this island.</p>'}
+          <h3>Carried materials</h3><ul class="hud-grid">${carried}</ul>
           <p class="hud-inv-stat">${icon('weight')} Load <b class="${(inv.carryWeight || 0) >= maxCarry ? 'is-slow' : ''}">${Math.round((inv.carryWeight || 0) * 10) / 10} / ${maxCarry}</b> · Speed <b class="${sf < 0.95 ? 'is-slow' : ''}">${Math.round(sf * 100)}%</b></p>
-          <p class="hud-inv-note">Drag a stack outside the inventory to drop it. Scroll to switch equipment.</p>
+          <p class="hud-inv-note">Select an item to inspect it or use its actions. Dragging stacks also works.</p>
           <div class="hud-inv-drop" data-world-drop>Drop here to place items on the ground</div>
-        </div>
         <div class="hud-inv-store">
           <h3>${icon('home')} Hut store</h3><ul class="hud-grid">${stored}</ul>
-          <p class="hud-inv-note">Drag carried loot here to deposit it near a hut drop-off. Mission needs ${need.requiredMeat ?? 3} meat and ${need.requiredHide ?? 1} hide in the store.</p>
+          <p class="hud-inv-note">Team supplies. Deposit carried materials near a hut drop-off.</p>
         </div>
+        </div>
+        <aside class="hud-inv-detail" aria-label="Selected item"></aside>
       </div>`;
+    this._selectInventoryItem(this._inventoryItems.has(this._inventorySelection) ? this._inventorySelection : this._inventoryItems.keys().next().value);
+    this.$invPanel.querySelector('.hud-inv-items').scrollTop = scroll;
+    if (focusedFilter) this.$invPanel.querySelector('[data-inventory-empty]')?.focus({ preventScroll: true });
+    if (focused) this.$invPanel.querySelector(`[data-inventory-item="${focused}"]`)?.focus({ preventScroll: true });
+    if (focusedAction) {
+      const button = this.$invPanel.querySelector(`[data-inventory-action="${focusedAction}"]`);
+      if (button && !button.disabled) button.focus({ preventScroll: true });
+      else this.$invPanel.querySelector(`[data-inventory-item="${this._inventorySelection}"]`)?.focus({ preventScroll: true });
+    }
+  }
+
+  _selectInventoryItem(key) {
+    const item = this._inventoryItems?.get(key);
+    if (!item) return;
+    this._inventorySelection = key;
+    for (const cell of this.$invPanel.querySelectorAll('[data-inventory-item]')) cell.setAttribute('aria-pressed', String(cell.dataset.inventoryItem === key));
+    const info = ITEM_INFO[item.kind] || {};
+    this.$invPanel.querySelector('.hud-inv-detail').innerHTML = `<div class="hud-inv-detail-icon">${icon(item.icon)}</div>
+      <p class="hud-inv-kind">${esc(item.stored ? 'Team storage' : info.kind || 'Equipment')}</p><h3>${esc(info.name || item.name)}</h3>
+      <p class="hud-inv-quantity">${item.kind === 'spear' ? 'Durability: ' : ['pistol', 'rifle'].includes(item.kind) ? 'Loaded / reserve: ' : 'Quantity: '}${esc(item.count ?? 0)}${item.stored ? ' in the hut store' : ''}</p>
+      <p>${esc(info.text || 'Equipment for your expedition.')}</p>${info.use ? `<p class="hud-inv-note">${esc(info.use)}</p>` : ''}
+      <div class="hud-inv-actions"><button type="button" class="wd-btn" data-inventory-action="drop" ${item.drop ? '' : 'disabled'}>Drop ${['spear', 'pistol', 'rifle'].includes(item.kind) ? 'equipment' : 'stack'}</button>
+      <button type="button" class="wd-btn wd-primary" data-inventory-action="deposit" ${item.drop && CONFIG.loot[item.kind] ? '' : 'disabled'}>Deposit stack at hut</button></div>
+      <p class="hud-inv-note">${item.stored ? 'Stored supplies are shared with your team.' : CONFIG.loot[item.kind] ? 'Move close to the hut drop-off to deposit. Actions affect the full stack.' : 'Drop places the carried item or stack on the ground.'}</p>`;
   }
 
   setTeam(members) {
@@ -990,6 +1059,7 @@ export class Hud {
     if (open) this._renderInventory();
     this.$invPanel.hidden = !open;
     this.root.classList.toggle('has-panel', this.isPanelOpen());
+    if (open) this.$invPanel.querySelector(`[data-inventory-item="${this._inventorySelection}"]`)?.focus({ preventScroll: true });
     return open;
   }
 
