@@ -1,0 +1,72 @@
+#loading.expedition-loading {
+  isolation: isolate;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: #11191c;
+  color: #f2ead6;
+  justify-content: flex-end;
+  align-items: flex-start;
+  padding: clamp(26px, 5vw, 84px);
+}
+.expedition-loading::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(0deg, rgba(7,13,16,.96), rgba(7,13,16,.2) 85%),
+    linear-gradient(90deg, rgba(7,13,16,.65), transparent 75%);
+  pointer-events: none;
+}
+.loading-photographs { position: absolute; inset: 0; z-index: -2; overflow: hidden; }
+.loading-photograph {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0;
+  transition: opacity .3s ease;
+}
+.loading-photograph.is-visible {
+  opacity: 1;
+  animation: loading-lookout 12s ease-in-out infinite alternate;
+}
+@keyframes loading-lookout {
+  from { transform: scale(1.035) translateX(-.4%); }
+  to { transform: scale(1.075) translateX(.4%); }
+}
+.loading-motion-paused .loading-photograph { animation-play-state: paused; }
+.loading-expedition { width: min(660px, 100%); text-shadow: 0 2px 8px #080f12; }
+.loading-eyebrow {
+  color: #c9b88c;
+  letter-spacing: .15em;
+  text-transform: uppercase;
+  font-weight: 700;
+  font-size: 14px;
+  margin: 0 0 16px;
+}
+.loading-island {
+  font-size: clamp(28px, 4.2vw, 60px);
+  line-height: 1.08;
+  margin: 0 0 24px;
+}
+#loading.expedition-loading .loading-text {
+  font-size: clamp(16px, 1.8vw, 24px);
+  line-height: 1.4;
+  margin: 0;
+}
+.loading-quip { color: #c5cdd0; font-size: clamp(14px, 1.3vw, 17px); line-height: 1.45; margin: 6px 0 20px; }
+.loading-phase-meter { display: flex; gap: 7px; max-width: 320px; }
+.loading-phase-meter span { flex: 1; height: 3px; background: #516065; }
+.loading-phase-meter .is-current { background: #e9c879; }
+.loading-phase-meter .is-complete { background: #a8bda5; }
+.loading-note { color: #aab8bd; font-size: 14px; line-height: 1.5; margin: 24px 0 0; }
+@media (max-height: 420px) {
+  .loading-eyebrow { margin-bottom: 8px; }
+  .loading-island { margin-bottom: 12px; }
+  .loading-note { margin-top: 12px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .loading-photograph { animation: none !important; transition: none; }
+}

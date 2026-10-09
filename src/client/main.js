@@ -15,6 +15,9 @@ import { initInternetTest } from './ui/internetTest.js';
 import { initHomeMenu } from './ui/homeMenu.js';
 import { initHomeExplorer } from './ui/homeExplorer.js';
 import { initHomeSkills } from './ui/homeSkills.js';
+import { initLoadingScreen } from './ui/loadingScreen.js';
+import { mapPreviewFrames } from './ui/mapPreviews.js';
+import { LEVELS } from '../shared/levels.js';
 import { BRAND, storageKey, migrateStorage } from '../shared/brand.js';
 
 migrateStorage();
@@ -39,7 +42,7 @@ const $ = (id) => document.getElementById(id);
 const menu = $('menu');
 const paused = $('paused');
 const loading = $('loading');
-const loadingText = loading.querySelector('.loading-text');
+const loadingUi = initLoadingScreen(loading);
 const canvas = $('game');
 const status = $('lobby-status');
 const nameInput = $('player-name');
@@ -184,6 +187,9 @@ async function start(mode, options = {}) {
   const name = nameInput.value.trim() || 'Explorer';
   try { localStorage.setItem(storageKey('name'), name); } catch { /* storage may be blocked */ }
   setBusy(true, mode === 'online' ? 'Connecting…' : 'Starting…');
+  const startingIsland = unlockedStartingIsland(Number($('play-island').value));
+  void loadingUi.start({ islandName: LEVELS[startingIsland].name, frames: mapPreviewFrames(startingIsland) });
+  menuTour?.setSuspended(true);
   let net;
   try {
     const outfit = savedOutfit();
@@ -194,6 +200,8 @@ async function start(mode, options = {}) {
   } catch (err) {
     if (mode === 'internet') internetTest.stop();
     busy = false;
+    loadingUi.stop();
+    syncTourSuspension();
     setBusy(false, err.message || String(err));
     return;
   }
@@ -217,16 +225,16 @@ async function launch(net, reuse = null) {
   let disconnectReason = 'Disconnected while loading the island';
   net.onClose = reason => { disconnectReason = reason || disconnectReason; };
   const lv = net.welcome.world.level;
-  loadingText.textContent = reuse ? `Sailing to island ${lv.index + 1}…` : 'Building the island…';
-  loading.hidden = false;
+  void loadingUi.start({ islandName: LEVELS[lv.index]?.name || `Island ${lv.index + 1}`, frames: mapPreviewFrames(lv.index) });
+  loadingUi.setStage('dinosaurs');
   // Let the loading screen paint before the heavy world build.
   await new Promise((r) => requestAnimationFrame(() => setTimeout(r, 30)));
   try {
     await preloadDinoModels((done, total) => {
-      loadingText.textContent = `Loading dinosaurs… ${done}/${total}`;
+      loadingUi.setStage('dinosaurs', { done, total });
     });
     if (net.closed) throw new Error(disconnectReason);
-    loadingText.textContent = 'Building the island…';
+    loadingUi.setStage('island');
     const { Game } = await loadGameModule();
     game = new Game(canvas, net, reuse ?? (menuAudio ? { audio: menuAudio } : null));
     net.on(`ev:${EV.MISSION}`, ({ mission }) => {
@@ -237,14 +245,14 @@ async function launch(net, reuse = null) {
       }
     });
     if (DEBUG_QUERY.has('debug')) window.dinoGame = game;   // testing aid: inspect the running game
-    loadingText.textContent = 'Preparing shaders…';
+    loadingUi.setStage('shaders');
     // Compile up front so the first playable frames do not hitch; optional.
     await game.gfx.prepare().catch((e) => console.warn('Shader precompile failed', e));
   } catch (err) {
     console.error(err);
     net.close();
     internetTest.stop();
-    loading.hidden = true;
+    loadingUi.stop();
     menu.hidden = false;
     void startMenuTour();
     menuAudio?.startMenuMusic();
@@ -266,7 +274,7 @@ async function launch(net, reuse = null) {
     net.welcome = welcome;
     launch(net, shared);
   };
-  loading.hidden = true;
+  loadingUi.stop();
   game.start();
   if (keepCreative) game.setCreative(true);
   game.input.requestLock();
