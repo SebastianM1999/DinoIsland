@@ -276,7 +276,9 @@ function buildShell({ terrain, layout, sky, geo, T, fillVertex, material }) {
   const inShell = new Set(cells.map(([i, j]) => j * n + i));
   const bottomAt = (k) => {
     const h = terrain.h(k % n1, (k / n1) | 0);
-    return depth[k] > 0 && roof[k] > -500 ? Math.max(h, Math.min(roof[k] - 0.2, S[k])) : h;
+    // (over an opening it starts 1.2 m under the nominal roof: the roof mesh dips up to ~0.85 m below it in its
+    // hollows (caveMesh.js bump), and the face must overlap that edge or a slit shows)
+    return depth[k] > 0 && roof[k] > -500 ? Math.max(h, Math.min(roof[k] - 1.2, S[k])) : h;
   };
   const skirt = [];   // [k1, k2, outward x, outward z]
   for (const [i, j] of cells) {
