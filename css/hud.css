@@ -732,6 +732,10 @@
 .hud-inv-stat b { color: var(--ink); }
 .hud-inv-stat b.is-slow { color: var(--orange); }
 .hud-inv-note { margin-top: 0.8em !important; color: var(--ink-dim); font-size: 0.95em; }
+.hud-equipped { display: flex; flex-wrap: wrap; justify-content: center; align-items: baseline; gap: .1em .7em; max-width: 28em; padding: .3em .6em; color: var(--cream); background: #152833de; border-radius: .4em; }
+.hud-equipped strong { font-size: .95em; font-weight: 800; }
+.hud-equipped span { font-size: .75em; color: #d3dfcf; }
+.hud-quiver { display: none; } /* Ammo and arrow wear are explicit in the selected-equipment readout. */
 
 /* Selected-item inspection and explicit actions complement stack dragging. */
 .hud-inv { width: min(70em, 95vw); height: min(48em, 90vh); max-height: 90vh; display: flex; flex-direction: column; }
