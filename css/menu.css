@@ -27,7 +27,6 @@
 .menu-play-options svg { width: 18px; height: 18px; }
 #menu .lobby-status { min-height: 1.4em; margin: 8px 0; color: #cad6c7; font-size: .85rem; }
 #menu .lobby-players:empty { display: none; }
-.menu-footnote { color: #b9c8b4; margin: 20px 0 0; font-size: .85rem; letter-spacing: .1em; text-transform: uppercase; }
 .menu-link { font: inherit; font-weight: 700; font-size: .95rem; min-height: 44px; padding: 8px 12px; background: transparent; border: 1px solid transparent; border-radius: 5px; color: #fff1d0; }
 .menu-link:hover { background: #d5dfc91a; border-color: #97aa9255; }
 .menu-link:focus-visible, .home-dialog input:focus-visible, .home-dialog select:focus-visible, #player-name:focus-visible, .tour-stop:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
@@ -97,7 +96,6 @@
   .menu-kicker { margin-bottom: 24px; }
   #menu .logo { font-size: 3.5rem; }
   .menu-goal { margin: 14px 0 20px; }
-  .menu-footnote { margin-top: 12px; }
   .menu-utilities { margin-top: 20px; }
 }
 @media (max-width: 420px) { .explorer-card { grid-template-columns: minmax(0, 1fr) auto; gap: 8px; } .explorer-mark { display: none; } .home-explorer-stats { gap: 8px; } .home-explorer-stats strong { font-size: 1.1rem; } }
