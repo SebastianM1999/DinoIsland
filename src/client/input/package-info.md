@@ -13,7 +13,7 @@
 ## Actions
 - Movement: `forward`, `back`, `left`, `right` (WASD/arrows), `jump` (Space), `sprint` (Shift), `dash` (Q).
 - Interaction: `interact` (E), `eat` (F), `give` (G), `knife` (V, hold at a carcass), `unstuck` (U), `reloadHint` (R), `slot1`..`slot6` (1-6), `primary` / `secondary` (mouse buttons).
-- Panels: `inventory` (Tab), `map` (M), `skills` (K); E and Escape first go to `onPanelToggle('interact' | 'close')`.
+- Panels: `inventory` (Tab), `map` (M), `skills` (K), `quests` (X, live tracker expansion); E and Escape first go to `onPanelToggle('interact' | 'close')`.
 - `team` (T) is bound but currently not read anywhere in `src/client/`.
 - Debug: `stats` (F2), `debug` (F3).
 
@@ -24,7 +24,7 @@
 - Pointer lock requests native unadjusted movement, falling back to ordinary lock on `NotSupportedError`. Other failures retain the cooldown retry.
 - Focus, enabled-state and pointer-lock transitions clear accumulated mouse/wheel input and re-prime relative movement. The first movement packet after a transition, nonfinite deltas and changes to locked cursor coordinates are discarded; legitimate relative deltas are never magnitude-capped.
 - Losing focus or pointer lock, or disabling gameplay, releases all held actions (reported as released).
-- `inventory`, `map`, `skills` never become held actions; they go straight to `onPanelToggle`. E and Escape are consumed when `onPanelToggle` returns true.
+- `inventory`, `map`, `skills`, `quests` never become held actions; they go straight to `onPanelToggle`. E and Escape are consumed when `onPanelToggle` returns true.
 - `pressed` / `released` are only valid until `endFrame()`.
 
 ## Not here

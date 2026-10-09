@@ -177,7 +177,7 @@ export class Hud {
     // ---------- bottom-left: key hints
     const bl = el('ul', 'hud-keys');
     bl.setAttribute('aria-label', 'Key hints');
-    for (const [ic, key, label] of [['bag', 'Tab', 'Inventory'], ['map', 'M', 'Map'], ['give', 'G', 'Give fruit'], ['eat', 'F', 'Eat'], ['knife', 'V', 'Butcher'], ['bolt', 'K', 'Skills']]) {
+    for (const [ic, key, label] of [['bag', 'Tab', 'Inventory'], ['map', 'M', 'Map'], ['give', 'G', 'Give fruit'], ['eat', 'F', 'Eat'], ['knife', 'V', 'Butcher'], ['bolt', 'K', 'Skills'], ['map', 'X', 'Quests']]) {
       bl.insertAdjacentHTML('beforeend', `<li><span class="hud-keys-ic brush">${icon(ic)}</span><span class="hud-keys-lab brush"><kbd>${key}</kbd>${label}</span></li>`);
     }
 
@@ -513,14 +513,31 @@ export class Hud {
     const sig = mission ? JSON.stringify(mission) : '';
     if (this._c.mission === sig) return;
     this._c.mission = sig;
+    this._mission = mission;
+    this._renderMission();
+  }
+
+  toggleMissionDetails() {
+    this._missionExpanded = !this._missionExpanded;
+    this._renderMission();
+  }
+
+  _renderMission() {
+    const mission = this._mission;
     const m = this.$mission;
     if (!mission) { m.hidden = true; return; }
     m.hidden = false;
     m.classList.toggle('is-complete', !!mission.complete);
+    m.classList.toggle('is-expanded', !!this._missionExpanded);
     const summary = missionSummary(mission);
     m.innerHTML = `<h2 class="hud-mission-title"><span class="hud-badge">${mission.complete ? icon('check') : '!'}</span>${esc(summary.title)}</h2>
       <p class="hud-mission-goal">${esc(summary.goal)}</p>${summary.tracked ? `<p class="hud-mission-contract">${esc(summary.tracked)}</p>` : ''}
-      <p class="hud-mission-help"><kbd>Esc</kbd> Expedition checklist</p>`;
+      <button type="button" class="hud-mission-toggle" aria-expanded="${!!this._missionExpanded}" aria-controls="hud-quest-details"><kbd>X</kbd> ${this._missionExpanded ? 'Collapse quests' : 'Expand quests'}</button>
+      <div id="hud-quest-details" class="hud-quest-details" ${this._missionExpanded ? '' : 'hidden'}>
+        <h3>Expedition</h3><ul class="hud-mission-list">${(mission.objectives || []).filter(o => o !== mission.trackedObjective && o.text !== mission.trackedObjective?.text).map(o => `<li class="${o.done ? 'is-done' : ''}"><span class="hud-check">${o.done ? icon('check') : ''}</span><span>${esc(o.text)}</span></li>`).join('')}</ul>
+        <h3>Team quests</h3><ul class="hud-mission-list">${BOARD_CONTRACTS.map((c, i) => { const q = mission.contracts?.[i]; return `<li class="${q?.done ? 'is-done' : ''}"><span class="hud-check">${q?.done ? icon('check') : ''}</span><span>${esc(c.title)} &middot; ${q?.progress || 0}/${c.goal}${c.id === this.trackedContract ? ' &middot; Tracked' : ''}</span></li>`; }).join('')}</ul>
+      </div>`;
+    m.querySelector('.hud-mission-toggle').addEventListener('click', () => this.toggleMissionDetails());
   }
 
   setCompass(yaw, markers) {

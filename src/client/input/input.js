@@ -15,6 +15,7 @@ const KEY_BINDINGS = {
   KeyR: 'reloadHint',
   Tab: 'inventory',
   KeyM: 'map',
+  KeyX: 'quests',
   KeyK: 'skills',     // skill tree panel
   KeyT: 'team',
   KeyU: 'unstuck',
@@ -108,7 +109,7 @@ export class Input {
     }
     const action = KEY_BINDINGS[e.code];
     if (!action || !this.enabled) return;
-    if (action === 'inventory' || action === 'map' || action === 'skills') {
+    if (action === 'inventory' || action === 'map' || action === 'skills' || action === 'quests') {
       e.preventDefault();
       if (down && !e.repeat) this.onPanelToggle?.(action);
       return;
