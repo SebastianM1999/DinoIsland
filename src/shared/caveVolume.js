@@ -95,6 +95,9 @@ export const VOXEL = 1.25;
 const GROW = 6;       // (the lattice reaches this much beyond the region the terrain gives up)
 const latticeCache = new WeakMap();
 
+/** Let go of the cached lattice and its samples (~25 MB on the fixed map) once the mesh is cut and the walk grid is built; a later call rebuilds it. */
+export function releaseVolumeLattice(plan) { latticeCache.delete(plan); }
+
 /**
  * The 2D data of every column of one uniform lattice (spacing `voxel`) over the volume's region: `top`, `floor`, `roof`,
  * the open distance `sOpen` and the slope of the skin (`g`, `inv`). Both the mesher (client/world/caveVolumeMesh.js) and the

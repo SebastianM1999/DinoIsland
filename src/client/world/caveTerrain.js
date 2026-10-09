@@ -19,6 +19,11 @@ import { withSurfaceDetail, setSurfaceBiome, CAVE_GLOW } from './surfaceDetail.j
 import { buildGlowField } from './caveStyle.js';
 import { buildSkyField, withCaveSky, CAVE_SKY } from './caveSky.js';
 import { meshCaveVolume } from './caveVolumeMesh.js';
+import { caveRock, releaseVolumeLattice } from '../../shared/caveVolume.js';
+import { caveBakeFor, meshKey, decodeMesh } from '../../shared/caveBake.js';
+
+/** Bump when the vertex paint below changes in a way the probe (paintProbe) cannot see; the probe catches most. */
+export const PAINT_VERSION = 1;
 
 const C = (hex) => new THREE.Color(hex);
 /** Above this height (m) there is no water and no shore: the floors are 2-5 m, the sea at 0. */
@@ -168,6 +173,20 @@ export function buildCaveTerrainMesh(terrain, layout) {
     A.sf2[k2] = surf.wet; A.sf2[k2 + 1] = surf.moss;
   };
   const T = { pos, col, sf, sf2 };
+  /** the paint of fixed probes (tunnel floors and walls, the coves, a roof): a bake made by other paint code has other numbers here */
+  const paintProbe = () => {
+    const A = { pos: new Float32Array(3), col: new Float32Array(3), sf: new Float32Array(4), sf2: new Float32Array(2) }, out = [PAINT_VERSION];
+    const tt = plan.cave.maze.tunnels;
+    for (let i = 0; i < 14; i++) {
+      const t = tt[i % tt.length], p = t.pts[(i * 3) % t.pts.length];
+      const y = caveFloorBase(plan, p.x, p.z) + [0.2, 0.2, 1.5, 3, 6, 9, 12][i % 7];
+      fillVertex(A, 0, p.x, y, p.z, [0.05, 0.5, 1.4, 0.9, 2.2][i % 5]);
+      out.push(...A.col, ...A.sf, ...A.sf2);
+    }
+    for (const [x, z] of [[-230, 4], [236, -6], [-200, 30], [205, 20]]) { fillVertex(A, 0, x, terrain.heightAt(x, z), z, 0.1); out.push(...A.col, ...A.sf, ...A.sf2); }
+    out.push(roofLook(roofTint, S, P, plan.cave.maze.nodes[0].x, 8, plan.cave.maze.nodes[0].z, 5), roofTint.r, roofTint.g, roofTint.b);
+    return out;
+  };
   for (let j = 0; j <= n; j++) {
     for (let i = 0; i <= n; i++) {
       const x = -half + i * cell, z = -half + j * cell;
@@ -178,8 +197,7 @@ export function buildCaveTerrainMesh(terrain, layout) {
   }
 
   // the volume draws everything in its region (a ring of ~6 m of it lies under the terrain's own cells beside it)
-  const vol = meshCaveVolume(plan, { half });
-  const inside = vol.rock.region(0);
+  const inside = caveRock(plan).region(0);
   const covered = new Uint8Array(stride * stride);
   for (let j = 0; j <= n; j++) for (let i = 0; i <= n; i++) covered[j * stride + i] = inside(-half + i * cell, -half + j * cell) ? 1 : 0;
   const idx = [];
@@ -211,13 +229,46 @@ export function buildCaveTerrainMesh(terrain, layout) {
   mesh.name = 'terrain';
   mesh.userData.caveMats = mats;
   mesh.userData.sky = sky;
-  mesh.userData.volumeStats = vol.stats;
 
-  // ---- the volume: painted per vertex from its position and normal (a roof faces down: wet dark stone)
+  // ---- the volume: a baked fixed map (assets/cave, scripts/bakeCave.mjs) when its keys agree with this code, else meshed and painted live
+  const roofTint = new THREE.Color();
+  const key = meshKey(plan, paintProbe());
+  const baked = caveBakeFor(plan, 'mesh');
+  let chunks, volumeStats;
+  if (baked && baked.header.meshKey === key) {
+    chunks = decodeMesh(baked.mesh);
+    volumeStats = { ...baked.header.stats, baked: true };
+  } else {
+    chunks = paintLive();
+  }
+  mesh.userData.volumeStats = volumeStats;
+  mesh.userData.bakeKey = key;
   const group = new THREE.Group();
   group.name = 'cave-volume';
-  const roofTint = new THREE.Color();
-  for (const ch of vol.chunks) {
+  for (const ch of chunks) {
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(ch.pos, 3));
+    g.setAttribute('normal', new THREE.BufferAttribute(ch.nor, 3));
+    g.setAttribute('color', new THREE.BufferAttribute(ch.col, 3));
+    g.setAttribute('surface', new THREE.BufferAttribute(ch.sf, 4));
+    g.setAttribute('surface2', new THREE.BufferAttribute(ch.sf2, 2));
+    g.setIndex(new THREE.BufferAttribute(ch.idx, 1));
+    g.computeBoundingSphere();
+    const c = new THREE.Mesh(g, mats.volume);
+    c.name = 'cave-volume-chunk';
+    c.userData.chunk = [ch.ci, ch.ck];
+    c.receiveShadow = true;
+    group.add(c);
+  }
+  mesh.add(group);
+
+  // the live path: mesh the volume and paint every vertex from its position and normal (a roof faces down: wet dark stone)
+  function paintLive() {
+    const vol = meshCaveVolume(plan, { half });
+    volumeStats = vol.stats;
+    releaseVolumeLattice(plan);   // (the mesh is cut, the walk grid built: the ~25 MB of samples can go)
+    const out = [];
+    for (const ch of vol.chunks) {
     const m = ch.pos.length / 3;
     const A = { pos: new Float32Array(m * 3), col: new Float32Array(m * 3), sf: new Float32Array(m * 4), sf2: new Float32Array(m * 2) };
     for (let v = 0; v < m; v++) {
@@ -233,20 +284,10 @@ export function buildCaveTerrainMesh(terrain, layout) {
         A.sf2[v * 2] += (0.55 + 0.4 * streak - A.sf2[v * 2]) * rk; A.sf2[v * 2 + 1] *= 1 - rk;
       }
     }
-    const g = new THREE.BufferGeometry();
-    g.setAttribute('position', new THREE.BufferAttribute(ch.pos, 3));
-    g.setAttribute('normal', new THREE.BufferAttribute(ch.nor, 3));
-    g.setAttribute('color', new THREE.BufferAttribute(A.col, 3));
-    g.setAttribute('surface', new THREE.BufferAttribute(A.sf, 4));
-    g.setAttribute('surface2', new THREE.BufferAttribute(A.sf2, 2));
-    g.setIndex(new THREE.BufferAttribute(ch.idx, 1));
-    g.computeBoundingSphere();
-    const c = new THREE.Mesh(g, mats.volume);
-    c.name = 'cave-volume-chunk';
-    c.receiveShadow = true;
-    group.add(c);
+    out.push({ pos: ch.pos, nor: ch.nor, col: A.col, sf: A.sf, sf2: A.sf2, idx: ch.idx, ci: ch.ci, ck: ch.ck });
+    }
+    return out;
   }
-  mesh.add(group);
 
   const glowTex = glow.glowTexture(half);
   CAVE_GLOW.uCaveGlow.value = glowTex;

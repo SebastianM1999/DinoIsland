@@ -7,6 +7,8 @@
 
 import { CONFIG } from '../shared/config.js';
 import { ServerWorld } from './world.js';
+import { LEVELS } from '../shared/levels.js';
+import { preloadCaveBake } from '../shared/caveBakeLoad.js';
 
 let world = null;
 let playerId = null;
@@ -51,9 +53,21 @@ function start(name, outfit, { level = 0, variant, dev = false, baseStage = 0, r
   }, tickMs / 2);
 }
 
-onmessage = (e) => {
+let booting = false;
+onmessage = async (e) => {
   const m = e.data;
-  if (m.type === 'start' && !world) start(m.name, m.outfit, m.opts, m.profile);
+  if (m.type === 'start' && !world && !booting) {
+    booting = true;
+    // The Hollow Mountain's baked walk grid (assets/cave, shared/caveBake.js): the world is built synchronously in here, so fetch
+    // the file first (the sim only needs the walk section). It is last in the game: fetch it in the background, wait for it
+    // only when this game starts there.
+    const cave = LEVELS.findIndex((l) => l.biome === 'cave');
+    const startsInCave = (m.opts?.level ?? 0) === cave;
+    const override = startsInCave && m.opts?.variant > 0 ? m.opts.variant : undefined;   // (?variant=N)
+    const fetching = cave >= 0 ? preloadCaveBake(cave, override, { mesh: false }) : null;
+    if (fetching && startsInCave) await fetching;
+    start(m.name, m.outfit, m.opts, m.profile);
+  }
   else if (m.type === 'msg' && world && playerId !== null) world.receive(playerId, m.msg);
   else if (m.type === 'stop') { clearInterval(interval); close(); }
 };

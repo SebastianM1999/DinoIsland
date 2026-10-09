@@ -19,6 +19,7 @@ import { initLoadingScreen } from './ui/loadingScreen.js';
 import { mapPreviewFrames } from './ui/mapPreviews.js';
 import { LEVELS } from '../shared/levels.js';
 import { BRAND, storageKey, migrateStorage } from '../shared/brand.js';
+import { preloadCaveBake } from '../shared/caveBakeLoad.js';
 
 migrateStorage();
 // Testing aids (solo only): ?island=2 starts on island 2 (1-based), ?base=1..3
@@ -240,6 +241,8 @@ async function launch(net, reuse = null, { openMenu = false } = {}) {
     });
     if (net.closed) throw new Error(disconnectReason);
     loadingUi.setStage('island');
+    // the Hollow Mountain's baked mesh and walk grid, if the site has them (assets/cave): the island then builds in a second, not seven
+    await preloadCaveBake(lv.index, lv.variant);
     const { Game } = await loadGameModule();
     game = new Game(canvas, net, reuse ?? (menuAudio ? { audio: menuAudio } : null));
     net.on(`ev:${EV.MISSION}`, ({ mission }) => {

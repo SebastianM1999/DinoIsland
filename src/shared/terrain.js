@@ -8,6 +8,7 @@ import { WORLD, HUT_GROUND, planIsland, islandHeight, riverQuery, poolAt, bogSam
 import { smoothstep } from './rng.js';
 import { caveCeiling, CAVE_SKY } from './caveField.js';
 import { buildCaveWalk } from './caveWalk.js';
+import { caveBakeFor, decodeWalk } from './caveBake.js';
 
 /**
  * Heat (volcano): the ground near lava and fumaroles is hot – 1 right at the
@@ -47,7 +48,9 @@ export class Terrain {
     // the Hollow Mountain's walls: floor and roof sampled finely from the very volume the client draws (caveWalk.js)
     this.walk = null;
     if (plan.cave) {
-      this.walk = buildCaveWalk(plan, { half: this.half, coarseHeight: (x, z) => this.#coarseHeight(x, z), coarseCeiling: (x, z) => this.#coarseCeiling(x, z) });
+      // (a baked fixed map brings the very same grid, see caveBake.js; any other island builds it from the volume)
+      const baked = caveBakeFor(plan, 'walk');
+      this.walk = baked ? decodeWalk(baked.walk) : buildCaveWalk(plan, { half: this.half, coarseHeight: (x, z) => this.#coarseHeight(x, z), coarseCeiling: (x, z) => this.#coarseCeiling(x, z) });
       // (the coarse grid follows it where it is covered: flood fills, the water shader and the sea floor mesh read it)
       const W = this.walk;
       for (let j = 0; j <= segments; j++) {
