@@ -9,6 +9,8 @@
     "start": "node server/index.js",
     "dev": "node --watch server/index.js",
     "test": "node --test",
+    "test:coverage": "c8 node --test",
+    "coverage:gaps": "node scripts/coverage/gaps.mjs",
     "prepare": "node scripts/link-agent-skills.mjs",
     "desktop": "electron .",
     "build:win": "electron-builder --win dir",
@@ -30,10 +32,25 @@
       "index.html",
       "package.json"
     ],
-    "asarUnpack": ["node_modules/koffi/**/*", "node_modules/steamworks-ffi-node/prebuilds/**/*"],
+    "asarUnpack": [
+      "node_modules/koffi/**/*",
+      "node_modules/steamworks-ffi-node/prebuilds/**/*"
+    ],
     "extraResources": [
-      { "from": ".", "to": ".", "filter": ["steamworks_sdk/redistributable_bin/win64/steam_api64.dll"] },
-      { "from": "node_modules/three/examples/jsm", "to": "three-addons", "filter": ["**/*"] }
+      {
+        "from": ".",
+        "to": ".",
+        "filter": [
+          "steamworks_sdk/redistributable_bin/win64/steam_api64.dll"
+        ]
+      },
+      {
+        "from": "node_modules/three/examples/jsm",
+        "to": "three-addons",
+        "filter": [
+          "**/*"
+        ]
+      }
     ],
     "win": {
       "target": "dir"
@@ -48,7 +65,9 @@
     "ws": "^8.18.0"
   },
   "devDependencies": {
+    "c8": "^12.0.0",
     "electron": "^44.4.5",
-    "electron-builder": "^26.15.3"
+    "electron-builder": "^26.15.3",
+    "playwright": "^1.63.0"
   }
 }

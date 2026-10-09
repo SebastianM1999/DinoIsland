@@ -1,0 +1,8 @@
+{
+  "all": true,
+  "src": ["src", "server", "desktop"],
+  "include": ["src/**/*.js", "server/**/*.js", "desktop/**/*.js", "desktop/**/*.cjs"],
+  "reporter": ["text", "json", "json-summary", "html"],
+  "reports-dir": "coverage",
+  "exclude-after-remap": false
+}
