@@ -216,9 +216,6 @@ export function buildCaveTerrainMesh(terrain, layout) {
  * as a dark arch under an overhang. Where it meets solid ground its vertices ARE the terrain's.
  * Returns the mesh (null if nothing is open); `userData.cells` lists the covered cells for tests.
  */
-/** How far behind a mouth's rim the shell stays flat on the roof (metres). */
-const LINTEL_FLAT = 7;
-
 function buildShell({ terrain, layout, sky, geo, T, fillVertex, material }) {
   const { n, cell, half } = terrain, n1 = n + 1, plan = layout.plan;
   const { depth, roof } = sky;
@@ -231,9 +228,8 @@ function buildShell({ terrain, layout, sky, geo, T, fillVertex, material }) {
       if (d <= 0.5) continue;
       const x = -half + i * cell, z = -half + j * cell;
       const top = caveRockTop(plan, x, z);
-      // (it lies on the roof for the first LINTEL_FLAT m behind the rim, then climbs to the rock: a wedge between roof
-      // and skin that opens at the rim would let anyone outside look up into the mountain)
-      const lintel = roof[k] + 0.3 + 2.0 * Math.max(0, d - ROOF_EDGE - LINTEL_FLAT);
+      // (it climbs from the roof right at the rim as a steep rock face; the skirt below closes it toward the opening)
+      const lintel = roof[k] + 0.3 + 3.0 * Math.max(0, d - ROOF_EDGE);
       const y = Math.max(h, Math.min(top, lintel));
       if (y > h + 0.05) { S[k] = y; lifted[k] = 1; }
     }
@@ -274,9 +270,52 @@ function buildShell({ terrain, layout, sky, geo, T, fillVertex, material }) {
     const a = id(j * n1 + i), b = id(j * n1 + i + 1), c = id((j + 1) * n1 + i), d = id((j + 1) * n1 + i + 1);
     idx.push(a, c, b, b, c, d);
   }
-  const m = order.length;
-  const A = { pos: new Float32Array(m * 3), col: new Float32Array(m * 3), sf: new Float32Array(m * 4), sf2: new Float32Array(m * 2) };
-  const nor = new Float32Array(m * 3);
+  // the skirt: wherever the skin's edge stands above the ground next to it (a mouth's rim, a tunnel wall's crest) a
+  // rock face closes the gap, from the ground - or, over an opening, from the roof's edge - up to the skin. Without
+  // it these edges are cracks you can look through into the mountain. Same material and colours as the cliffs.
+  const inShell = new Set(cells.map(([i, j]) => j * n + i));
+  const bottomAt = (k) => {
+    const h = terrain.h(k % n1, (k / n1) | 0);
+    return depth[k] > 0 && roof[k] > -500 ? Math.max(h, Math.min(roof[k] - 0.2, S[k])) : h;
+  };
+  const skirt = [];   // [k1, k2, outward x, outward z]
+  for (const [i, j] of cells) {
+    const k00 = j * n1 + i, k10 = k00 + 1, k01 = k00 + n1, k11 = k01 + 1;
+    for (const [ka, kb, ni, nj, ox, oz] of [[k00, k01, i - 1, j, -1, 0], [k10, k11, i + 1, j, 1, 0], [k00, k10, i, j - 1, 0, -1], [k01, k11, i, j + 1, 0, 1]]) {
+      if (ni >= 0 && nj >= 0 && ni < n && nj < n && inShell.has(nj * n + ni)) continue;
+      if (S[ka] - bottomAt(ka) < 0.05 && S[kb] - bottomAt(kb) < 0.05) continue;
+      skirt.push([ka, kb, ox, oz]);
+    }
+  }
+  // one column of vertices per grid vertex, shared by the skirt edges that meet there, with the outward
+  // directions averaged: the face shades as one smooth rock face, not as separate plates
+  const ROWS = 4;
+  const columns = new Map();   // grid vertex -> { ox, oz }
+  for (const [ka, kb, ox, oz] of skirt) for (const k of [ka, kb]) {
+    const c = columns.get(k) ?? { ox: 0, oz: 0 };
+    c.ox += ox; c.oz += oz;
+    columns.set(k, c);
+  }
+  const m = order.length, ms = m + columns.size * (ROWS + 1);
+  const A = { pos: new Float32Array(ms * 3), col: new Float32Array(ms * 3), sf: new Float32Array(ms * 4), sf2: new Float32Array(ms * 2) };
+  const nor = new Float32Array(ms * 3);
+  {
+    let v = m;
+    for (const [k, c] of columns) {
+      c.base = v;
+      const x = -half + (k % n1) * cell, z = -half + ((k / n1) | 0) * cell, y0 = bottomAt(k), y1 = S[k];
+      const l = Math.hypot(c.ox, c.oz) || 1;
+      for (let r = 0; r <= ROWS; r++) {
+        fillVertex(A, v, x, y0 + (y1 - y0) * (r / ROWS), z, 2.5);   // (slope 2.5: painted as cliff)
+        nor[v * 3] = c.ox / l * 0.96; nor[v * 3 + 1] = 0.28 * (r / ROWS); nor[v * 3 + 2] = c.oz / l * 0.96;
+        v++;
+      }
+    }
+    for (const [ka, kb] of skirt) {
+      const A0 = columns.get(ka).base, B0 = columns.get(kb).base;
+      for (let r = 0; r < ROWS; r++) idx.push(A0 + r, B0 + r, A0 + r + 1, A0 + r + 1, B0 + r, B0 + r + 1);
+    }
+  }
   const at = (i, j) => S[Math.min(n, Math.max(0, j)) * n1 + Math.min(n, Math.max(0, i))];
   order.forEach((k, v) => {
     const i = k % n1, j = (k / n1) | 0, x = -half + i * cell, z = -half + j * cell;
