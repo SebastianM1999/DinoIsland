@@ -267,6 +267,46 @@ test('the controller stops at the wall you see and never ends up inside the rock
   }
 });
 
+test('jumping into a wall just stops the body: no push-back, no climbing, never inside the rock', () => {
+  // (walls are nodes whose floor is the top of the rock: the slide logic of the controller must not read them as a slope)
+  for (const variant of VARIANTS) {
+    const { terrain, layout, plan, ray } = island(variant);
+    const rng = makeRng(variant + 7);
+    let runs = 0, worstBack = 0, worstRise = 0;
+    for (const t of plan.cave.maze.tunnels.filter((q) => q.kind === 'tree' || q.kind === 'loop' || q.kind === 'exit')) {
+      for (let k = 2; k < t.pts.length - 2; k += 2) {
+        const a = t.pts[k], b = t.pts[k + 1], L = Math.hypot(b.x - a.x, b.z - a.z) || 1;
+        const side = rng() < 0.5 ? -1 : 1, nx = -(b.z - a.z) / L * side, nz = (b.x - a.x) / L * side;
+        const v = ray.stand(a.x, a.z);
+        if (!v || v.floor > 8 || terrain.waterDepthAt(a.x, a.z) > 0.3 || !walkable(terrain, a.x, a.z)) continue;
+        let dist = -1;
+        for (let d = 0; d < a.w; d += 0.05) if (ray.inRock(a.x + nx * d, v.floor + 1.0, a.z + nz * d)) { dist = d; break; }
+        if (dist < 0) continue;
+        const pc = new PlayerController(terrain, layout.playerColliders, layout.rockSurfaceAt);
+        pc.teleport(a.x, a.z, 0);
+        pc.yaw = Math.atan2(-nx, -nz);
+        for (let f = 0; f < 60 * 4; f++) pc.update(1 / 60, { forward: true });   // up to the wall
+        const sx = pc.pos.x, sz = pc.pos.z, sy = pc.pos.y;
+        let back = 0, over = -Infinity;
+        for (let f = 0; f < 60 * 4; f++) {
+          pc.update(1 / 60, { forward: true, jump: true });                       // hop against it
+          back = Math.min(back, (pc.pos.x - sx) * nx + (pc.pos.z - sz) * nz);
+          // (height gained beyond the jump's own apex and a walkable slope over the way slid along the wall)
+          over = Math.max(over, pc.pos.y - sy - Math.hypot(pc.pos.x - sx, pc.pos.z - sz) * P.maxWalkSlope);
+          for (const dy of [0.5, 1.1, 1.7]) assert.ok(!ray.inRock(pc.pos.x, pc.pos.y + dy, pc.pos.z), `variant ${variant}: jumped into the rock at (${pc.pos.x.toFixed(2)}, ${pc.pos.z.toFixed(2)}) y ${pc.pos.y.toFixed(2)} dy ${dy} floor ${terrain.heightAt(pc.pos.x, pc.pos.z).toFixed(2)} start ${sy.toFixed(2)} f ${f} from (${a.x.toFixed(1)}, ${a.z.toFixed(1)}) n ${nx.toFixed(2)},${nz.toFixed(2)}`);
+          assert.ok(terrain.heightAt(pc.pos.x, pc.pos.z) < 14, `variant ${variant}: stands on top of the rock`);
+        }
+        runs++;
+        worstBack = Math.min(worstBack, back); worstRise = Math.max(worstRise, over);
+        assert.ok(-back < 0.3, `variant ${variant}: pushed ${(-back).toFixed(2)} m away from the wall at (${a.x.toFixed(1)}, ${a.z.toFixed(1)})`);
+        assert.ok(over < 2.6, `variant ${variant}: rose ${over.toFixed(2)} m beyond a jump at the wall at (${a.x.toFixed(1)}, ${a.z.toFixed(1)}) (climbing)`);
+      }
+    }
+    assert.ok(runs >= 15, `variant ${variant}: ${runs} wall jumps`);
+    void worstBack; void worstRise;
+  }
+});
+
 test('stalagmites, columns and stalactites sit on the volume\'s floor and roof', () => {
   for (const variant of VARIANTS) {
     const { terrain, layout, ray } = island(variant);
