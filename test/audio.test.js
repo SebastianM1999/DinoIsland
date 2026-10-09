@@ -125,6 +125,7 @@ function effectContext() {
   ctx.decodeAudioData = async bytes => ({ bytes });
   ctx.createBufferSource = () => { const s = node({ playbackRate: param(1), start(t) { this.started = t; }, stop() {} }); ctx.sources.push(s); return s; };
   ctx.createPanner = () => { const p = node({ positionX: param(0), positionY: param(0), positionZ: param(0) }); ctx.panners.push(p); return p; };
+  ctx.createConvolver = () => node({ buffer: null });
   ctx.createBiquadFilter = () => { const f = node({ frequency: param(0), Q: param(0) }); ctx.filters.push(f); return f; };
   ctx.createOscillator = () => { const o = node({ frequency: param(0), start() {}, stop() {} }); ctx.oscillators.push(o); return o; };
   return ctx;
