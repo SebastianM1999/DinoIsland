@@ -4,6 +4,7 @@
 ## Files
 
 - `coverage-gaps.test.js` — reporting of uncovered lines, functions and branches, including topic filters.
+- `performance-harness.test.js` — benchmark percentile correctness, invalid-sample rejection and fail-closed timing-budget arguments; deterministic checks, without timing thresholds.
 
 - `map-previews.test.js` — all island photographs preload/decode once, cache reuse and missing-photo fallback isolation.
 
@@ -82,6 +83,7 @@ Grouped by the module area they mainly cover. Many simulation tests also check t
 
 ## Entry points
 - `npm test` runs `node --test`, which discovers every `*.test.js` file here. A single file runs with `node --test test/<name>.test.js`.
+- `npm run test:coverage` runs the same suite through c8. `.c8rc.json` includes all source modules, with unimported modules at zero; reports are in ignored `coverage/`. `npm run coverage:gaps -- <topic>` reads the last report and checks that no source file is missing. A focused report is not the full-suite baseline.
 - There is no shared helper module; each file defines its own small fixtures (`setup()`, `fixture()`, `solo()` and similar).
 
 ## Rules
@@ -95,4 +97,4 @@ Grouped by the module area they mainly cover. Many simulation tests also check t
 
 ## Not here
 - Code under test: `src/shared/`, `src/sim/`, `src/client/`, `server/`, `desktop/`.
-- Asset and model tooling scripts: `scripts/`. Browser/visual checks of the running game are not automated here.
+- Asset and model tooling and opt-in measured gameplay/simulation benchmarks: `scripts/`. Browser/visual checks and hardware timing are outside this headless test suite; see `docs/performance-testing.md`.

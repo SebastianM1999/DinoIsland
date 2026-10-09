@@ -4,5 +4,10 @@
   "include": ["src/**/*.js", "server/**/*.js", "desktop/**/*.js", "desktop/**/*.cjs"],
   "reporter": ["text", "json", "json-summary", "html"],
   "reports-dir": "coverage",
+  "check-coverage": true,
+  "lines": 69,
+  "statements": 69,
+  "functions": 83,
+  "branches": 88,
   "exclude-after-remap": false
 }

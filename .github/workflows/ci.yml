@@ -43,8 +43,18 @@ jobs:
           git diff --check "$BASE_SHA" HEAD
       - name: Install locked dependencies
         run: npm ci
-      - name: Run automated tests
-        run: npm test
+      - name: Run automated tests with complete-source coverage
+        run: npm run test:coverage
+      - name: Verify complete source coverage report
+        run: node scripts/coverage-gaps.mjs > coverage/gaps.txt
+      - name: Upload coverage diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-${{ github.sha }}
+          path: coverage/
+          if-no-files-found: ignore
+          retention-days: 7
       - name: Test integration safety rules
         run: node --test .github/scripts/integration.test.cjs .github/scripts/rebase.test.cjs .github/scripts/await-task-ci.test.cjs
       - name: Record tested merge candidate

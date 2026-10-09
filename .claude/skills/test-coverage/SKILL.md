@@ -1,6 +1,6 @@
 ---
 name: test-coverage
-description: Measure and improve meaningful test coverage in Dinosaur Island using Node's built-in test runner. Use for coverage gaps, regression tests, test-quality reviews, or coverage-threshold work; browser and visual checks need separate validation.
+description: Improve meaningful test coverage and test gameplay performance in Dinosaur Island. Use for coverage gaps, regression tests, FPS or stutter measurements, resource lifetime, and performance budgets; real browser and hardware measurements are required for FPS claims.
 ---
 
 # Test coverage for Dinosaur Island
@@ -13,11 +13,12 @@ feature spans shared rules, simulation, and client code. Paths below are relativ
 to the owning feature worktree.
 
 This repository uses ES modules, Node 22+, `node:test`, and
-`node:assert/strict`. `npm test` runs `node --test`. There is currently **no
-configured coverage threshold or measured repository-wide 100% baseline** in
-`package.json` or `.github/workflows/ci.yml`. Recheck those files before reporting
-the current policy. Do not carry over the original operatorclient skill's Vitest,
-pnpm, statement counts, exclusions, or historical percentages.
+`node:assert/strict`. `npm test` runs `node --test`. `npm run test:coverage` uses
+c8 over the same suite, including every JavaScript/CommonJS source file in
+`src/`, `server/`, and `desktop/`, even when no test imports it. Coverage
+configuration and enforced floors live in `.c8rc.json`; inspect it and CI before
+reporting policy. There is no repository-wide 100% baseline. Do not carry over
+the original operatorclient skill's Vitest, pnpm, exclusions, or percentages.
 
 Coverage identifies missing scenarios; assertions establish correct behavior.
 Preserve existing regression protection and cover changed behavior when a
@@ -25,11 +26,11 @@ meaningful test can detect a real failure. Do not add tests that merely execute
 lines or mirror implementation details. For reversible cosmetic changes, an
 appropriate visual check may provide more value than a headless test.
 
-If coverage enforcement is requested, first measure a reproducible baseline and
-define its source scope and runtime. Add any threshold configuration in that
-task; prose in this skill does not enforce it. Preserve configured thresholds
-once introduced: close gaps rather than lowering a gate to make a change pass.
-Do not assume that line or branch coverage must reach 100% to be useful.
+Preserve configured thresholds: close gaps rather than lowering a gate to make
+a change pass. Raise floors as verified coverage improves, using the same source
+scope and runtime. Do not exclude browser or desktop code to inflate a number.
+The long-term goal is meaningful protection of supported behavior; a line or
+branch percentage alone cannot prove correctness or smooth gameplay.
 
 ## Measure with the actual runner
 
@@ -38,12 +39,19 @@ Run these commands from the feature worktree root:
 ```powershell
 npm test
 node --test test/skills.test.js
+npm run test:coverage
+npm run coverage:gaps -- actions.js interp.js
 ```
 
-Node's experimental coverage mode reports lines, branches, and functions, not a
-separate statement metric. The following measures the source loaded by the full
-game test suite, excluding test fixtures and dependencies through explicit
-source include patterns:
+The complete-source c8 report is written to `coverage/` (HTML, JSON, summary and
+terminal output). `coverage:gaps` reads the **last** `coverage-final.json`, names
+uncovered lines/functions/branch locations, and fails if a source module is
+absent from the report. A focused run may overwrite this report; run the full
+suite before drawing conclusions about the repository or changing a floor.
+
+Node's native experimental coverage mode remains useful for fast focused
+diagnosis. It reports lines, branches, and functions, not a separate statement
+metric. This alternative measures only source loaded by the full game suite:
 
 ```powershell
 node --test --experimental-test-coverage --test-coverage-include="src/**/*.js" --test-coverage-include="server/**/*.js" --test-coverage-include="desktop/**/*.js" --test-coverage-include="desktop/**/*.cjs"
@@ -55,16 +63,16 @@ For one gap, use a focused report:
 node --test --experimental-test-coverage --test-coverage-include="src/shared/skills.js" test/skills.test.js
 ```
 
-The focused report is not a repository baseline. Even the full report only
-includes loaded source files: an unimported module is a blind spot, not evidence
-of complete coverage. Compare the reported file list with the intended source
-scope and list unmeasured modules separately. Use the same Node version, include
-patterns, and test selection when comparing runs; CI currently uses Node 22.
+The focused native report is not a repository baseline. Even the full native
+report only includes loaded source files: an unimported module is a blind spot.
+Use the complete-source c8 report for policy. Do not compare native loaded-only
+percentages directly with c8's all-source percentages. Use the same Node version,
+include patterns, and test selection when comparing runs; CI uses Node 22.
 Check available flags with `node --help` when the installed version differs.
 
-The text report lists uncovered lines. Read those lines and the surrounding
-function before deciding which scenario is missing. Node does not provide this
-repo with a `coverage:gaps` command or a Vitest `coverage-final.json` file.
+Read uncovered lines and their surrounding function before deciding which
+scenario is missing. The JSON report is Istanbul-compatible output from c8,
+not a Vitest report.
 Capture fresh output if a report is needed; `coverage/` and `*.log` are ignored.
 When redirecting output in PowerShell, save `$LASTEXITCODE` immediately after the
 command and propagate it after reading the log.
@@ -140,9 +148,10 @@ Do not exclude difficult gameplay or host logic to inflate a score.
 
 ## Submission checks and limits
 
-`AGENTS.md` requires `npm test` and `git diff --check` before submission. There
-are no configured `lint`, `lint:layers`, `typecheck`, or `test:coverage` npm
-scripts at this baseline; do not claim to have run them.
+`AGENTS.md` requires `npm test` and `git diff --check` before submission. Run
+`npm run test:coverage` when changing tested behavior or coverage configuration;
+CI enforces its floors. There are no configured `lint`, `lint:layers`, or
+`typecheck` npm scripts; do not claim to have run them.
 
 CI's `Node 22 tests` job also selects hidden integration-controller tests
 explicitly, outside the game suite's default discovery:
@@ -156,6 +165,38 @@ Run that suite for changes to integration automation and inspect
 run when making a claim about its measured source scope or setting a gate.
 Browser gameplay, visual checks, real Steam, and packaging checks remain
 separate validation where relevant.
+
+## Gameplay performance
+
+Use [the performance testing guide](../../../docs/performance-testing.md) for
+the benchmark commands, scenarios, report format and hardware calibration.
+The requested reference target is **120 FPS at medium detail**: 8.33 ms per
+frame at a declared resolution, GPU, browser, display refresh rate and player
+count. This is a target, not a claim that the current game achieves it.
+
+- Measure real `Game` updates and WebGL rendering on all three islands with
+  active dinosaurs and four-player load. Menu-only FPS, mocked rendering and
+  simulation ticks do not establish gameplay FPS. Record the fixed variant,
+  graphics tier, render scale, contact shading, FPS cap and browser GPU string.
+- Warm up asset/shader loading separately. Sample representative movement,
+  effects and UI interactions. Repeat runs on the same reference machine;
+  compare medians and variance, with p95/p99 frame times and stalls over 50 ms.
+  Average FPS alone can hide freezes. Record cold-load hitches separately.
+- Run timing benchmarks without coverage instrumentation or another benchmark
+  running. Headless/software-GPU results are diagnostics, not acceptance for
+  a hardware 120 FPS target. A 60 Hz display or a frame cap can prevent rAF from
+  demonstrating 120 FPS even when CPU/GPU work fits the frame budget.
+- Keep deterministic performance regressions in normal CI: bounded history and
+  telemetry, single resource disposal, cache retention, shader warm-up and
+  network ordering. Use opt-in timing gates calibrated on a reference runner;
+  do not impose arbitrary shared-runner FPS thresholds.
+- Check simulation tick latency separately from renderer frame time and network
+  jitter/RTT. Smooth local frames do not prove lag-free co-op. Test cleanup over
+  repeated island changes so growing resource counts cannot hide behind a short
+  FPS run.
+- When a budget fails, report the scenario and measured limiting subsystem.
+  Fix the measured cause and repeat the same scenario. Do not silently reduce
+  resolution, dinosaur count, detail, or measurement scope to make it pass.
 
 Report the commands, pass/fail/skip results, scope of any coverage percentage,
 and remaining untested behavior. Follow `AGENTS.md` and `docs/agent-workflow.md`

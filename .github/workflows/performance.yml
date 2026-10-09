@@ -1,0 +1,41 @@
+name: Performance diagnostics
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: performance-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  diagnostics:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Measure four-player simulation on every island
+        run: npm run perf:sim -- --output=output/performance/simulation.json
+      - name: Exercise rendered gameplay on every island
+        # Software GPU validates the benchmark path, not the hardware 120 FPS target.
+        run: npm run perf:browser -- --software --seconds=5 --warmup-seconds=3 --output=output/performance/browser.json
+      - name: Upload measured diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: performance-${{ github.sha }}
+          path: output/performance/
+          if-no-files-found: warn
+          retention-days: 14

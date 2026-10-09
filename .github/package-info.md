@@ -2,8 +2,9 @@
 > GitHub-hosted automation and repository integration configuration.
 
 ## Files
+- `workflows/performance.yml` — manually dispatched four-player simulation and real WebGL gameplay diagnostics on all three islands; uploads measurements. Shared-runner software GPU results do not gate hardware FPS or replace normal CI.
 - `copilot-instructions.md` — automatically discovered Copilot repository instructions; points to root AGENTS.md and repeats the essential isolated-worktree, one-feature/one-PR workflow for clients that do not load AGENTS.md themselves.
-- `workflows/ci.yml` — read-only CI for pull requests targeting `main`, pushes to `main`, merge-group candidates, and manual runs. Installs locked dependencies and runs the Node 22 test suite and submitted-diff whitespace/conflict-marker checks on Ubuntu.
+- `workflows/ci.yml` — read-only CI for pull requests targeting `main`, pushes to `main`, merge-group candidates, and manual runs. Installs locked dependencies and runs the Node 22 test suite with complete-source c8 coverage floors, verifies every source module is reported, uploads coverage diagnostics, and checks submitted-diff whitespace/conflict markers on Ubuntu.
 - `workflows/integration.yml` — trusted-main controller, awakened by the ready-to-merge label, ready-for-review transitions, completed CI, explicit rebase/repair handoffs, and manual runs; no idle schedule. Does not execute PR source.
 - `workflows/integration-repair.yml` — reserved same-repository task repair using Claude subscription credentials; validates eligibility, rebases onto main and continues resolved conflicts, repairs files, tests, publishes only the task branch, and wakes the controller for independent candidate CI.
 - `workflows/integration-rebase.yml` — deterministic same-repository feature rebase onto current main, with exact-head reservation, trusted eligibility checks, disabled Git hooks and lease-guarded publication; holds conflicts for repair without running feature code.

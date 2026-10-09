@@ -8,7 +8,7 @@ import { CONFIG } from '../../src/shared/config.js';
 import { MSG, PF } from '../../src/shared/protocol.js';
 import { options, number, distribution, environment, report } from './common.mjs';
 
-const opts = options();
+const opts = options(['ticks', 'warmup', 'players', 'variant', 'max-tick-p95-ms', 'output']);
 const ticks = number(opts, 'ticks', 600, 1);
 const warmup = number(opts, 'warmup', 120, 0);
 const variant = number(opts, 'variant', 42, 1);

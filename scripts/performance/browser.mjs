@@ -3,11 +3,13 @@ import { chromium } from 'playwright';
 import { WebSocket } from 'ws';
 import { createGameServer } from '../../server/index.js';
 import { makeRng } from '../../src/shared/rng.js';
-import { goodSpot } from '../../src/sim/unstuck.js';
+import { goodSpot, standable } from '../../src/sim/unstuck.js';
 import { PF } from '../../src/shared/protocol.js';
+import { CONFIG } from '../../src/shared/config.js';
 import { options, number, distribution, environment, report } from './common.mjs';
 
-const opts = options();
+const opts = options(['seconds', 'warmup-seconds', 'variant', 'max-frame-p95-ms', 'max-frame-p99-ms', 'max-stalls', 'headed', 'software', 'width', 'height', 'target-fps', 'channel', 'output']);
+for (const name of ['headed', 'software']) assert(opts[name] === undefined || opts[name] === true, `Use --${name} without a value`);
 const duration = number(opts, 'seconds', 15, 1);
 const warmup = number(opts, 'warmup-seconds', 8);
 const variant = number(opts, 'variant', 42, 1);
@@ -47,13 +49,14 @@ async function bot(url, name, world) {
       });
     }), 10000, 'Bot welcome');
     id = welcome.id;
+    const start = { ...world.players.get(id) };
     interval = setInterval(() => {
       const p = world.players.get(id);
       if (!p || ws.readyState !== WebSocket.OPEN) return;
       const angle = seq * .04;
-      const x = p.x + Math.cos(angle) * .08, z = p.z + Math.sin(angle) * .08;
+      const x = start.x + Math.cos(angle) * .75, z = start.z + Math.sin(angle) * .75;
       ws.send(JSON.stringify({ t: 'state', s: ++seq, k: p.epoch,
-        x, y: world.terrain.heightAt(x, z), z, yaw: angle, pitch: 0, spd: 1.6, eq: 0, fl: PF.GROUND }));
+        x, y: world.layout.groundAt(x, z), z, yaw: angle, pitch: 0, spd: .6, eq: 0, fl: PF.GROUND }));
     }, 50);
     return () => { clearInterval(interval); ws.terminate(); };
   } catch (error) { clearInterval(interval); ws.terminate(); throw error; }
@@ -89,15 +92,35 @@ try {
       assert.equal(world.variant, variant);
       // Observe live dinosaurs outside the protected landing camp. Find a
       // legal player position near a real spawn; never freeze/remove AI.
-      const target = world.dinos.list.find(d => d.type !== 'ptera') ?? world.dinos.list[0];
-      assert(target);
-      let view;
-      for (let radius = 25; radius <= 60 && !view; radius += 5) {
-        for (let i = 0; i < 24; i++) {
-          const angle = i * Math.PI / 12;
-          const x = target.x + Math.cos(angle) * radius, z = target.z + Math.sin(angle) * radius;
-          if (goodSpot(world.terrain, world.layout, x, z) !== null) { view = { x, z, yaw: Math.atan2(x - target.x, z - target.z) }; break; }
+      const candidates = world.dinos.list.filter(d => ['stego', 'brachio'].includes(d.type));
+      assert(candidates.length, 'No herbivore observation target');
+      let view, target;
+      for (const candidate of candidates) {
+        const firstRadius = candidate.scale ? world.layout.grove.r + 8 : 40;
+        for (let radius = firstRadius; radius <= 140 && !view; radius += 2) {
+          for (let i = 0; i < 72; i++) {
+            const angle = i * Math.PI / 36;
+            const x = candidate.x + Math.cos(angle) * radius, z = candidate.z + Math.sin(angle) * radius;
+            const danger = world.dinos.list.some(d => {
+              if (!['raptor', 'trex', 'ptera', 'alpha-sarcosuchus'].includes(d.type)) return false;
+              const radius = (CONFIG.dinos[d.type].sightRadius ?? CONFIG.dinos[d.type].targetRadius ?? 55) + 15;
+              return Math.hypot(d.x - x, d.z - z) < radius ||
+                d.type === 'ptera' && d.area && Math.hypot(d.area.x - x, d.area.z - z) < radius;
+            });
+            const clear = !danger && goodSpot(world.terrain, world.layout, x, z) !== null &&
+              Array.from({ length: 16 }, (_, k) => k * Math.PI / 8).every(a => {
+                const px = x + Math.cos(a) * 1.5, pz = z + Math.sin(a) * 1.5;
+                return standable(world.terrain, world.layout, px, pz) !== null &&
+                  world.terrain.heatAt(px, pz) < CONFIG.volcano.heat.dmgFrom;
+              });
+            if (clear) {
+              target = candidate;
+              view = { x, z, yaw: Math.atan2(x - candidate.x, z - candidate.z) };
+              break;
+            }
+          }
         }
+        if (view) break;
       }
       assert(view, 'No legal dinosaur observation point');
       world.layout.spawnPoints = Array.from({ length: 4 }, () => ({ ...view }));
@@ -115,7 +138,7 @@ try {
       page.on('console', message => { if (message.type() === 'error') console.error('[browser]', message.text()); });
       await page.route(`${base}/`, route => route.fulfill({ contentType: 'text/html', body: html }));
       await page.goto(base, { waitUntil: 'load', timeout: 30000 });
-      const measurement = await bounded(page.evaluate(async ({ duration, warmup, base }) => {
+      const measurement = await bounded(page.evaluate(async ({ duration, warmup, base, route }) => {
         const [{ Net }, { Game }, settingsModule, { preloadDinoModels }, { TIERS }] = await Promise.all([
           import('/src/client/net/net.js'), import('/src/client/core/game.js'),
           import('/src/client/core/settings.js'), import('/src/client/models/dino/glbDino.js'), import('/src/client/core/graphicsTier.js'),
@@ -143,17 +166,39 @@ try {
           };
           requestAnimationFrame(sample);
         });
-        const frameMs = [], renderCpuMs = [], gpuMs = [], calls = [], triangles = [], geometries = [], textures = [], tiers = new Set();
-        let previous, measuredAt, start, updates = 0, visibleDinosMax = 0, movementMeters = 0;
+        const frameMs = [], updateCpuMs = [], renderCpuMs = [], gpuMs = [], calls = [], triangles = [], geometries = [], textures = [], tiers = new Set();
+        let previous, measuredAt, start, updates = 0, activeUpdates = 0, visibleDinosMax = 0, movementMeters = 0, initialHp;
+        const realStats = game.stats.frame.bind(game.stats);
+        game.stats.frame = (dt, source) => {
+          if (measuredAt !== undefined) updateCpuMs.push(source.cpuUpdateMs);
+          realStats(dt, source);
+        };
         const realUpdate = game.update.bind(game);
+        let waypoint = 0;
         game.update = dt => {
-          const phase = Math.floor(game.time / 1.5) % 4;
           game.input.held.clear();
-          game.input.held.add(['left', 'forward', 'right', 'back'][phase]);
+          if (game.hud.isPanelOpen()) game.input.onPanelToggle('close');
+          // Follow a checked one-metre route using real movement intent, never teleporting.
+          let angle = waypoint * Math.PI / 4;
+          let tx = route.x + Math.cos(angle), tz = route.z + Math.sin(angle);
+          if (Math.hypot(tx - game.player.pos.x, tz - game.player.pos.z) < .25) {
+            waypoint++;
+            angle = waypoint * Math.PI / 4;
+            tx = route.x + Math.cos(angle); tz = route.z + Math.sin(angle);
+          }
+          game.player.yaw = route.yaw + Math.sin(game.time * .2) * .15;
+          const dx = tx - game.player.pos.x, dz = tz - game.player.pos.z;
+          const length = Math.hypot(dx, dz) || 1, cos = Math.cos(game.player.yaw), sin = Math.sin(game.player.yaw);
+          const localX = (dx * cos - dz * sin) / length, localZ = (dx * sin + dz * cos) / length;
+          if (Math.abs(localX) > .3) game.input.held.add(localX > 0 ? 'right' : 'left');
+          if (Math.abs(localZ) > .3) game.input.held.add(localZ > 0 ? 'back' : 'forward');
           const old = { ...game.player.pos };
-          game.player.yaw += dt * .08;
           realUpdate(dt);
-          if (measuredAt !== undefined) { updates++; movementMeters += Math.hypot(game.player.pos.x - old.x, game.player.pos.z - old.z); }
+          if (measuredAt !== undefined) {
+            updates++;
+            if (game.me.alive && !game.downed) activeUpdates++;
+            movementMeters += Math.hypot(game.player.pos.x - old.x, game.player.pos.z - old.z);
+          }
         };
         const realRender = game.gfx.render.bind(game.gfx);
         let resolve;
@@ -164,6 +209,7 @@ try {
           start ??= now;
           if (now - start < warmup * 1000) return;
           measuredAt ??= now;
+          initialHp ??= game.me.hp;
           if (previous !== undefined) frameMs.push(now - previous);
           previous = now;
           const info = game.gfx.renderer.info;
@@ -183,9 +229,14 @@ try {
         const THREE = await import('three');
         game.start();
         await complete;
-        const result = { frameMs, renderCpuMs, gpuMs, calls, triangles, geometries, textures, gpu,
+        const result = { frameMs, updateCpuMs, renderCpuMs, gpuMs, calls, triangles, geometries, textures, gpu,
           settings: { ...settingsModule.settings }, tiers: [...tiers], viewport: { width: innerWidth, height: innerHeight, dpr: devicePixelRatio },
-          updates, movementMeters, visibleDinosMax, snapshots: net.telemetry.snapshots, alive: game.me.alive,
+          updates, activeUpdates, movementMeters, visibleDinosMax, snapshots: net.telemetry.snapshots, alive: game.me.alive,
+          initialHp, finalHp: game.me.hp, downed: !!game.downed, frozen: game.player.frozen,
+          network: { rttMs: net.rtt * 1000, jitterMs: net.jitter * 1000, interpolationDelayMs: net.interpDelay * 1000,
+            rttP50Ms: net.telemetry.rttP50 * 1000, rttP95Ms: net.telemetry.rttP95 * 1000,
+            staleSnapshots: net.telemetry.staleSnapshots, missingSnapshots: net.telemetry.missingSnapshots,
+            corrections: game.corrections },
           actualMeasurementMs: previous - measuredAt, userAgent: navigator.userAgent, level: game.level,
           connectedPlayers: net.welcome.world.players.length,
           graphics: { ...game.gfx.graphics }, renderScale: game.gfx.renderScale, contactShading: game.gfx.aoStrength,
@@ -193,16 +244,20 @@ try {
         net.close();
         const reusable = game.dispose(); reusable.gfx.dispose(); reusable.audio.dispose?.();
         return result;
-      }, { duration, warmup, base }), (duration + warmup + 120) * 1000, 'Gameplay benchmark');
-      assert.equal(measurement.connectedPlayers, 4, 'Welcome must contain the four-player workload');
-      assert(world.players.size >= 3, 'Bot players must remain connected until cleanup');
-      assert(measurement.updates > 0 && measurement.movementMeters > 0 && measurement.snapshots > 0);
-      assert(measurement.visibleDinosMax > 0, 'No dinosaur entered the view frustum');
-      assert.equal(errors.length, 0, `Browser errors: ${errors.join('; ')}`);
-      const stats = Object.fromEntries(['frameMs', 'renderCpuMs', 'calls', 'triangles', 'geometries', 'textures'].map(key => [key, distribution(measurement[key])]));
-      results.push({ ...measurement, ...stats, gpuMs: measurement.gpuMs.length ? distribution(measurement.gpuMs) : null,
+      }, { duration, warmup, base, route: view }), (duration + warmup + 120) * 1000, 'Gameplay benchmark');
+      const invalidReasons = [];
+      if (measurement.connectedPlayers !== 4 || world.players.size < 3) invalidReasons.push('Four-player workload disconnected');
+      if (!(measurement.updates > 0 && measurement.movementMeters > 0 && measurement.snapshots > 0)) invalidReasons.push('Missing movement, updates or snapshots');
+      if (measurement.activeUpdates < measurement.updates * .9 || !measurement.alive || measurement.downed) invalidReasons.push('Player incapacitated during observation route');
+      if (!measurement.visibleDinosMax) invalidReasons.push('No dinosaur entered the view frustum');
+      invalidReasons.push(...errors.map(error => `Browser error: ${error}`));
+      const stats = Object.fromEntries(['frameMs', 'updateCpuMs', 'renderCpuMs', 'calls', 'triangles', 'geometries', 'textures'].map(key => [key, distribution(measurement[key])]));
+      results.push({ ...measurement, ...stats, valid: !invalidReasons.length, invalidReasons,
+        route: 'herbivore-observation', target: { id: target.id, type: target.type },
+        gpuMs: measurement.gpuMs.length ? distribution(measurement.gpuMs) : null,
         rafCadenceMs: distribution(measurement.rafCadenceMs),
         observedRafHz: 1000 / distribution(measurement.rafCadenceMs).p50,
+        averageFps: measurement.frameMs.length * 1000 / measurement.actualMeasurementMs,
         stallsOver50ms: measurement.frameMs.filter(ms => ms > 50).length,
         softwareGpu: /swiftshader|llvmpipe|software|microsoft basic/i.test(measurement.gpu), players: 4, variant });
     } finally {
@@ -222,4 +277,4 @@ try {
 await report({ kind: 'real-game-websocket-rendering', environment: { ...environment(), chromium: browser.version(), headless, requestedChannel: opts.channel ?? 'bundled', requestedSoftware: software },
   targetFps, frameBudgetMs: 1000 / targetFps, mediumTier: true,
   gates: { frameP95Ms: frameLimit, frameP99Ms: frameP99Limit, stallsOver50ms: stallLimit }, scenarios: results }, opts.output);
-if (results.some(r => frameLimit !== null && r.frameMs.p95 > frameLimit || frameP99Limit !== null && r.frameMs.p99 > frameP99Limit || stallLimit !== null && r.stallsOver50ms > stallLimit)) process.exitCode = 1;
+if (results.some(r => !r.valid || frameLimit !== null && r.frameMs.p95 > frameLimit || frameP99Limit !== null && r.frameMs.p99 > frameP99Limit || stallLimit !== null && r.stallsOver50ms > stallLimit)) process.exitCode = 1;
