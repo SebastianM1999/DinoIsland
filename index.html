@@ -51,7 +51,6 @@
     <nav class="menu-utilities" aria-label="Game information and preferences">
       <button type="button" class="menu-link" id="btn-home-skills">Skill tree</button>
       <button type="button" class="menu-link" data-home-panel="guide">How to play</button>
-      <button type="button" class="menu-link" data-open-settings="controls">Controls</button>
       <button type="button" class="menu-link" data-open-settings>Settings</button>
       <button type="button" class="menu-link" data-home-panel="credits">Credits</button>
     </nav>
@@ -96,7 +95,7 @@
     <section class="home-panel" role="dialog" aria-modal="true" aria-labelledby="home-guide-title">
       <header class="home-panel-head"><div><p class="menu-eyebrow">Your first expedition</p><h2 id="home-guide-title">How to play</h2></div><button type="button" class="menu-link" data-home-close aria-label="Close how to play">×</button></header>
       <ol class="home-guide-steps"><li><h3>Explore and prepare</h3><p>Follow the trails, gather fruit, and use the camp workbench to craft supplies. Fruit restores health.</p></li><li><h3>Hunt as a team</h3><p>Track dinosaurs, choose your moment, and keep an eye on your crew. Harvest fallen dinosaurs for resources.</p></li><li><h3>Find the boat parts</h3><p>Your mission board lists the missing parts. Search the island, repair the boat, and gather everyone to set sail.</p></li><li><h3>Grow stronger</h3><p>Hunts and recovered boat parts earn experience. Open Skills with K and spend your points near camp.</p></li></ol>
-      <footer><button type="button" class="btn" data-open-settings="controls">See controls</button><button type="button" class="menu-link" data-home-close>Back to menu</button></footer>
+      <footer><button type="button" class="menu-link" data-home-close>Back to menu</button></footer>
     </section>
   </div>
   <div id="home-credits" class="screen home-dialog" hidden>
@@ -125,9 +124,6 @@
           </button>
           <button type="button" class="btn btn-icon" data-open-settings>
             <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-gear"/></svg>Settings
-          </button>
-          <button type="button" class="btn btn-icon" data-open-settings="controls">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-keys"/></svg>Controls
           </button>
           <details class="pause-testing"><summary>Testing tools</summary>
           <button type="button" class="btn btn-icon" id="btn-creative" aria-pressed="false">
