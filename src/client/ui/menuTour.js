@@ -31,7 +31,7 @@ const SPEED = 1.65;
  * onIsland receives { index, number, name, motionEnabled } on every selection
  * and motion change. Pausing freezes both the camera and scenery animation.
  */
-export async function createMenuTour(canvas, onIsland = () => {}) {
+export async function createMenuTour(canvas, onIsland = () => {}, { signal } = {}) {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -259,6 +259,7 @@ export async function createMenuTour(canvas, onIsland = () => {}) {
   function dispose() {
     if (disposed) return;
     disposed = true;
+    signal?.removeEventListener('abort', dispose);
     ++request;
     stopFrames();
     removeEventListener('resize', resize);
@@ -276,8 +277,11 @@ export async function createMenuTour(canvas, onIsland = () => {}) {
   }
 
   try {
+    if (signal?.aborted) throw new DOMException('Tour cancelled', 'AbortError');
+    signal?.addEventListener('abort', dispose, { once: true });
     resize();
     await setIsland(0);
+    if (disposed) throw new DOMException('Tour cancelled', 'AbortError');
     addEventListener('resize', resize);
     document.addEventListener('visibilitychange', resumeFrames);
     motionPreference.addEventListener('change', preferenceChanged);

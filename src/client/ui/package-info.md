@@ -15,9 +15,10 @@
 - `skillModel.js` — pure, DOM-free view-model of the skill panel (`buildSkillView`, `previewBuy`, `nearCamp`, ...).
 - `skillIcons.js` — 24x24 stroke SVG icons per skill and tree, plus lock/tick/close glyphs.
 - `menus.js` — `ICON_SPRITE`, `initSettings()` (settings dialog) and `renderPause(game)` (pause screen contents).
-- `menuTour.js` — lazily loaded `createMenuTour(canvas, onIsland)`: live home-menu camera tour through all three seeded island layouts; owns its scenery renderer, reduced-motion and visibility handling, island selection and disposal.
-- `homeMenu.js` — `initHomeMenu()`: create/join expedition, how-to-play and credits dialogs; focus handling and connection status feedback. Keeps the title screen focused on player identity and play actions.
+- `menuTour.js` — lazily loaded async `createMenuTour(canvas, onIsland, {signal})`: staged live tour with three cached scenery corridors from seeded game layouts, high-performance renderer, capped resolution, occasional shadow refresh, overlay/hidden-tab suspension and cancellation/disposal. Background previews do not unlock playable maps.
+- `homeMenu.js` — `initHomeMenu()`: create/join expedition, how-to-play and credits dialogs; focus handling and connection status feedback. Populates separate all-island preview and earned-island solo selectors.
 - `homeExplorer.js` — `initHomeExplorer()`: saved level/XP/skills summary and lazy outfit customization with the existing wardrobe; no skill purchases, preview GPU resources are released on close.
+- `homeSkills.js` — `initHomeSkills()`: complete skill tree before play, draft purchases and refund/reset using earned points; explicit Save build persists the validated profile, Cancel discards edits. XP and bonus points are preserved; gameplay keeps its authoritative camp reset rules.
 - `perfStats.js` — `PerfStats` / `FrameSamples`: FPS and ping overlay (off / compact / detailed).
 - `internetTest.js` — `initInternetTest()`: UI for the server's `/internet` start/stop/status endpoint and the shareable address.
 - `steamLobby.js` — `initSteamLobby()`: Steam friends/invite panel over the Electron bridge `window.dinoSteam`.

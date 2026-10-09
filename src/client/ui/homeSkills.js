@@ -92,7 +92,7 @@ export function initHomeSkills() {
         panel.el.querySelector('[data-act="close"]').textContent = 'Cancel';
         const button = document.createElement('button');
         button.type = 'button';
-        button.className = 'wd-btn primary';
+        button.className = 'wd-btn wd-primary';
         button.dataset.homeSkillsSave = '';
         button.textContent = 'Save build';
         panel.el.querySelector('.sk-actions').append(button);

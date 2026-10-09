@@ -36,6 +36,8 @@
         <div><label for="player-name">Playing as</label><input id="player-name" name="name" maxlength="14" placeholder="Explorer" autocomplete="off"><span id="home-progress">Explorer · Level 1</span></div>
         <button type="button" id="btn-explorer" class="menu-link">Customize</button>
       </div>
+      <div class="solo-map-choice"><label for="play-island">Starting island</label><select id="play-island" aria-describedby="island-unlock-help"></select></div>
+      <p id="island-unlock-help" class="island-unlock-help">Complete an island’s mission and set sail to unlock the next. Applies to solo play.</p>
       <nav class="menu-buttons" aria-label="Start an expedition">
         <button type="button" class="btn btn-primary" id="btn-solo"><span>Play solo</span><span aria-hidden="true">→</span><span class="action-note">An offline expedition of your own</span></button>
         <div class="menu-play-options">
@@ -47,6 +49,7 @@
       <ul id="lobby-players" class="lobby-players" aria-label="Players on the server"></ul>
     </div>
     <nav class="menu-utilities" aria-label="Game information and preferences">
+      <button type="button" class="menu-link" id="btn-home-skills">Skill tree</button>
       <button type="button" class="menu-link" data-home-panel="guide">How to play</button>
       <button type="button" class="menu-link" data-open-settings="controls">Controls</button>
       <button type="button" class="menu-link" data-open-settings>Settings</button>
@@ -61,6 +64,8 @@
         <button type="button" class="tour-stop" id="tour-next" disabled aria-label="Preview next island">Next island</button>
         <span id="tour-count">01 / 03</span>
       </div>
+      <label class="tour-map-label" for="tour-island">Preview island</label>
+      <select id="tour-island" aria-label="Preview island"></select>
     </aside>
   </main>
 

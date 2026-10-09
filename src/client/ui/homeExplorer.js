@@ -52,7 +52,8 @@ export function initHomeExplorer() {
         <span><strong>${p.free}</strong>Unspent skill points</span>
       </div>
       <progress max="${p.need}" value="${p.into}" aria-label="Experience toward next level"></progress>
-      <p class="home-explorer-progress">${p.capped ? 'Maximum explorer level reached.' : `${p.into} / ${p.need} XP to level ${p.level + 1}.`} Spend skill points at camp during an expedition.</p>
+      <p class="home-explorer-progress">${p.capped ? 'Maximum explorer level reached.' : `${p.into} / ${p.need} XP to level ${p.level + 1}.`} Read skills and rebuild your allocation before heading out.</p>
+      <button type="button" class="menu-link" data-explorer-skills>Open skill tree</button>
       ${learned.length ? `<details class="home-explorer-skills"><summary>Learned skills (${learned.length})</summary><ul>${learned.map(([id, rank]) => `<li><strong>${esc(SKILLS[id].name)} · ${rank}/${SKILLS[id].ranks.length}</strong><span>${esc(SKILLS[id].ranks[rank - 1])}</span></li>`).join('')}</ul></details>` : '<p class="home-explorer-progress">Your first expedition begins your skill journey.</p>'}`;
   }
 
@@ -126,6 +127,11 @@ export function initHomeExplorer() {
     }
   }
   root.querySelector('.home-dialog-close').addEventListener('click', close);
+  summary.addEventListener('click', event => {
+    if (!event.target.closest('[data-explorer-skills]')) return;
+    close();
+    document.getElementById('btn-home-skills').click();
+  });
   root.addEventListener('pointerdown', event => { if (event.target === root) close(); });
   root.addEventListener('keydown', keyboard);
   trigger?.addEventListener('click', open);

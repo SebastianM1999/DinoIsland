@@ -5,6 +5,8 @@ import { CONFIG } from '../shared/config.js';
 import { ICON_SPRITE, initSettings, renderPause } from './ui/menus.js';
 import { savedOutfit } from './ui/wardrobe.js';
 import { loadProfile } from './core/profile.js';
+import { unlockIsland, unlockedStartingIsland } from './core/islandProgress.js';
+import { EV } from '../shared/protocol.js';
 import { preloadDinoModels } from './models/dino/glbDino.js';
 import { GameAudio } from './audio/audio.js';
 import { initSteamLobby } from './ui/steamLobby.js';
@@ -12,6 +14,7 @@ import { initLanAddress, websocketAddress } from './net/lan.js';
 import { initInternetTest } from './ui/internetTest.js';
 import { initHomeMenu } from './ui/homeMenu.js';
 import { initHomeExplorer } from './ui/homeExplorer.js';
+import { initHomeSkills } from './ui/homeSkills.js';
 import { BRAND, storageKey, migrateStorage } from '../shared/brand.js';
 
 migrateStorage();
@@ -45,6 +48,7 @@ const buttons = [$('btn-join'), $('btn-solo'), $('btn-host'), $('btn-host-lan'),
 const internetTest = initInternetTest();
 const homeMenu = initHomeMenu();
 const homeExplorer = initHomeExplorer();
+const homeSkills = initHomeSkills();
 let busy = false;
 
 let game = null;
@@ -62,6 +66,7 @@ const settingsUi = initSettings();
 
 // Load the real island backdrop after the interactive menu has painted.
 let menuTour = null;
+let tourAbort = null;
 let tourIsland = 0;
 let tourRequest = 0;
 const tourDescriptions = [
@@ -71,24 +76,31 @@ const tourDescriptions = [
 ];
 async function startMenuTour() {
   const request = ++tourRequest;
+  tourAbort?.abort();
+  tourAbort = new AbortController();
   try {
     const { createMenuTour } = await import('./ui/menuTour.js');
     if (request !== tourRequest || menu.hidden) return;
     const tour = await createMenuTour($('menu-tour'), island => {
       if (request !== tourRequest) return;
       tourIsland = island.index;
+      $('tour-island').value = String(island.index);
+      $('tour-island').disabled = $('tour-next').disabled = !!island.loading;
       $('tour-title').textContent = island.name;
       $('tour-description').textContent = tourDescriptions[island.index];
       $('tour-count').textContent = `${String(island.index + 1).padStart(2, '0')} / 03`;
-      $('tour-state').textContent = island.motionEnabled ? 'Exploring the archipelago' : 'Island lookout';
+      $('tour-state').textContent = island.loading ? 'Preparing island preview…' : island.motionEnabled ? 'Exploring the archipelago' : 'Island lookout';
       $('tour-motion').textContent = island.motionEnabled ? 'Pause tour' : 'Play tour';
       $('tour-motion').setAttribute('aria-pressed', String(!island.motionEnabled));
-    });
+    }, { signal: tourAbort.signal });
     if (request !== tourRequest || menu.hidden) { tour.dispose(); return; }
     menuTour = tour;
+    if (DEBUG_QUERY.has('debug')) window.__menuTour = tour;
+    syncTourSuspension();
     $('tour-motion').disabled = false;
     $('tour-next').disabled = false;
   } catch (error) {
+    if (request !== tourRequest || error.name === 'AbortError') return;
     console.warn('Island tour unavailable', error);
     $('tour-state').textContent = 'Welcome, explorer';
     $('tour-description').textContent = 'Start an expedition to discover the islands.';
@@ -96,13 +108,27 @@ async function startMenuTour() {
 }
 function stopMenuTour() {
   ++tourRequest;
+  tourAbort?.abort();
   menuTour?.dispose();
   menuTour = null;
   $('tour-motion').disabled = true;
   $('tour-next').disabled = true;
 }
 $('tour-motion').addEventListener('click', () => menuTour?.toggleMotion());
-$('tour-next').addEventListener('click', () => menuTour?.setIsland(tourIsland + 1));
+async function selectPreviewIsland(index) {
+  try { await menuTour?.setIsland(index); }
+  catch (error) { console.warn('Island preview failed', error); $('tour-state').textContent = 'Could not load this preview'; }
+}
+$('tour-next').addEventListener('click', () => { void selectPreviewIsland(tourIsland + 1); });
+$('tour-island').addEventListener('change', () => { void selectPreviewIsland(Number($('tour-island').value)); });
+function syncTourSuspension() {
+  menuTour?.setSuspended?.([...document.querySelectorAll('.home-dialog, #settings, #steam-friends')].some(root => !root.hidden));
+}
+const tourOverlayObserver = new MutationObserver(syncTourSuspension);
+for (const root of document.querySelectorAll('.home-dialog, #settings, #steam-friends')) {
+  tourOverlayObserver.observe(root, { attributes: true, attributeFilter: ['hidden'] });
+}
+window.addEventListener('pagehide', () => tourOverlayObserver.disconnect());
 // Native Tab/Enter navigation also works; arrows provide quick menu selection.
 menu.querySelector('.menu-buttons').addEventListener('keydown', event => {
   if (!['ArrowUp', 'ArrowDown', 'Home', 'End'].includes(event.key)) return;
@@ -137,7 +163,7 @@ function setBusy(busy, text = '') {
   $('btn-friends').disabled = busy || !steamLobby.available;
   status.textContent = text;
   homeMenu.feedback(text);
-  for (const button of document.querySelectorAll('[data-home-panel], #btn-explorer')) button.disabled = busy;
+  for (const button of document.querySelectorAll('[data-home-panel], #btn-explorer, #btn-home-skills')) button.disabled = busy;
   if (text) delete status.dataset.auto;
 }
 
@@ -154,7 +180,7 @@ async function start(mode, options = {}) {
     const profile = loadProfile();   // saved XP and skills; the host re-validates them
     if (mode === 'internet') options.url = await internetTest.start();
     net = mode === 'steam' ? await Net.steam(window.dinoSteam, options, name, outfit, profile) :
-      mode === 'online' || mode === 'internet' ? await Net.connect(websocketAddress(options.url ?? serverInput.value), name, outfit, profile) : await Net.local(name, outfit, { level: DEBUG_ISLAND, baseStage: DEBUG_BASE, raidIn: DEBUG_RAID }, profile);
+      mode === 'online' || mode === 'internet' ? await Net.connect(websocketAddress(options.url ?? serverInput.value), name, outfit, profile) : await Net.local(name, outfit, { level: DEBUG_QUERY.has('island') ? DEBUG_ISLAND : unlockedStartingIsland(Number($('play-island').value)), baseStage: DEBUG_BASE, raidIn: DEBUG_RAID }, profile);
   } catch (err) {
     if (mode === 'internet') internetTest.stop();
     busy = false;
@@ -164,6 +190,7 @@ async function start(mode, options = {}) {
   menu.hidden = true;
   homeMenu.close();
   homeExplorer.close();
+  homeSkills.close();
   stopMenuTour();
   steamLobby.updateSession(net.steamSession);
   menuAudio?.stopMusic();
@@ -192,6 +219,13 @@ async function launch(net, reuse = null) {
     loadingText.textContent = 'Building the island…';
     const { Game } = await loadGameModule();
     game = new Game(canvas, net, reuse ?? (menuAudio ? { audio: menuAudio } : null));
+    net.on(`ev:${EV.MISSION}`, ({ mission }) => {
+      // This comes from the host after parts, repair and sailing are complete.
+      // Creative expeditions and scenery previews do not earn map unlocks.
+      if (mission.complete && mission.objectives.every(objective => objective.done) && !game.player.creative) {
+        unlockIsland(mission.level.index + 1);
+      }
+    });
     if (DEBUG_QUERY.has('debug')) window.dinoGame = game;   // testing aid: inspect the running game
     loadingText.textContent = 'Preparing shaders…';
     // Compile up front so the first playable frames do not hitch; optional.
