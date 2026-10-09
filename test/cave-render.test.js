@@ -3,6 +3,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { planIsland } from '../src/shared/island.js';
+import { levelDef } from '../src/shared/levels.js';
 import { Terrain } from '../src/shared/terrain.js';
 import { buildLayout } from '../src/shared/layout.js';
 import { caveRockTop } from '../src/shared/caveField.js';
@@ -21,7 +22,8 @@ function island(variant) {
   it.mesh ??= buildCaveTerrainMesh(it.terrain, it.layout);
   return it;
 }
-const VARIANTS = [1, 2, 3, 4, 5, 6];
+// (the fixed map first, then a few more)
+const VARIANTS = [...new Set([levelDef(3).variant, 1, 2, 3, 4, 5, 6])];
 
 test('no cave dressing outside the cave: everything stands under a roof, inside the mountain', () => {
   for (const variant of VARIANTS) {

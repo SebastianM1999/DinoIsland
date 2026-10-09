@@ -2,15 +2,23 @@
 // work from - where you stood and looked, what the crosshair hits (object, mesh, material, face, instance), the
 // terrain there (height, slope, roof, water, depth into a cave mountain, grid cell), level/variant/seed, graphics
 // and frame stats, and a screenshot - via the dev server into `dev-pins/` (server/devPins.js).
-// Pins of the current layout show as red markers. `?island=N&variant=V&dev&pin=<id>` loads the same layout and
-// flies you to the pin (creative, ACT.DEV_TP). Dev only: nothing here runs without ?dev.
+// Pins of the current layout show as red markers. `?island=N&dev&pin=<id>` loads the same (fixed) map and flies you
+// to the pin; a pin taken on a `?variant=V` override keeps `&variant=V` in its revisit link (creative, ACT.DEV_TP). Dev only: nothing here runs without ?dev.
 
 import * as THREE from 'three';
 import { ACT } from '../../shared/protocol.js';
+import { levelDef } from '../../shared/levels.js';
 
 const KINDS = ['visual glitch', 'see-through / hole', 'floating object', 'collision / stuck', 'lighting', 'gameplay', 'other'];
 const r3 = (v) => Math.round(v * 1000) / 1000;
 const v3 = (v) => [r3(v.x), r3(v.y), r3(v.z)];
+
+/** The link that loads this map again: the island alone for its fixed map, plus `&variant` for an override. */
+export function revisitUrl(lv, base = `${location.origin}${location.pathname}`) {
+  const index = lv.index ?? 0;
+  const override = lv.variant != null && lv.variant !== levelDef(index).variant ? `&variant=${lv.variant}` : '';
+  return `${base}?island=${index + 1}${override}&dev`;
+}
 
 /** The terrain and cave facts at one point. */
 function probe(game, x, z) {
@@ -84,7 +92,7 @@ function collect(game) {
   const info = game.gfx.renderer.info;
   return {
     level: { index: lv.index, number: (lv.index ?? 0) + 1, variant: lv.variant, name: game.layout.level?.name ?? null, biome: game.layout.biome?.id ?? null, seed: game.terrain.plan?.seed ?? null },
-    revisit: `${location.origin}${location.pathname}?island=${(lv.index ?? 0) + 1}&variant=${lv.variant}&dev`,
+    revisit: revisitUrl(lv),
     player: { pos: v3(p.pos), yaw: r3(p.yaw), pitch: r3(p.pitch), flying: !!p.flying, creative: !!p.creative, swimming: !!p.swimming, diving: !!p.diving },
     camera: { pos: v3(cam.position), dir: v3(dir), fov: cam.fov },
     hit,

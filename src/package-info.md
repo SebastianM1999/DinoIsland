@@ -25,7 +25,7 @@ src/shared/ ──▶ src/shared/ only       (no DOM, no three, no Math.random, 
 ## Authority model (details at the top of `shared/protocol.js`)
 - The server owns dinosaurs, items, fruit, traps, health, inventories, missions, the hut store and the base.
 - Clients own only their own movement and send it about 20 times a second. They report hits; the server checks the hits against the dinos' past poses (lag compensation, `CONFIG.net.lagCompMax`).
-- The island layout is deterministic from (level, variant seed), so client and server build the same world. Sim spawns and AI use `Math.random` and are **not** deterministic.
+- The island layout is deterministic from (level, variant seed), so client and server build the same world. Every island is a fixed map: its variant comes from `shared/levels.js` (`?variant=N` overrides it for testing). Sim spawns and AI use `Math.random` and are **not** deterministic.
 
 ## Feature map
 Where each feature lives in each layer. Paths are relative to `src/` unless they start with `test/`, `server/` or `desktop/`.
