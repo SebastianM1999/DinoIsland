@@ -26,7 +26,7 @@
 
   <!-- Title / lobby screen -->
   <main id="menu" class="screen">
-    <div id="menu-preview" class="is-booting" aria-hidden="true">
+    <div id="menu-preview" class="is-booting">
       <div id="menu-startup" role="status"><span class="menu-spinner" aria-hidden="true"></span><p>Scouting the islands…</p><small>Your expedition will be ready in a moment.</small></div>
       <canvas id="menu-tour" aria-hidden="true"></canvas>
       <img class="menu-preview-image" alt="">
@@ -133,12 +133,13 @@
           </button>
         </nav>
         <div class="pause-info">
-          <details class="pause-block">
-            <summary><span id="pause-mission-title">Expedition</span><span id="pause-mission-progress"></span></summary>
+          <section class="pause-block">
+            <h3><span id="pause-mission-title">Expedition</span><span id="pause-mission-progress"></span></h3>
             <ul id="pause-objectives" class="pause-objectives"></ul>
-          </details>
-          <details class="pause-block">
-            <summary>Team <span id="pause-team-count"></span></summary>
+            <h3>Team quests</h3><ul id="pause-contracts" class="pause-objectives"></ul>
+          </section>
+          <section class="pause-block">
+            <h3>Players <span id="pause-team-count"></span></h3>
             <ul id="pause-team" class="pause-team"></ul>
             <p id="steam-session-info" class="lobby-note" hidden></p>
             <section id="pause-internet" hidden>
@@ -151,7 +152,7 @@
               </div>
               <p id="pause-internet-status" class="lobby-note" role="status" aria-live="polite">Keep this game open while your friends play.</p>
             </section>
-          </details>
+          </section>
         </div>
 
       </div>

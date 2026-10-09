@@ -156,13 +156,19 @@ const loadGameModule = () => (gameModule ??= import('./core/game.js'));
 (window.requestIdleCallback ?? ((fn) => setTimeout(fn, 1500)))(() => { loadGameModule().catch(() => { gameModule = null; }); }, { timeout: 4000 });
 
 /** Show or hide the pause card; refresh its expedition/team info when shown. */
+let pauseRefresh = null;
 function setPaused(show) {
   if (show && paused.hidden) {
     renderPause(game);
     resetLeave();
     syncCreative();
   }
+  clearInterval(pauseRefresh);
+  pauseRefresh = null;
   paused.hidden = !show;
+  if (show) pauseRefresh = setInterval(() => {
+    if (game?.running && !paused.hidden && !document.hidden) renderPause(game);
+  }, 1000);
   if (show && !settingsUi.isOpen()) $('btn-resume').focus({ preventScroll: true });
   if (!show) settingsUi.close();
 }
@@ -209,7 +215,7 @@ async function start(mode, options = {}) {
   stopMenuTour();
   steamLobby.updateSession(net.steamSession);
   menuAudio?.stopMusic();
-  if (await launch(net)) setBusy(false, '');
+  if (await launch(net, null, { openMenu: !!options.openMenu })) setBusy(false, '');
   busy = false;
 }
 
@@ -218,7 +224,7 @@ async function start(mode, options = {}) {
  * renderer, audio and input of the previous island's game.
  */
 let keepCreative = false;
-async function launch(net, reuse = null) {
+async function launch(net, reuse = null, { openMenu = false } = {}) {
   let disconnectReason = 'Disconnected while loading the island';
   net.onClose = reason => { disconnectReason = reason || disconnectReason; };
   const lv = net.welcome.world.level;
@@ -274,8 +280,13 @@ async function launch(net, reuse = null) {
   loadingUi.stop();
   game.start();
   if (keepCreative) game.setCreative(true);
-  game.input.requestLock();
-  setPaused(!game.input.locked);
+  if (openMenu) {
+    game.input.exitLock();
+    setPaused(true);
+  } else {
+    game.input.requestLock();
+    setPaused(!game.input.locked);
+  }
   return true;
 }
 
@@ -289,12 +300,12 @@ function backToMenu(reason) {
 
 $('join-form').addEventListener('submit', (e) => {
   e.preventDefault();
-  if (document.activeElement === $('friend-internet-address')) start('online', { url: $('friend-internet-address').value });
-  else start('online');
+  if (document.activeElement === $('friend-internet-address')) start('online', { url: $('friend-internet-address').value, openMenu: true });
+  else start('online', { openMenu: true });
 });
 $('btn-solo').addEventListener('click', () => start('local'));
 $('btn-host-internet').addEventListener('click', () => start('internet', { url: `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}` }));
-$('btn-join-internet').addEventListener('click', () => start('online', { url: $('friend-internet-address').value }));
+$('btn-join-internet').addEventListener('click', () => start('online', { url: $('friend-internet-address').value, openMenu: true }));
 $('btn-host-lan').addEventListener('click', () => start('online', { url: `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}` }));
 $('btn-host').addEventListener('click', async () => {
   await steamLobby.ready;
@@ -302,7 +313,7 @@ $('btn-host').addEventListener('click', async () => {
   else void start('online', { url: `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}` });
 });
 const steamLobby = initSteamLobby({
-  join: lobbyId => start('steam', { lobbyId }),
+  join: lobbyId => start('steam', { lobbyId, openMenu: true }),
   isPlaying: () => busy || !!game?.running,
   leaveToJoin: () => { game?.net.close(); backToMenu(''); },
   notifyInvite: () => game?.hud.toast('Steam invite received. Open the pause menu to join your friend.'),
