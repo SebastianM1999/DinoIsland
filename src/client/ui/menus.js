@@ -2,6 +2,7 @@
 // and the contents of the pause screen.
 
 import { CONFIG } from '../../shared/config.js';
+import { CONTRACTS } from '../../shared/missions.js';
 import { SETTING_DEFS, setSetting, resetSettings, onSettings } from '../core/settings.js';
 
 const $ = (id) => document.getElementById(id);
@@ -156,6 +157,15 @@ export function renderPause(game) {
   }));
   const current = ul.querySelector('li:not(.done)');
   if (current) current.classList.add('current');
+
+  $('pause-contracts').replaceChildren(...CONTRACTS.map((contract, index) => {
+    const progress = m?.contracts?.[index];
+    const li = document.createElement('li');
+    li.className = progress?.done ? 'done' : '';
+    li.title = contract.text;
+    li.textContent = contract.title + ' · ' + (progress?.progress || 0) + '/' + contract.goal + (progress?.done ? ' · Complete' : '');
+    return li;
+  }));
 
   const team = game.team || [{ name: game.me.name, slot: game.me.slot, hp: game.me.hp, alive: game.me.alive, isYou: true }];
   $('pause-team-count').textContent = `${team.length} explorer${team.length === 1 ? '' : 's'}`;
