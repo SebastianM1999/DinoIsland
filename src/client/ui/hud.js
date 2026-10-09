@@ -14,6 +14,7 @@ import { CONTRACTS as BOARD_CONTRACTS } from '../../shared/missions.js';
 import { RELICS } from '../../shared/relics.js';
 import { BRAND } from '../../shared/brand.js';
 import { progress } from '../../shared/skills.js';
+import { missionSummary } from './missionSummary.js';
 
 const TAU = Math.PI * 2;
 const DEG = 180 / Math.PI;
@@ -516,9 +517,10 @@ export class Hud {
     if (!mission) { m.hidden = true; return; }
     m.hidden = false;
     m.classList.toggle('is-complete', !!mission.complete);
-    const items = (mission.objectives || []).map((o) =>
-      `<li class="${o.done ? 'is-done' : ''}"><span class="hud-check" aria-hidden="true">${o.done ? icon('check') : ''}</span><span>${esc(o.text)}</span><span class="sr">${o.done ? ' (done)' : ''}</span></li>`).join('');
-    m.innerHTML = `<h2 class="hud-mission-title"><span class="hud-badge">${mission.complete ? icon('check') : '!'}</span>${esc(mission.title)}</h2><ul class="hud-mission-list">${items}</ul>`;
+    const summary = missionSummary(mission);
+    m.innerHTML = `<h2 class="hud-mission-title"><span class="hud-badge">${mission.complete ? icon('check') : '!'}</span>${esc(summary.title)}</h2>
+      <p class="hud-mission-goal">${esc(summary.goal)}</p>${summary.tracked ? `<p class="hud-mission-contract">${esc(summary.tracked)}</p>` : ''}
+      <p class="hud-mission-help"><kbd>Esc</kbd> Expedition checklist</p>`;
   }
 
   setCompass(yaw, markers) {

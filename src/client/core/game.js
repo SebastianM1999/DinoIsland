@@ -361,7 +361,7 @@ export class Game {
     const objectives = c
       ? [...m.objectives, { text: `${CONTRACTS[i].title}: ${c.progress}/${CONTRACTS[i].goal}`, done: c.done }]
       : m.objectives;
-    this.hud.setMission({ ...m, objectives });
+    this.hud.setMission({ ...m, objectives, trackedObjective: c ? objectives.at(-1) : null });
   }
 
   /**
