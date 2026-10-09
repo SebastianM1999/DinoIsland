@@ -4,7 +4,8 @@
 // File: 'DCAV', u32 format, u32 header length, header (JSON), then the sections (each gzip'd, offsets in the header):
 //   walk   the sim's floor and ceiling grids (caveWalk.js), exact Float32: the server and every client that load it agree to the bit
 //   mesh   the painted volume mesh (caveVolumeMesh.js + the vertex paint of client/world/caveTerrain.js), quantised:
-//          positions uint16 per chunk box, normals int8 octahedral, colours uint16, surface weights uint8, indices uint16
+//          positions uint16 per chunk box, normals int8 octahedral, colours uint8 (gamma), surface weights uint8, the baked light
+//          (ambient occlusion / daylight / water shimmer, glow rgb: client/world/caveLight.js) uint8, indices uint16
 // A bake carries two keys. `walkKey` hashes everything the walk grid depends on (the format, WALK_VERSION, the seed and a probe of the
 // field itself: 48 columns and 48 samples of the volume), `meshKey` adds the mesher's and the painter's versions and a probe of the
 // painted colours. A loader computes the keys of the live code and uses a bake only when they agree; otherwise it builds live.
@@ -17,9 +18,9 @@ import { CaveWalk, WALK_VERSION } from './caveWalk.js';
 import { levelDef } from './levels.js';
 
 /** Container layout version. */
-export const BAKE_FORMAT = 1;
+export const BAKE_FORMAT = 2;
 /** Bump when caveVolumeMesh.js changes what it makes (the mesh is not hashed). */
-export const MESH_VERSION = 1;
+export const MESH_VERSION = 2;
 /** Folder of the baked files, relative to the site root. */
 export const BAKE_DIR = 'assets/cave/';
 
@@ -150,13 +151,13 @@ function undeltaPlanes(bytes, off, n, stride) {
 }
 
 /**
- * @param {{pos:Float32Array, nor:Float32Array, col:Float32Array, sf:Float32Array, sf2:Float32Array, idx:Uint32Array|Uint16Array, ci:number, ck:number}[]} chunks
+ * @param {{pos:Float32Array, nor:Float32Array, col:Float32Array, sf:Float32Array, sf2:Float32Array, lt:Float32Array, gl:Float32Array, idx:Uint32Array|Uint16Array, ci:number, ck:number}[]} chunks
  */
 export function encodeMesh(chunks) {
   let nv = 0, ni = 0;
   for (const c of chunks) { nv += c.pos.length / 3; ni += c.idx.length; if (c.pos.length / 3 > 65535) throw new Error('chunk too big for 16-bit indices'); }
   const TABLE = 40;   // per chunk: ci,ck (u16), nv, ni (u32), box min xyz + size xyz (f32)
-  const posQ = new Uint16Array(nv * 3), norQ = new Uint8Array(nv * 2), colQ = new Uint8Array(nv * 3), sfQ = new Uint8Array(nv * 4), sf2Q = new Uint8Array(nv * 2), idxQ = new Uint16Array(ni);
+  const posQ = new Uint16Array(nv * 3), norQ = new Uint8Array(nv * 2), colQ = new Uint8Array(nv * 3), sfQ = new Uint8Array(nv * 4), sf2Q = new Uint8Array(nv * 2), ltQ = new Uint8Array(nv * 3), glQ = new Uint8Array(nv * 3), idxQ = new Uint16Array(ni);
   const table = new Uint8Array(chunks.length * TABLE), dv = new DataView(table.buffer);
   let v0 = 0, i0 = 0, t = 0;
   for (const c of chunks) {
@@ -175,11 +176,15 @@ export function encodeMesh(chunks) {
       for (let k = 0; k < 3; k++) colQ[g * 3 + k] = Math.max(0, Math.min(255, Math.round(Math.sqrt(Math.max(0, c.col[v * 3 + k]) / COLOR_MAX) * 255)));
       for (let k = 0; k < 4; k++) sfQ[g * 4 + k] = Math.max(0, Math.min(255, Math.round(c.sf[v * 4 + k] * 255)));
       for (let k = 0; k < 2; k++) sf2Q[g * 2 + k] = Math.max(0, Math.min(255, Math.round(c.sf2[v * 2 + k] * 255)));
+      for (let k = 0; k < 3; k++) {
+        ltQ[g * 3 + k] = Math.max(0, Math.min(255, Math.round(c.lt[v * 3 + k] * 255)));
+        glQ[g * 3 + k] = Math.max(0, Math.min(255, Math.round(Math.sqrt(Math.max(0, c.gl[v * 3 + k])) * 255)));   // (sqrt: the dim end keeps its resolution)
+      }
     }
     for (let i = 0; i < c.idx.length; i++) idxQ[i0 + i] = c.idx[i];
     v0 += m; i0 += c.idx.length;
   }
-  const parts = [table, deltaPlanes(posQ, 3), deltaBytes(norQ, 2), deltaBytes(colQ, 3), deltaBytes(sfQ, 4), deltaBytes(sf2Q, 2), deltaPlanes(idxQ, 1)];
+  const parts = [table, deltaPlanes(posQ, 3), deltaBytes(norQ, 2), deltaBytes(colQ, 3), deltaBytes(sfQ, 4), deltaBytes(sf2Q, 2), deltaBytes(ltQ, 3), deltaBytes(glQ, 3), deltaPlanes(idxQ, 1)];
   const bytes = new Uint8Array(16 + parts.reduce((s, p) => s + p.length, 0)), hd = new DataView(bytes.buffer);
   hd.setUint32(0, chunks.length, true); hd.setUint32(4, nv, true); hd.setUint32(8, ni, true);
   let o = 16;
@@ -187,7 +192,7 @@ export function encodeMesh(chunks) {
   return bytes;
 }
 
-/** @returns {{pos:Float32Array, nor:Float32Array, col:Float32Array, sf:Float32Array, sf2:Float32Array, idx:Uint16Array, ci:number, ck:number}[]} */
+/** @returns {{pos:Float32Array, nor:Float32Array, col:Float32Array, sf:Float32Array, sf2:Float32Array, lt:Float32Array, gl:Float32Array, idx:Uint16Array, ci:number, ck:number}[]} */
 export function decodeMesh(bytes) {
   const dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   const nChunks = dv.getUint32(0, true), nv = dv.getUint32(4, true), ni = dv.getUint32(8, true);
@@ -196,6 +201,7 @@ export function decodeMesh(bytes) {
   const posQ = undeltaPlanes(bytes, o, nv * 3, 3); o += nv * 6;
   const sub = (n) => { const s = bytes.slice(o, o + n); o += n; return s; };
   const norQ = undeltaBytes(sub(nv * 2), 2), colQ = undeltaBytes(sub(nv * 3), 3), sfQ = undeltaBytes(sub(nv * 4), 4), sf2Q = undeltaBytes(sub(nv * 2), 2);
+  const ltQ = undeltaBytes(sub(nv * 3), 3), glQ = undeltaBytes(sub(nv * 3), 3);
   const idxQ = undeltaPlanes(bytes, o, ni, 1);
   void b0;
   const out = [];
@@ -203,7 +209,7 @@ export function decodeMesh(bytes) {
   for (let c = 0, t = 16; c < nChunks; c++, t += TABLE) {
     const ci = dv.getUint16(t, true), ck = dv.getUint16(t + 2, true), m = dv.getUint32(t + 4, true), n = dv.getUint32(t + 8, true);
     const lo = [0, 1, 2].map((k) => dv.getFloat32(t + 12 + k * 4, true)), size = [0, 1, 2].map((k) => dv.getFloat32(t + 24 + k * 4, true));
-    const pos = new Float32Array(m * 3), nor = new Float32Array(m * 3), col = new Float32Array(m * 3), sf = new Float32Array(m * 4), sf2 = new Float32Array(m * 2);
+    const pos = new Float32Array(m * 3), nor = new Float32Array(m * 3), col = new Float32Array(m * 3), sf = new Float32Array(m * 4), sf2 = new Float32Array(m * 2), lt = new Float32Array(m * 3), gl = new Float32Array(m * 3);
     for (let v = 0; v < m; v++) {
       const g = v0 + v;
       for (let k = 0; k < 3; k++) pos[v * 3 + k] = lo[k] + posQ[g * 3 + k] / 65535 * size[k];
@@ -211,8 +217,9 @@ export function decodeMesh(bytes) {
       for (let k = 0; k < 3; k++) { const q = colQ[g * 3 + k] / 255; col[v * 3 + k] = q * q * COLOR_MAX; }
       for (let k = 0; k < 4; k++) sf[v * 4 + k] = sfQ[g * 4 + k] / 255;
       for (let k = 0; k < 2; k++) sf2[v * 2 + k] = sf2Q[g * 2 + k] / 255;
+      for (let k = 0; k < 3; k++) { lt[v * 3 + k] = ltQ[g * 3 + k] / 255; const q = glQ[g * 3 + k] / 255; gl[v * 3 + k] = q * q; }
     }
-    out.push({ pos, nor, col, sf, sf2, idx: idxQ.slice(i0, i0 + n), ci, ck });
+    out.push({ pos, nor, col, sf, sf2, lt, gl, idx: idxQ.slice(i0, i0 + n), ci, ck });
     v0 += m; i0 += n;
   }
   return out;

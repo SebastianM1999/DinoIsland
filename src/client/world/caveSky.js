@@ -29,6 +29,7 @@ export const CAVE_SKY = {
   // x: 1 / sun scale of the scene's sun, y: the interior's share of the outdoor sky light,
   // z: the scene's current sky-light scale (both so a pixel's light is independent of the camera)
   uCaveL: { value: new THREE.Vector4(1, 0.4, 1, 0) },
+  uCaveT: { value: 0 },                                           // seconds, for the water shimmer
 };
 
 /** Sky visibility from a distance through the tunnels (metres). */
@@ -144,22 +145,34 @@ uniform sampler2D uSkyTex;
 uniform vec3 uSkyRect;
 uniform vec4 uCaveL;
 uniform float uSkyMode;
+uniform float uCaveT;
 float caveSkyVis() {
+#ifdef CAVE_VOL
+  return vCaveBake.y;   // the volume: baked per vertex (caveLight.js)
+#else
   vec2 t = texture2D(uSkyTex, (vCaveW.xz - uSkyRect.xy) * uSkyRect.z).rg;
   float v = t.r;
   if (uSkyMode < 0.5) v = mix(v, 1.0, smoothstep(t.g + 0.1, t.g + 1.4, vCaveW.y));   // above the roof: the mountain's skin
-  else if (uSkyMode > 1.5) v = mix(v, 1.0, smoothstep(t.g + 1.0, t.g + 2.6, vCaveW.y));   // the volume: its roof lies at t.g (+- the noise), the skin well above it
   else if (!gl_FrontFacing) v = 0.0;
   return v;
+#endif
 }
-/** The baked crystal glow lights what is under the roof, never the mountain's skin above it. */
+/** The 2D glow texture lights what is under the roof, never the mountain's skin above it (the volume's glow is per vertex). */
 float caveGlowK() {
+#ifdef CAVE_VOL
+  return 1.0;
+#else
   if (uSkyMode > 0.5 && uSkyMode < 1.5) return gl_FrontFacing ? 1.0 : 0.0;
   float roofY = texture2D(uSkyTex, (vCaveW.xz - uSkyRect.xy) * uSkyRect.z).g;
-  if (uSkyMode > 1.5) return 1.0 - smoothstep(roofY + 1.0, roofY + 2.6, vCaveW.y);
   return 1.0 - smoothstep(roofY + 0.1, roofY + 1.4, vCaveW.y);
+#endif
 }
 `;
+// The volume mesh (mode 2) carries its light baked per vertex (caveLight.js): `bake` = (ambient occlusion, daylight, water
+// shimmer) and `glow` = the crystal / daylight glow with line of sight. The other modes read the 2D sky field per pixel.
+const VOL_VERT_PARS = 'attribute vec3 bake;\nattribute vec3 glow;\nvarying vec3 vCaveBake;\nvarying vec3 vCaveGlow;\n';
+const VOL_VERT_MAIN = 'vCaveBake = bake;\nvCaveGlow = glow;\n';
+const VOL_FRAG_PARS = '#define CAVE_VOL\nvarying vec3 vCaveBake;\nvarying vec3 vCaveGlow;\n';
 
 const CH = THREE.ShaderChunk;
 const LIGHTS_BEGIN = CH.lights_fragment_begin.replace(
@@ -184,13 +197,17 @@ export function withCaveSky(mat, mode) {
     shader.uniforms.uSkyRect = CAVE_SKY.uSkyRect;
     shader.uniforms.uCaveL = CAVE_SKY.uCaveL;
     shader.uniforms.uSkyMode = { value: mode };
+    shader.uniforms.uCaveT = CAVE_SKY.uCaveT;
+    const vol = mode === 2;
     shader.vertexShader = shader.vertexShader
-      .replace('#include <common>', `#include <common>\n${VERT_PARS}`)
-      .replace('#include <project_vertex>', `#include <project_vertex>\n${VERT_MAIN}`);
+      .replace('#include <common>', `#include <common>\n${VERT_PARS}${vol ? VOL_VERT_PARS : ''}`)
+      .replace('#include <project_vertex>', `#include <project_vertex>\n${VERT_MAIN}${vol ? VOL_VERT_MAIN : ''}`);
     shader.fragmentShader = shader.fragmentShader
-      .replace('#include <common>', `#include <common>\n${FRAG_PARS}`)
+      .replace('#include <common>', `#include <common>\n${vol ? VOL_FRAG_PARS : ''}${FRAG_PARS}`)
+      // ambient occlusion of the volume: darkens the albedo a little (torch light too) and the indirect light fully
+      .replace('#include <color_fragment>', `#include <color_fragment>${vol ? '\n\tdiffuseColor.rgb *= mix(0.4, 1.0, vCaveBake.x);' : ''}`)
       .replace('#include <lights_fragment_begin>', `float cVis = caveSkyVis();\n\tfloat cSunK = cVis * uCaveL.x;\n\tfloat cAmbK = mix(uCaveL.y, 1.0, cVis) / uCaveL.z;\n${LIGHTS_BEGIN}`)
-      .replace('#include <lights_fragment_end>', `#if defined( RE_IndirectDiffuse )\n\tirradiance *= cAmbK;\n#endif\n#include <lights_fragment_end>`)
+      .replace('#include <lights_fragment_end>', `#if defined( RE_IndirectDiffuse )\n\tirradiance *= cAmbK${vol ? ' * vCaveBake.x' : ''};\n#endif\n#include <lights_fragment_end>`)
       .replace('#include <fog_fragment>', FOG);
   };
   mat.customProgramCacheKey = () => `cavesky-${mode}`;

@@ -33,7 +33,8 @@ for (const variant of variants) {
   const group = mesh.children.find((c) => c.name === 'cave-volume');
   const chunks = group.children.map((c) => ({
     pos: c.geometry.attributes.position.array, nor: c.geometry.attributes.normal.array, col: c.geometry.attributes.color.array,
-    sf: c.geometry.attributes.surface.array, sf2: c.geometry.attributes.surface2.array, idx: c.geometry.index.array,
+    sf: c.geometry.attributes.surface.array, sf2: c.geometry.attributes.surface2.array,
+    lt: c.geometry.attributes.bake.array, gl: c.geometry.attributes.glow.array, idx: c.geometry.index.array,
     ci: c.userData.chunk[0], ck: c.userData.chunk[1],
   }));
   const walkRaw = encodeWalk(terrain.walk), meshRaw = encodeMesh(chunks);

@@ -19,11 +19,12 @@ import { withSurfaceDetail, setSurfaceBiome, CAVE_GLOW } from './surfaceDetail.j
 import { buildGlowField } from './caveStyle.js';
 import { buildSkyField, withCaveSky, CAVE_SKY } from './caveSky.js';
 import { meshCaveVolume } from './caveVolumeMesh.js';
-import { caveRock, releaseVolumeLattice } from '../../shared/caveVolume.js';
+import { caveRock, releaseVolumeLattice, volumeLattice } from '../../shared/caveVolume.js';
+import { bakeCaveLight, sourceProbe } from './caveLight.js';
 import { caveBakeFor, meshKey, decodeMesh } from '../../shared/caveBake.js';
 
 /** Bump when the vertex paint below changes in a way the probe (paintProbe) cannot see; the probe catches most. */
-export const PAINT_VERSION = 1;
+export const PAINT_VERSION = 2;
 
 const C = (hex) => new THREE.Color(hex);
 /** Above this height (m) there is no water and no shore: the floors are 2-5 m, the sea at 0. */
@@ -185,6 +186,7 @@ export function buildCaveTerrainMesh(terrain, layout) {
     }
     for (const [x, z] of [[-230, 4], [236, -6], [-200, 30], [205, 20]]) { fillVertex(A, 0, x, terrain.heightAt(x, z), z, 0.1); out.push(...A.col, ...A.sf, ...A.sf2); }
     out.push(roofLook(roofTint, S, P, plan.cave.maze.nodes[0].x, 8, plan.cave.maze.nodes[0].z, 5), roofTint.r, roofTint.g, roofTint.b);
+    out.push(...sourceProbe(glow.sources));   // (the baked light: a changed crystal / light layout makes a stale bake)
     return out;
   };
   for (let j = 0; j <= n; j++) {
@@ -252,6 +254,8 @@ export function buildCaveTerrainMesh(terrain, layout) {
     g.setAttribute('color', new THREE.BufferAttribute(ch.col, 3));
     g.setAttribute('surface', new THREE.BufferAttribute(ch.sf, 4));
     g.setAttribute('surface2', new THREE.BufferAttribute(ch.sf2, 2));
+    g.setAttribute('bake', new THREE.BufferAttribute(ch.lt, 3));      // ambient occlusion, daylight, water shimmer (caveLight.js)
+    g.setAttribute('glow', new THREE.BufferAttribute(ch.gl, 3));      // crystal / daylight glow with line of sight
     g.setIndex(new THREE.BufferAttribute(ch.idx, 1));
     g.computeBoundingSphere();
     const c = new THREE.Mesh(g, mats.volume);
@@ -266,6 +270,8 @@ export function buildCaveTerrainMesh(terrain, layout) {
   function paintLive() {
     const vol = meshCaveVolume(plan, { half });
     volumeStats = vol.stats;
+    // the light of every vertex from the same SDF (before the lattice is let go)
+    volumeStats.light = bakeCaveLight(volumeLattice(plan, half), vol.chunks, { sources: glow.sources, visAt: sky.visAt, waterAt: (x, z) => terrain.waterLevelAt(x, z) });
     releaseVolumeLattice(plan);   // (the mesh is cut, the walk grid built: the ~25 MB of samples can go)
     const out = [];
     for (const ch of vol.chunks) {
@@ -284,7 +290,7 @@ export function buildCaveTerrainMesh(terrain, layout) {
         A.sf2[v * 2] += (0.55 + 0.4 * streak - A.sf2[v * 2]) * rk; A.sf2[v * 2 + 1] *= 1 - rk;
       }
     }
-    out.push({ pos: ch.pos, nor: ch.nor, col: A.col, sf: A.sf, sf2: A.sf2, idx: ch.idx, ci: ch.ci, ck: ch.ck });
+    out.push({ pos: ch.pos, nor: ch.nor, col: A.col, sf: A.sf, sf2: A.sf2, lt: ch.lt, gl: ch.gl, idx: ch.idx, ci: ch.ci, ck: ch.ck });
     }
     return out;
   }

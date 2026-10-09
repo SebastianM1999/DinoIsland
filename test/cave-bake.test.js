@@ -109,15 +109,15 @@ test('pack, encode and decode round-trip: exact walk grid, mesh within its quant
   assert.deepEqual(walk.floor, live.walk.floor);
   const rng = makeRng(9);
   const chunks = [0, 1].map((ci) => {
-    const m = 300, pos = new Float32Array(m * 3), nor = new Float32Array(m * 3), col = new Float32Array(m * 3), sf = new Float32Array(m * 4), sf2 = new Float32Array(m * 2);
+    const m = 300, pos = new Float32Array(m * 3), nor = new Float32Array(m * 3), col = new Float32Array(m * 3), sf = new Float32Array(m * 4), sf2 = new Float32Array(m * 2), lt = new Float32Array(m * 3), gl = new Float32Array(m * 3);
     for (let v = 0; v < m; v++) {
-      for (let k = 0; k < 3; k++) { pos[v * 3 + k] = rng.range(-50, 50); col[v * 3 + k] = rng.range(0, 1.2); }
+      for (let k = 0; k < 3; k++) { pos[v * 3 + k] = rng.range(-50, 50); col[v * 3 + k] = rng.range(0, 1.2); lt[v * 3 + k] = rng(); gl[v * 3 + k] = rng() * rng(); }
       const n = [rng.range(-1, 1), rng.range(-1, 1), rng.range(-1, 1)], l = Math.hypot(...n);
       nor.set(n.map((q) => q / l), v * 3);
       for (let k = 0; k < 4; k++) sf[v * 4 + k] = rng();
       for (let k = 0; k < 2; k++) sf2[v * 2 + k] = rng();
     }
-    return { pos, nor, col, sf, sf2, idx: Uint32Array.from({ length: 90 }, () => Math.floor(rng() * m)), ci, ck: 3 };
+    return { pos, nor, col, sf, sf2, lt, gl, idx: Uint32Array.from({ length: 90 }, () => Math.floor(rng() * m)), ci, ck: 3 };
   });
   const back = decodeMesh(encodeMesh(chunks));
   assert.equal(back.length, 2);
@@ -132,6 +132,8 @@ test('pack, encode and decode round-trip: exact walk grid, mesh within its quant
     }
     for (let i = 0; i < a.col.length; i++) assert.ok(Math.abs(a.col[i] - b.col[i]) < 0.02 + 0.02 * a.col[i], 'colours within 8 bit gamma steps');
     for (let i = 0; i < a.sf.length; i++) assert.ok(Math.abs(a.sf[i] - b.sf[i]) < 1 / 255);
+    for (let i = 0; i < a.lt.length; i++) assert.ok(Math.abs(a.lt[i] - b.lt[i]) < 1 / 255 + 1e-6, 'baked ao / sky / shimmer within 8 bits');
+    for (let i = 0; i < a.gl.length; i++) assert.ok(Math.abs(a.gl[i] - b.gl[i]) < 0.012, 'baked glow within 8 bit sqrt steps');
   });
   const packed = packBake({ header: { x: 1 }, sections: { a: new Uint8Array([1, 2, 3]), b: new Uint8Array([9]) } });
   const un = unpackBake(packed);
@@ -162,6 +164,7 @@ test('the baked mesh matches a live build: same chunks, vertex counts, bounds an
     const ba = box(ga), bc = box(gc);
     for (const k of ['x', 'y', 'z']) { assert.ok(Math.abs(ba.min[k] - bc.min[k]) < 0.01 && Math.abs(ba.max[k] - bc.max[k]) < 0.01, `chunk ${i} bounds ${k}`); }
     const pa = ga.attributes.position.array, pc = gc.attributes.position.array, ca = ga.attributes.color.array, cc = gc.attributes.color.array;
+    const la = ga.attributes.bake.array, lc = gc.attributes.bake.array, wa = ga.attributes.glow.array, wc = gc.attributes.glow.array;
     const na = ga.attributes.normal.array, nc = gc.attributes.normal.array, sa = ga.attributes.surface.array, sc = gc.attributes.surface.array;
     for (let v = 0; v < pa.length / 3; v += 37) {
       for (let k = 0; k < 3; k++) {
@@ -171,6 +174,10 @@ test('the baked mesh matches a live build: same chunks, vertex counts, bounds an
       const dot = na[v * 3] * nc[v * 3] + na[v * 3 + 1] * nc[v * 3 + 1] + na[v * 3 + 2] * nc[v * 3 + 2];
       assert.ok(dot > 0.998, `chunk ${i} vertex ${v} normal`);
       for (let k = 0; k < 4; k++) assert.ok(Math.abs(sa[v * 4 + k] - sc[v * 4 + k]) < 1 / 255 + 1e-6);
+      for (let k = 0; k < 3; k++) {
+        assert.ok(Math.abs(la[v * 3 + k] - lc[v * 3 + k]) < 1 / 255 + 1e-6, `chunk ${i} vertex ${v} baked light ${k}`);
+        assert.ok(Math.abs(wa[v * 3 + k] - wc[v * 3 + k]) < 0.012, `chunk ${i} vertex ${v} baked glow ${k}`);
+      }
     }
     verts += pa.length / 3; tris += ga.index.count / 3;
   });

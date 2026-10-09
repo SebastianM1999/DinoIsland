@@ -14,6 +14,7 @@ import { buildCaveDecor } from './caveDecor.js';
 import { buildCaveFx, caveTier } from './caveFx.js';
 import { buildCaveCoves } from './caveCoves.js';
 import { buildWallTorches } from './wallTorches.js';
+import { CAVE_SKY } from './caveSky.js';
 
 export function buildCaveWorld(terrain, layout, gfx, terrainMesh, water) {
   const group = new THREE.Group();
@@ -39,6 +40,7 @@ export function buildCaveWorld(terrain, layout, gfx, terrainMesh, water) {
     get inside() { return fx.inside; },
     get wet() { return fx.wet; },
     update(dt, time, cam) {
+      CAVE_SKY.uCaveT.value = time % 3600;   // (the water shimmer of the volume's shader)
       fx.update(dt, time, cam, { audio: api.audio });
       decor.update(dt, time, cam);
       coves.update?.(dt, time, cam);
