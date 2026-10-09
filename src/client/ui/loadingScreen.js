@@ -49,7 +49,10 @@ export function initLoadingScreen(root) {
   const note = document.createElement('p');
   note.className = 'loading-note';
   note.textContent = 'Stay together. Dinosaurs prefer explorers who wander off.';
-  card.append(eyebrow, title, status, quip, meter, note);
+  const paw = document.createElement('span');
+  paw.className = 'dino-loading-icon';
+  paw.setAttribute('aria-hidden', 'true');
+  card.append(paw, eyebrow, title, status, quip, meter, note);
   root.replaceChildren(photographs, card);
 
   let running = false, generation = 0, timer = null;
