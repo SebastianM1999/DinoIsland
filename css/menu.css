@@ -211,9 +211,11 @@
 #menu-preview.is-booting #menu-startup { display: flex; }
 #menu-startup p { font-size: 1.2rem; margin: 20px 0 8px; }
 #menu-startup small { color: #b9c7bf; }
-.menu-spinner { width: 40px; height: 40px; border: 3px solid #ffffff24; border-top-color: #ffc933; border-radius: 50%; animation: menu-startup-spin 1s linear infinite; }
-@keyframes menu-startup-spin { to { transform: rotate(360deg); } }
+.dino-loading-icon { display: block; flex-shrink: 0; width: 56px; height: 56px; background: url('../assets/images/dino-loading-paw.png') center / contain no-repeat; animation: dino-loading-step 1.2s ease-in-out infinite; }
+@keyframes dino-loading-step { 0%, 100% { opacity: .5; transform: scale(.9) rotate(-6deg); } 50% { opacity: 1; transform: scale(1) rotate(0deg); } }
 #menu .tour-info { width: auto; }
 #menu .menu-link, #menu .menu-link:hover { background: transparent; border-color: transparent; transform: none; animation: none; transition: none; }
 @media (max-width: 800px) { #menu-startup { padding-left: 0; } }
-@media (prefers-reduced-motion: reduce) { .menu-spinner { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .dino-loading-icon { animation: none; } }
+
+.loading-motion-paused .dino-loading-icon { animation-play-state: paused; }

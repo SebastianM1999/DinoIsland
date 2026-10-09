@@ -70,3 +70,5 @@
 @media (prefers-reduced-motion: reduce) {
   .loading-photograph { animation: none !important; transition: none; }
 }
+
+.loading-expedition .dino-loading-icon { margin-bottom: 18px; }
