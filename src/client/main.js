@@ -28,6 +28,7 @@ const DEBUG_ISLAND = Math.max(0, (Number(DEBUG_QUERY.get('island')) || 1) - 1);
 const DEBUG_VARIANT = Number(DEBUG_QUERY.get('variant')) || undefined;   // ?variant=7: a fixed island layout (screenshots, bug reports)
 const DEBUG_BASE = Math.max(0, Math.min(3, Number(DEBUG_QUERY.get('base')) || 0));
 const DEBUG_RAID = Math.max(0, Number(DEBUG_QUERY.get('raid')) || 0);   // ?raid=10: first raid in 10 s (with ?base)
+const DEBUG_DEV = DEBUG_QUERY.has('dev') || DEBUG_QUERY.has('pin');   // ?dev: the dev pin tool (F8, client/core/devPins.js)
 document.title = BRAND.name;
 
 // SVG filter that gives HUD and menu panels their brush-stroke edges.
@@ -200,7 +201,7 @@ async function start(mode, options = {}) {
     const profile = loadProfile();   // saved XP and skills; the host re-validates them
     if (mode === 'internet') options.url = await internetTest.start();
     net = mode === 'steam' ? await Net.steam(window.dinoSteam, options, name, outfit, profile) :
-      mode === 'online' || mode === 'internet' ? await Net.connect(websocketAddress(options.url ?? serverInput.value), name, outfit, profile) : await Net.local(name, outfit, { level: DEBUG_QUERY.has('island') ? DEBUG_ISLAND : unlockedStartingIsland(Number($('play-island').value)), variant: DEBUG_VARIANT, baseStage: DEBUG_BASE, raidIn: DEBUG_RAID }, profile);
+      mode === 'online' || mode === 'internet' ? await Net.connect(websocketAddress(options.url ?? serverInput.value), name, outfit, profile) : await Net.local(name, outfit, { level: DEBUG_QUERY.has('island') ? DEBUG_ISLAND : unlockedStartingIsland(Number($('play-island').value)), variant: DEBUG_VARIANT, dev: DEBUG_DEV, baseStage: DEBUG_BASE, raidIn: DEBUG_RAID }, profile);
   } catch (err) {
     if (mode === 'internet') internetTest.stop();
     busy = false;
@@ -266,6 +267,13 @@ async function launch(net, reuse = null, { openMenu = false } = {}) {
   // The game took over net.onClose; a disconnect during the precompile had no onLeave yet.
   if (net.closed) { backToMenu('Disconnected while loading the island'); return false; }
   window.__game = game; // handy for debugging in the console
+  if (DEBUG_DEV) {
+    // dev pin tool (F8): reports into dev-pins/ via the dev server; ?pin=<id> revisits one (client/core/devPins.js)
+    const { installDevPins } = await import('./core/devPins.js');
+    const pins = installDevPins(game, { pinId: reuse ? null : DEBUG_QUERY.get('pin') });   // (only the first island revisits)
+    const dispose = game.dispose.bind(game);
+    game.dispose = (...args) => { pins.dispose(); return dispose(...args); };
+  }
   game.input.onLockChange = (locked) => {
     setPaused(!locked && game?.running && !game.hud.isPanelOpen() && !game.input.lockPending);
   };

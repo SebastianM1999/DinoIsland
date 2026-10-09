@@ -72,6 +72,7 @@ export const ACT = {
   REVIVE: 'revive',     // { to } start reviving a downed teammate (hold E) | { stop: true }
   DASH: 'dash',         // {}                                   Dash skill used (client moves, server grants the distance + checks cooldown)
   LIGHT: 'light',       // { torch }                              light a Hollow Mountain wall torch with the lit hand torch (within reach)
+  DEV_TP: 'devtp',      // { x, y, z }                            dev pin tool: jump there (only a solo world started with ?dev, creative)
 };
 
 /** Server events (msg.e). */

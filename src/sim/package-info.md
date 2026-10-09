@@ -17,6 +17,7 @@
 - `volcano.js` — `Volcano` (island 3, idle elsewhere): hot ground burns players (not with Fireproof), the eruption cycle calm -> rumble -> erupt (lava bombs near players and anywhere, never at the camp, base or boat; they hurt dinosaurs too) -> ash (dinosaurs see less far: `sightMul`), the mountain path's bomb zone (bombs ahead of whoever climbs it, eruption or not), lava geysers (bubble, then spout: they burn and throw back players and dinosaurs; only near players), sinking columns (stood on: down under the lava and up again, their colliders with them), the lava lake treasure (loot and xp, once), and ash rain on the wind between eruptions (the eruption keeps its time); out in the ash a player loses health after a grace time, never below a floor (the camp and the base plots shelter: `ashShelter`); `public()` (phase, what brought the ash) for late joiners.
 - `unstuck.js` — `standable`, `goodSpot`, `findUnstuckSpot`: nearest safe spot for the "get unstuck" action.
 - `worker.js` — Web Worker host for solo play: runs `ServerWorld` on a timer and relays messages to the page.
+- Dev tools: the worker passes `?variant=N` through (a fixed layout) and sets `world.devTools` for `?dev`; only then does `ACT.DEV_TP` (creative only) teleport, for the dev pin tool. Hosted servers never set it.
 
 ### Areas inside `world.js` (~1500 lines, find by the `// ----- <area>` banners)
 - constructor / `#loadLevel` / `nextLevel`: builds terrain + layout from `shared/` (`planIsland`, `buildLayout`), resets per-island state; `worldEpoch` bumps per island.

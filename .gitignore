@@ -47,3 +47,6 @@ output/playwright/
 
 # Local junction so Codex finds the project skills in .claude/skills (create with: mklink /J .agents\skills .claude\skills)
 .agents/
+
+# Dev pin tool reports (F8 in a ?dev game, server/devPins.js)
+dev-pins/
