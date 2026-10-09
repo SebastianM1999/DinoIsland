@@ -205,3 +205,15 @@
 .preview-placeholder { left: 52%; right: 8%; }
 @media (max-width: 800px) { #menu-preview { top: 0; } .preview-placeholder { left: 8%; } }
 @media (prefers-reduced-motion: reduce) { #menu-tour { transition: none; } }
+
+/* A quiet startup state replaces incomplete scenery until the tour is warmed. */
+#menu-startup { position: absolute; inset: 0; z-index: 4; display: none; background: #111c28; color: #fff1d0; align-items: center; justify-content: center; flex-direction: column; padding-left: 35%; }
+#menu-preview.is-booting #menu-startup { display: flex; }
+#menu-startup p { font-size: 1.2rem; margin: 20px 0 8px; }
+#menu-startup small { color: #b9c7bf; }
+.menu-spinner { width: 40px; height: 40px; border: 3px solid #ffffff24; border-top-color: #ffc933; border-radius: 50%; animation: menu-startup-spin 1s linear infinite; }
+@keyframes menu-startup-spin { to { transform: rotate(360deg); } }
+#menu .tour-info { width: auto; }
+#menu .menu-link, #menu .menu-link:hover { background: transparent; border-color: transparent; transform: none; animation: none; transition: none; }
+@media (max-width: 800px) { #menu-startup { padding-left: 0; } }
+@media (prefers-reduced-motion: reduce) { .menu-spinner { animation: none; } }
