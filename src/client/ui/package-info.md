@@ -11,7 +11,7 @@
 - `boatPanel.js` — `BoatPanel`: boat wreck dialog listing found/missing boat parts and the Repair button.
 - `grovePrompt.js` — `GrovePrompt`: Yes/No warning and hint shown at the giant's pen barrier.
 - `wardrobe.js` — `Wardrobe` (hat/top/pants picker with rotatable 3D preview) and `savedOutfit()` from localStorage.
-- `skillPanel.js` — `SkillPanel`: skill tree dialog (key K) with optimistic buys reverted after a timeout.
+- `skillPanel.js` — `SkillPanel`: skill tree dialog (key K), numeric ranks/costs and readable locked states, aggregate tier spending/progress, with optimistic buys reverted after a timeout. Locked tiles remain keyboard-inspectable; purchase rules stay in the shared model.
 - `skillModel.js` — pure, DOM-free view-model of the skill panel (`buildSkillView`, `previewBuy`, `nearCamp`, ...).
 - `skillIcons.js` — 24x24 stroke SVG icons per skill and tree, plus lock/tick/close glyphs.
 - `menus.js` — `ICON_SPRITE`, `initSettings()` (settings dialog) and `renderPause(game)` (live expedition menu: left action rail, expandable mission progress and team details). Keyboard focus/navigation lives in `main.js`; the island keeps running.
