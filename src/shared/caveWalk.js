@@ -18,14 +18,17 @@
 import { CONFIG } from './config.js';
 import { smoothstep } from './rng.js';
 import { CAVE_GEOM as G } from './caveMaze.js';
+import { CAVE_SKY } from './caveField.js';
 import { volumeLattice, NEAR } from './caveVolume.js';
 
 /** Bump when the sampling changes: a baked grid (assets/cave) of an older version is ignored. */
-export const WALK_VERSION = 1;
+export const WALK_VERSION = 2;
 /** cell: grid spacing (m); tile: cells per tile side; erode: wall clearance (m, ~ the player's radius); step: vertical scan step (m). */
 export const WALK = { cell: 0.5, tile: 16, erode: 0.35, step: 0.5 };
 /** Stored for "no roof" (open sky). */
 export const SKY = 1e4;
+/** a stored roof at or above this is open sky (the same threshold as caveField's CAVE_SKY) */
+const SKY_RAW = CAVE_SKY;
 
 const P = CONFIG.player;
 /** free height a player needs (eroded spans lose twice the clearance) */
@@ -69,7 +72,19 @@ export class CaveWalk {
   /** Floor height at (x, z), or NaN when the point is outside the covered tiles. */
   height(x, z) { return this.#sample(this.floor, x, z); }
   /** Raw roof value (>= CAVE_SKY: open) at (x, z), or NaN outside the covered tiles. */
-  ceiling(x, z) { return this.#sample(this.ceil, x, z); }
+  ceiling(x, z) {
+    // (where open "no roof" nodes and finite ones meet - a roof sheet thinner than the lattice over a tunnel mouth is found
+    // at some nodes and not at the next - a blend would turn the sheet into a huge number that reads as open sky: the
+    // lowest finite corner wins there)
+    const o = this.#cell(x, z);
+    if (o < 0) return NaN;
+    const fx = this.fx, fz = this.fz, s = this.t1, c = this.ceil;
+    const a = c[o], b = c[o + 1], d = c[o + s], e = c[o + s + 1];
+    const lo = Math.min(a, b, d, e);
+    if (lo < SKY_RAW && Math.max(a, b, d, e) >= SKY_RAW) return lo;
+    if (fx + fz < 1) return a + (b - a) * fx + (d - a) * fz;
+    return e + (d - e) * (1 - fx) + (b - e) * (1 - fz);
+  }
   /** Is (x, z) in a covered tile? */
   covers(x, z) { return this.#cell(x, z) >= 0; }
 }
