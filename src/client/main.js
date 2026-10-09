@@ -5,7 +5,7 @@ import { CONFIG } from '../shared/config.js';
 import { ICON_SPRITE, initSettings, renderPause } from './ui/menus.js';
 import { savedOutfit } from './ui/wardrobe.js';
 import { loadProfile } from './core/profile.js';
-import { unlockIsland, unlockedStartingIsland } from './core/islandProgress.js';
+import { unlockIsland, unlockedStartingIsland, availableStartingIsland } from './core/islandProgress.js';
 import { EV } from '../shared/protocol.js';
 import { preloadDinoModels } from './models/dino/glbDino.js';
 import { GameAudio } from './audio/audio.js';
@@ -81,15 +81,21 @@ async function startMenuTour() {
   try {
     const { createMenuTour } = await import('./ui/menuTour.js');
     if (request !== tourRequest || menu.hidden) return;
-    const tour = await createMenuTour($('menu-tour'), island => {
+    const tour = await createMenuTour($('menu-preview'), island => {
       if (request !== tourRequest) return;
       tourIsland = island.index;
-      $('tour-island').value = String(island.index);
-      $('tour-island').disabled = $('tour-next').disabled = !!island.loading;
+      $('play-island').value = String(unlockedStartingIsland(island.index));
+      for (const button of document.querySelectorAll('[data-island]')) {
+        button.disabled = !!island.loading || Number(button.dataset.island) > availableStartingIsland();
+        button.setAttribute('aria-pressed', String(Number(button.dataset.island) === island.index));
+      }
+      $('tour-next').disabled = !!island.loading;
       $('tour-title').textContent = island.name;
       $('tour-description').textContent = tourDescriptions[island.index];
       $('tour-count').textContent = `${String(island.index + 1).padStart(2, '0')} / 03`;
-      $('tour-state').textContent = island.loading ? 'Preparing island preview…' : island.motionEnabled ? 'Exploring the archipelago' : 'Island lookout';
+      $('tour-state').textContent = island.loading ? 'Preloading all island postcards…' : 'Solo expedition starts here';
+      $('menu-preview').classList.toggle('is-loading', !!island.loading);
+      $('preview-placeholder-copy').textContent = island.loading ? 'Unfolding the island postcards…' : 'Reconnaissance photos unavailable. Your expedition is still ready.';
       $('tour-motion').textContent = island.motionEnabled ? 'Pause tour' : 'Play tour';
       $('tour-motion').setAttribute('aria-pressed', String(!island.motionEnabled));
     }, { signal: tourAbort.signal });
@@ -119,8 +125,11 @@ async function selectPreviewIsland(index) {
   try { await menuTour?.setIsland(index); }
   catch (error) { console.warn('Island preview failed', error); $('tour-state').textContent = 'Could not load this preview'; }
 }
-$('tour-next').addEventListener('click', () => { void selectPreviewIsland(tourIsland + 1); });
-$('tour-island').addEventListener('change', () => { void selectPreviewIsland(Number($('tour-island').value)); });
+$('tour-next').addEventListener('click', () => { void selectPreviewIsland((tourIsland + 1) % (availableStartingIsland() + 1)); });
+$('tour-islands').addEventListener('click', event => {
+  const button = event.target.closest('[data-island]');
+  if (button && !button.disabled) void selectPreviewIsland(Number(button.dataset.island));
+});
 function syncTourSuspension() {
   menuTour?.setSuspended?.([...document.querySelectorAll('.home-dialog, #settings, #steam-friends')].some(root => !root.hidden));
 }
@@ -393,3 +402,15 @@ async function pollLobby() {
 }
 pollLobby();
 void initLanAddress();
+
+// Explicit developer capture mode only: rebuild postcards after map art changes.
+if (DEBUG_QUERY.has('capturePreviews')) {
+  const captureRoot = document.createElement('div');
+  captureRoot.hidden = true;
+  const captureCanvas = document.createElement('canvas');
+  captureRoot.append(captureCanvas); document.body.append(captureRoot);
+  import('./ui/menuPreviewCapture.js').then(async ({ createMenuTour }) => {
+    const capture = await createMenuTour(captureCanvas);
+    capture.dispose();
+  }).catch(error => console.warn('Postcard capture failed', error));
+}

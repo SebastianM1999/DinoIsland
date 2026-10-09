@@ -3,6 +3,8 @@
 
 ## Files
 
+- `map-previews.test.js` — all island photographs preload/decode once, cache reuse and missing-photo fallback isolation.
+
 - `mission-summary.test.js` — compact phase/relic goals, pinned contracts and win/travel copy; verifies host mission data stays unchanged.
 
 `sarco-model.test.js` validates the Alpha Sarcosuchus boss GLB: near-black green skin, bright red scars, red/yellow emissive eyes, normalized weights, jaw deformation, fourteen clips, braced wind-up contacts and staggered attack steps, loop closure and ground clearance.

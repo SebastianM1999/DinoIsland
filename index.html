@@ -26,7 +26,11 @@
 
   <!-- Title / lobby screen -->
   <main id="menu" class="screen">
-    <canvas id="menu-tour" aria-hidden="true"></canvas>
+    <div id="menu-preview" aria-hidden="true">
+      <img class="menu-preview-image" alt="">
+      <img class="menu-preview-image" alt="">
+      <div class="preview-placeholder"><span>Expedition reconnaissance</span><strong id="preview-placeholder-copy">Unfolding the island postcards…</strong><p>A little scenery. A lot of teeth.</p></div>
+    </div>
     <p class="menu-eyebrow menu-kicker">Co-op dinosaur survival · 1–4 explorers</p>
     <div class="menu-card">
       <h1 class="logo">Dinosaur<br>Island <span class="logo-foot" aria-hidden="true"></span></h1>
@@ -36,8 +40,7 @@
         <div><label for="player-name">Playing as</label><input id="player-name" name="name" maxlength="14" placeholder="Explorer" autocomplete="off"><span id="home-progress">Explorer · Level 1</span></div>
         <button type="button" id="btn-explorer" class="menu-link">Customize</button>
       </div>
-      <div class="solo-map-choice"><label for="play-island">Starting island</label><select id="play-island" aria-describedby="island-unlock-help"></select></div>
-      <p id="island-unlock-help" class="island-unlock-help">Playtest access: all islands are available for solo expeditions.</p>
+      <input type="hidden" id="play-island" value="0">
       <nav class="menu-buttons" aria-label="Start an expedition">
         <button type="button" class="btn btn-primary" id="btn-solo"><span>Play solo</span><span aria-hidden="true">→</span><span class="action-note">An offline expedition of your own</span></button>
         <div class="menu-play-options">
@@ -55,16 +58,17 @@
       <button type="button" class="menu-link" data-home-panel="credits">Credits</button>
     </nav>
     <aside class="tour-info" aria-label="Island preview">
-      <p class="menu-eyebrow" id="tour-state">Exploring the archipelago</p>
-      <h2 id="tour-title">Dinosaur Island</h2>
+      <p class="menu-eyebrow" id="tour-state">Preparing island postcards</p>
+      <h2 id="tour-title">Emerald Jungle</h2>
       <p id="tour-description">Your next expedition is out there.</p>
       <div class="tour-controls">
         <button type="button" class="tour-stop" id="tour-motion" aria-pressed="false" disabled>Pause tour</button>
-        <button type="button" class="tour-stop" id="tour-next" disabled aria-label="Preview next island">Next island</button>
+        <button type="button" class="tour-stop" id="tour-next" disabled aria-label="Select next starting island">Next island</button>
         <span id="tour-count">01 / 03</span>
       </div>
-      <label class="tour-map-label" for="tour-island">Preview island</label>
-      <select id="tour-island" aria-label="Preview island"></select>
+      <p class="tour-map-label">Choose your solo starting island</p>
+      <div id="tour-islands" role="group" aria-label="Starting island"></div>
+      <p id="island-unlock-help" class="island-unlock-help">Playtest access: all islands are available for solo expeditions.</p>
     </aside>
   </main>
 
