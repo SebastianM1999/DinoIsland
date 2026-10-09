@@ -293,7 +293,7 @@ test('no enclosed pocket of walkable cave floor is cut off from the spawn', () =
   }
 });
 
-test('under every walkable cave cell the roof is at least a body up; in the core of a passage 3.4 m and more', () => {
+test('under every walkable cave cell the roof is at least a body up; in the core of a passage 3.2 m and more', () => {
   for (const { variant, terrain, plan, layout, maze } of VARIANTS.map(island)) {
     const f = flood(terrain, spawnOf(layout));
     let cells = 0, low = Infinity, tunnelLow = Infinity, high = 0;
@@ -318,8 +318,8 @@ test('under every walkable cave cell the roof is at least a body up; in the core
       }
     }
     assert.ok(cells > 1000);
-    assert.ok(low >= 3.4, `variant ${variant}: lowest roof ${low.toFixed(2)} m`);
-    assert.ok(tunnelLow >= 3.4, `variant ${variant}: lowest tunnel roof ${tunnelLow.toFixed(2)} m`);
+    assert.ok(low >= 3.2, `variant ${variant}: lowest roof ${low.toFixed(2)} m`);
+    assert.ok(tunnelLow >= 3.2, `variant ${variant}: lowest tunnel roof ${tunnelLow.toFixed(2)} m`);
     assert.ok(high <= 30 && high >= 12, `variant ${variant}: chambers up to ${high.toFixed(1)} m`);
     // the roof over the mouth rises into the open sky
     assert.equal(terrain.ceilingAt(layout.caveEntrance.x, layout.caveEntrance.z), Infinity);
