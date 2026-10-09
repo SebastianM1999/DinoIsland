@@ -109,22 +109,44 @@
 
   <!-- Shown while pointer lock is released during play -->
   <div id="paused" class="screen" hidden>
-    <section class="pause-card brush" role="dialog" aria-labelledby="pause-title">
+    <section class="pause-card" role="dialog" aria-modal="true" aria-labelledby="pause-title" tabindex="-1">
       <button type="button" class="icon-btn pause-close" id="btn-pause-close" aria-label="Close pause menu" title="Resume">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
       </button>
       <header class="pause-head">
-        <h2 id="pause-title">Paused</h2>
-        <p class="pause-sub">The island keeps moving – your team is still out there.</p>
+        <p class="menu-eyebrow pause-live">LIVE EXPEDITION</p>
+        <h2 id="pause-title">Expedition menu</h2>
+        <p class="pause-sub">Stay alert. The island keeps moving.</p>
       </header>
       <div class="pause-grid">
+        <nav class="pause-actions" aria-label="Pause menu">
+          <button type="button" class="btn btn-primary btn-icon" id="btn-resume">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-play"/></svg>Back to the island
+          </button>
+          <button type="button" class="btn btn-icon" data-open-settings>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-gear"/></svg>Settings
+          </button>
+          <button type="button" class="btn btn-icon" data-open-settings="controls">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-keys"/></svg>Controls
+          </button>
+          <details class="pause-testing"><summary>Testing tools</summary>
+          <button type="button" class="btn btn-icon" id="btn-creative" aria-pressed="false">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-wing"/></svg><span>Creative mode: Off</span>
+          </button>
+          </details>
+          <button type="button" class="btn" id="btn-invite" hidden>Invite friends</button>
+          <button type="button" class="btn" id="btn-accept-invite" hidden>Leave and join friend</button>
+          <button type="button" class="btn btn-icon btn-danger" id="btn-leave">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-door"/></svg><span>Leave game</span>
+          </button>
+        </nav>
         <div class="pause-info">
-          <section class="pause-block">
-            <h3 id="pause-mission-title">Expedition</h3>
+          <details class="pause-block">
+            <summary><span id="pause-mission-title">Expedition</span><span id="pause-mission-progress"></span></summary>
             <ul id="pause-objectives" class="pause-objectives"></ul>
-          </section>
-          <section class="pause-block">
-            <h3>Team</h3>
+          </details>
+          <details class="pause-block">
+            <summary>Team <span id="pause-team-count"></span></summary>
             <ul id="pause-team" class="pause-team"></ul>
             <p id="steam-session-info" class="lobby-note" hidden></p>
             <section id="pause-internet" hidden>
@@ -137,29 +159,11 @@
               </div>
               <p id="pause-internet-status" class="lobby-note" role="status" aria-live="polite">Keep this game open while your friends play.</p>
             </section>
-          </section>
+          </details>
         </div>
-        <nav class="pause-actions" aria-label="Pause menu">
-          <button type="button" class="btn btn-primary btn-icon" id="btn-resume">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-play"/></svg>Resume
-          </button>
-          <button type="button" class="btn btn-icon" data-open-settings>
-            <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-gear"/></svg>Settings
-          </button>
-          <button type="button" class="btn btn-icon" data-open-settings="controls">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-keys"/></svg>Controls
-          </button>
-          <button type="button" class="btn btn-icon" id="btn-creative" aria-pressed="false">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-wing"/></svg><span>Creative mode: Off</span>
-          </button>
-          <button type="button" class="btn" id="btn-invite" hidden>Invite friends</button>
-          <button type="button" class="btn" id="btn-accept-invite" hidden>Leave and join friend</button>
-          <button type="button" class="btn btn-icon btn-danger" id="btn-leave">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-door"/></svg><span>Leave game</span>
-          </button>
-        </nav>
+
       </div>
-      <p class="pause-hint">Click anywhere outside to jump back in</p>
+      <p class="pause-hint"><kbd>↑</kbd><kbd>↓</kbd> Select <kbd>Enter</kbd> Open · Click outside to return</p>
     </section>
   </div>
 

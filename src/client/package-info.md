@@ -2,7 +2,7 @@
 > The browser/Electron game client: menu and lobby flow, Three.js rendering of the island, local player prediction, input, HUD/UI, audio and the connection to the authoritative world.
 
 ## Files
-- `main.js` — entry point loaded by `index.html`: menu/lobby, starting a session in the chosen mode, building a `Game` per island, pause card, leave/back-to-menu.
+- `main.js` — entry point loaded by `index.html`: menu/lobby, starting a session in the chosen mode, building a `Game` per island, live left-aligned expedition menu with keyboard navigation, leave/back-to-menu.
 - `core/` — `Game` shell (main loop, wiring of all subsystems), renderer, graphics auto-tier, settings, saved profile, resource disposal.
 - `net/` — `Net` session over WebSocket, Steam bridge or the solo Web Worker; clock sync, snapshot ordering, interpolation buffer, LAN address helpers.
 - `input/` — `Input`: keyboard/mouse to named actions, pointer lock.
@@ -16,7 +16,7 @@
 ## Entry points
 - `main.js` runs on page load (`<script type="module" src="src/client/main.js">` in `index.html`). Flow:
   1. Menu: left-aligned player identity and solo/create/join actions. `ui/homeMenu.js` groups connection routes into dedicated dialogs plus how-to-play/credits; `ui/homeExplorer.js` shows saved progression and opens the existing outfit picker. Name saves while typing; outfit and profile carry into the next expedition. Lobby polling of `/status`, menu music on first gesture, `initSteamLobby`, `initLanAddress`, `initInternetTest`. Dynamically loads `ui/menuTour.js` after paint for a disposable live tour of the three seeded islands; stops the tour and closes home dialogs before gameplay starts and restarts it if launch fails. `css/menu.css` styles the home screen and its dialogs.
-  2. `start(mode)` opens a `Net`: `Net.local` (solo worker, starting from the earned island selected in the menu, with `?island=`, `?base=`, `?raid=` explicit testing aids), `Net.connect` (online, LAN, internet via `internetTest`), or `Net.steam` (`window.dinoSteam` bridge). Sends the saved outfit (`ui/wardrobe.js`) and profile (`core/profile.js`). The home skill tree edits a draft of earned points and persists only on Save build; XP/bonus remain unchanged. Completed host mission events unlock the next starting island locally unless creative mode is active; multiplayer starts on its host's island. Previews never unlock play.
+  2. `start(mode)` opens a `Net`: `Net.local` (solo worker, starting from the selected island; temporary playtest access bypasses earned locks, with `?island=`, `?base=`, `?raid=` explicit testing aids), `Net.connect` (online, LAN, internet via `internetTest`), or `Net.steam` (`window.dinoSteam` bridge). Sends the saved outfit (`ui/wardrobe.js`) and profile (`core/profile.js`). The home skill tree edits a draft of earned points and persists only on Save build; XP/bonus remain unchanged. Completed host mission events unlock the next starting island locally unless creative mode is active; multiplayer starts on its host's island. Previews never unlock play.
   3. `launch(net)`: loading screen, `preloadDinoModels`, `new Game(canvas, net, reuse)`, `game.gfx.prepare()` (shader precompile), `game.start()`, pointer lock.
   4. On `game.onNewIsland(welcome)` (team set sail) the old game is `dispose()`d and `launch` runs again, reusing renderer, audio and input; creative mode is carried over.
   5. Leaving or a disconnect calls `backToMenu`, which reloads the page with the reason in the URL hash.
