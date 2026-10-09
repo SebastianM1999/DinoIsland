@@ -29,7 +29,7 @@ Every main directory has a `package-info.md` with its responsibility, files, ent
 - `desktop/package-info.md`: Electron wrapper and Steam bridge
 - `test/package-info.md`: test layout and conventions
 
-Not documented by a package-info: `art/` (Blender sources, see the `dino-blender-creator` skill), `assets/` (runtime models/audio), `scripts/` (offline asset tooling; `islandmap.mjs` renders top-down PNGs of islands for picking fixed maps), `docs/` (design notes), `dist/` and `output/` (build output).
+Not documented by a package-info: `art/` (Blender sources, see the `dino-blender-creator` skill), `assets/` (runtime models/audio; `assets/cave/*.bin` is the baked Hollow Mountain of the fixed map, rebuilt by `node scripts/bakeCave.mjs` after any change to the cave field, walk sampling, mesher or vertex paint: `test/cave-bake.test.js` fails when it is stale), `scripts/` (offline asset tooling; `islandmap.mjs` renders top-down PNGs of islands for picking fixed maps), `docs/` (design notes), `dist/` and `output/` (build output).
 
 ## Required coverage skill before pushing
 

@@ -31,6 +31,7 @@ const MIME = {
   '.txt': 'text/plain; charset=utf-8',
   '.webmanifest': 'application/manifest+json',
   '.glb': 'model/gltf-binary',
+  '.bin': 'application/octet-stream',   // (assets/cave: the baked Hollow Mountain)
   '.wav': 'audio/wav',
   '.ogg': 'audio/ogg',
   '.mp3': 'audio/mpeg',

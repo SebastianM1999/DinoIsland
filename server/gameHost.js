@@ -5,11 +5,13 @@ import { WebSocketServer } from 'ws';
 import { CONFIG } from '../src/shared/config.js';
 import { MSG } from '../src/shared/protocol.js';
 import { ServerWorld } from '../src/sim/world.js';
+import { installCaveBakes } from './caveBake.js';
 
 const NET = CONFIG.net;
 const MAX_MSG_BYTES = 8 * 1024;
 
 export function startGameHost(httpServer = null, { onConnection } = {}) {
+  installCaveBakes();   // (the Hollow Mountain's baked walk grid: assets/cave, see src/shared/caveBake.js)
   const wss = httpServer ? new WebSocketServer({ server: httpServer, maxPayload: MAX_MSG_BYTES }) : null;
   /** @type {Map<number, import('ws').WebSocket>} */
   const sockets = new Map();
