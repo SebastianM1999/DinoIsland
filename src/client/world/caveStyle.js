@@ -1,24 +1,11 @@
-// Shared look of the Hollow Mountain (biome 'cave'): how far inside the mountain a
-// point is, the crystal / daylight colours, the baked glow field that tints the
-// terrain and the roof, and the two air moods (cove daylight, mountain dark).
-// Pure data and maths (THREE colours only): used by terrainMesh, caveTerrain,
-// caveDecor, caveFx and the audio / minimap.
+// Shared look of the Hollow Mountain (biome 'cave'): the crystal / daylight colours and the
+// glow sources (crystals, relic chambers, pools, daylight at the mouths). The volume mesh bakes
+// them per vertex with line of sight (caveLight.js); `glowTexture` paints them into a 2D
+// texture for the sea floor outside. THREE colours and maths only: used by caveTerrain,
+// caveLight, caveDecor and caveFx.
 
 import * as THREE from 'three';
-import { smoothstep, lerp } from '../../shared/rng.js';
-
-/** Is this island the Hollow Mountain? */
-export const isCaveLevel = (layout) => !!layout?.plan?.cave;
-
-/**
- * How deep inside the mountain (0 = out in the cove / canyon, 1 = under the roof),
- * smooth in the distance to the mountain's outside (`plan.cave.depthAt`). The sun,
- * the fog and the sea air fade with it.
- */
-export function insideAt(layout, x, z) {
-  const depth = layout.plan.cave.depthAt(x, z);
-  return smoothstep(8, 30, depth);
-}
+import { smoothstep } from '../../shared/rng.js';
 
 // ------------------------------------------------------------------ colours
 const AMBER = new THREE.Color('#ffa63d');
@@ -36,10 +23,6 @@ export function glowColor(hue, out = new THREE.Color()) {
   return out;
 }
 export const GLOW_COLORS = { AMBER, CYAN, VIOLET, MINT, DAY, NEUTRAL };
-
-// ------------------------------------------------------------------ moods
-/** The air in the two coves (biome.skyOutside) and inside the mountain (biome.sky). */
-export const caveSkies = (layout) => ({ out: layout.biome.skyOutside ?? layout.biome.sky, inside: layout.biome.sky });
 
 // ------------------------------------------------------------------ baked glow
 /**
@@ -66,19 +49,6 @@ export function buildGlowField(layout) {
   day(layout.caveExit, 18, 1.1);
   for (const f of layout.falseExits || []) day(f, 13, 0.8);
 
-  // coarse grid so a vertex only meets the sources near it
-  const CELL = 24, grid = new Map();
-  const key = (i, j) => i * 4096 + j;
-  for (const s of sources) {
-    for (let i = Math.floor((s.x - s.r) / CELL); i <= Math.floor((s.x + s.r) / CELL); i++) {
-      for (let j = Math.floor((s.z - s.r) / CELL); j <= Math.floor((s.z + s.r) / CELL); j++) {
-        const k = key(i, j);
-        let l = grid.get(k);
-        if (!l) grid.set(k, l = []);
-        l.push(s);
-      }
-    }
-  }
   /**
    * The glow as a texture over the whole island (RGB, 1 m texels, bilinear): the cave shader
    * reads it per pixel, so the glow of a crystal hall falls off smoothly over every wall,
@@ -125,25 +95,8 @@ export function buildGlowField(layout) {
   return {
     sources,
     glowTexture,
-    sample(x, y, z, nx, ny, nz, out) {
-      const list = grid.get(key(Math.floor(x / CELL), Math.floor(z / CELL)));
-      if (!list) return out;
-      for (const s of list) {
-        const dx = s.x - x, dy = s.y - y, dz = s.z - z;
-        const d2 = dx * dx + dy * dy * 0.6 + dz * dz;
-        if (d2 >= s.r * s.r) continue;
-        const d = Math.sqrt(d2) || 1e-3;
-        const f = 1 - d / s.r;
-        const facing = 0.55 + 0.45 * Math.max(0, (nx * dx + ny * dy + nz * dz) / d);
-        const w = f * f * s.k * facing;
-        out.r += s.c.r * w; out.g += s.c.g * w; out.b += s.c.b * w;
-      }
-      return out;
-    },
   };
 }
 
 /** The glow texture stores colour / GLOW_RANGE (so glow may exceed 1). */
 export const GLOW_RANGE = 1.6;
-
-export { lerp };

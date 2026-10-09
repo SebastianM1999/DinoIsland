@@ -14,7 +14,7 @@
 
 import * as THREE from 'three';
 import { fbm, smoothstep } from '../../shared/rng.js';
-import { caveFloorBase, caveCeiling } from '../../shared/caveField.js';
+import { caveFloorBase } from '../../shared/caveField.js';
 import { withSurfaceDetail, setSurfaceBiome, CAVE_GLOW } from './surfaceDetail.js';
 import { buildGlowField } from './caveStyle.js';
 import { buildSkyField, withCaveSky, CAVE_SKY } from './caveSky.js';
@@ -74,7 +74,6 @@ export function buildCaveTerrainMesh(terrain, layout) {
     }
 
     // ---- outside / inside: above the tunnel roof is the mountain's skin
-    const isCliff = d > -3 && above > 9 + 3 * (1 - smoothstep(0, 24, d));   // the rock above the roof line
     const cliffK = smoothstep(7, 14, above) * smoothstep(-6, 4, d);
 
     // ---- cove ground (outside the mountain)
@@ -320,5 +319,3 @@ function roofLook(out, S, P, x, y, z, gap) {
   out.multiplyScalar(0.55 + 0.45 * smoothstep(0.2, 6.5, gap));   // AO toward the walls
   return streak;
 }
-
-export { caveCeiling };

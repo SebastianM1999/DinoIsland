@@ -18,7 +18,7 @@ import { smoothstep } from '../../shared/rng.js';
 import { caveOpenSdf, caveRoofBase } from '../../shared/caveField.js';
 
 /** How far into the mountain a mouth's daylight counts as open sky (metres): the sky field's sources. */
-export const ARCH_DEPTH = 2;
+const ARCH_DEPTH = 2;
 /** The mouth's daylight reaches this far (metres through the tunnel) before it is dark. */
 const DAYLIGHT_REACH = 13;
 
