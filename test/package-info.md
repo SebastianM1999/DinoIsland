@@ -60,6 +60,7 @@ Grouped by the module area they mainly cover. Many simulation tests also check t
 - `interpolation.test.js` — packet reordering, bounded extrapolation, short-path angle interpolation and bounded long-session snapshot storage.
 - `resource-lifetime.test.js` — owned GPU resource disposal once across scenes, cache resource retention, shader uniform textures and per-instance buffer cleanup.
 - `performance-samples.test.js` — frame-time percentiles expose stalls, remain bounded over long sessions and reject invalid timing samples; deterministic checks, not an FPS benchmark.
+- `player-actions.test.js` — real PlayerActions input routing with headless viewmodel/effects: weapon resource handling and cooldowns, obstruction, reload rejection, fruit selection/giving, revive and butcher confirmation/cancellation, auto-loot capacities and request throttling, camp interactions, carry HUD and spotted compass markers.
 - `tracking-minimap.test.js` — dinosaur discovery by sustained sighting, server sighting checks, minimap does not reveal the boss arena.
 - `dino-visibility.test.js` — every server-spawned dinosaur type has an animated client model; damage events name the attacker.
 - `sarco-client.test.js` — boss state/clip selection, authoritative phase sampling at late joins and five FPS, retrigger timing, directional size fitting, level torso/grounded feet and authored pose protection, missing-asset crocodile fallback and deep ambush hollows with dry causeway across 15 variants.
