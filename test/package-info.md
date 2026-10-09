@@ -3,6 +3,8 @@
 
 ## Files
 
+- `coverage-gaps.test.js` — reporting of uncovered lines, functions and branches, including topic filters.
+
 - `map-previews.test.js` — all island photographs preload/decode once, cache reuse and missing-photo fallback isolation.
 
 - `mission-summary.test.js` — compact phase/relic goals, pinned contracts and win/travel copy; verifies host mission data stays unchanged.
@@ -55,6 +57,9 @@ Grouped by the module area they mainly cover. Many simulation tests also check t
 - `outfits.test.js` — outfit sanitizing, server outfit changes, player model outfits.
 
 ### Client (headless)
+- `interpolation.test.js` — packet reordering, bounded extrapolation, short-path angle interpolation and bounded long-session snapshot storage.
+- `resource-lifetime.test.js` — owned GPU resource disposal once across scenes, cache resource retention, shader uniform textures and per-instance buffer cleanup.
+- `performance-samples.test.js` — frame-time percentiles expose stalls, remain bounded over long sessions and reject invalid timing samples; deterministic checks, not an FPS benchmark.
 - `tracking-minimap.test.js` — dinosaur discovery by sustained sighting, server sighting checks, minimap does not reveal the boss arena.
 - `dino-visibility.test.js` — every server-spawned dinosaur type has an animated client model; damage events name the attacker.
 - `sarco-client.test.js` — boss state/clip selection, authoritative phase sampling at late joins and five FPS, retrigger timing, directional size fitting, level torso/grounded feet and authored pose protection, missing-asset crocodile fallback and deep ambush hollows with dry causeway across 15 variants.
