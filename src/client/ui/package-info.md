@@ -3,7 +3,7 @@
 
 ## Files
 - `hud.js` — `Hud`: the in-game HUD (~1080 lines, see below).
-- `missionSummary.js` — pure compact goal copy from host mission phases/relic progress; keeps pinned contracts visible without rendering the entire checklist during play. Full objectives remain in the expedition menu and board.
+- `missionSummary.js` — pure compact goal copy from host mission phases/relic progress; keeps pinned contracts visible without rendering the entire checklist during play. Full objectives remain in the expedition menu and board, and the live HUD expands expedition objectives and team quests with X.
 - `minimap.js` — `buildMapBase` paints the island once to an offscreen canvas (swamp bogs and the swamp arena ring, the volcano's lava craters and crater rim included); `drawMap` blits a region plus markers each frame.
 - `icons.js` — `ICONS`, `icon(id)`, `portraitSvg()`: inline 32x32 SVG item/HUD icons with distinct equipment/material silhouettes at small sizes (every fruit kind, `flame` for heat and the volcano's warnings, `ash` for the ash rain).
 - `itemInfo.js` — `ITEM_INFO`: names and tooltip texts for inventory items, numbers taken from `CONFIG`.
@@ -12,7 +12,7 @@
 - `boatPanel.js` — `BoatPanel`: boat wreck dialog listing found/missing boat parts and the Repair button.
 - `grovePrompt.js` — `GrovePrompt`: Yes/No warning and hint shown at the giant's pen barrier.
 - `wardrobe.js` — `Wardrobe` (hat/top/pants picker with rotatable 3D preview) and `savedOutfit()` from localStorage.
-- `skillPanel.js` — `SkillPanel`: skill tree dialog (key K), numeric ranks/costs and readable locked states, aggregate tier spending/progress, with optimistic buys reverted after a timeout. Locked tiles remain keyboard-inspectable; purchase rules stay in the shared model.
+- `skillPanel.js` — `SkillPanel`: skill tree dialog (key K), numeric ranks/costs and readable locked states, a viewport-fitted three-branch tree without scrolling, aggregate tier spending/progress, with optimistic buys reverted after a timeout. All three branches and tiers fit the viewport without tree scrolling; selected skill explanations remain in the footer. Locked tiles remain keyboard-inspectable; purchase rules stay in the shared model.
 - `skillModel.js` — pure, DOM-free view-model of the skill panel (`buildSkillView`, `previewBuy`, `nearCamp`, ...).
 - `skillIcons.js` — 24x24 stroke SVG icons per skill and tree, plus lock/tick/close glyphs.
 - `menus.js` — `ICON_SPRITE`, `initSettings()` (settings dialog) and `renderPause(game)` (live expedition menu: left action rail, expandable mission progress and team details). Keyboard focus/navigation lives in `main.js`; the island keeps running.
@@ -27,7 +27,7 @@
 - `preview.js` — fills the preview HUD with fake data every frame, using a real `Terrain` and `buildLayout`.
 
 ### hud.js areas of responsibility
-- Layout built once in `_build()`: independent bottom-left player name, portrait/XP ring, level badge and labeled HP/stamina percentages; mission top-left, compact key hints/equipment/team at the edges; perk chips (dash, adrenaline); compass and hint bubble; minimap and big map; crosshair, hit marker, eat ring, interaction prompt, revive/medic prompt; carry/load info. Normal edge information hides behind the live expedition menu while critical overlays remain available.
+- Layout built once in `_build()`: independent bottom-left player name, portrait/XP ring, level badge and labeled HP/stamina percentages; expandable mission top-left, single-column compact key hints/equipment/team at the edges; perk chips (dash, adrenaline); compass and hint bubble; minimap and big map; crosshair, hit marker, eat ring, interaction prompt, revive/medic prompt; carry/load info. Normal edge information hides behind the live expedition menu while critical overlays remain available.
 - Overlays: death, downed, mission complete, damage flash/source, toasts and alerts.
 - Fruit buffs running (`setBuffs`), the swamp tag (`setSwamp`), hot ground (`setHeat`), the ash rain (`setAsh`: sheltered, a countdown, choking).
 - Selected equipment readout identifies the weapon/item and separates durability, arrow wear, loaded/reserve rounds, reload status and available item counts; numeric hotbar slots retain their keyboard shortcuts.

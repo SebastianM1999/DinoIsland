@@ -143,6 +143,10 @@ export class Game {
       this.#showMission();
     };
     this.input.onPanelToggle = (action) => {
+      if (action === 'quests') {
+        if (!this.hud.isPanelOpen()) this.hud.toggleMissionDetails();
+        return true;
+      }
       if (action === 'interact') {
         if (!(this.hud._boardOpen || this.hud.isExtraOpen('wardrobe') || this.hud.isExtraOpen('boat') || this.hud.isExtraOpen('crafting') || this.hud.isExtraOpen('base'))) return false;
         action = 'close';

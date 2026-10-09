@@ -162,3 +162,21 @@ test('Cancelling an unsupported raw lock request does not reacquire ordinary loc
     assert.equal(f.input.lockPending, false);
   } finally { f.restore(); }
 });
+
+
+test('X toggles live quests once per press without becoming a held gameplay action', () => {
+  const f = mouseFixture();
+  try {
+    const toggles = [];
+    f.input.onPanelToggle = action => { toggles.push(action); return true; };
+    f.emit('keydown', { code: 'KeyX', repeat: false, preventDefault() {} });
+    f.emit('keydown', { code: 'KeyX', repeat: true, preventDefault() {} });
+    f.emit('keyup', { code: 'KeyX', repeat: false, preventDefault() {} });
+    assert.deepEqual(toggles, ['quests']);
+    assert.equal(f.input.isHeld('quests'), false);
+    assert.equal(f.input.wasPressed('quests'), false);
+    f.input.enabled = false;
+    f.emit('keydown', { code: 'KeyX', repeat: false, preventDefault() {} });
+    assert.deepEqual(toggles, ['quests']);
+  } finally { f.restore(); }
+});
