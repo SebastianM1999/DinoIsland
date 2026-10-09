@@ -1,19 +1,6 @@
 // Home-screen panels group existing game routes without creating new sessions.
-import { LEVELS } from '../../shared/levels.js';
-import { availableStartingIsland } from '../core/islandProgress.js';
 export function initHomeMenu() {
   const menu = document.getElementById('menu');
-  const unlocked = availableStartingIsland();
-  const islands = document.getElementById('tour-islands');
-  islands.replaceChildren(...LEVELS.map((level, index) => {
-    const button = document.createElement('button');
-    button.type = 'button'; button.className = 'tour-island-button';
-    button.dataset.island = String(index);
-    button.setAttribute('aria-pressed', String(index === 0));
-    button.textContent = `${level.name}${index > unlocked ? ' — Locked' : ''}`;
-    button.disabled = true;
-    return button;
-  }));
   const roots = [...document.querySelectorAll('.home-dialog')];
   const overlays = ['settings', 'steam-friends'].map(id => document.getElementById(id));
   let active = null, returnFocus = null;

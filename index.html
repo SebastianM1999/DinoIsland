@@ -26,7 +26,8 @@
 
   <!-- Title / lobby screen -->
   <main id="menu" class="screen">
-    <div id="menu-preview" aria-hidden="true">
+    <div id="menu-preview" class="is-booting" aria-hidden="true">
+      <div id="menu-startup" role="status"><span class="menu-spinner" aria-hidden="true"></span><p>Scouting the islands…</p><small>Your expedition will be ready in a moment.</small></div>
       <canvas id="menu-tour" aria-hidden="true"></canvas>
       <img class="menu-preview-image" alt="">
       <img class="menu-preview-image" alt="">
@@ -59,17 +60,7 @@
       <button type="button" class="menu-link" data-home-panel="credits">Credits</button>
     </nav>
     <aside class="tour-info" aria-label="Island preview">
-      <p class="menu-eyebrow" id="tour-state">Preparing island postcards</p>
-      <h2 id="tour-title">Emerald Jungle</h2>
-      <p id="tour-description">Your next expedition is out there.</p>
-      <div class="tour-controls">
-        <button type="button" class="tour-stop" id="tour-motion" aria-pressed="false" disabled>Pause tour</button>
-        <button type="button" class="tour-stop" id="tour-next" disabled aria-label="Select next starting island">Next island</button>
-        <span id="tour-count">01 / 03</span>
-      </div>
-      <p class="tour-map-label">Choose your solo starting island</p>
-      <div id="tour-islands" role="group" aria-label="Starting island"></div>
-      <p id="island-unlock-help" class="island-unlock-help">Playtest access: all islands are available for solo expeditions.</p>
+      <button type="button" class="tour-stop" id="tour-next" disabled aria-label="Select next starting island">Next island</button>
     </aside>
   </main>
 
