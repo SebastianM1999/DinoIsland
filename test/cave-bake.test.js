@@ -86,8 +86,9 @@ test('a stale or foreign bake is rejected and the island builds live', () => {
   for (const tampered of [{ ...b.header, walkKey: '0123456789abcdef' }, { ...b.header, walkKey: walkKey(p).slice(0, 15) + '0' }]) {
     registerCaveBake(LEVEL, VARIANT, { ...b, header: tampered });
     assert.equal(caveBakeFor(p, 'walk'), null);
-    assert.equal(new Terrain(planIsland(LEVEL, VARIANT)).walk.stats.baked, undefined, 'built live');
   }
+  // (one live build is enough: the decision above is what the Terrain asks; a live build costs seconds, more under c8)
+  assert.equal(new Terrain(planIsland(LEVEL, VARIANT)).walk.stats.baked, undefined, 'built live');
   // the key follows the map and the painter's numbers
   assert.notEqual(walkKey(planIsland(LEVEL, VARIANT + 1)), walkKey(p));
   assert.notEqual(meshKey(p, [1]), meshKey(p, [2]));
@@ -142,10 +143,26 @@ test('pack, encode and decode round-trip: exact walk grid, mesh within its quant
   assert.equal(un.section('c'), null);
 });
 
+/** live meshes built while no matching bake was registered (a live build costs seconds, more under c8: build it once) */
+const liveMeshes = [];
+
+test('a bake with another mesh key is not used for the mesh (built live), but the walk grid still is', () => {
+  const b = readCaveBake(LEVEL, VARIANT, { mesh: true });
+  forgetCaveBakes();
+  registerCaveBake(LEVEL, VARIANT, { ...b, header: { ...b.header, meshKey: 'ffffffffffffffff' } });
+  const p = planIsland(LEVEL, VARIANT);
+  assert.ok(caveBakeFor(p, 'walk'), 'the walk key is the old one: still valid');
+  const mesh = buildCaveTerrainMesh(live, layout);
+  liveMeshes.push(mesh);                                               // (kept: the next test compares the bake with a live build)
+  assert.equal(mesh.userData.volumeStats.baked, undefined, 'the stale mesh was not used');
+  assert.ok(mesh.children.find((c) => c.name === 'cave-volume').children.length > 300, 'and it was meshed live');
+  forgetCaveBakes();
+});
+
 test('the baked mesh matches a live build: same chunks, vertex counts, bounds and sampled vertices', () => {
   const b = readCaveBake(LEVEL, VARIANT, { mesh: true });
   forgetCaveBakes();
-  const liveMesh = buildCaveTerrainMesh(live, layout);                 // (no bake registered: meshed and painted live)
+  const liveMesh = liveMeshes[0] ?? buildCaveTerrainMesh(live, layout); // (no bake registered: meshed and painted live)
   assert.equal(liveMesh.userData.volumeStats.baked, undefined);
   assert.equal(b.header.meshKey, liveMesh.userData.bakeKey, STALE);
   registerCaveBake(LEVEL, VARIANT, b);
@@ -184,17 +201,5 @@ test('the baked mesh matches a live build: same chunks, vertex counts, bounds an
   assert.equal(tris, liveMesh.userData.volumeStats.triangles);
   assert.equal(verts, liveMesh.userData.volumeStats.vertices);
   assert.equal(b.header.stats.triangles, tris);
-  forgetCaveBakes();
-});
-
-test('a bake with another mesh key is not used for the mesh (built live), but the walk grid still is', () => {
-  const b = readCaveBake(LEVEL, VARIANT, { mesh: true });
-  forgetCaveBakes();
-  registerCaveBake(LEVEL, VARIANT, { ...b, header: { ...b.header, meshKey: 'ffffffffffffffff' } });
-  const p = planIsland(LEVEL, VARIANT);
-  assert.ok(caveBakeFor(p, 'walk'), 'the walk key is the old one: still valid');
-  const mesh = buildCaveTerrainMesh(live, layout);
-  assert.equal(mesh.userData.volumeStats.baked, undefined, 'the stale mesh was not used');
-  assert.ok(mesh.children.find((c) => c.name === 'cave-volume').children.length > 300, 'and it was meshed live');
   forgetCaveBakes();
 });

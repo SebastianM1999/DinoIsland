@@ -46,7 +46,9 @@ test('club sweep: harmless wind-up, the strike crosses the whole arc behind the 
   }
 });
 
-const VARIANTS = Array.from({ length: 16 }, (_, i) => i + 1);
+// (a Terrain + layout build is ~3 s, several times that under c8: the fixed map and three more; the maze itself is
+// checked over every variant in cave-level.test.js)
+const VARIANTS = [...new Set([levelDef(3).variant, 1, 2, 3])];
 const layouts = new Map();
 function layoutOf(variant) {
   if (!layouts.has(variant)) layouts.set(variant, buildLayout(new Terrain(planIsland(3, variant))));

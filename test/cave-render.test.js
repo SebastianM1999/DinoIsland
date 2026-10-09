@@ -27,7 +27,8 @@ function meshed(variant) {
   return it;
 }
 // (the fixed map first, then a few more)
-const VARIANTS = [...new Set([levelDef(3).variant, 1, 2, 3, 4, 5, 6])];
+// (the fixed map and three more: each variant is a ~3 s Terrain build plus a ~6 s mesh build, more under c8)
+const VARIANTS = [...new Set([levelDef(3).variant, 1, 2, 3])];
 
 test('no cave dressing outside the cave: everything stands under a roof, inside the mountain', () => {
   for (const variant of VARIANTS) {

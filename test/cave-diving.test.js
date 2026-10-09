@@ -15,7 +15,11 @@ import { ServerWorld } from '../src/sim/world.js';
 import { sumpLurkerBrain } from '../src/sim/ai/sumpLurker.js';
 
 const LEVEL = 3;
+// The generator must stay valid for every variant: the sump count is checked on the maze plan of all 16 (cheap,
+// planIsland only). The geometric checks need a built Terrain (~3 s each, several times that under c8), so they
+// run on four spread-out variants that the dive tests below reuse from the cache.
 const VARIANTS = Array.from({ length: 16 }, (_, i) => i + 1);
+const BUILT = [1, 5, 9, 13];
 const P = CONFIG.player, SW = P.swim, DV = P.dive;
 const cache = new Map();
 function island(variant) {
@@ -45,17 +49,18 @@ const sumpTunnel = (maze) => maze.tunnels.find((t) => t.flooded?.sump);
 
 test('every variant has at most one sump, and nearly all of them have one', () => {
   let withSump = 0;
-  for (const { variant, maze, layout } of VARIANTS.map(island)) {
+  for (const variant of VARIANTS) {
+    const maze = planIsland(LEVEL, variant).cave.maze;
     const n = maze.tunnels.filter((t) => t.flooded?.sump).length;
     assert.ok(n <= 1, `variant ${variant}: ${n} sumps`);
-    assert.equal(layout.sumps.length, n);
+    if (BUILT.includes(variant)) assert.equal(island(variant).layout.sumps.length, n, `variant ${variant}: the layout holds the sump`);
     withSump += n;
   }
   assert.ok(withSump >= 12, `${withSump} of 16 variants have a sump`);
 });
 
 test('a sump dives under the roof for 8-20 m, with >= 2.5 m of headroom over a >= 4 m wide channel, within the breath time', () => {
-  for (const { variant, terrain, maze } of VARIANTS.map(island)) {
+  for (const { variant, terrain, maze } of BUILT.map(island)) {
     const t = sumpTunnel(maze);
     if (!t) continue;
     let sub = 0, minHead = Infinity, minWidth = Infinity;
@@ -85,7 +90,7 @@ test('a sump dives under the roof for 8-20 m, with >= 2.5 m of headroom over a >
 });
 
 test('the sump is only a shortcut: every relic and the exit stay reachable on dry land, and the sump itself is not', () => {
-  for (const { variant, terrain, layout, plan, maze } of VARIANTS.map(island)) {
+  for (const { variant, terrain, layout, plan, maze } of BUILT.map(island)) {
     const t = sumpTunnel(maze);
     if (!t) continue;
     // flood fill over walkable (dry, gentle) cells from the spawn: no wading deeper than 0.3 m, so no sump
@@ -116,7 +121,7 @@ test('the sump is only a shortcut: every relic and the exit stay reachable on dr
 });
 
 test('the cache lies on the floor of the dive and the lurker waits at the mouth, not inside', () => {
-  for (const { variant, terrain, layout, maze } of VARIANTS.map(island)) {
+  for (const { variant, terrain, layout, maze } of BUILT.map(island)) {
     const sm = layout.sumps[0];
     if (!sm) continue;
     const t = maze.tunnels[sm.tunnel];
@@ -242,7 +247,7 @@ test('the roof of the sump is the top: no head through the rock, and the mouth i
 });
 
 test('a fit diver swims the whole sump and comes up on the other side with air to spare', () => {
-  for (const variant of [1, 5, 9, 13]) {
+  for (const variant of BUILT) {
     const { pc, terrain, sm, line, t } = diver(variant);
     const goal = line.filter((p) => p.u > t.flooded.sump.s1 + t.flooded.sump.ramp + 0.02)[0];
     const path = line.filter((p) => p.u >= t.flooded.sump.s0 - t.flooded.sump.ramp - 0.05 && p.u <= goal.u && p.d % 2 < 0.5);
