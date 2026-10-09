@@ -734,6 +734,10 @@
 .hud-inv-note { margin-top: 0.8em !important; color: var(--ink-dim); font-size: 0.95em; }
 .hud-equipped { display: flex; flex-wrap: wrap; justify-content: center; align-items: baseline; gap: .1em .7em; max-width: 28em; padding: .3em .6em; color: var(--cream); background: #152833de; border-radius: .4em; }
 .hud-equipped strong { font-size: .95em; font-weight: 800; }
+.hud-mission-goal { margin-top: .55em; font-weight: 800; font-size: 1em; color: var(--cream); }
+.hud-mission-contract { margin-top: .4em; font-size: .85em; color: #d0dfc8; }
+.hud-mission-help { margin-top: .7em; font-size: .75em; color: var(--ink-dim); }
+.hud-mission-help kbd { font-size: 1em; }
 .hud-equipped span { font-size: .75em; color: #d3dfcf; }
 .hud-quiver { display: none; } /* Ammo and arrow wear are explicit in the selected-equipment readout. */
 
