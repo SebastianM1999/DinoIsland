@@ -206,7 +206,7 @@ export class SkillPanel {
         ${t.tiers.map((g) => `
           <div class="sk-tier${g.open ? '' : ' is-locked'}">
             <span class="sk-tierlabel">${esc(g.label)}</span>
-            <span class="sk-gate">${g.open ? TICK_ICON : LOCK_ICON}${g.gate === 0 ? 'Available from start' : g.open ? 'Tier unlocked' : `${t.spent}/${g.gate} points spent · ${g.gate - t.spent} more to unlock`}</span>
+            <span class="sk-gate">${g.open ? TICK_ICON : LOCK_ICON}${g.gate === 0 ? 'Available from start' : g.open ? 'Tier unlocked' : `${t.spent}/${g.gate} spent · ${g.gate - t.spent} needed`}</span>
             ${g.gate > 0 ? `<span class="sk-gate-track" role="progressbar" aria-label="${esc(t.name)} ${esc(g.label)} unlock progress" aria-valuemin="0" aria-valuemax="${g.gate}" aria-valuenow="${Math.min(t.spent, g.gate)}"><span style="transform:scaleX(${Math.min(1, t.spent / g.gate)})"></span></span>` : ''}
           </div>
           <div class="sk-tiles">${g.skills.map((s) => this.#tileHtml(s)).join('')}</div>`).join('')}
