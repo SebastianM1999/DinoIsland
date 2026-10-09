@@ -17,7 +17,7 @@ test('All map photographs decode before selection and subsequent loads reuse the
     const first = f.api.preloadMapPreviews();
     assert.equal(f.api.preloadMapPreviews(), first);
     await first;
-    assert.equal(f.requests.length, 9);
+    assert.equal(f.requests.length, 12);
     for (let island = 0; island < 3; island++) {
       assert.equal(f.api.mapPreviewFrames(island).length, 3);
       assert.ok(f.api.mapPreviewFrames(island).every(src => src.includes(`island-${island + 1}-`)));
@@ -26,9 +26,9 @@ test('All map photographs decode before selection and subsequent loads reuse the
     copy.pop();
     assert.equal(f.api.mapPreviewFrames(0).length, 3);
     await f.api.preloadMapPreviews();
-    assert.equal(f.requests.length, 9);
+    assert.equal(f.requests.length, 12);
     assert.deepEqual(f.api.previewURLs(-1), []);
-    assert.deepEqual(f.api.previewURLs(3), []);
+    assert.deepEqual(f.api.previewURLs(4), []);
   } finally { f.restore(); }
 });
 

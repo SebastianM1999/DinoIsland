@@ -34,7 +34,7 @@ function travel(view, cadence, speed, seconds, dt = .025) {
 }
 
 test('all current species have distinct cadence and relative weight profiles', () => {
-  assert.deepEqual(Object.keys(CREATURE_STEP_PROFILES).sort(), ['alpha-sarcosuchus', 'brachio', 'ptera', 'raptor', 'stego', 'trex']);
+  assert.deepEqual(Object.keys(CREATURE_STEP_PROFILES).sort(), ['alpha-sarcosuchus', 'brachio', 'crystal-plodder', 'gloom-raptor', 'ptera', 'raptor', 'stego', 'sump-lurker', 'trex']);
   assert.equal(CREATURE_STEP_PROFILES.raptor.weightGain, 0);
   assert.equal(CREATURE_STEP_PROFILES.ptera.weightGain, 0);
   assert.ok(CREATURE_STEP_PROFILES.trex.weightGain > CREATURE_STEP_PROFILES.stego.weightGain);

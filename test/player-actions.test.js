@@ -28,7 +28,7 @@ function fixture(t) {
       isPanelOpen: () => game.panel,
       toast: (...args) => toasts.push(args), alert: (...args) => alerts.push(args),
       prompt: (...args) => prompts.push(args), hitMarker: weak => game.hit = weak,
-      setHotbar: rows => { game.hotbar = rows; }, setInventory: inv => { game.inventoryHud = inv; },
+      setHotbar: rows => { game.hotbar = rows; }, setTorch() {}, setInventory: inv => { game.inventoryHud = inv; },
       setCrosshair: value => { game.crosshair = value; }, eatProgress: value => { game.progress = value; },
       hint: (...args) => { game.hint = args; },
     },
