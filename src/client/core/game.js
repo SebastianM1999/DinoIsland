@@ -176,6 +176,7 @@ export class Game {
       return true;
     };
     this.hud.onCloseBoard = () => this.input.onPanelToggle('close');
+    this.hud.onCloseInventory = () => this.input.onPanelToggle('close');
 
     this.#buildWorld();
     this.stats = new PerfStats(this.overlay);
