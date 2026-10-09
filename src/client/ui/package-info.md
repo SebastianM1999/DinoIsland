@@ -15,6 +15,7 @@
 - `skillModel.js` — pure, DOM-free view-model of the skill panel (`buildSkillView`, `previewBuy`, `nearCamp`, ...).
 - `skillIcons.js` — 24x24 stroke SVG icons per skill and tree, plus lock/tick/close glyphs.
 - `menus.js` — `ICON_SPRITE`, `initSettings()` (settings dialog) and `renderPause(game)` (pause screen contents).
+- `menuTour.js` — lazily loaded `createMenuTour(canvas, onIsland)`: live home-menu camera tour through all three seeded island layouts; owns its scenery renderer, reduced-motion and visibility handling, island selection and disposal.
 - `perfStats.js` — `PerfStats` / `FrameSamples`: FPS and ping overlay (off / compact / detailed).
 - `internetTest.js` — `initInternetTest()`: UI for the server's `/internet` start/stop/status endpoint and the shareable address.
 - `steamLobby.js` — `initSteamLobby()`: Steam friends/invite panel over the Electron bridge `window.dinoSteam`.
