@@ -99,3 +99,71 @@
   .menu-utilities { margin-top: 20px; }
 }
 @media (max-width: 420px) { .explorer-card { grid-template-columns: minmax(0, 1fr) auto; gap: 8px; } .explorer-mark { display: none; } .home-explorer-stats { gap: 8px; } .home-explorer-stats strong { font-size: 1.1rem; } }
+
+/* Wide customization: progression, live explorer and outfit choices side by side. */
+#menu[inert] .menu-card, #menu[inert] .menu-kicker, #menu[inert] .menu-utilities, #menu[inert] .tour-info { visibility: hidden; }
+#home-explorer-root, #home-explorer-root *, #home-skills, #home-skills * { scrollbar-width: none; }
+#home-explorer-root::-webkit-scrollbar, #home-explorer-root *::-webkit-scrollbar, #home-skills::-webkit-scrollbar, #home-skills *::-webkit-scrollbar { display: none; width: 0; height: 0; }
+#home-explorer-root .home-dialog-card { width: min(1200px, 100%); display: grid; grid-template-columns: 170px minmax(0, 1fr); gap: 16px 24px; }
+#home-explorer-root .home-dialog-head { grid-column: 1 / -1; margin-bottom: 0; }
+#home-explorer-root .home-explorer-stats { grid-template-columns: 1fr; gap: 20px; }
+#home-explorer-root .home-explorer-summary { padding-right: 20px; border-right: 1px solid #97aa9244; }
+#home-explorer-root .home-explorer-wardrobe { min-width: 0; }
+#home-explorer-root .hud-panel { border: 0; padding: 0; }
+#home-explorer-root .hud-panel-head { display: none; }
+#home-explorer-root .wd-body { grid-template-columns: minmax(180px, .65fr) minmax(0, 1fr); gap: 20px; }
+#home-explorer-root .wd-canvas { height: clamp(260px, 42vh, 360px); }
+#home-explorer-root .wd-slot { padding: 10px; }
+#home-explorer-root .wd-slot header { gap: 8px; }
+#home-explorer-root .wd-cycle { gap: 4px; }
+#home-explorer-root .wd-name { font-size: .9rem; }
+#home-explorer-root .wd-arrow { min-width: 32px; min-height: 36px; }
+#home-explorer-root .wd-foot { margin-top: 14px; }
+#home-explorer-root .wd-btn { min-height: 44px; }
+.tour-map-label { display: block; margin: 12px 0 4px; color: #d5dfc9; font-size: .8rem; }
+#tour-island { width: 100%; min-height: 44px; font: inherit; color: #fff1d0; background: #132b2de6; border: 1px solid #b3c6b7; border-radius: 5px; padding: 8px 12px; }
+#tour-island:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
+/* Same complete tree as in play, with a saved-build footer in the home menu. */
+#home-skills { justify-content: center; }
+.home-skills-card { width: min(1100px, 100%); height: 90dvh; max-height: 90dvh; display: flex; flex-direction: column; overflow: hidden; background: #152b2cf5; border: 1px solid #8d9e8b66; border-radius: 12px; padding: 20px; }
+.home-skills-card .home-dialog-head { flex: none; margin-bottom: 0; }
+.home-skills-mount { flex: 1; min-height: 0; }
+.home-skills-mount .hud-panel { position: static; inset: auto; transform: none; width: 100%; height: 100%; max-height: none; padding: 0; animation: none; }
+.home-skills-mount .sk-head { margin: 0 0 6px; justify-content: flex-end; }
+.home-skills-mount .sk-head h2 { display: none; }
+.home-skills-mount .hud-panel::before { display: none; }
+.home-skills-mount .sk-cols { overflow-y: auto; }
+.home-skills-mount .sk-foot { height: auto; min-height: 90px; }
+.home-skills-mount .sk-xptable { display: none; }
+.home-skills-mount .hud-panel-close { display: none; }
+.home-skills-help, .home-skills-status { color: #cad6c7; font-size: .9rem; margin: 8px 0 12px; }
+.home-skills-status:empty { display: none; }
+.home-skills-mount .sk-actions { flex-wrap: wrap; }
+@media (max-width: 900px) {
+  #home-explorer-root .home-dialog-card { grid-template-columns: 1fr; }
+  #home-explorer-root .home-explorer-stats { grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  #home-explorer-root .home-explorer-summary { border-right: 0; padding-right: 0; }
+  #home-explorer-root .home-explorer-progress { margin-bottom: 4px; }
+  #home-explorer-root .wd-body { grid-template-columns: minmax(150px, .65fr) minmax(0, 1fr); }
+  .home-skills-card { max-height: calc(100dvh - 40px); }
+}
+@media (max-width: 580px) {
+  #home-explorer-root .wd-body { grid-template-columns: 1fr; }
+  #home-explorer-root .wd-canvas { height: 200px; }
+  #home-explorer-root .wd-foot { flex-wrap: wrap; }
+}
+.solo-map-choice { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 12px; margin-top: 14px; }
+.solo-map-choice label { color: #d5dfc9; font-size: .85rem; }
+#play-island { width: 100%; min-height: 44px; font: inherit; font-size: .95rem; background: #132b2de6; color: #fff1d0; border: 1px solid #97aa9280; border-radius: 5px; padding: 8px 10px; }
+#play-island:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
+.island-unlock-help { font-size: .75rem; line-height: 1.3; color: #b9c8b4; margin: 6px 0 0; }
+@media (max-height: 850px) and (min-width: 801px) {
+  #menu { padding-top: 22px; padding-bottom: 22px; }
+  .menu-kicker { margin-bottom: 14px; }
+  #menu .logo { font-size: 3rem; }
+  .menu-goal { margin: 12px 0 16px; font-size: 1rem; }
+  .explorer-card { padding: 10px 12px; }
+  #menu #btn-solo { padding: 12px 16px; font-size: 1.35rem; }
+  .menu-utilities { margin-top: 14px; gap: 4px; }
+  .menu-utilities .menu-link { font-size: .85rem; padding-right: 10px; }
+}

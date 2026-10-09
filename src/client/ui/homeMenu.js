@@ -1,6 +1,23 @@
 // Home-screen panels group existing game routes without creating new sessions.
+import { LEVELS } from '../../shared/levels.js';
+import { loadIslandProgress } from '../core/islandProgress.js';
 export function initHomeMenu() {
   const menu = document.getElementById('menu');
+  const islandSelect = document.getElementById('tour-island');
+  islandSelect.replaceChildren(...LEVELS.map((level, index) => {
+    const option = document.createElement('option');
+    option.value = String(index); option.textContent = level.name;
+    return option;
+  }));
+  const playSelect = document.getElementById('play-island');
+  const unlocked = loadIslandProgress();
+  playSelect.replaceChildren(...LEVELS.map((level, index) => {
+    const option = document.createElement('option');
+    option.value = String(index);
+    option.disabled = index > unlocked;
+    option.textContent = `${level.name}${index > unlocked ? ' — Locked' : ''}`;
+    return option;
+  }));
   const roots = [...document.querySelectorAll('.home-dialog')];
   const overlays = ['settings', 'steam-friends'].map(id => document.getElementById(id));
   let active = null, returnFocus = null;
@@ -8,8 +25,9 @@ export function initHomeMenu() {
   function syncOverlay() {
     const overlayOpen = overlays.some(root => !root.hidden);
     const explorer = document.getElementById('home-explorer-root');
+    const skills = document.getElementById('home-skills');
     if (active) active.inert = overlayOpen;
-    menu.inert = !!active || overlayOpen || !!(explorer && !explorer.hidden);
+    menu.inert = !!active || overlayOpen || !!(explorer && !explorer.hidden) || !!(skills && !skills.hidden);
   }
 
   function visibleControls(root) {

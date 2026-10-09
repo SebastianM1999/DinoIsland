@@ -40,6 +40,7 @@ Grouped by the module area they mainly cover. Many simulation tests also check t
 - `skills-server.test.js` — server-side profile, XP awards, skill effects, downed and revive.
 - `skills-movement.test.js` — skill effects on local movement: stamina, jumps, dash (PlayerController).
 - `skills-ui.test.js` — profile persistence, profile in `hello`/`MSG.PROF`, skill panel view model (`src/client/core/profile.js`, `src/client/ui/skillModel.js`).
+- `island-progress.test.js` — starting-island unlock persistence, monotonic completion, catalog bounds, corrupt/blocked storage, and locked-start restriction.
 - `creative.test.js` — creative mode: all skills, free crafting, full supplies, boat repair without parts.
 - `crafting.test.js` — workbench recipes, upgrades and their effects on the server.
 - `base.test.js` — base building stages, costs, colliders, camp stations, towers.
