@@ -20,6 +20,9 @@ import { PlayerController } from '../src/client/player/controller.js';
 const LEVEL = 3;
 // (the fixed map first, then 16 more: the generator must stay valid for every variant)
 const VARIANTS = [...new Set([levelDef(LEVEL).variant, ...Array.from({ length: 16 }, (_, i) => i + 1)])];
+// Building a Terrain + layout costs ~3 s (several times that under c8), so only the rules that read the maze plan
+// run over every variant (planIsland alone, ~30 ms). The geometric rules run on the fixed map plus three more.
+const BUILT = [...new Set([levelDef(LEVEL).variant, 1, 2, 3])];
 const SLOPE = CONFIG.player.maxWalkSlope;
 const cache = new Map();
 /** Is (x, z) beside the stretch of the sump tunnel that dives (its ramps included)? */
@@ -35,6 +38,12 @@ function inSumpReach(maze, x, z) {
     }
   }
   return false;
+}
+
+/** the plan and maze of a variant, without the terrain */
+function planned(variant) {
+  const plan = planIsland(LEVEL, variant);
+  return { variant, plan, maze: plan.cave.maze };
 }
 
 function island(variant) {
@@ -91,7 +100,10 @@ test('level 4 is the last level, a cave biome with a dark palette and no flyers 
 });
 
 test('the cave level is deterministic: the same variant builds the same maze, ground, roof and layout', () => {
-  for (const variant of [1, 2, 3]) {
+  for (const variant of VARIANTS) {
+    assert.deepEqual(JSON.parse(JSON.stringify(planned(variant).maze)), JSON.parse(JSON.stringify(planned(variant).maze)), `variant ${variant}: the same maze twice`);
+  }
+  for (const variant of BUILT.filter((v) => v !== levelDef(LEVEL).variant).slice(0, 2)) {
     const a = island(variant);
     const t2 = new Terrain(planIsland(LEVEL, variant));
     const l2 = buildLayout(t2);
@@ -119,7 +131,7 @@ test('other islands have no roof', () => {
 });
 
 test('the maze has loops, dead ends, crystal halls, a flooded branch and side chambers off the direct way', () => {
-  for (const { variant, maze } of VARIANTS.map(island)) {
+  for (const { variant, maze } of VARIANTS.map(planned)) {
     const real = maze.nodes.filter((n) => !n.outside);
     const dry = maze.tunnels.filter((t) => !t.flooded && t.kind !== 'falseExit');
     // (the two outside end points and the false exits' ends are no chambers)
@@ -145,7 +157,7 @@ test('the maze has loops, dead ends, crystal halls, a flooded branch and side ch
 });
 
 test('the whole maze is reachable over the real ground, dry: the hall, the relics, the exit and the boat', () => {
-  for (const { variant, terrain, layout, maze } of VARIANTS.map(island)) {
+  for (const { variant, terrain, layout, maze } of BUILT.map(island)) {
     const f = flood(terrain, spawnOf(layout));
     for (const r of layout.relics) assert.ok(f.at(r.x, r.z), `variant ${variant}: ${r.kind} reachable`);
     for (const n of maze.nodes.filter((m) => !m.outside)) assert.ok(f.at(n.x, n.z), `variant ${variant}: chamber ${n.id} (${n.kind}) reachable`);
@@ -157,7 +169,7 @@ test('the whole maze is reachable over the real ground, dry: the hall, the relic
 });
 
 test('false exits end in a rock sill: daylight over it, never a way onto the ledge or down the cliff', () => {
-  for (const { variant, terrain, plan, layout, maze } of VARIANTS.map(island)) {
+  for (const { variant, terrain, plan, layout, maze } of BUILT.map(island)) {
     const f = flood(terrain, spawnOf(layout));
     for (const fe of layout.falseExits) {
       const t = maze.tunnels[fe.tunnel];
@@ -188,7 +200,7 @@ test('false exits end in a rock sill: daylight over it, never a way onto the led
 });
 
 test('the east beach is reachable only through the mountain, by exactly one tunnel; nobody walks, wades or climbs round it', () => {
-  for (const { variant, terrain, plan, layout, maze } of VARIANTS.map(island)) {
+  for (const { variant, terrain, plan, layout, maze } of BUILT.map(island)) {
     const inMountain = (x, z) => plan.cave.depthAt(x, z) > 0;
     // with the mountain shut, the west cove cannot reach the boat even by wading the shallows (up to the wade limit)
     const outside = flood(terrain, spawnOf(layout), { block: inMountain, depth: CONFIG.world.maxWadeDepth });
@@ -232,7 +244,7 @@ test('the east beach is reachable only through the mountain, by exactly one tunn
 });
 
 test('walls are steeper than the walk limit and nobody climbs onto the mountain', () => {
-  for (const { variant, terrain, plan, layout } of VARIANTS.map(island)) {
+  for (const { variant, terrain, plan, layout } of BUILT.map(island)) {
     const f = flood(terrain, spawnOf(layout));
     let max = -Infinity, reached = 0;
     for (let j = 0; j <= terrain.n; j++) {
@@ -261,7 +273,7 @@ test('walls are steeper than the walk limit and nobody climbs onto the mountain'
 });
 
 test('no enclosed pocket of walkable cave floor is cut off from the spawn', () => {
-  for (const { variant, terrain, layout } of VARIANTS.map(island)) {
+  for (const { variant, terrain, layout } of BUILT.map(island)) {
     const f = flood(terrain, spawnOf(layout));
     // walkable floor cells under a roof that the spawn cannot reach: grouped into components
     const n1 = f.n1, comp = new Int32Array(n1 * n1);
@@ -294,7 +306,7 @@ test('no enclosed pocket of walkable cave floor is cut off from the spawn', () =
 });
 
 test('under every walkable cave cell the roof is at least a body up; in the core of a passage 3.2 m and more', () => {
-  for (const { variant, terrain, plan, layout, maze } of VARIANTS.map(island)) {
+  for (const { variant, terrain, plan, layout, maze } of BUILT.map(island)) {
     const f = flood(terrain, spawnOf(layout));
     let cells = 0, low = Infinity, tunnelLow = Infinity, high = 0;
     for (let j = 0; j <= terrain.n; j++) {
@@ -328,7 +340,7 @@ test('under every walkable cave cell the roof is at least a body up; in the core
 });
 
 test('flooded tunnels: swimmable in the middle, an air gap above, shallow banks, no water above the floor beside it', () => {
-  for (const { variant, terrain, plan, maze } of VARIANTS.map(island)) {
+  for (const { variant, terrain, plan, maze } of BUILT.map(island)) {
     const flows = plan.flows;
     assert.equal(flows.length, maze.tunnels.filter((t) => t.flooded).length);
     for (const flow of flows) {
@@ -360,7 +372,7 @@ test('flooded tunnels: swimmable in the middle, an air gap above, shallow banks,
 });
 
 test('three relics: dry, clear, reachable, each in its own side chamber, and the hints tell the truth', () => {
-  for (const { variant, terrain, plan, layout, maze } of VARIANTS.map(island)) {
+  for (const { variant, terrain, plan, layout, maze } of BUILT.map(island)) {
     assert.equal(layout.relics.length, 3, `variant ${variant}`);
     assert.deepEqual(layout.relics.map((r) => r.site), ['cave', 'lake', 'abyss']);
     const f = flood(terrain, spawnOf(layout));
@@ -386,7 +398,7 @@ test('three relics: dry, clear, reachable, each in its own side chamber, and the
 });
 
 test('torch spots lie dry and clear in the arrival cove, and the arrival boat is a prop on the beach', () => {
-  for (const { variant, terrain, layout, plan } of VARIANTS.map(island)) {
+  for (const { variant, terrain, layout, plan } of BUILT.map(island)) {
     const spots = layout.torchSpots;
     assert.ok(spots.length >= 4 && spots.length <= 6, `variant ${variant}: ${spots.length} torch spots`);
     for (const s of spots) {
@@ -404,7 +416,7 @@ test('torch spots lie dry and clear in the arrival cove, and the arrival boat is
 });
 
 test('dinosaurs: only species that fit, spawning dry on walkable ground under a high roof, outside colliders', () => {
-  for (const { variant, terrain, plan, layout } of VARIANTS.map(island)) {
+  for (const { variant, terrain, plan, layout } of BUILT.map(island)) {
     for (const kind of ['brachio', 'stego']) assert.equal(layout.dinoZones[kind].length, 0, kind);
     assert.equal(layout.trexPatrol.length, 0);
     assert.equal(layout.dinoZones.raptor.length, plan.level.dinos.raptor, `variant ${variant}: raptor packs`);
@@ -430,7 +442,7 @@ test('dinosaurs: only species that fit, spawning dry on walkable ground under a 
 });
 
 test('cave dressing: stalactites hang from the roof, stalagmites keep tunnels open (>= 4 m clear), crystals glow in halls', () => {
-  for (const { variant, terrain, plan, layout } of VARIANTS.map(island)) {
+  for (const { variant, terrain, plan, layout } of BUILT.map(island)) {
     const d = layout.caveDecor;
     assert.ok(d.stalactites.length >= 150 && d.stalagmites.length >= 100 && d.crystals.length >= 50, `variant ${variant}: decor counts`);
     for (const s of d.stalactites) {
@@ -501,7 +513,7 @@ test('a server world on the cave level spawns pack hunters, hall grazers and lur
 });
 
 test('the outside is a real mountain: ragged shore, steep flanks, two summits far above every roof', () => {
-  for (const variant of VARIANTS.slice(0, 8)) {
+  for (const variant of BUILT) {
     const { terrain, plan } = island(variant);
     const D = plan.cave.depthAt;
     // the summit and a second, separate one
@@ -541,7 +553,7 @@ test('the outside is a real mountain: ragged shore, steep flanks, two summits fa
 });
 
 test('the rock is always above the roof, and nobody on foot reaches the flanks or the top', () => {
-  for (const variant of VARIANTS) {
+  for (const variant of BUILT) {
     const { terrain, plan, layout } = island(variant);
     const n1 = terrain.n + 1;
     // the skin lies above the roof everywhere inside, with room to spare

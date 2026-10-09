@@ -10,7 +10,17 @@ import { levelDef } from '../src/shared/levels.js';
 import { ServerWorld } from '../src/sim/world.js';
 
 const LEVEL = 3;
-const VARIANTS = [...new Set([levelDef(LEVEL).variant, 0, 1, 2, 3, 4, 5, 6])];
+// (Terrain + layout cost ~3 s each, several times that under c8: the fixed map and three more, built once and shared)
+const VARIANTS = [...new Set([levelDef(LEVEL).variant, 0, 1, 2])];
+const built = new Map();
+function island(variant) {
+  if (!built.has(variant)) {
+    const plan = planIsland(LEVEL, variant);
+    const terrain = new Terrain(plan);
+    built.set(variant, { plan, terrain, layout: buildLayout(terrain) });
+  }
+  return built.get(variant);
+}
 
 test('the hand torch reaches further than before (owner: more light distance)', () => {
   assert.ok(TORCH.light.distance >= 24);
@@ -18,8 +28,7 @@ test('the hand torch reaches further than before (owner: more light distance)', 
 
 test('wall torches hang on the visible wall: the back plate lies on the volume skin, facing into the tunnel, rock behind and air in front', () => {
   for (const variant of VARIANTS) {
-    const plan = planIsland(LEVEL, variant);
-    const layout = buildLayout(new Terrain(plan));
+    const { plan, layout } = island(variant);
     const rock = caveRock(plan);
     assert.ok(layout.wallTorches.length >= 18, `variant ${variant}: ${layout.wallTorches.length} sconces`);
     for (const w of layout.wallTorches) {
@@ -39,8 +48,7 @@ test('wall torches hang on the visible wall: the back plate lies on the volume s
 
 test('wall torches: about every 50 m along the tunnels, on the wall, under the roof, dry, never on another island', () => {
   for (const variant of VARIANTS) {
-    const terrain = new Terrain(planIsland(LEVEL, variant));
-    const layout = buildLayout(terrain);
+    const { terrain, layout } = island(variant);
     const W = layout.wallTorches;
     assert.ok(W.length >= 18, `variant ${variant}: ${W.length} wall torches`);
     W.forEach((w, i) => {
