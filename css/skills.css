@@ -128,13 +128,72 @@
 .sk-note { font-size: 0.85em; font-weight: 700; color: var(--ink-dim); }
 .sk-danger { background: var(--red); color: #fff; box-shadow: 0 3px 0 #a52a3a; }
 
-@media (max-width: 900px) {
-  .sk-cols { grid-template-columns: 1fr; }
-  .sk-foot { flex-direction: column; align-items: stretch; height: auto; }
-}
+
+/* All tiers share the viewport; skill explanations live in the fixed footer.
+   Three branches never collapse into a tall scrolling list. */
+.hud-skills { font-size: clamp(14px, min(1.1vw, 1.9dvh), 20px); width: min(86em, 96vw); height: min(56em, 94dvh); max-height: 94dvh; box-sizing: border-box; overflow: hidden; }
+.sk-cols { overflow: visible; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.sk-col { display: grid; grid-template-rows: auto auto minmax(0, 2fr) auto minmax(0, 2fr) auto minmax(0, 1fr); align-items: stretch; gap: .2em; }
+.sk-colhead { padding: .3em .5em; }
+.sk-treetxt small { display: none; }
+.sk-tier { margin: .15em .4em; padding: .2em .4em; gap: .1em; }
+.sk-tierlabel { font-size: 1em; }
+.sk-gate { font-size: 1em; }
+.sk-tiles { gap: .25em; padding: 0 .4em; min-height: 0; }
+.sk-tiles > :last-child:nth-child(odd) { justify-self: stretch; width: auto; }
+.sk-tile { min-height: 0; display: grid; grid-template-columns: 1.65em minmax(0, 1fr); grid-template-rows: 1fr auto; align-items: center; gap: .15em .3em; padding: .3em .45em; text-align: left; }
+.sk-disc { grid-row: 1 / -1; width: 1.6em; height: 1.6em; padding: .25em; }
+.sk-name { font-size: 1em; }
+.sk-meta { grid-column: 2; justify-content: start; font-size: 1em; }
+.sk-pips, .sk-state { display: none; }
+.sk-foot { min-height: 6em; margin-top: .4em; align-items: center; }
+.sk-desc { overflow: visible; max-height: none; font-size: 1em; }
+.sk-xptable { display: none; }
+.sk-xprow { margin-bottom: .3em; }
 @media (max-height: 650px) {
-  .hud-skills { padding: 0.6em 0.8em; }
-  .sk-head { margin-bottom: 0.2em; }
-  .sk-xptable { display: none; }
-  .sk-desc { max-height: 6em; }
+  .hud-skills { padding: .5em .7em; height: 96dvh; max-height: 96dvh; }
+  .sk-head { margin-bottom: .2em; }
+  .sk-colhead { padding: .15em .4em; }
+  .sk-treeic { width: 1.7em; height: 1.7em; padding: .25em; }
+  .sk-tier { grid-template-columns: auto 1fr; column-gap: .4em; }
+  .sk-gate-track { grid-column: 1 / -1; }
+  .sk-foot { min-height: 5em; }
 }
+
+.sk-tier { grid-template-columns: auto minmax(0, 1fr); align-items: center; column-gap: .4em; }
+.sk-gate-track { grid-column: 1 / -1; }
+.sk-gate { letter-spacing: 0; }
+.sk-tiles { grid-auto-rows: minmax(0, 1fr); }
+.home-skills-card { height: 96dvh; max-height: 96dvh; padding: 12px; }
+.home-skills-card .home-dialog-head h2 { font-size: 24px; }
+.home-skills-help { font-size: 14px; margin: 4px 0 6px; }
+.home-skills-mount .sk-cols { overflow: visible; }
+.home-skills-mount .sk-foot { min-height: 4em; }
+.home-skills-mount .hud-panel { font-size: 14px; }
+@media (max-height: 650px) {
+  .home-skills-card .menu-eyebrow { display: none; }
+  .home-skills-help { display: none; }
+  .home-skills-card .home-dialog-head { margin-bottom: 4px; }
+  .sk-tierlabel, .sk-gate { font-size: 14px; }
+  .sk-gate svg { display: none; }
+}
+
+.sk-gate { font-size: 14px; }
+.sk-gate svg { display: none; }
+.sk-tierlabel { font-size: 14px; letter-spacing: 0; }
+.sk-tier { margin-block: 0; padding-block: .1em; }
+.sk-tile { padding-block: .15em; }
+.sk-meta { flex-wrap: nowrap; gap: .25em; font-size: 14px; white-space: nowrap; }
+.sk-col { padding-bottom: .25em; }
+
+.sk-col { grid-template-rows: auto auto minmax(0, 2fr) auto minmax(0, 2fr) auto minmax(0, 1fr); }
+@media (max-width: 1000px) {
+  .sk-tile { grid-template-columns: minmax(0, 1fr); }
+  .sk-disc { display: none; }
+  .sk-meta { grid-column: 1; }
+  .sk-cols { gap: .4em; }
+}
+
+/* HUD's generic SVG rule must not expand inline skill glyphs. */
+.hud-skills .sk-gate svg { display: none; }
+.hud-skills .sk-head h2 svg { width: 1.2em; height: 1.2em; }
