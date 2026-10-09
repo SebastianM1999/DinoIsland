@@ -14,9 +14,9 @@
 - `skillPanel.js` — `SkillPanel`: skill tree dialog (key K) with optimistic buys reverted after a timeout.
 - `skillModel.js` — pure, DOM-free view-model of the skill panel (`buildSkillView`, `previewBuy`, `nearCamp`, ...).
 - `skillIcons.js` — 24x24 stroke SVG icons per skill and tree, plus lock/tick/close glyphs.
-- `menus.js` — `ICON_SPRITE`, `initSettings()` (settings dialog) and `renderPause(game)` (pause screen contents).
+- `menus.js` — `ICON_SPRITE`, `initSettings()` (settings dialog) and `renderPause(game)` (live expedition menu: left action rail, expandable mission progress and team details). Keyboard focus/navigation lives in `main.js`; the island keeps running.
 - `menuTour.js` — lazily loaded async `createMenuTour(canvas, onIsland, {signal})`: staged live tour with three cached scenery corridors from seeded game layouts, high-performance renderer, capped resolution, occasional shadow refresh, overlay/hidden-tab suspension and cancellation/disposal. Background previews do not unlock playable maps.
-- `homeMenu.js` — `initHomeMenu()`: create/join expedition, how-to-play and credits dialogs; focus handling and connection status feedback. Populates separate all-island preview and earned-island solo selectors.
+- `homeMenu.js` — `initHomeMenu()`: create/join expedition, how-to-play and credits dialogs; focus handling and connection status feedback. Populates separate preview and solo selectors; the temporary playtest flag exposes all solo starting islands without granting earned unlocks.
 - `homeExplorer.js` — `initHomeExplorer()`: saved level/XP/skills summary and lazy outfit customization with the existing wardrobe; no skill purchases, preview GPU resources are released on close.
 - `homeSkills.js` — `initHomeSkills()`: complete skill tree before play, draft purchases and refund/reset using earned points; explicit Save build persists the validated profile, Cancel discards edits. XP and bonus points are preserved; gameplay keeps its authoritative camp reset rules.
 - `perfStats.js` — `PerfStats` / `FrameSamples`: FPS and ping overlay (off / compact / detailed).

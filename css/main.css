@@ -580,3 +580,45 @@ kbd {
   .pause-card, .settings-card, .btn-danger[data-confirm] { animation: none; }
   .icon-btn[data-open-settings]:hover svg { animation: none; }
 }
+
+/* Live expedition menu: a left rail, with the island kept visible on the right. */
+#paused { display: flex; align-items: flex-start; justify-content: flex-start; padding: 5vh 5vw; overflow-y: auto; scrollbar-width: none; background: linear-gradient(90deg, #102629fa 0%, #102629f2 30%, #102629b3 46%, #10262926 67%, transparent 90%); backdrop-filter: none; }
+#paused::-webkit-scrollbar { display: none; }
+#paused .pause-card { width: min(400px, 44vw); padding: 0; margin: auto 0; animation: none; }
+#paused .pause-head { padding-right: 44px; margin-bottom: 22px; }
+#paused .pause-close { top: 0; right: 0; }
+#paused .pause-head h2 { font-size: clamp(2rem, 3.2vw, 3rem); color: var(--cream); text-transform: none; line-height: 1.05; letter-spacing: -.02em; }
+#paused .pause-live { color: var(--green); font-size: .75rem; margin-bottom: 12px; }
+#paused .pause-live::before { content: ''; display: inline-block; width: 7px; height: 7px; margin-right: 8px; border-radius: 50%; background: currentColor; }
+#paused .pause-sub { font-size: .95rem; color: #c7d5c2; margin: 10px 0 0; }
+#paused .pause-grid { display: flex; flex-direction: column; gap: 20px; }
+#paused .pause-actions { gap: 8px; }
+#paused .pause-actions .btn { min-height: 48px; padding: 10px 16px; background: #274347e6; border: 1px solid #93aaa34d; border-radius: 6px; box-shadow: none; font-size: 1rem; }
+#paused .pause-actions .btn:hover { background: #385a5e; }
+#paused .pause-actions .btn:focus-visible, #paused summary:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
+#paused .pause-actions #btn-resume { min-height: 58px; font-size: 1.25rem; color: #23351e; background: var(--yellow); border-color: var(--yellow); }
+#paused .pause-actions #btn-leave { color: #ffb0a4; background: #3b302ce0; border-color: #a8756355; margin-top: 6px; }
+#paused .pause-actions #btn-leave[data-confirm] { background: var(--red); color: white; }
+#paused .pause-info { gap: 8px; }
+#paused .pause-block { background: #102629d9; border: 1px solid #93aaa333; border-radius: 6px; padding: 0 12px; }
+#paused summary { min-height: 44px; padding: 10px 0; color: #e0e8d8; font-size: .9rem; font-weight: 700; }
+#paused .pause-block summary span:last-child:not(:first-child) { float: right; color: #a9bfaa; margin-left: 8px; }
+#paused .pause-objectives, #paused .pause-team { padding: 4px 0 14px; }
+#paused .pause-objectives li { font-size: .85rem; }
+#paused .pause-testing { padding: 0 16px; border: 1px solid #93aaa333; border-radius: 6px; }
+#paused .pause-testing[open] { padding-bottom: 10px; }
+#paused .pause-testing .btn { text-align: left; }
+#paused .pause-hint { text-align: left; font-size: .75rem; color: #a9bfaa; margin-top: 18px; }
+#paused .pause-hint kbd { font-size: .7rem; }
+body:has(#paused:not([hidden])) #hud :is(.hud-status, .hud-tl, .hud-keys, .hud-bc, .hud-br, .hud-compass, .hud-cross) { visibility: hidden; }
+@media (max-width: 640px) {
+  #paused { padding: 24px; background: linear-gradient(90deg, #102629fa, #102629e6 65%, #10262980); }
+  #paused .pause-card { width: min(400px, 100%); }
+}
+@media (max-height: 700px) {
+  #paused { padding-top: 20px; padding-bottom: 20px; }
+  #paused .pause-head { margin-bottom: 14px; }
+  #paused .pause-grid { gap: 12px; }
+  #paused .pause-actions .btn { min-height: 44px; }
+  #paused .pause-hint { margin-top: 12px; }
+}

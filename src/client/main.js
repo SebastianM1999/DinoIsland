@@ -154,6 +154,7 @@ function setPaused(show) {
     syncCreative();
   }
   paused.hidden = !show;
+  if (show && !settingsUi.isOpen()) $('btn-resume').focus({ preventScroll: true });
   if (!show) settingsUi.close();
 }
 const served = location.protocol.startsWith('http');
@@ -303,6 +304,19 @@ $('btn-resume').addEventListener('click', resumeGame);
 $('btn-pause-close').addEventListener('click', resumeGame);
 paused.addEventListener('click', (e) => {
   if (e.target === paused) resumeGame();
+});
+// Keep keyboard navigation inside the live menu; settings manages its own focus.
+paused.addEventListener('keydown', event => {
+  if (paused.hidden || settingsUi.isOpen()) return;
+  const controls = [...paused.querySelectorAll('button, summary')].filter(el => !el.disabled && el.getClientRects().length);
+  const index = controls.indexOf(document.activeElement);
+  if (['ArrowUp', 'ArrowDown', 'Home', 'End'].includes(event.key)) {
+    event.preventDefault();
+    const next = event.key === 'Home' ? 0 : event.key === 'End' ? controls.length - 1 : (index + (event.key === 'ArrowDown' ? 1 : -1) + controls.length) % controls.length;
+    controls[next]?.focus();
+  } else if (event.key === 'Tab' && (index < 0 || (!event.shiftKey && index === controls.length - 1) || (event.shiftKey && index === 0))) {
+    event.preventDefault(); controls[event.shiftKey ? controls.length - 1 : 0]?.focus();
+  }
 });
 canvas.addEventListener('click', () => {
   if (!game?.running || game.hud.isPanelOpen()) return;

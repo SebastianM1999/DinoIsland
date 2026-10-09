@@ -145,6 +145,8 @@ export function renderPause(game) {
   const m = game.mission;
   $('pause-mission-title').textContent = m?.title || 'Expedition';
   const ul = $('pause-objectives');
+  const objectives = m?.objectives || [];
+  $('pause-mission-progress').textContent = `${objectives.filter(o => o.done).length}/${objectives.length}`;
   ul.replaceChildren(...(m?.objectives || []).map((o) => {
     const li = document.createElement('li');
     li.className = o.done ? 'done' : '';
@@ -156,6 +158,7 @@ export function renderPause(game) {
   if (current) current.classList.add('current');
 
   const team = game.team || [{ name: game.me.name, slot: game.me.slot, hp: game.me.hp, alive: game.me.alive, isYou: true }];
+  $('pause-team-count').textContent = `${team.length} explorer${team.length === 1 ? '' : 's'}`;
   $('pause-team').replaceChildren(...team.map((p) => {
     const li = document.createElement('li');
     li.style.setProperty('--c', CONFIG.playerColors[p.slot % 4]);
