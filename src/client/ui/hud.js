@@ -215,7 +215,9 @@ export class Hud {
       this.$hotbar.appendChild(li);
       this._slots.push({ li, ic: li.children[1], count: li.children[2], sig: '' });
     }
-    bc.append(this.$carry, this.$hotbar);
+    this.$equipped = el('div', 'hud-equipped');
+    this.$equipped.setAttribute('aria-label', 'Selected equipment');
+    bc.append(this.$carry, this.$equipped, this.$hotbar);
 
     // ---------- bottom-right: team
     const br = el('div', 'hud-br');
@@ -599,6 +601,8 @@ export class Hud {
   }
 
   setHotbar(slots, selected) {
+    this._selectedEquipment = slots[selected] || null;
+    this._refreshEquipped();
     for (let i = 0; i < EQUIP.length; i++) {
       const s = slots && slots[i];
       const slot = this._slots[i];
@@ -623,6 +627,7 @@ export class Hud {
   setInventory(inv) {
     if (!inv) return;
     this._inv = inv;
+    this._refreshEquipped();
     // quiver
     const gunAmmo = inv.guns?.[inv.weapon];
     const nextArrowUses = inv.arrowUses?.length ? Math.min(...inv.arrowUses) : CONFIG.weapons.bow.uses;
@@ -660,6 +665,24 @@ export class Hud {
     }
     this._invDirty = true;
     if (this._invOpen) this._renderInventory();
+  }
+
+  _refreshEquipped() {
+    const slot = this._selectedEquipment;
+    if (!slot || !this.$equipped) return;
+    const inv = this._inv || {};
+    const name = ITEM_INFO[slot.id === 'fruit' ? slot.sub : slot.id]?.name || slot.label || slot.id;
+    const gun = inv.guns?.[slot.id];
+    let detail = slot.id === 'spear' ? (slot.enabled === false ? 'Spear missing · replace at camp' : `Durability ${slot.count ?? `${inv.spearHealth ?? 100}%`}`)
+      : slot.id === 'bow' ? `${slot.count ?? inv.arrows ?? 0} arrows · next arrow lasts ${inv.arrows ? Math.min(...(inv.arrowUses?.length ? inv.arrowUses : [CONFIG.weapons.bow.uses])) : 0} shots`
+      : slot.id === 'trap' ? `${slot.count ?? 0} traps available`
+      : slot.id === 'fruit' ? `${slot.count ?? 0} fruit carried · F to eat`
+      : gun ? `${slot.count ?? gun.loaded} loaded · ${gun.reserve ?? 0} reserve · ${inv.reloading ? 'Reloading…' : 'R to reload'}`
+      : `${slot.count ?? 0} rounds loaded · R to reload`;
+    const sig = `${name}|${detail}`;
+    if (this._c.equipped === sig) return;
+    this._c.equipped = sig;
+    this.$equipped.innerHTML = `<strong>${esc(name)}</strong><span>${esc(detail)}</span>`;
   }
 
   _renderInventory() {
