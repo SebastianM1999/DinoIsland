@@ -17,6 +17,7 @@
 - `skillIcons.js` — 24x24 stroke SVG icons per skill and tree, plus lock/tick/close glyphs.
 - `menus.js` — `ICON_SPRITE`, `initSettings()` (settings dialog) and `renderPause(game)` (live expedition menu: left action rail, expandable mission progress and team details). Keyboard focus/navigation lives in `main.js`; the island keeps running.
 - `menuTour.js` — async `createMenuTour(root, onIsland, {signal})`: CSS photograph drift/crossfades of predecoded actual map shots; switching islands changes only the right-side lookout. No WebGL renderer; reduced-motion/overlay/hidden-tab suspension and disposal.
+- `loadingScreen.js` — lightweight expedition loading overlay using cached map photographs, CSS motion and truthful connection/model/world/shader stages with playful secondary captions; cleanup, hidden-tab and reduced-motion support. Styled by `css/loading.css`.
 - `mapPreviews.js` — shared preload/decode cache for all three islands' photographs, also reused by expedition loading. Failed photographs are omitted; the dark reconnaissance fallback remains available.
 - `menuPreviewCapture.js` — opt-in developer tool (`?capturePreviews=1`) for rebuilding nine map photographs from actual seeded scenery; never imported by normal sessions.
 - `homeMenu.js` — `initHomeMenu()`: create/join expedition, how-to-play and credits dialogs; focus handling and connection status feedback. Populates the right-side starting-island buttons; the temporary playtest flag exposes all solo starting islands without granting earned unlocks.
