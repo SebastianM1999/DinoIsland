@@ -6,16 +6,23 @@ const svg = (body, vb = '0 0 32 32') =>
   `<svg viewBox="${vb}" aria-hidden="true" focusable="false">${body}</svg>`;
 
 const OUT = '#1a2238'; // soft dark outline used on colorful item icons
+// Item silhouettes share a roughly 3–29 drawing area. Keep identifying features
+// broad enough to survive the 24px hotbar: grip, barrel, bone ends and feathers.
 
 export const ICONS = {
-  pistol: svg(`<path d="M4 10h23v7H15l-3 12H6l3-12H4z" fill="#596573" stroke="${OUT}" stroke-width="1.2"/><path d="M6 12h18M18 17v5h-5" fill="none" stroke="#abb6bf" stroke-width="1.4"/>`),
-  rifle: svg(`<path d="M2 10h7v3h5v-2h10v3h6v3H19l-2 10h-5l1-9H9v4H3z" fill="#596573" stroke="${OUT}" stroke-width="1.1"/><path d="M17 9h5M11 14h13" stroke="#b5bec5" stroke-width="1.4"/>`),
+  pistol: svg(`<path d="M4 8h23v7H14l-3 13H5l3-13H4z" fill="#657585" stroke="${OUT}" stroke-width="1.4" stroke-linejoin="round"/>
+    <path d="M8 15h6l-3 13H5z" fill="#354150" stroke="${OUT}" stroke-width="1.4" stroke-linejoin="round"/>
+    <path d="M14 15h5v4h-6M7 10.5h16" fill="none" stroke="#bdcbd5" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M6 7h3M22 7h3" stroke="${OUT}" stroke-width="1.6" stroke-linecap="round"/>`),
+  rifle: svg(`<g transform="rotate(-18 16 16)"><path d="M3 11h6l2 3h10v5H11l-3 5H3z" fill="#596573" stroke="${OUT}" stroke-width="1.4" stroke-linejoin="round"/>
+    <path d="M21 14h9v3h-9M13 19h5l-1 8h-5z" fill="#354150" stroke="${OUT}" stroke-width="1.4" stroke-linejoin="round"/>
+    <path d="M10 14v-4h8v4M21 12v7" fill="none" stroke="${OUT}" stroke-width="1.6" stroke-linejoin="round"/>
+    <path d="M12 16h6M4.5 14v6" stroke="#b5bec5" stroke-width="1.4" stroke-linecap="round"/></g>`),
   heart: svg(`<path d="M16 28 C6 20 2 15.5 2 10.5 2 6.4 5.2 3.5 9 3.5c2.9 0 5.3 1.6 7 4 1.7-2.4 4.1-4 7-4 3.8 0 7 2.9 7 7C30 15.5 26 20 16 28z" fill="#ee4d5f"/>
     <path d="M7.5 8.5c1-1.6 2.6-2 3.8-1.6" stroke="#ff9aa6" stroke-width="2.2" stroke-linecap="round" fill="none"/>`),
 
-  bones: svg(`<path d="M8.5 6.2a3 3 0 0 1 5 1.6l9 9a3 3 0 1 1 1.7 5 3 3 0 1 1-5 1.6l-9-9a3 3 0 1 1-1.7-5 3 3 0 0 1 0-3.2z" fill="#f2e8d0" stroke="${OUT}" stroke-width="1" stroke-linejoin="round"/>
-    <path d="M23.5 6.2a3 3 0 0 0-5 1.6l-2.3 2.3 3.2 3.2 2.3-2.3a3 3 0 1 0 1.8-4.8z" fill="#e1d3b2" stroke="${OUT}" stroke-width="1" stroke-linejoin="round"/>
-    <path d="M12 14.5l-3.4 3.4a3 3 0 1 0-1.8 4.8 3 3 0 0 0 5 1.6l3.4-3.4z" fill="#e1d3b2" stroke="${OUT}" stroke-width="1" stroke-linejoin="round"/>`),
+  bones: svg(`<path d="M6 19l13-13c-.3-2 1.3-3.5 3.3-3 1.7.4 2.4 2 2 3.3 1.4-.4 3 .3 3.4 2 .5 2-1 3.6-3 3.3l-13 13c.3 2-1.3 3.5-3.3 3-1.7-.4-2.4-2-2-3.3-1.4.4-3-.3-3.4-2-.5-2 1-3.6 3-3.3z" fill="#f2e8d0" stroke="${OUT}" stroke-width="1.4" stroke-linejoin="round"/>
+    <path d="M10 20 21 9" stroke="#d4bd91" stroke-width="1.8" stroke-linecap="round"/>`),
 
   tent: svg(`<path d="M16 4 3 27h26z" fill="#c98a4f" stroke="#1a2238" stroke-width="1.1" stroke-linejoin="round"/>
     <path d="M16 4v23M16 13l-5 14h10z" fill="#5a3a22" stroke="#1a2238" stroke-width="0.9" stroke-linejoin="round"/>
@@ -35,8 +42,8 @@ export const ICONS = {
 
   spear: svg(`<path d="M5 28 L20 11" stroke="#9a5b2e" stroke-width="3.2" stroke-linecap="round"/>
     <path d="M5 28 L20 11" stroke="#c07a42" stroke-width="1.3" stroke-linecap="round"/>
-    <path d="M17.2 11.6 29 3l-8.5 11.9z" fill="#d7dbe6" stroke="${OUT}" stroke-width="0.9" stroke-linejoin="round"/>
-    <path d="M29 3 20.5 14.9 19 13.3z" fill="#9aa1b5"/>
+    <path d="M15 10 29 3l-7 14z" fill="#d7dbe6" stroke="${OUT}" stroke-width="1.4" stroke-linejoin="round"/>
+    <path d="M29 3 22 17l-3.5-3.5z" fill="#9aa1b5"/>
     <path d="M16.4 12.8l2.6 2.6M15 14.4l2.6 2.6" stroke="#6b3f1e" stroke-width="1.6" stroke-linecap="round"/>`),
 
   bow: svg(`<path d="M8 3c11 3 18 11 21 21" stroke="#9a5b2e" stroke-width="3" stroke-linecap="round" fill="none"/>
@@ -50,14 +57,14 @@ export const ICONS = {
     <rect x="3" y="24" width="26" height="4.5" rx="1.6" fill="#b77a45" stroke="${OUT}" stroke-width="0.8"/>
     <path d="M9 18.5 6 28M23 18.5 26 28" stroke="#6b3f1e" stroke-width="1.6" stroke-linecap="round"/>`),
 
-  meat: svg(`<path d="M6.5 14.5C5 9 9.5 4.5 16 4.5c7.5 0 12 4.5 11 10.5-.9 5.6-6.4 10.5-13 10.5C8.8 25.5 7.6 19 6.5 14.5z" fill="#e2485a" stroke="${OUT}" stroke-width="1"/>
-    <path d="M9 14.5c-.8-4 2.5-7.3 7.2-7.3 5.2 0 8.5 3.1 8 7.1-.5 4-4.4 7.2-9 7.2-3.9 0-5.4-3.7-6.2-7z" fill="#f26b7a"/>
-    <circle cx="13.5" cy="13.5" r="3.4" fill="#fff4ec" stroke="#e7c9c0" stroke-width="0.8"/>
-    <circle cx="13.5" cy="13.5" r="1.4" fill="#f1b9b9"/>
-    <path d="M19 17.5c1.5-.3 2.6-1.3 3-2.6" stroke="#fff" stroke-width="1.2" stroke-linecap="round" fill="none" opacity=".75"/>`),
+  meat: svg(`<path d="M4 14C2 8 8 4 16 4c9 0 14 5 12 12-1.7 6-7 12-15 12C6 28 5 20 4 14z" fill="#e2485a" stroke="${OUT}" stroke-width="1.4"/>
+    <path d="M7 14c-1-4 3-7 9-7 6.5 0 10 3.5 9 8-1 5-6 10-11 10-5 0-6-6-7-11z" fill="#f26b7a"/>
+    <circle cx="12" cy="13" r="4" fill="#fff4ec"/>
+    <circle cx="12" cy="13" r="1.8" fill="#f1b9b9"/>
+    <path d="M18 21c3-1 4.5-3 5-5" stroke="#fff4ec" stroke-width="1.8" stroke-linecap="round" fill="none"/>`),
 
   hide: svg(`<path d="M9 5c2 2 4.5 2 7 2s5-0 7-2c1 2.5.5 4 2.5 5.5 2 1.5 3 1 3.5 3-2 1-2.5 2.5-2.5 5s1.5 4 0 6c-2 .2-3.5 1.5-4 3.5-2-.8-4-1-6.5-1s-4.5.2-6.5 1c-.5-2-2-3.3-4-3.5-1.5-2 0-3.5 0-6S5 14.5 3 13.5C3.5 11.5 4.5 12 6.5 10.5S8 7.5 9 5z" fill="#c98a4f" stroke="${OUT}" stroke-width="1"/>
-    <path d="M11 11c3 1.2 7 1.2 10 0M10.5 17c3.5 1 7.5 1 11 0M12 22.5c2.5.6 5.5.6 8 0" stroke="#a86a35" stroke-width="1.4" stroke-linecap="round" fill="none"/>`),
+    <path d="M16 10v13M12 12l8 2M12 17l8 2M12 22l8 2" stroke="#8a5a33" stroke-width="1.5" stroke-linecap="round" fill="none"/>`),
 
   teeth: svg(`<path d="M9 4.5c4-1.5 10-1.5 14 0 .8 5-1 12-4.5 18.5-.8 1.6-1.6 3.8-2.5 5-.9-1.2-1.7-3.4-2.5-5C10 16.5 8.2 9.5 9 4.5z" fill="#fbf4e2" stroke="${OUT}" stroke-width="1"/>
     <path d="M12 7c.2 4.5 1.4 9.5 3.4 14" stroke="#e1d3b2" stroke-width="1.6" stroke-linecap="round" fill="none"/>`),
