@@ -75,7 +75,7 @@ export class Hud {
     const r = this.root;
     r.innerHTML = '';
 
-    // ---------- top-left: portrait + status bars + mission
+    // ---------- edge anchors: mission top-left, vitals bottom-left
     const tl = el('div', 'hud-tl');
     const status = el('div', 'hud-status');
     this.$portrait = el('div', 'hud-portrait', portraitSvg(CONFIG.playerColors[0], 0));
@@ -96,9 +96,9 @@ export class Hud {
     const mkBar = (cls, ic, label) => {
       const row = el('div', `hud-bar ${cls}`);
       row.innerHTML = `<span class="hud-bar-ic">${icon(ic)}</span>
-        <span class="hud-bar-track" role="meter" aria-label="${label}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100"><span class="hud-bar-fill"></span></span>`;
+        <span class="hud-bar-track" role="meter" aria-label="${label}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100"><span class="hud-bar-fill"></span><span class="hud-bar-label" aria-hidden="true">${label}</span><b class="hud-bar-value" aria-hidden="true">100%</b></span>`;
       bars.appendChild(row);
-      return { meter: row.querySelector('[role=meter]'), fill: row.querySelector('.hud-bar-fill'), row };
+      return { meter: row.querySelector('[role=meter]'), fill: row.querySelector('.hud-bar-fill'), value: row.querySelector('.hud-bar-value'), row };
     };
     this.$hp = mkBar('is-hp', 'heart', 'Health');
     this.$st = mkBar('is-st', 'bolt', 'Stamina');
@@ -111,12 +111,13 @@ export class Hud {
     this.$adren = el('span', 'hud-perk is-adren', `${icon('bolt')}<span>Adrenaline</span><i class="hud-perk-fill"></i>`);
     this.$adren.hidden = true;
     this.$perks.append(this.$dash, this.$adren);
+    bars.prepend(this.$name);
     bars.append(this.$perks);
     status.append(this.$portraitWrap, bars);
     this.$mission = el('section', 'hud-mission brush');
     this.$mission.setAttribute('aria-label', 'Current mission');
     this.$mission.hidden = true;
-    tl.append(status, this.$mission);
+    tl.append(this.$mission);
 
     // ---------- top-center: compass + hint
     const tc = el('div', 'hud-tc');
@@ -334,7 +335,7 @@ export class Hud {
     this.$invPanel.addEventListener('pointermove', (e) => showTip(e.target.closest('[data-tip]'), e.clientX, e.clientY));
     this.$invPanel.addEventListener('pointerleave', () => { this.$tip.hidden = true; });
 
-    r.append(this.$flash, tl, tc, tr, cc, bl, bc, br, this.$death, this.$downed, this.$win, this.$invPanel, this.$mapPanel, this.$board, this.$tip);
+    r.append(this.$flash, tl, status, tc, tr, cc, bl, bc, br, this.$death, this.$downed, this.$win, this.$invPanel, this.$mapPanel, this.$board, this.$tip);
 
     // Canvas backing-store sizes follow their CSS size (no per-frame layout reads).
     this._mm = { w: 0, h: 0, dpr: 1 };
@@ -399,6 +400,7 @@ export class Hud {
     const s = slot | 0;
     this.$portrait.innerHTML = portraitSvg(CONFIG.playerColors[s] || CONFIG.playerColors[0], s);
     this.$portrait.title = name || '';
+    this.$name.textContent = name || 'Explorer';
     this.$portrait.style.setProperty('--pc', CONFIG.playerColors[s] || '#fff');
   }
 
@@ -458,6 +460,7 @@ export class Hud {
     if (this._c[key + 'pct'] !== pct) {
       this._c[key + 'pct'] = pct;
       b.meter.setAttribute('aria-valuenow', String(pct));
+      b.value.textContent = `${pct}%`;
     }
     const low = f < 0.25;
     if (this._c[key + 'low'] !== low) {

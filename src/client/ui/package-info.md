@@ -26,7 +26,7 @@
 - `preview.js` — fills the preview HUD with fake data every frame, using a real `Terrain` and `buildLayout`.
 
 ### hud.js areas of responsibility
-- Layout built once in `_build()`: portrait with XP ring, level badge and HP/stamina bars; perk chips (dash, adrenaline); compass and hint bubble; minimap and big map; crosshair, hit marker, eat ring, interaction prompt, revive/medic prompt; key hints; hotbar and carry/load info; team list.
+- Layout built once in `_build()`: independent bottom-left player name, portrait/XP ring, level badge and labeled HP/stamina percentages; mission top-left, compact key hints/equipment/team at the edges; perk chips (dash, adrenaline); compass and hint bubble; minimap and big map; crosshair, hit marker, eat ring, interaction prompt, revive/medic prompt; carry/load info. Normal edge information hides behind the live expedition menu while critical overlays remain available.
 - Overlays: death, downed, mission complete, damage flash/source, toasts and alerts.
 - Fruit buffs running (`setBuffs`), the swamp tag (`setSwamp`), hot ground (`setHeat`), the ash rain (`setAsh`: sheltered, a countdown, choking).
 - Inventory (loot, fruit, items with `ITEM_INFO` tooltips), the mission board (`shared/missions.js` contracts, relics) and XP gain popups.
