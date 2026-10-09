@@ -850,6 +850,8 @@ export class ServerWorld {
     const state = m.state;
     // The client dashes in the same state packet: grant the distance before that state is validated.
     if (m.a === ACT.DASH) this.grantDash(p);
+    // The dev pin teleport carries the pose it jumps to: never validate that as movement (onAct checks devTools/creative).
+    if (m.a === ACT.DEV_TP) return this.onAct(p, m);
     // Dead or downed clients send no usable movement: these acts don't need a pose.
     if (!p.alive && (m.a === ACT.SKILL || m.a === ACT.RESPAWN)) return this.onAct(p, m);
     if (!state) return this.onAct(p, m); // compatible with older clients
@@ -1273,6 +1275,17 @@ export class ServerWorld {
         return;
       }
       case ACT.UNSTUCK: return this.unstuck(p, !!m.manual);
+      case ACT.DEV_TP: {
+        // dev pin tool (client/core/devPins.js): revisit a pinned spot. Only a solo world started with ?dev allows it
+        // (`devTools`, set by sim/worker.js), and only in creative mode; never on a hosted server.
+        if (!this.devTools || !p.creative || ![m.x, m.y, m.z].every(Number.isFinite)) return;
+        const lim = this.terrain.half;
+        p.x = Math.max(-lim, Math.min(lim, m.x)); p.z = Math.max(-lim, Math.min(lim, m.z)); p.y = m.y;
+        p.lastMoveAt = this.now;
+        p.moveBudget = 3.5;
+        this.correct(p);
+        return;
+      }
       case ACT.BUTCHER: return m.stop ? this.stopButcher(p) : this.startButcher(p, m.dino);
       case ACT.REFILL: {
         if (!p.alive || !this.nearAny(p, this.stations().refill, 6)) return;

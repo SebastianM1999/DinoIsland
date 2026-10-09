@@ -13,6 +13,7 @@ import { lanAddresses } from './lanAddress.js';
 import { InternetHost } from './internetHost.js';
 import { BRAND } from '../src/shared/brand.js';
 import { serveStatic } from './staticFiles.js';
+import { handleDevPins } from './devPins.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -82,6 +83,7 @@ export function createGameServer() {
     });
     return;
   }
+  if (handleDevPins(req, res, ROOT)) return;   // dev pin tool (F8 in a ?dev game), source checkouts on this machine only
   if (req.url === '/connection') {
     const port = httpServer.address()?.port;
     res.writeHead(200, { 'Content-Type': MIME['.json'], 'Cache-Control': 'no-store' });

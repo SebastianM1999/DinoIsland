@@ -4,6 +4,7 @@
 
 - Run: `npm start` (http://localhost:8080), desktop: `npm run desktop`
 - Test: `npm test` (`node --test`, files in `test/`)
+- Dev pins: testers press F8 in a solo game started with `?dev` (e.g. `http://localhost:8080/?island=4&variant=1&dev`) to pin a glitch. Reports land in `dev-pins/<id>.json` + `.png` (gitignored): position, view, what the crosshair hits, terrain/cave facts, level/variant/seed, commit. Read them when asked to fix pinned spots; `revisit` + `&pin=<id>` reloads the same layout at the spot. See `src/client/core/devPins.js`, `server/devPins.js`.
 
 ## Directory specs
 Every main directory has a `package-info.md` with its responsibility, files, entry points, rules and what does **not** belong there. **Before changing code in a directory, read its `package-info.md`.** For a feature that spans layers, start with the feature map in `src/package-info.md`. When you add, rename or remove a file, or change a rule, update that directory's `package-info.md` in the same change.
