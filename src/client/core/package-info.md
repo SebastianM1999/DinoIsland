@@ -10,7 +10,7 @@
 - `gpuTimer.js` — `GpuTimer`: non-blocking GPU frame time via `EXT_disjoint_timer_query_webgl2`.
 - `settings.js` — `settings`, `SETTING_DEFS`, `setSetting`, `resetSettings`, `onSettings`, `audioGains`, `FPS_LIMITS`: player preferences in localStorage with change listeners.
 - `profile.js` — `loadProfile`, `saveProfile`, `PROFILE_KEY`: the XP/skills save carried by the client and sent in `hello`.
-- `islandProgress.js` — saved highest earned starting island; guards corrupt/blocked storage and restricts ordinary solo menu selection. Unlocks are recorded from completed authoritative expedition missions, never from scenery previews or creative mode.
+- `islandProgress.js` — saved highest earned starting island; guards corrupt/blocked storage and restricts ordinary solo menu selection. Temporary `TEST_ALL_ISLANDS_UNLOCKED` playtest access exposes all islands without changing earned saves. Unlocks are recorded from completed authoritative expedition missions, never from scenery previews or creative mode.
 - `resources.js` — `retainResource`, `retainObjectResources`, `disposeIslandScenes`: marks cache-owned GPU resources and disposes everything else when an island is torn down.
 
 ### Areas inside `game.js` (~1000 lines)

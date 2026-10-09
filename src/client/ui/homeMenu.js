@@ -1,6 +1,6 @@
 // Home-screen panels group existing game routes without creating new sessions.
 import { LEVELS } from '../../shared/levels.js';
-import { loadIslandProgress } from '../core/islandProgress.js';
+import { availableStartingIsland } from '../core/islandProgress.js';
 export function initHomeMenu() {
   const menu = document.getElementById('menu');
   const islandSelect = document.getElementById('tour-island');
@@ -10,7 +10,7 @@ export function initHomeMenu() {
     return option;
   }));
   const playSelect = document.getElementById('play-island');
-  const unlocked = loadIslandProgress();
+  const unlocked = availableStartingIsland();
   playSelect.replaceChildren(...LEVELS.map((level, index) => {
     const option = document.createElement('option');
     option.value = String(index);
