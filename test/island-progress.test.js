@@ -12,11 +12,21 @@ function storageFixture(value) {
   };
 }
 
+test('playtest access allows every island without changing earned progression', () => {
+  const storage = storageFixture();
+  for (let index = 0; index < LEVELS.length; index++) {
+    assert.equal(unlockedStartingIsland(index, storage), index);
+    assert.equal(unlockedStartingIsland(index, null), index);
+  }
+  assert.equal(loadIslandProgress(storage), 0);
+  assert.equal(unlockedStartingIsland(2, storage, false), 0);
+});
+
 test('new players start on the jungle and saved unlocks use the game storage namespace', () => {
   const storage = storageFixture();
   assert.equal(ISLAND_PROGRESS_KEY, storageKey('islandProgress'));
   assert.equal(loadIslandProgress(storage), 0);
-  assert.equal(unlockedStartingIsland(LEVELS.length - 1, storage), 0);
+  assert.equal(unlockedStartingIsland(LEVELS.length - 1, storage, false), 0);
   assert.equal(loadIslandProgress(null), 0);
 });
 
@@ -45,10 +55,10 @@ test('island values stay inside the catalog and menu requests cannot exceed earn
   assert.equal(loadIslandProgress(storageFixture('{"unlocked":-8}')), 0);
   assert.equal(loadIslandProgress(storageFixture('{"unlocked":999}')), LEVELS.length - 1);
   const storage = storageFixture('{"unlocked":1}');
-  for (const selected of [2, 999]) assert.equal(unlockedStartingIsland(selected, storage), 1);
-  for (const selected of [-1, null, '1', NaN, 1.5]) assert.equal(unlockedStartingIsland(selected, storage), 0);
-  assert.equal(unlockedStartingIsland(0, storage), 0);
-  assert.equal(unlockedStartingIsland(1, storage), 1);
+  for (const selected of [2, 999]) assert.equal(unlockedStartingIsland(selected, storage, false), 1);
+  for (const selected of [-1, null, '1', NaN, 1.5]) assert.equal(unlockedStartingIsland(selected, storage, false), 0);
+  assert.equal(unlockedStartingIsland(0, storage, false), 0);
+  assert.equal(unlockedStartingIsland(1, storage, false), 1);
   assert.equal(unlockIsland(999, storage), LEVELS.length - 1);
   assert.equal(loadIslandProgress(storage), LEVELS.length - 1);
 });
@@ -58,7 +68,7 @@ test('blocked storage fails closed and failed writes do not report an unsaved un
   assert.equal(loadIslandProgress(blocked), 0);
   assert.equal(unlockIsland(1, blocked), 0);
   assert.equal(unlockIsland(1, null), 0);
-  assert.equal(unlockedStartingIsland(2, blocked), 0);
+  assert.equal(unlockedStartingIsland(2, blocked, false), 0);
   const readOnly = { getItem: () => '{"unlocked":1}', setItem() { throw new Error('quota'); } };
   assert.equal(unlockIsland(2, readOnly), 1);
   assert.equal(loadIslandProgress(readOnly), 1);

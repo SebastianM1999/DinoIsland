@@ -4,6 +4,9 @@ import { LEVELS } from '../../shared/levels.js';
 import { storageKey } from '../../shared/brand.js';
 
 export const ISLAND_PROGRESS_KEY = storageKey('islandProgress');
+// Temporary playtest access. Turn off for progression testing/release; earned
+// progress remains separate so testing never permanently grants island unlocks.
+export const TEST_ALL_ISLANDS_UNLOCKED = true;
 
 function defaultStorage() {
   try { return globalThis.localStorage ?? null; } catch { return null; }
@@ -40,6 +43,10 @@ export function unlockIsland(index, storage = defaultStorage()) {
 }
 
 /** Restrict an ordinary menu start to the saved, earned range. */
-export function unlockedStartingIsland(selected, storage = defaultStorage()) {
-  return Math.min(islandIndex(selected) ?? 0, loadIslandProgress(storage));
+export function availableStartingIsland(storage = defaultStorage(), testing = TEST_ALL_ISLANDS_UNLOCKED) {
+  return testing ? LEVELS.length - 1 : loadIslandProgress(storage);
+}
+
+export function unlockedStartingIsland(selected, storage = defaultStorage(), testing = TEST_ALL_ISLANDS_UNLOCKED) {
+  return Math.min(islandIndex(selected) ?? 0, availableStartingIsland(storage, testing));
 }
