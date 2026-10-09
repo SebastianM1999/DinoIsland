@@ -22,7 +22,9 @@ function cellHasRoof(terrain, sky, n1, i, j) {
   for (const [di, dj] of [[0, 0], [1, 0], [0, 1], [1, 1]]) {
     const k = (j + dj) * n1 + i + di;
     if (sky.depth[k] < ROOF_EDGE) return false;
-    if (terrain.h(i + di, j + dj) <= sky.roof[k] + 1.5) open = true;
+    // a corner inside a tunnel or chamber (the open-space field); low ground near the outer cliff is no tunnel:
+    // a roof there poked out of the mountain's flank as dark triangles
+    if (sky.open[k] && terrain.h(i + di, j + dj) <= sky.roof[k] + 1.5) open = true;
   }
   return open;
 }

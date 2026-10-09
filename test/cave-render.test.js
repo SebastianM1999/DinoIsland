@@ -117,3 +117,23 @@ test('sky visibility: 1 at the openings, nearly 0 a few metres inside, falling s
     for (const m of [layout.caveEntrance, layout.caveExit]) assert.ok(sky.visAt(m.x, m.y + 2, m.z) > 0.9, 'daylight at the mouth');
   }
 });
+
+test('the roof only spans tunnels and chambers (never pokes out of the flank), and nothing over low ground is left open', async () => {
+  const { roofCells } = await import('../src/client/world/caveMesh.js');
+  for (const variant of [1, 2, 3]) {
+    const { terrain, plan, mesh } = island(variant);
+    const sky = mesh.userData.sky, n = terrain.n, n1 = n + 1, half = terrain.half, cell = terrain.cell;
+    const shell = mesh.children.find((c) => c.name === 'cave-shell');
+    const sh = new Set(shell.userData.cells.map(([i, j]) => j * n + i)), rf = new Set(roofCells(terrain, sky));
+    for (const c of rf) {
+      const i = c % n, j = (c / n) | 0;
+      assert.ok([j * n1 + i, j * n1 + i + 1, (j + 1) * n1 + i, (j + 1) * n1 + i + 1].some((k) => sky.open[k]), `variant ${variant}: roof cell (${i}, ${j}) outside every tunnel`);
+    }
+    for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
+      const cs = [[i, j], [i + 1, j], [i, j + 1], [i + 1, j + 1]];
+      if (cs.some(([a, b]) => sky.depth[b * n1 + a] <= 0.5)) continue;
+      if (!cs.some(([a, b]) => terrain.h(a, b) < caveRockTop(plan, -half + a * cell, -half + b * cell) - 2)) continue;
+      assert.ok(sh.has(j * n + i) || rf.has(j * n + i), `variant ${variant}: open cell (${i}, ${j}) without roof or shell`);
+    }
+  }
+});
