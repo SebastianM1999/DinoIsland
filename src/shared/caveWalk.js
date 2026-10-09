@@ -81,7 +81,8 @@ export class CaveWalk {
     const fx = this.fx, fz = this.fz, s = this.t1, c = this.ceil;
     const a = c[o], b = c[o + 1], d = c[o + s], e = c[o + s + 1];
     const lo = Math.min(a, b, d, e);
-    if (lo < SKY_RAW && Math.max(a, b, d, e) >= SKY_RAW) return lo;
+    // (only over standable ground: at a wall node - floor = the top of the rock - the finite roof of the passage beside it is no roof of that rock)
+    if (lo < SKY_RAW && Math.max(a, b, d, e) >= SKY_RAW && lo - this.height(x, z) >= HEAD) return lo;
     if (fx + fz < 1) return a + (b - a) * fx + (d - a) * fz;
     return e + (d - e) * (1 - fx) + (b - e) * (1 - fz);
   }

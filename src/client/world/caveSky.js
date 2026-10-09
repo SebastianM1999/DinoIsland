@@ -16,6 +16,7 @@
 import * as THREE from 'three';
 import { smoothstep } from '../../shared/rng.js';
 import { caveOpenSdf, caveRoofBase } from '../../shared/caveField.js';
+import { LIGHT_CAP } from '../../shared/torch.js';
 
 /** How far into the mountain a mouth's daylight counts as open sky (metres): the sky field's sources. */
 const ARCH_DEPTH = 2;
@@ -146,6 +147,12 @@ uniform vec3 uSkyRect;
 uniform vec4 uCaveL;
 uniform float uSkyMode;
 uniform float uCaveT;
+// point lights close up: soft cap of the irradiance (shared/torch.js softCapIrradiance), so a wall near the torch does not clip
+vec3 caveSoftCap(vec3 c) {
+  float m = max(max(c.r, c.g), c.b) / ${LIGHT_CAP.toFixed(2)};
+  m *= m;
+  return c * inversesqrt(sqrt(1.0 + m * m));
+}
 float caveSkyVis() {
 #ifdef CAVE_VOL
   return vCaveBake.y;   // the volume: baked per vertex (caveLight.js)
@@ -178,6 +185,9 @@ const CH = THREE.ShaderChunk;
 const LIGHTS_BEGIN = CH.lights_fragment_begin.replace(
   'getDirectionalLightInfo( directionalLight, directLight );',
   'getDirectionalLightInfo( directionalLight, directLight );\n\t\tdirectLight.color *= cSunK;',
+).replace(
+  'getPointLightInfo( pointLight, geometryPosition, directLight );',
+  'getPointLightInfo( pointLight, geometryPosition, directLight );\n\t\tdirectLight.color = caveSoftCap( directLight.color );',
 );
 // (head under water, uCaveL.w = how deep under: the fog takes the water's colour, but deep in the mountain that water
 // is as dark as the cave air around it - only near the openings does daylight reach into it)

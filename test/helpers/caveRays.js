@@ -1,6 +1,11 @@
 // Vertical rays through the Hollow Mountain's real mesh (client/world/caveVolumeMesh.js): the visible floors and roofs of a column,
 // the shared truth the walk tests compare the sim's floor and ceiling with.
 
+import { CONFIG } from '../../src/shared/config.js';
+
+/** free height a body needs */
+const HEAD = CONFIG.player.height + 0.05;
+
 /** Vertical rays through the mesh: a grid of triangles per 2 m cell. */
 export function rayIndex(vol) {
   const CELL = 2, tri = [];

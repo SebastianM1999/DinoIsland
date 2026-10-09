@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { ServerWorld } from '../src/sim/world.js';
 import { ACT, MSG, PF, EV } from '../src/shared/protocol.js';
-import { TORCH, carriesLight } from '../src/shared/torch.js';
+import { TORCH, WALL_TORCH, carriesLight, softCapIrradiance, pointIrradiance, LIGHT_CAP } from '../src/shared/torch.js';
 
 function setup(spots) {
   const events = [];
@@ -74,4 +74,45 @@ test('a torch is kept across respawn and an item never expires', () => {
   assert.equal(p.inv.torch, true);
   world.step(10000);
   assert.equal(torches().length, 1);
+});
+
+// --- close-up shading: the cave shaders cap every point light's irradiance (shared/torch.js softCapIrradiance, the same
+// formula as caveSky.js caveSoftCap), so a wall a metre from the hand torch stays below white after ACES tone mapping.
+const srgbToLinear = (v) => (v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4);
+const hexLinear = (hex) => [1, 3, 5].map((i) => srgbToLinear(parseInt(hex.slice(i, i + 2), 16) / 255));
+/** three.js ACESFilmic on one grey channel (RRT + ODT fit, exposure / 0.6) */
+const aces = (x, exposure) => { const v = Math.max(0, x) * exposure / 0.6; return Math.min(1, (v * (v + 0.0245786) - 0.000090537) / (v * (0.983729 * v + 0.432951) + 0.238081)); };
+/** tone-mapped linear colour of a Lambert wall of `albedo` lit by `light` at `d` metres head-on */
+function wallColour(light, albedo, d, { cap = true, exposure = 1.1 } = {}) {
+  const e = pointIrradiance(light, d);
+  // (the cap scales the colour by its brightest channel, like the shader)
+  const m = Math.max(...hexLinear(light.color)) * e;
+  const k = cap ? softCapIrradiance(m) / m : 1;
+  return hexLinear(light.color).map((ch) => aces(albedo / Math.PI * ch * e * k, exposure));
+}
+const luminance = ([r, g, b]) => 0.2126 * r + 0.7152 * g + 0.0722 * b;
+
+test('the soft cap leaves normal light alone and bounds the close-up irradiance', () => {
+  assert.equal(softCapIrradiance(0), 0);
+  for (const e of [0.1, 0.5, 1, 2, 3]) assert.ok(softCapIrradiance(e) > e * 0.95, `${e} barely changes`);
+  let prev = 0;
+  for (const e of [0.5, 2, 5, 8, 15, 40, 400]) { const c = softCapIrradiance(e); assert.ok(c > prev && c <= LIGHT_CAP * 1.0001, `${e} -> ${c}`); prev = c; }
+});
+
+test('a wall a metre from the hand torch or a wall torch stays below white after tone mapping', () => {
+  for (const light of [TORCH.light, WALL_TORCH.light]) {
+    for (const albedo of [0.2, 0.4, 0.65]) for (const d of [0.4, 0.7, 1, 1.5]) {
+      const rgb = wallColour({ ...light }, albedo, d);
+      assert.ok(luminance(rgb) < 0.9, `albedo ${albedo} at ${d} m: luminance ${luminance(rgb).toFixed(2)}`);
+      assert.ok(Math.max(...rgb) < 0.97, `albedo ${albedo} at ${d} m: channel ${Math.max(...rgb).toFixed(2)} clips`);
+    }
+  }
+  // the old, uncapped light did clip a bright wall at 40 cm
+  const raw = wallColour(TORCH.light, 0.65, 0.4, { cap: false });
+  assert.ok(Math.max(...raw) > 0.97, `uncapped ${Math.max(...raw).toFixed(2)}`);
+  // and the walls stay readable further out: 3 m and 6 m are within 5 % of the uncapped light's brightness
+  for (const d of [3, 6]) {
+    const a = luminance(wallColour(TORCH.light, 0.4, d)), b = luminance(wallColour(TORCH.light, 0.4, d, { cap: false }));
+    assert.ok(a > b * 0.95 && a > 0.1, `${d} m: ${a.toFixed(3)} vs ${b.toFixed(3)}`);
+  }
 });
