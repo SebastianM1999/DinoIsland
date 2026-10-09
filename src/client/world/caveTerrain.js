@@ -218,7 +218,7 @@ export function buildCaveTerrainMesh(terrain, layout) {
  */
 function buildShell({ terrain, layout, sky, geo, T, fillVertex, material }) {
   const { n, cell, half } = terrain, n1 = n + 1, plan = layout.plan;
-  const { depth, roof } = sky;
+  const { depth, roof, open } = sky;
   const S = new Float32Array(n1 * n1);
   const lifted = new Uint8Array(n1 * n1);
   for (let j = 0; j <= n; j++) {
@@ -230,7 +230,11 @@ function buildShell({ terrain, layout, sky, geo, T, fillVertex, material }) {
       const top = caveRockTop(plan, x, z);
       // (it climbs from the roof right at the rim as a steep rock face; the skirt below closes it toward the opening)
       const lintel = roof[k] + 0.3 + 3.0 * Math.max(0, d - ROOF_EDGE);
-      const y = Math.max(h, Math.min(top, lintel));
+      let y = Math.max(h, Math.min(top, lintel));
+      // (solid rock near the mountain's outside - a tunnel wall's crest close to the cliff - eases back down to the
+      // cliff's own surface: lifted there, its edge stood out of the flank as dark fins. Only open ground, over the
+      // openings, keeps the full lift.)
+      if (!open[k]) y = h + (y - h) * smoothstep(0.5, 9, d);
       if (y > h + 0.05) { S[k] = y; lifted[k] = 1; }
     }
   }
