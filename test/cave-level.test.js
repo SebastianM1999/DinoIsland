@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import { planIsland } from '../src/shared/island.js';
 import { Terrain } from '../src/shared/terrain.js';
 import { buildLayout } from '../src/shared/layout.js';
-import { caveOpenSdf, caveRockTop, caveRoofBase, CAVE_WALK_MAX } from '../src/shared/caveField.js';
+import { caveOpenSdf, caveRockTop, caveRoofBase, CAVE_WALK_MAX, FALSE_SILL } from '../src/shared/caveField.js';
 import { penetration } from '../src/shared/collision.js';
 import { RELICS } from '../src/shared/relics.js';
 import { levelDef } from '../src/shared/levels.js';
@@ -150,7 +150,39 @@ test('the whole maze is reachable over the real ground, dry: the hall, the relic
     for (const n of maze.nodes.filter((m) => !m.outside)) assert.ok(f.at(n.x, n.z), `variant ${variant}: chamber ${n.id} (${n.kind}) reachable`);
     assert.ok(f.at(layout.boat.interact.x, layout.boat.interact.z), `variant ${variant}: the boat is reachable`);
     assert.ok(f.at(layout.caveExit.x, layout.caveExit.z) && f.at(layout.caveEntrance.x, layout.caveEntrance.z));
-    for (const fe of layout.falseExits) assert.ok(f.at(fe.x, fe.z) || terrain.heightAt(fe.x, fe.z) < 6, 'the false exit can be walked to (and back)');
+    // a false exit is walked up to its rock sill, never past it: nobody reaches the ledge or falls down the sea cliff
+    for (const fe of layout.falseExits) assert.equal(f.at(fe.x, fe.z), false, `variant ${variant}: the false exit's ledge is out of reach`);
+  }
+});
+
+test('false exits end in a rock sill: daylight over it, never a way onto the ledge or down the cliff', () => {
+  for (const { variant, terrain, plan, layout, maze } of VARIANTS.map(island)) {
+    const f = flood(terrain, spawnOf(layout));
+    for (const fe of layout.falseExits) {
+      const t = maze.tunnels[fe.tunnel];
+      // walk the tunnel from its chamber outward: the floor is reachable up to the sill, then it rises steeply
+      let lastReach = null, blockedAt = null;
+      for (const p of t.pts) {
+        if (f.at(p.x, p.z)) lastReach = p;
+        else if (lastReach && !blockedAt) blockedAt = p;
+      }
+      assert.ok(lastReach, `variant ${variant}: the false exit tunnel is entered`);
+      const end = t.pts[t.pts.length - 1];
+      let along = 0;   // metres along the tunnel from the last reachable point to its open end
+      for (let i = t.pts.indexOf(lastReach) + 1; i < t.pts.length; i++) along += Math.hypot(t.pts[i].x - t.pts[i - 1].x, t.pts[i].z - t.pts[i - 1].z);
+      assert.ok(along > FALSE_SILL.end0 - 2.5, `variant ${variant}: nobody gets past the sill toward the rim (${along.toFixed(1)} m from the end)`);
+      // daylight: the roof opens over the sill (or above it there is room under the roof)
+      const sillPts = t.pts.slice(t.pts.indexOf(lastReach) + 1);
+      assert.ok(sillPts.some((p) => terrain.ceilingAt(p.x, p.z) > terrain.heightAt(p.x, p.z) + 1.5), `variant ${variant}: daylight over the sill`);
+      assert.ok(end, 'tunnel end');
+    }
+    // and no reachable cell lies outside the mountain anywhere near a false exit (the sea cliff)
+    for (const fe of layout.falseExits) {
+      for (let a = 0; a < 24; a++) for (const r of [3, 6, 9, 12]) {
+        const x = fe.x + Math.cos(a / 24 * Math.PI * 2) * r, z = fe.z + Math.sin(a / 24 * Math.PI * 2) * r;
+        if (plan.cave.depthAt(x, z) <= 0) assert.equal(f.at(x, z), false, `variant ${variant}: the cliff below a false exit is reachable`);
+      }
+    }
   }
 });
 

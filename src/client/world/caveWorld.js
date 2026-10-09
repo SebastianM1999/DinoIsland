@@ -4,7 +4,7 @@
 //   caveDecor.js  stalactites, stalagmites, columns, crystals, mushrooms, glow halos
 //   caveFx.js     pooled crystal lights, the cave air (sun / fog / exposure by depth into the
 //                 mountain), water lamps, drips, dust, daylight lures
-//   caveCoves.js  the two outdoor coves (arrival wreck, driftwood, lanterns, mine supports)
+//   caveCoves.js  the two outdoor coves (the arrival boat, dune grass; nothing man-made at the mountain)
 // `update(dt, time, cam)` runs every frame; `audio` is set by Game.
 
 import * as THREE from 'three';

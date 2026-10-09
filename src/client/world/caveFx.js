@@ -212,7 +212,6 @@ export function buildCaveFx(terrain, layout, gfx, water, tier, decor, sky) {
           d.on = false; d.wait = 1.5 + Math.random() * 5;
           pos[i * 3 + 1] = -1e4;
           if (terrain.waterLevelAt(d.x, d.z) !== null) water.ripple(d.x, d.z, 0.28);
-          audio?.play?.('caveDrip', { pos: { x: d.x, y: d.floor, z: d.z }, vol: 0.5 + Math.random() * 0.5, onWater: terrain.waterLevelAt(d.x, d.z) !== null });
           return;
         }
         pos[i * 3] = d.x; pos[i * 3 + 1] = d.y; pos[i * 3 + 2] = d.z;

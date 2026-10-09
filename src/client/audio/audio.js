@@ -63,7 +63,7 @@ export class GameAudio {
     this.sfx.connect(this.reverbSend);
     this.ambBus.connect(this.reverbSend);
     this.reverbSend.connect(this.reverb).connect(this.master);
-    this.cave = { on: false, drone: null, layers: null, dripAt: 0, rumbleAt: 0, creakAt: 0 };
+    this.cave = { on: false, drone: null, layers: null, rumbleAt: 0, creakAt: 0 };
     // long buffers + random start offsets: loops built on them never audibly repeat
     this.noiseBuf = this.#makeNoise(6);
     this.brownBuf = this.#makeNoise(6, 'brown');
@@ -473,14 +473,6 @@ export class GameAudio {
         }
         break;
       }
-      case 'caveDrip': {
-        // a drop falling from the roof: a bright tick, a hollow ping that rings in the cave (water: a lower plink)
-        const f = (o.onWater ? 700 : 1300) + Math.random() * 700;
-        this.#osc('sine', f, f * 0.42, t, 0.1, out, 0.2, 0.002);
-        this.#osc('sine', f * 2.01, f * 1.2, t, 0.05, out, 0.06, 0.002);
-        this.#noise(t, 0.03, out, { vol: 0.05, f0: 4200, f1: 2600, q: 1.2, a: 0.002 });
-        break;
-      }
       case 'plop': {
         // a small thing dropping in (arrow, spear): the bubble's pitch drop + a tiny splash
         const f = 700 + Math.random() * 500;
@@ -767,7 +759,7 @@ export class GameAudio {
     }
     // --- a pool / basin: now and then a drop falls in or a bubble rises
     const p = w.pool;
-    if (p && p.d < 18 && t >= W.poolAt) {
+    if (p && p.d < 18 && t >= W.poolAt && !this.cave.on) {   // (no drop sounds on the cave level)
       const a = Math.random() * Math.PI * 2, rr = Math.random() * (p.r ?? 4);
       const pos = { x: p.pos.x + Math.cos(a) * rr, y: p.pos.y, z: p.pos.z + Math.sin(a) * rr };
       this.#drip(t, pos, { f: 600 + Math.random() * 900, vol: 0.025 * near(p.d, 1, 18), fall: 1.6 + Math.random() * 0.8, dur: 0.06 });
@@ -781,7 +773,7 @@ export class GameAudio {
 
   /**
    * Inside the Hollow Mountain (`inside` 0..1): the reverb opens, a low wind moves through the tunnels,
-   * the mountain rumbles far away, drops fall at random places and the water laps near flooded stretches
+   * the mountain rumbles far away and the water laps near flooded stretches (no drip sounds: the owner wants them gone)
    * (`wet` 0..1). Outside (the coves) none of it is heard and the surf and birds carry on.
    */
   #caveAmbience(t, inside, wet) {
@@ -802,12 +794,6 @@ export class GameAudio {
     this.#steer(L.lap, 0.05 * inside * wet, null, t);
     if (inside < 0.25) return;
     const lp = this.listenerPos;
-    if (t >= this.cave.dripAt) {
-      // a drop somewhere round the listener, now and then two in a row
-      const a = Math.random() * Math.PI * 2, d = 3 + Math.random() * 14;
-      this.#drip(t, { x: lp.x + Math.cos(a) * d, y: lp.y + 1 + Math.random() * 2, z: lp.z + Math.sin(a) * d }, { f: 900 + Math.random() * 1500, vol: 0.05 * inside, fall: 0.4, dur: 0.08 });
-      this.cave.dripAt = t + (Math.random() < 0.25 ? 0.18 + Math.random() * 0.2 : 1.2 + Math.random() * 3.6);
-    }
     if (t >= this.cave.rumbleAt) {
       // the mountain shifting far away: a long, low swell
       this.#noise(t, 4.2, this.ambBus, { vol: 0.35 * inside, type: 'lowpass', f0: 110, f1: 48, q: 0.8, a: 1.4 });

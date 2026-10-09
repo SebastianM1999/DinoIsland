@@ -141,9 +141,9 @@ function tryMaze(seed, depthAt, G, attempt) {
   // (from the exit hall to the east beach): hand-shaped, nothing else may cross them
   const mouthNode = addNode({ kind: 'pocket', x: -G.face - 14, z: E.z, r: 1, roof: 10, outside: true, tags: ['mouth'] });
   const exitNode = addNode({ kind: 'pocket', x: G.face + 14, z: X.z, r: 1, roof: 10, outside: true, tags: ['mouth'] });
-  const mouth = push(build(mouthNode.id, E.id, 'mouth', 13, 10));
-  const exit = push(build(X.id, exitNode.id, 'exit', 12, 9.5));
-  mouth.pts.forEach((p) => { p.w = Math.max(p.w, 11.5); });
+  // (narrow and low, so neither reads as an obvious gate from the beach: ~9.5 m wide, ~6.5 m high)
+  const mouth = push(build(mouthNode.id, E.id, 'mouth', 9.5, 6.5));
+  const exit = push(build(X.id, exitNode.id, 'exit', 9.4, 6.4));
   // (the two outside end points are no chambers)
   const real = nodes.filter((n) => n.r > 1);
 
