@@ -372,6 +372,8 @@ export class Game {
     for (const c of world.volcano?.columns || []) this.volcanoArena.sink(c.id, c.left);
     if (world.volcano?.treasure) this.volcanoArena.openTreasure();
     this.fruitCounts = world.fruit.slice();
+    this.wallTorchesLit = new Set(world.wallTorches ?? []);   // Hollow Mountain wall torches the team has lit
+    this.caveWorld?.wallTorches.setLit(this.wallTorchesLit);
     world.fruit.forEach((count, id) => this.fruitPlants.setCount(id, count));
     this.hud.setPlayer({ name: this.me.name, slot: this.me.slot });
     this.#showMission();
@@ -528,6 +530,12 @@ export class Game {
       } else {
         this.remotes.setOutfit(m.id, m.outfit);
       }
+    });
+    net.on(`ev:${EV.WALL_TORCH}`, (m) => {
+      this.wallTorchesLit?.add(m.torch);
+      this.caveWorld?.wallTorches.setLit(this.wallTorchesLit);
+      const t = this.layout.wallTorches?.[m.torch];
+      if (t) this.audio?.play('torchLight', { pos: { x: t.x, y: t.y, z: t.z } });
     });
     net.on(`ev:${EV.FRUIT}`, (m) => {
       this.fruitCounts[m.spot] = m.count;

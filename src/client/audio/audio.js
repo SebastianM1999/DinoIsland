@@ -431,6 +431,11 @@ export class GameAudio {
         this.#osc('triangle', 330, 300, t, 0.09, out, 0.35);
         this.#osc('triangle', 247, 220, t + 0.12, 0.14, out, 0.35);
         break;
+      case 'torchLight':
+        // a wall torch catches: a soft whoomph of flame and a crackle
+        this.#noise(t, 0.5, out, { vol: 0.28, type: 'lowpass', f0: 380, f1: 1300, q: 0.7, a: 0.03 });
+        this.#noise(t + 0.08, 0.35, out, { vol: 0.08, type: 'bandpass', f0: 2600, f1: 1800, q: 1.5, a: 0.01 });
+        break;
       case 'switch':
         this.#osc('square', 1200, 900, t, 0.03, out, 0.08);
         break;

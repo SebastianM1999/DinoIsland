@@ -19,6 +19,7 @@ import { CONFIG } from './config.js';
 import { insideOutline, halfWidthAt, flowsOf } from './island.js';
 import { caveOpenSdf } from './caveField.js';
 import { SUMP } from './caveMaze.js';
+import { WALL_TORCH } from './torch.js';
 import { SPRING_LIP_OFFSET, SPRING_FLOOR, springColliders } from './springShape.js';
 
 const TAU = Math.PI * 2;
@@ -88,6 +89,7 @@ export function buildLayout(terrain) {
     caveEntrance: null,     // { x, y, z, dir, hall } just outside the tunnel mouth (west cove)
     caveExit: null,         // { x, y, z, dir, hall } just outside the exit tunnel (east beach)
     falseExits: [],         // tunnels that end in daylight at a sea cliff: { x, y, z, a }
+    wallTorches: [],        // Hollow Mountain sconces the team lights: { id, x, y, z, nx, nz (facing out of the wall), tunnel } (shared/torch.js WALL_TORCH)
     sumps: [],              // dive-only shortcuts: { tunnel, level, len, a:{x,z}, b:{x,z}, cache:{x,z,y,loot} } (see shared/caveMaze.js SUMP)
     arrivalBoat: null,      // the boat the team came on (west cove, decoration only): { x, y, z, rot }
     logs: [],               // fallen trees: { x, z, rot, len, r, yA, yB, roots, dead }
@@ -795,6 +797,42 @@ export function buildLayout(terrain) {
     }
     addLight(cv.entrance.x + 18, cv.entrance.z, 'daylight', 1, 0.6, -1, 4);
     addLight(cv.exit.x - 18, cv.exit.z, 'daylight', 1, 0.6, -1, 4);
+
+    // --- wall torches: a sconce about every WALL_TORCH.spacing m along the dry tunnels, left or right at random,
+    // for the team to light one by one (shared/torch.js; the server keeps which are lit). Own random stream:
+    // nothing else moves.
+    {
+      const wr = makeRng((plan.seed ^ 0x70c4) >>> 0);
+      const W = layout.wallTorches;
+      const spaced = (x, z, d) => W.every((w) => Math.hypot(w.x - x, w.z - z) >= d);
+      let side = wr() < 0.5 ? -1 : 1;
+      for (const t of mz.tunnels) {
+        if (t.kind === 'falseExit') continue;
+        let run = WALL_TORCH.spacing * (0.3 + 0.5 * wr());   // (the first one comes early in every tunnel)
+        for (let i = 1; i < t.pts.length; i++) {
+          const a = t.pts[i - 1], b = t.pts[i];
+          const seg = Math.hypot(b.x - a.x, b.z - a.z);
+          run -= seg;
+          if (run > 0) continue;
+          run = WALL_TORCH.spacing * (0.75 + 0.5 * wr());
+          const u = i / (t.pts.length - 1);
+          if (t.flooded && u > t.flooded.u0 - 0.05 && u < t.flooded.u1 + 0.05) continue;   // (never over the water)
+          if (wr() < 0.3) side = -side; else if (wr() < 0.5) side = -side;                 // irregular: left, right, sometimes twice the same
+          const dx = (b.x - a.x) / seg, dz = (b.z - a.z) / seg, nx = -dz * side, nz = dx * side;
+          const floor = floorY(b.x, b.z);
+          if (!underRoof(b.x, b.z) || terrain.waterDepthAt(b.x, b.z) > 0) continue;
+          // walk to the wall: the first point where the ground rises 1.6 m over the tunnel floor
+          let d = 0;
+          while (d < 15 && floorY(b.x + nx * d, b.z + nz * d) < floor + 1.6) d += 0.25;
+          if (d >= 15 || d < 2) continue;   // (in a chamber the wall is further away)
+          const x = b.x + nx * (d - 0.35), z = b.z + nz * (d - 0.35);
+          const y = floor + WALL_TORCH.height;
+          if (!(terrain.ceilingAt(x, z) > y + 1.2) || !spaced(x, z, WALL_TORCH.spacing * 0.5)) continue;
+          if (layout.relics.some((r) => Math.hypot(r.x - x, r.z - z) < 6)) continue;
+          W.push({ id: W.length, x, y, z, nx: -nx, nz: -nz, tunnel: t.id });
+        }
+      }
+    }
   }
 
   // ---------------------------------------------------- jungle density
