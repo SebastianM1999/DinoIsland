@@ -1,5 +1,5 @@
 /* Home screen: expedition actions on the left, live island scenery on the right. */
-#menu { display: flex; flex-direction: column; align-items: flex-start; justify-content: flex-start; padding: clamp(24px, 5vh, 64px) clamp(24px, 5vw, 96px); background: #162d30; isolation: isolate; scrollbar-width: thin; }
+#menu { display: flex; flex-direction: column; align-items: flex-start; justify-content: flex-start; padding: clamp(24px, 5vh, 64px) clamp(24px, 5vw, 96px); background: #111c28; isolation: isolate; scrollbar-width: thin; }
 #menu-tour { position: fixed; inset: 0; width: 100%; height: 100%; z-index: -2; pointer-events: none; }
 #menu::before { content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none; background: linear-gradient(90deg, #0c1b1ef5, #0c1b1ed9 25%, #0c1b1e59 49%, transparent 74%), linear-gradient(0deg, #0c1b1ea6, transparent 35%); }
 #menu .menu-card { width: min(440px, 42vw); padding: 0; margin: auto 0; text-align: left; }
@@ -168,3 +168,30 @@
   .menu-utilities { margin-top: 14px; gap: 4px; }
   .menu-utilities .menu-link { font-size: .85rem; padding-right: 10px; }
 }
+
+/* Only the right-hand lookout changes; expedition controls have a stable backdrop. */
+#menu::before { background: none; }
+#menu-preview { position: absolute; left: 46%; right: 0; top: 0; bottom: 0; z-index: -1; overflow: hidden; background: radial-gradient(ellipse at 70% 40%, #304055, #121c29 70%); }
+#menu-preview::after { content: ''; position: absolute; inset: 0; pointer-events: none; background: linear-gradient(90deg, #111c28, #111c2822 30%, transparent 60%), linear-gradient(0deg, #111c28ee, transparent 68%); }
+.menu-preview-image { position: absolute; width: 100%; height: 100%; inset: 0; object-fit: cover; opacity: 0; transition: opacity .28s ease; animation: island-postcard-drift 16s ease-in-out alternate infinite; animation-play-state: paused; }
+.menu-preview-image.is-front { opacity: 1; animation-play-state: running; }
+#menu-preview.is-still .menu-preview-image { animation-play-state: paused; }
+@keyframes island-postcard-drift { from { transform: scale(1.06) translate(-1%, -.5%); } to { transform: scale(1.12) translate(1%, .5%); } }
+.preview-placeholder { position: absolute; inset: 12% 10% 45% 16%; z-index: 1; display: flex; flex-direction: column; justify-content: center; gap: 16px; color: #fff1d0; }
+.preview-placeholder span { text-transform: uppercase; letter-spacing: .12em; font-size: 14px; color: #d0dbd1; }
+.preview-placeholder strong { font-size: clamp(24px, 2.5vw, 38px); line-height: 1.15; }
+.preview-placeholder p { margin: 0; color: #bccbbf; }
+#menu-preview.has-preview .preview-placeholder { display: none; }
+.tour-info { width: min(560px, 44vw); }
+#tour-islands { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.tour-island-button { min-height: 48px; font: 700 14px var(--font); color: #f8eed8; background: #172c31de; border: 1px solid #7d968a; border-radius: 6px; padding: 10px; }
+.tour-island-button:hover { background: #385449; }
+.tour-island-button[aria-pressed="true"] { background: #ffc933; color: #1c3027; border-color: #ffc933; }
+.tour-island-button:disabled { opacity: .5; }
+.tour-island-button:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
+@media (max-width: 800px) {
+  #menu-preview { left: 0; top: 50%; }
+  .tour-info { width: 100%; margin-top: 24px; padding: 18px; background: #111c28dd; border-radius: 8px; }
+  .preview-placeholder { inset: 15% 8% 30%; }
+}
+@media (prefers-reduced-motion: reduce) { .menu-preview-image { animation: none; transition: none; } }
