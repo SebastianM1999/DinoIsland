@@ -79,3 +79,21 @@ export function wallMount(rock, floor, b, dir, side) {
   }
   return null;
 }
+
+/**
+ * Close-up cap of the Hollow Mountain's point lights (the hand torch, wall torches, crystal lights): the cave shaders
+ * (client/world/caveSky.js) pass every point light's irradiance (colour x intensity x distance falloff, the number that is
+ * multiplied by cos(angle) and albedo / PI) through `softCapIrradiance`, so a wall a metre from the torch keeps its texture
+ * instead of clipping to white under ACES, while light beyond ~2 m is untouched. The GLSL there is the same formula.
+ */
+export const LIGHT_CAP = 5.5;
+export function softCapIrradiance(e) {
+  const r = e / LIGHT_CAP, r2 = r * r;
+  return e / Math.sqrt(Math.sqrt(1 + r2 * r2));
+}
+/** Irradiance of a point light (three.js: intensity in cd, `distance` window, `decay`) at `d` metres. */
+export function pointIrradiance({ intensity, distance, decay }, d) {
+  const f = 1 / Math.pow(Math.max(d, 0.01), decay);
+  const w = distance > 0 ? Math.min(1, Math.max(0, 1 - Math.pow(d / distance, 4))) ** 2 : 1;   // (three's getDistanceAttenuation window)
+  return intensity * f * w;
+}

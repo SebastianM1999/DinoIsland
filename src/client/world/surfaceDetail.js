@@ -510,11 +510,14 @@ const CAVE_EMISSIVE = /* glsl */ `
 #ifdef CAVE_VOL
   totalEmissiveRadiance += vCaveGlow * GLOW_RANGE_F * (0.07 + 0.5 * diffuseColor.rgb);
   if (uSdLevel > 0.5 && vCaveBake.z > 0.01) {
-    vec3 shp = vSdPos * 0.8;
-    float shA = sdNoise3(shp + vec3(0.0, uCaveT * 0.21, uCaveT * 0.16));
-    float shB = sdNoise3(shp * 1.9 + vec3(uCaveT * 0.14, 0.0, -uCaveT * 0.19) + 7.0);
-    float shR = pow(1.0 - abs(shA + shB - 1.0), 5.0);
-    totalEmissiveRadiance += vec3(0.035, 0.11, 0.12) * vCaveBake.z * (0.25 + shR) * (0.35 + 1.3 * dot(diffuseColor.rgb, vec3(0.3333)));
+    // soft light patches of the water: two slow, low-frequency 3D noises by WORLD position (about 3 m and 5 m across,
+    // drifting), blended smoothly - no thin ridges, so no streaks along the triangles; the baked weight only scales it
+    vec3 shp = vSdPos * 0.3;
+    float shA = sdNoise3(shp + vec3(0.0, uCaveT * 0.07, uCaveT * 0.05));
+    float shB = sdNoise3(shp * 0.62 + vec3(uCaveT * 0.04, 0.0, -uCaveT * 0.06) + 7.0);
+    float shR = smoothstep(0.25, 0.85, 0.5 * (shA + shB));
+    float shW = smoothstep(0.0, 0.6, vCaveBake.z);
+    totalEmissiveRadiance += vec3(0.07, 0.2, 0.22) * shW * (0.35 + 0.9 * shR) * (0.35 + 1.3 * dot(diffuseColor.rgb, vec3(0.3333)));
   }
 #else
   totalEmissiveRadiance += texture2D(uCaveGlow, (vSdPos.xz - uCaveGlowRect.xy) * uCaveGlowRect.z).rgb * GLOW_RANGE_F * caveGlowK() * (0.07 + 0.5 * diffuseColor.rgb);

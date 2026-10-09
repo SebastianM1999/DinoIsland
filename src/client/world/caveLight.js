@@ -20,7 +20,7 @@ import { smoothstep } from '../../shared/rng.js';
 import { GLOW_RANGE } from './caveStyle.js';
 
 /** Bump when anything below changes what it makes (the bake's key also hashes a probe of the sources). */
-export const LIGHT_VERSION = 1;
+export const LIGHT_VERSION = 2;
 
 /** Out-of-band samples of the lattice are signs only; for marching they count as this far from the surface (m). */
 const FAR = 3.5;
@@ -126,7 +126,7 @@ export function bakeCaveLight(lat, chunks, { sources, visAt, waterAt }) {
         }
         if (near > 0) {
           const h = y - lvl;
-          if (h > -0.3 && h < 3.4) sh = (1 - smoothstep(0.2, 3.4, h)) * Math.min(1, near / 4) * (1 - 0.85 * lt[v * 3 + 1]);
+          if (h > -0.3 && h < 3.4) sh = (1 - smoothstep(0.2, 3.4, h)) * Math.min(1, near / 2.5) * (1 - 0.85 * lt[v * 3 + 1]);
         }
       }
       if (sh > 0.01) shimVerts++;
