@@ -13,6 +13,7 @@ import { freshProfile } from '../../shared/skills.js';
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const REVERT_MS = 2000;     // an optimistic buy the server never confirmed is dropped after this
 const CONFIRM_MS = 4000;    // the reset button stays armed this long
+let panelSequence = 0;
 
 function ensureStylesheet() {
   if (typeof document === 'undefined' || document.querySelector('link[data-skills-css]')) return;
@@ -36,6 +37,7 @@ export class SkillPanel {
     this.confirming = false;
     this.hoverId = null;              // tile under the pointer / with keyboard focus: its text fills the footer
     this.focusId = null;
+    this.descId = `skill-description-${++panelSequence}`;
     this.el = document.createElement('section');
     this.el.className = 'hud-panel hud-skills brush';
     this.el.setAttribute('aria-label', 'Skills');
@@ -157,10 +159,13 @@ export class SkillPanel {
     const pips = Array.from({ length: s.max }, (_, i) => `<i class="${i < s.rank ? 'on' : ''}"></i>`).join('');
     const label = `${s.name}, rank ${s.rank} of ${s.max}${s.state === 'locked' ? `, locked: ${s.reason}` : s.state === 'maxed' ? ', maxed' : `, costs ${s.cost}`}`;
     const cls = `is-${s.state}${s.lock ? ` lock-${s.lock}` : ''}${s.capstone ? ' is-cap' : ''}`;
-    return `<button type="button" class="sk-tile ${cls}" data-skill="${s.id}" aria-disabled="${s.state !== 'available'}" aria-label="${esc(label)}">
+    const stateLabel = s.state === 'maxed' ? 'Maxed' : s.lock === 'gate' ? 'Tier locked' : s.lock === 'points' ? 'Need points' : 'Learn rank';
+    return `<button type="button" class="sk-tile ${cls}" data-skill="${s.id}" aria-disabled="${s.state !== 'available'}" aria-label="${esc(label)}" aria-describedby="${this.descId}">
       <span class="sk-disc">${skillIcon(s.id)}</span>
       <span class="sk-name">${esc(s.name)}</span>
+      <span class="sk-meta"><b>${s.rank}/${s.max}</b><span>${s.cost} ${s.cost === 1 ? 'point' : 'points'}</span></span>
       <span class="sk-pips" aria-hidden="true">${pips}</span>
+      <span class="sk-state">${s.lock === 'gate' ? LOCK_ICON : ''}${stateLabel}</span>
       ${s.state === 'maxed' ? `<span class="sk-done" aria-hidden="true">${TICK_ICON}</span>` : ''}
     </button>`;
   }
@@ -201,7 +206,8 @@ export class SkillPanel {
         ${t.tiers.map((g) => `
           <div class="sk-tier${g.open ? '' : ' is-locked'}">
             <span class="sk-tierlabel">${esc(g.label)}</span>
-            ${g.gateText ? `<span class="sk-gate">${g.open ? TICK_ICON : LOCK_ICON}${esc(g.gateText)}${g.open ? '' : ` <em>${t.spent}/${g.gate}</em>`}</span>` : ''}
+            <span class="sk-gate">${g.open ? TICK_ICON : LOCK_ICON}${g.gate === 0 ? 'Available from start' : g.open ? 'Tier unlocked' : `${t.spent}/${g.gate} points spent · ${g.gate - t.spent} more to unlock`}</span>
+            ${g.gate > 0 ? `<span class="sk-gate-track" role="progressbar" aria-label="${esc(t.name)} ${esc(g.label)} unlock progress" aria-valuemin="0" aria-valuemax="${g.gate}" aria-valuenow="${Math.min(t.spent, g.gate)}"><span style="transform:scaleX(${Math.min(1, t.spent / g.gate)})"></span></span>` : ''}
           </div>
           <div class="sk-tiles">${g.skills.map((s) => this.#tileHtml(s)).join('')}</div>`).join('')}
       </section>`).join('');
@@ -222,7 +228,7 @@ export class SkillPanel {
       </div>
       <div class="sk-cols">${cols}</div>
       <footer class="wd-foot sk-foot">
-        <div class="sk-desc" aria-live="polite">${this.#descHtml()}</div>
+        <div class="sk-desc" id="${this.descId}" aria-live="polite">${this.#descHtml()}</div>
         <div class="sk-actions">
           ${this.atCamp ? '' : '<span class="sk-note">Reset only at camp</span>'}
           ${this.confirming ? '<button type="button" class="wd-btn" data-act="cancel">Cancel</button>' : ''}
