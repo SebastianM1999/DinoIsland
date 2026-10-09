@@ -1,21 +1,28 @@
-// The Hollow Mountain's ground: the two coves (dark sand, wet rock, weed), the
+// The Hollow Mountain's look: the two coves (dark sand, wet rock, weed), the
 // mountain's outside (a massive banded cliff face) and everything inside it
 // (mud and gravel floors, wet layered walls with warm and cool bands, flowstone
-// streaks, moss and algae at the water, ambient occlusion where wall meets
-// floor). Same grid and triangulation as terrainMesh.js / Terrain.heightAt();
-// the fine grain comes from the 'cave' kind of surfaceDetail.js. Crystal and
-// daylight glow is baked into the `caveGlow` attribute (caveStyle.js).
+// streaks, moss and algae at the water, wet dark roof, ambient occlusion where
+// wall meets floor). The mountain, its tunnels and the coves are ONE closed
+// volume mesh (caveVolumeMesh.js, child 'cave-volume', painted with the same
+// vertex colours); the terrain heightfield (same grid and triangulation as
+// terrainMesh.js / Terrain.heightAt()) only draws what lies beyond the volume's
+// region: the open sea floor. The fine grain comes from the 'cave' kind of
+// surfaceDetail.js. Crystal and daylight glow is baked into the `caveGlow`
+// attribute (caveStyle.js).
 //
 // surface (sand, cliff, mud, flowstone), surface2 (wet, moss) feed the shader.
 
 import * as THREE from 'three';
 import { fbm, smoothstep } from '../../shared/rng.js';
-import { caveFloorBase, caveCeiling, caveRockTop } from '../../shared/caveField.js';
+import { caveFloorBase, caveCeiling } from '../../shared/caveField.js';
 import { withSurfaceDetail, setSurfaceBiome, CAVE_GLOW } from './surfaceDetail.js';
 import { buildGlowField } from './caveStyle.js';
-import { buildSkyField, withCaveSky, CAVE_SKY, ROOF_EDGE } from './caveSky.js';
+import { buildSkyField, withCaveSky, CAVE_SKY } from './caveSky.js';
+import { meshCaveVolume } from './caveVolumeMesh.js';
 
 const C = (hex) => new THREE.Color(hex);
+/** Above this height (m) there is no water and no shore: the floors are 2-5 m, the sea at 0. */
+const WET_MAX = 8;
 
 export function buildCaveTerrainMesh(terrain, layout) {
   const n = terrain.n, cell = terrain.cell, half = terrain.half, stride = n + 1;
@@ -37,7 +44,9 @@ export function buildCaveTerrainMesh(terrain, layout) {
 
   const vertexColor = (x, y, z, slope) => {
     surf.sand = surf.cliff = surf.mud = surf.flow = surf.wet = surf.moss = 0;
-    const water = terrain.waterLevelAt(x, z);
+    // (the sea and every flooded tunnel lie below WET_MAX: the mountain's walls above ask nothing of the water queries)
+    const low = y < WET_MAX;
+    const water = low ? terrain.waterLevelAt(x, z) : null;
     const d = depthAt(x, z);
     const floorB = caveFloorBase(plan, x, z);
     const above = y - floorB;                          // height over the nominal tunnel floor
@@ -100,7 +109,7 @@ export function buildCaveTerrainMesh(terrain, layout) {
     }
 
     // ---- floors: mud and gravel, flowstone sheets by the walls, moss near water
-    const wetNear = nearWater(x, z, 3.4);
+    const wetNear = low && nearWater(x, z, 3.4);
     const floorN = fbm(x * 0.12, z * 0.12, 3, S + 203) * 0.5 + 0.5;
     g.copy(P.dirt).lerp(P.rockDark, 0.62).lerp(P.dirtDark, 0.2 + 0.4 * floorN).lerp(P.mud, smoothstep(0.55, 0.8, fbm(x * 0.05 + 3, z * 0.05, 2, S + 205) * 0.5 + 0.5) * 0.7);
     g.lerp(P.rockDark, 0.4 * smoothstep(0.5, 0.75, fbm(x * 0.2, z * 0.2, 2, S + 207) * 0.5 + 0.5));   // gravel
@@ -168,10 +177,16 @@ export function buildCaveTerrainMesh(terrain, layout) {
     }
   }
 
+  // the volume draws everything in its region (a ring of ~6 m of it lies under the terrain's own cells beside it)
+  const vol = meshCaveVolume(plan, { half });
+  const inside = vol.rock.region(0);
+  const covered = new Uint8Array(stride * stride);
+  for (let j = 0; j <= n; j++) for (let i = 0; i <= n; i++) covered[j * stride + i] = inside(-half + i * cell, -half + j * cell) ? 1 : 0;
   const idx = [];
   for (let j = 0; j < n; j++) {
     for (let i = 0; i < n; i++) {
       const a = j * stride + i, b = a + 1, c = a + stride, d = c + 1;
+      if (covered[a] && covered[b] && covered[c] && covered[d]) continue;
       if (pos[a * 3 + 1] < -15.8 && pos[b * 3 + 1] < -15.8 && pos[c * 3 + 1] < -15.8 && pos[d * 3 + 1] < -15.8) continue;   // (the shelf bottoms out at -16: the seabed reaches out until it is flat)
       idx.push(a, c, b, b, c, d);
     }
@@ -186,20 +201,52 @@ export function buildCaveTerrainMesh(terrain, layout) {
   geo.computeVertexNormals();
   geo.computeBoundingSphere();
   setSurfaceBiome(layout.biome);
-  // one look, three sky behaviours (caveSky.js): the ground (above the roof it is the mountain's skin),
-  // the roof and everything under it, the shell over the tunnels
-  const material = (mode, side) => withSurfaceDetail(withCaveSky(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9, metalness: 0, side }), mode), 'cave');
-  const mats = { terrain: material(0, THREE.FrontSide), roof: material(1, THREE.DoubleSide), shell: material(2, THREE.DoubleSide) };
-  mats.shell.polygonOffset = true; mats.shell.polygonOffsetFactor = -1; mats.shell.polygonOffsetUnits = -1;
+  // one look, two sky behaviours (caveSky.js): the sea floor outside (above the roof it would be the mountain's skin),
+  // the volume (everything of the mountain: skin, walls, floors, roof)
+  const material = (mode) => withSurfaceDetail(withCaveSky(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9, metalness: 0, side: THREE.FrontSide }), mode), 'cave');
+  const mats = { terrain: material(0), volume: material(2) };
+  mats.volume.polygonOffset = true; mats.volume.polygonOffsetFactor = -1; mats.volume.polygonOffsetUnits = -1;
   const mesh = new THREE.Mesh(geo, mats.terrain);
   mesh.receiveShadow = true;
   mesh.name = 'terrain';
   mesh.userData.caveMats = mats;
   mesh.userData.sky = sky;
+  mesh.userData.volumeStats = vol.stats;
 
-  // ---- the shell: the mountain's skin over every tunnel and chamber, continuing the rock exactly
-  const shell = buildShell({ terrain, layout, sky, geo, T, fillVertex, material: mats.shell });
-  if (shell) mesh.add(shell);
+  // ---- the volume: painted per vertex from its position and normal (a roof faces down: wet dark stone)
+  const group = new THREE.Group();
+  group.name = 'cave-volume';
+  const roofTint = new THREE.Color();
+  for (const ch of vol.chunks) {
+    const m = ch.pos.length / 3;
+    const A = { pos: new Float32Array(m * 3), col: new Float32Array(m * 3), sf: new Float32Array(m * 4), sf2: new Float32Array(m * 2) };
+    for (let v = 0; v < m; v++) {
+      const x = ch.pos[v * 3], y = ch.pos[v * 3 + 1], z = ch.pos[v * 3 + 2], ny = ch.nor[v * 3 + 1];
+      // (the heightfield's slope: rise over run, capped; downward faces count as walls)
+      const slope = Math.min(2.5, Math.hypot(ch.nor[v * 3], ch.nor[v * 3 + 2]) / Math.max(Math.abs(ny), 0.04));
+      fillVertex(A, v, x, y, z, ny < 0 ? Math.max(slope, 1) : slope);
+      const rk = smoothstep(-0.1, -0.55, ny);
+      if (rk > 0) {
+        const streak = roofLook(roofTint, S, P, x, y, z, y - terrain.heightAt(x, z));
+        A.col[v * 3] += (roofTint.r - A.col[v * 3]) * rk; A.col[v * 3 + 1] += (roofTint.g - A.col[v * 3 + 1]) * rk; A.col[v * 3 + 2] += (roofTint.b - A.col[v * 3 + 2]) * rk;
+        A.sf[v * 4] *= 1 - rk; A.sf[v * 4 + 1] = Math.max(A.sf[v * 4 + 1], rk); A.sf[v * 4 + 2] *= 1 - rk; A.sf[v * 4 + 3] += (streak * 0.8 - A.sf[v * 4 + 3]) * rk;
+        A.sf2[v * 2] += (0.55 + 0.4 * streak - A.sf2[v * 2]) * rk; A.sf2[v * 2 + 1] *= 1 - rk;
+      }
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(ch.pos, 3));
+    g.setAttribute('normal', new THREE.BufferAttribute(ch.nor, 3));
+    g.setAttribute('color', new THREE.BufferAttribute(A.col, 3));
+    g.setAttribute('surface', new THREE.BufferAttribute(A.sf, 4));
+    g.setAttribute('surface2', new THREE.BufferAttribute(A.sf2, 2));
+    g.setIndex(new THREE.BufferAttribute(ch.idx, 1));
+    g.computeBoundingSphere();
+    const c = new THREE.Mesh(g, mats.volume);
+    c.name = 'cave-volume-chunk';
+    c.receiveShadow = true;
+    group.add(c);
+  }
+  mesh.add(group);
 
   const glowTex = glow.glowTexture(half);
   CAVE_GLOW.uCaveGlow.value = glowTex;
@@ -208,141 +255,23 @@ export function buildCaveTerrainMesh(terrain, layout) {
   return mesh;
 }
 
+const _tint = new THREE.Color();
 /**
- * The terrain heightfield over a tunnel is the tunnel's floor, so from above you would look into it.
- * The shell is an upward-facing skin at the rock's own height (`caveRockTop`, the very function the
- * ground rises to between the tunnels) over every cell that touches open space. Over the first
- * metres behind a tunnel mouth it hugs the roof (a lintel), rising to the rock, so the opening reads
- * as a dark arch under an overhang. Where it meets solid ground its vertices ARE the terrain's.
- * Returns the mesh (null if nothing is open); `userData.cells` lists the covered cells for tests.
+ * The look of a roof (the underside of the rock over a tunnel) into `out`: dark wet stone with bands, pale flowstone
+ * streaks, darker toward the walls (`gap`: metres over the floor). Returns the streak weight.
  */
-function buildShell({ terrain, layout, sky, geo, T, fillVertex, material }) {
-  const { n, cell, half } = terrain, n1 = n + 1, plan = layout.plan;
-  const { depth, roof, open } = sky;
-  const S = new Float32Array(n1 * n1);
-  const lifted = new Uint8Array(n1 * n1);
-  for (let j = 0; j <= n; j++) {
-    for (let i = 0; i <= n; i++) {
-      const k = j * n1 + i, h = terrain.h(i, j), d = depth[k];
-      S[k] = h;
-      if (d <= 0.5) continue;
-      const x = -half + i * cell, z = -half + j * cell;
-      const top = caveRockTop(plan, x, z);
-      // (it climbs from the roof right at the rim as a steep rock face; the skirt below closes it toward the opening)
-      const lintel = roof[k] + 0.3 + 3.0 * Math.max(0, d - ROOF_EDGE);
-      let y = Math.max(h, Math.min(top, lintel));
-      // (solid rock near the mountain's outside - a tunnel wall's crest close to the cliff - eases back down to the
-      // cliff's own surface: lifted there, its edge stood out of the flank as dark fins. Only open ground, over the
-      // openings, keeps the full lift.)
-      if (!open[k]) y = h + (y - h) * smoothstep(0.5, 9, d);
-      if (y > h + 0.05) { S[k] = y; lifted[k] = 1; }
-    }
-  }
-  // cells that need the skin: all corners inside the mountain's edge, some corner lifted by more than a touch
-  const need = new Uint8Array(n * n);
-  for (let j = 0; j < n; j++) {
-    for (let i = 0; i < n; i++) {
-      const a = j * n1 + i, ks = [a, a + 1, a + n1, a + n1 + 1];
-      if (ks.some((k) => depth[k] <= 0.5)) continue;
-      if (ks.some((k) => S[k] - terrain.h(k % n1, (k / n1) | 0) > 0.3)) need[j * n + i] = 1;
-    }
-  }
-  // the skin runs two cells beyond the lifted ones: its normals and colours come from the skin itself
-  // (a vertex on a tunnel wall's crest has the wall in its terrain normal: dark slits along the skin)
-  const cells = [];
-  for (let j = 0; j < n; j++) {
-    for (let i = 0; i < n; i++) {
-      let hit = need[j * n + i] === 1;
-      for (let dj = -2; dj <= 2 && !hit; dj++) for (let di = -2; di <= 2 && !hit; di++) {
-        const a = i + di, b = j + dj;
-        if (a >= 0 && b >= 0 && a < n && b < n && need[b * n + a]) hit = true;
-      }
-      if (!hit) continue;
-      const q = j * n1 + i, corners = [q, q + 1, q + n1, q + n1 + 1];
-      if (corners.some((k) => depth[k] <= 0.5)) continue;
-      // (a cell with no lifted corner lies exactly on the terrain: drawn twice, with the shell's outdoor light, it
-      // shows as bright zigzag slivers on the walls - the terrain draws it; the normals below still use the whole skin)
-      if (!corners.some((k) => lifted[k])) continue;
-      cells.push([i, j]);
-    }
-  }
-  if (!cells.length) return null;
-  const remap = new Map(), order = [];
-  const id = (k) => { let v = remap.get(k); if (v === undefined) { v = order.length; remap.set(k, v); order.push(k); } return v; };
-  const idx = [];
-  for (const [i, j] of cells) {
-    const a = id(j * n1 + i), b = id(j * n1 + i + 1), c = id((j + 1) * n1 + i), d = id((j + 1) * n1 + i + 1);
-    idx.push(a, c, b, b, c, d);
-  }
-  // the skirt: wherever the skin's edge stands above the ground next to it (a mouth's rim, a tunnel wall's crest) a
-  // rock face closes the gap, from the ground - or, over an opening, from the roof's edge - up to the skin. Without
-  // it these edges are cracks you can look through into the mountain. Same material and colours as the cliffs.
-  const inShell = new Set(cells.map(([i, j]) => j * n + i));
-  const bottomAt = (k) => {
-    const h = terrain.h(k % n1, (k / n1) | 0);
-    // (over an opening it starts 1.2 m under the nominal roof: the roof mesh dips up to ~0.85 m below it in its
-    // hollows (caveMesh.js bump), and the face must overlap that edge or a slit shows)
-    return depth[k] > 0 && roof[k] > -500 ? Math.max(h, Math.min(roof[k] - 1.2, S[k])) : h;
-  };
-  const skirt = [];   // [k1, k2, outward x, outward z]
-  for (const [i, j] of cells) {
-    const k00 = j * n1 + i, k10 = k00 + 1, k01 = k00 + n1, k11 = k01 + 1;
-    for (const [ka, kb, ni, nj, ox, oz] of [[k00, k01, i - 1, j, -1, 0], [k10, k11, i + 1, j, 1, 0], [k00, k10, i, j - 1, 0, -1], [k01, k11, i, j + 1, 0, 1]]) {
-      if (ni >= 0 && nj >= 0 && ni < n && nj < n && inShell.has(nj * n + ni)) continue;
-      if (S[ka] - bottomAt(ka) < 0.05 && S[kb] - bottomAt(kb) < 0.05) continue;
-      skirt.push([ka, kb, ox, oz]);
-    }
-  }
-  // one column of vertices per grid vertex, shared by the skirt edges that meet there, with the outward
-  // directions averaged: the face shades as one smooth rock face, not as separate plates
-  const ROWS = 4;
-  const columns = new Map();   // grid vertex -> { ox, oz }
-  for (const [ka, kb, ox, oz] of skirt) for (const k of [ka, kb]) {
-    const c = columns.get(k) ?? { ox: 0, oz: 0 };
-    c.ox += ox; c.oz += oz;
-    columns.set(k, c);
-  }
-  const m = order.length, ms = m + columns.size * (ROWS + 1);
-  const A = { pos: new Float32Array(ms * 3), col: new Float32Array(ms * 3), sf: new Float32Array(ms * 4), sf2: new Float32Array(ms * 2) };
-  const nor = new Float32Array(ms * 3);
-  {
-    let v = m;
-    for (const [k, c] of columns) {
-      c.base = v;
-      const x = -half + (k % n1) * cell, z = -half + ((k / n1) | 0) * cell, y0 = bottomAt(k), y1 = S[k];
-      const l = Math.hypot(c.ox, c.oz) || 1;
-      for (let r = 0; r <= ROWS; r++) {
-        fillVertex(A, v, x, y0 + (y1 - y0) * (r / ROWS), z, 2.5);   // (slope 2.5: painted as cliff)
-        nor[v * 3] = c.ox / l * 0.96; nor[v * 3 + 1] = 0.28 * (r / ROWS); nor[v * 3 + 2] = c.oz / l * 0.96;
-        v++;
-      }
-    }
-    for (const [ka, kb] of skirt) {
-      const A0 = columns.get(ka).base, B0 = columns.get(kb).base;
-      for (let r = 0; r < ROWS; r++) idx.push(A0 + r, B0 + r, A0 + r + 1, A0 + r + 1, B0 + r, B0 + r + 1);
-    }
-  }
-  const at = (i, j) => S[Math.min(n, Math.max(0, j)) * n1 + Math.min(n, Math.max(0, i))];
-  order.forEach((k, v) => {
-    const i = k % n1, j = (k / n1) | 0, x = -half + i * cell, z = -half + j * cell;
-    const gx = (at(i + 1, j) - at(i - 1, j)) / (2 * cell), gz = (at(i, j + 1) - at(i, j - 1)) / (2 * cell);
-    fillVertex(A, v, x, S[k], z, Math.hypot(gx, gz));
-    const l = Math.hypot(gx, 1, gz);
-    nor[v * 3] = -gx / l; nor[v * 3 + 1] = 1 / l; nor[v * 3 + 2] = -gz / l;
-  });
-  const g = new THREE.BufferGeometry();
-  g.setAttribute('position', new THREE.BufferAttribute(A.pos, 3));
-  g.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
-  g.setAttribute('color', new THREE.BufferAttribute(A.col, 3));
-  g.setAttribute('surface', new THREE.BufferAttribute(A.sf, 4));
-  g.setAttribute('surface2', new THREE.BufferAttribute(A.sf2, 2));
-  g.setIndex(idx);
-  g.computeBoundingSphere();
-  const mesh = new THREE.Mesh(g, material);
-  mesh.name = 'cave-shell';
-  mesh.receiveShadow = true;
-  mesh.userData.cells = cells;
-  return mesh;
+function roofLook(out, S, P, x, y, z, gap) {
+  const noise = fbm(x * 0.05, z * 0.05, 3, S + 311) * 0.5 + 0.5;
+  const warp = fbm(x * 0.06, z * 0.06, 2, S + 312) * 2;
+  const band = Math.sin(x * 0.11 + z * 0.07 + warp * 2.2);
+  out.copy(P.rockDark).lerp(P.rock, 0.25 + 0.4 * noise);
+  out.lerp(P.rockWarm, smoothstep(0.2, 0.9, band) * 0.35);
+  out.offsetHSL(band * 0.02, 0, band * 0.025);
+  out.multiplyScalar(0.66);
+  const streak = smoothstep(0.62, 0.85, fbm(x * 0.12 + z * 0.1, z * 0.045, 3, S + 313) * 0.5 + 0.5);
+  out.lerp(_tint.copy(P.flowstone).multiplyScalar(0.8), streak * 0.4);
+  out.multiplyScalar(0.55 + 0.45 * smoothstep(0.2, 6.5, gap));   // AO toward the walls
+  return streak;
 }
 
 export { caveCeiling };

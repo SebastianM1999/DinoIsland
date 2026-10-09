@@ -1,14 +1,14 @@
-// Hollow Mountain, the parts the player sees: the closed mountain (shell over every tunnel), the sky
-// light field, no cave dressing outside the cave, small coves. Pure geometry checks in node (no GPU).
+// Hollow Mountain, the parts the player sees: the terrain mesh that hands over to the volume, the sky light field,
+// no cave dressing outside the cave, small coves. Pure geometry checks in node (no GPU). The volume itself
+// (holes, watertightness, the flank) is checked in cave-volume.test.js.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { planIsland } from '../src/shared/island.js';
 import { levelDef } from '../src/shared/levels.js';
 import { Terrain } from '../src/shared/terrain.js';
 import { buildLayout } from '../src/shared/layout.js';
-import { caveRockTop } from '../src/shared/caveField.js';
 import { buildCaveTerrainMesh } from '../src/client/world/caveTerrain.js';
-import { ARCH_DEPTH, visFromDistance } from '../src/client/world/caveSky.js';
+import { visFromDistance } from '../src/client/world/caveSky.js';
 
 const LEVEL = 3;
 const cache = new Map();
@@ -18,7 +18,11 @@ function island(variant) {
     const layout = buildLayout(terrain);
     cache.set(variant, { variant, terrain, layout, plan: terrain.plan, mesh: null });
   }
-  const it = cache.get(variant);
+  return cache.get(variant);
+}
+/** the terrain mesh (volume included) of a variant: ~6 s, built on demand */
+function meshed(variant) {
+  const it = island(variant);
   it.mesh ??= buildCaveTerrainMesh(it.terrain, it.layout);
   return it;
 }
@@ -65,43 +69,6 @@ test('the two coves are small: room for the camp and the boat, no more', () => {
   }
 });
 
-test('the mountain is closed: a skin at the rock height over every cell that touches a tunnel or chamber', () => {
-  for (const variant of VARIANTS.slice(0, 3)) {
-    const { terrain, plan, mesh } = island(variant);
-    const shell = mesh.children.find((c) => c.name === 'cave-shell');
-    assert.ok(shell, 'shell exists');
-    const covered = new Set(shell.userData.cells.map(([i, j]) => j * terrain.n + i));
-    const n1 = terrain.n + 1;
-    const depth = (i, j) => plan.cave.depthAt(-terrain.half + i * terrain.cell, -terrain.half + j * terrain.cell);
-    const top = (i, j) => caveRockTop(plan, -terrain.half + i * terrain.cell, -terrain.half + j * terrain.cell);
-    const sky = mesh.userData.sky;
-    let open = 0;
-    for (let j = 0; j < terrain.n; j++) {
-      for (let i = 0; i < terrain.n; i++) {
-        const corners = [[i, j], [i + 1, j], [i, j + 1], [i + 1, j + 1]];
-        if (corners.some(([a, b]) => sky.depth[b * n1 + a] <= ARCH_DEPTH + 2)) continue;   // the mouths' first metres: the arch (below)
-        if (!corners.some(([a, b]) => terrain.h(a, b) < top(a, b) - 1)) continue;          // solid rock
-        if (corners.every(([a, b]) => terrain.h(a, b) >= sky.roof[b * n1 + a] + 0.3)) continue;   // the ground itself is a closed skin above the roof there
-        open++;
-        assert.ok(covered.has(j * terrain.n + i), `variant ${variant}: open cell (${i}, ${j}) under the sky`);
-      }
-    }
-    assert.ok(open > 500, 'a real maze');
-    // the only cells under the open sky inside the mountain lie in front of the mouths (entrance, exit, false exits)
-    const mouths = [plan.cave.entrance, plan.cave.exit, ...plan.cave.maze.falseExits];
-    for (let j = 0; j < terrain.n; j++) {
-      for (let i = 0; i < terrain.n; i++) {
-        const d = depth(i, j);
-        if (d <= 0.5 || d > ARCH_DEPTH + 2) continue;
-        if (covered.has(j * terrain.n + i)) continue;
-        if (terrain.h(i, j) >= top(i, j) - 3) continue;
-        const x = -terrain.half + i * terrain.cell, z = -terrain.half + j * terrain.cell;
-        assert.ok(mouths.some((m) => Math.hypot(m.x - x, m.z - z) < 40), `variant ${variant}: an uncovered opening at (${x.toFixed(0)}, ${z.toFixed(0)}) away from every mouth`);
-      }
-    }
-  }
-});
-
 test('sky visibility: 1 at the openings, nearly 0 a few metres inside, falling smoothly', () => {
   assert.equal(visFromDistance(0), 1);
   assert.ok(visFromDistance(6) < 0.4);
@@ -109,7 +76,7 @@ test('sky visibility: 1 at the openings, nearly 0 a few metres inside, falling s
   let prev = 1;
   for (let d = 0; d <= 16; d += 0.5) { const v = visFromDistance(d); assert.ok(v <= prev + 1e-9); prev = v; }
   for (const variant of [1, 2]) {
-    const { mesh, layout, plan } = island(variant);
+    const { mesh, layout, plan } = meshed(variant);
     const sky = mesh.userData.sky;
     // outside: full sky; the entrance hall's centre (a long way in): dark; the sky above the roof: full
     assert.equal(sky.visAt(layout.spawnPoints[0].x, 5, layout.spawnPoints[0].z), 1);
@@ -120,22 +87,18 @@ test('sky visibility: 1 at the openings, nearly 0 a few metres inside, falling s
   }
 });
 
-test('the roof only spans tunnels and chambers (never pokes out of the flank), and nothing over low ground is left open', async () => {
-  const { roofCells } = await import('../src/client/world/caveMesh.js');
-  for (const variant of [1, 2, 3]) {
-    const { terrain, plan, mesh } = island(variant);
-    const sky = mesh.userData.sky, n = terrain.n, n1 = n + 1, half = terrain.half, cell = terrain.cell;
-    const shell = mesh.children.find((c) => c.name === 'cave-shell');
-    const sh = new Set(shell.userData.cells.map(([i, j]) => j * n + i)), rf = new Set(roofCells(terrain, sky));
-    for (const c of rf) {
-      const i = c % n, j = (c / n) | 0;
-      assert.ok([j * n1 + i, j * n1 + i + 1, (j + 1) * n1 + i, (j + 1) * n1 + i + 1].some((k) => sky.open[k]), `variant ${variant}: roof cell (${i}, ${j}) outside every tunnel`);
-    }
-    for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
-      const cs = [[i, j], [i + 1, j], [i, j + 1], [i + 1, j + 1]];
-      if (cs.some(([a, b]) => sky.depth[b * n1 + a] <= 0.5)) continue;
-      if (!cs.some(([a, b]) => terrain.h(a, b) < caveRockTop(plan, -half + a * cell, -half + b * cell) - 2)) continue;
-      assert.ok(sh.has(j * n + i) || rf.has(j * n + i), `variant ${variant}: open cell (${i}, ${j}) without roof or shell`);
-    }
+test('the terrain mesh hands over to the volume: no cell drawn twice, the volume in its own child, no old shell or roof', () => {
+  const { terrain, mesh } = meshed(VARIANTS[0]);
+  assert.equal(mesh.children.some((c) => c.name === 'cave-shell'), false);
+  const group = mesh.children.find((c) => c.name === 'cave-volume');
+  assert.ok(group && group.children.length > 100, 'the volume is chunked for culling');
+  const tris = group.children.reduce((a, c) => a + c.geometry.index.count / 3, 0);
+  assert.equal(tris, mesh.userData.volumeStats.triangles);
+  // the heightfield keeps only the cells beside the volume (the sea floor): far fewer than the whole grid
+  assert.ok(mesh.geometry.index.count / 6 < terrain.n * terrain.n * 0.6, 'the covered cells are dropped');
+  assert.ok(mesh.geometry.index.count > 0);
+  for (const c of group.children) {
+    assert.ok(c.geometry.attributes.normal && c.geometry.attributes.color && c.geometry.attributes.surface && c.geometry.attributes.surface2);
+    assert.equal(c.material, mesh.userData.caveMats.volume);
   }
 });

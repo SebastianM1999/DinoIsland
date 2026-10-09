@@ -8,6 +8,7 @@
 //   caveHeight(plan,x,z)  -> final ground height
 //   caveCeiling(plan,x,z) -> roof height (>= SKY outdoors, the client/Terrain map that to Infinity)
 //   caveOpenSdf(plan,x,z) -> signed distance to the open space (negative = tunnel/chamber floor)
+//   caveColumn(plan,x,z,o)-> top / floor / roof / open sdf of one column in a single pass (caveVolume.js)
 
 import { fbm, clamp, lerp, smoothstep } from './rng.js';
 import { CAVE_GEOM as G, SUMP } from './caveMaze.js';
@@ -306,6 +307,33 @@ function buildField(plan) {
       }
       return h;
     },
+    /**
+     * Everything the volume needs of one column in one pass (shares the memoised tunnel query): `top` the highest solid
+     * (the ground outdoors, the mountain's skin over the tunnels), `floor` the tunnel floor (= the ground outdoors),
+     * `roof` (1e4 outdoors), `s` the open-space distance (metres), `d` the depth into the mountain.
+     */
+    column(x, z, o) {
+      const d = depth(x, z), h0 = beachH(x, z, d);
+      o.d = d;
+      let floor = h0, top = h0;
+      if (d > 0) {
+        const q = query(x, z), fc = floorBase(x, z, d);
+        const fb0 = h0 > 0.2 ? lerp(h0, fc, smoothstep(0, 10, d)) : fc;
+        const fb = q.fw > 0 ? lerp(fb0, q.y0, q.fw) : fb0;
+        floor = fb - q.dep + FALSE_SILL.h * q.fx;
+        const up = rise(x, z, d);
+        const s = (q.s + 1.0 * fbm(x * 0.025 + 3, z * 0.025 + 7, 2, seed + 17)) * 1.6;
+        top = Math.max(lerp(floor, fb + up, smoothstep(0, WALL, s)), fb0 + up);   // (the height, and the rock top beside it)
+        o.roof = roofOf(x, z, d, q);
+        o.s = q.s;
+      } else { o.roof = 1e4; o.s = query(x, z).s; }
+      for (const p of pads) {
+        const dd = Math.hypot(x - p.x, z - p.z);
+        if (dd < p.r) { const t = 1 - smoothstep(p.r * 0.65, p.r, dd); floor = lerp(floor, p.h, t); top = lerp(top, p.h, t); }
+      }
+      o.floor = floor; o.top = top;
+      return o;
+    },
     ceiling(x, z) {
       const d = depth(x, z);
       if (d <= 0) return 1e4;
@@ -323,4 +351,5 @@ export const caveOpenSdf = (plan, x, z) => fieldOf(plan).open(x, z);
 export const caveDepth = (plan, x, z) => fieldOf(plan).depth(x, z);
 export const caveFloorBase = (plan, x, z) => fieldOf(plan).floorBase(x, z);
 export const caveRoofBase = (plan, x, z) => fieldOf(plan).roofBase(x, z);
+export const caveColumn = (plan, x, z, o = {}) => fieldOf(plan).column(x, z, o);
 export const caveRockTop = (plan, x, z) => fieldOf(plan).rockTop(x, z);
