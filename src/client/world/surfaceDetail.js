@@ -504,6 +504,23 @@ const ASH = /* glsl */ `
 
 const BUMP = { terrain: 0.9, rock: 1.2, foliage: 0.7, cave: 1.1 };
 
+// Glow of the cave: the volume mesh carries it baked per vertex with line of sight (caveLight.js, CAVE_VOL), plus a faint
+// moving shimmer of nearby water (baked weight, animated here); the sea floor outside reads the 2D glow texture.
+const CAVE_EMISSIVE = /* glsl */ `
+#ifdef CAVE_VOL
+  totalEmissiveRadiance += vCaveGlow * GLOW_RANGE_F * (0.07 + 0.5 * diffuseColor.rgb);
+  if (uSdLevel > 0.5 && vCaveBake.z > 0.01) {
+    vec3 shp = vSdPos * 0.8;
+    float shA = sdNoise3(shp + vec3(0.0, uCaveT * 0.21, uCaveT * 0.16));
+    float shB = sdNoise3(shp * 1.9 + vec3(uCaveT * 0.14, 0.0, -uCaveT * 0.19) + 7.0);
+    float shR = pow(1.0 - abs(shA + shB - 1.0), 5.0);
+    totalEmissiveRadiance += vec3(0.035, 0.11, 0.12) * vCaveBake.z * (0.25 + shR) * (0.35 + 1.3 * dot(diffuseColor.rgb, vec3(0.3333)));
+  }
+#else
+  totalEmissiveRadiance += texture2D(uCaveGlow, (vSdPos.xz - uCaveGlowRect.xy) * uCaveGlowRect.z).rgb * GLOW_RANGE_F * caveGlowK() * (0.07 + 0.5 * diffuseColor.rgb);
+#endif
+`;
+
 /**
  * Add procedural surface detail of `kind` ('terrain' | 'rock' | 'foliage')
  * to a MeshStandardMaterial (in place; returns it). Chains an existing
@@ -533,7 +550,7 @@ export function withSurfaceDetail(mat, kind) {
   float sdRough = 1.0;
   ${FRAG[kind]}
   ${ASH}`)
-      .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>${cave ? '\n  totalEmissiveRadiance += texture2D(uCaveGlow, (vSdPos.xz - uCaveGlowRect.xy) * uCaveGlowRect.z).rgb * GLOW_RANGE_F * caveGlowK() * (0.07 + 0.5 * diffuseColor.rgb);' : ''}`)
+      .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>${cave ? CAVE_EMISSIVE : ''}`)
       .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\n  roughnessFactor = clamp(roughnessFactor * sdRough, 0.04, 1.0);')
       .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
   if (uSdLevel > 1.5) normal = sdBumpNormal(-vViewPosition, normal, sdH * ${BUMP[kind].toFixed(2)} * 0.06, faceDirection);`);
