@@ -5,13 +5,36 @@ import { Terrain } from '../src/shared/terrain.js';
 import { buildLayout } from '../src/shared/layout.js';
 import { WALL_TORCH, TORCH } from '../src/shared/torch.js';
 import { ACT, EV, MSG, PF } from '../src/shared/protocol.js';
+import { caveRock } from '../src/shared/caveVolume.js';
+import { levelDef } from '../src/shared/levels.js';
 import { ServerWorld } from '../src/sim/world.js';
 
 const LEVEL = 3;
-const VARIANTS = [0, 1, 2, 3, 4, 5, 6, 7];
+const VARIANTS = [...new Set([levelDef(LEVEL).variant, 0, 1, 2, 3, 4, 5, 6])];
 
 test('the hand torch reaches further than before (owner: more light distance)', () => {
   assert.ok(TORCH.light.distance >= 24);
+});
+
+test('wall torches hang on the visible wall: the back plate lies on the volume skin, facing into the tunnel, rock behind and air in front', () => {
+  for (const variant of VARIANTS) {
+    const plan = planIsland(LEVEL, variant);
+    const layout = buildLayout(new Terrain(plan));
+    const rock = caveRock(plan);
+    assert.ok(layout.wallTorches.length >= 18, `variant ${variant}: ${layout.wallTorches.length} sconces`);
+    for (const w of layout.wallTorches) {
+      const e = 0.15;
+      const at = (dx, dy, dz) => rock.rock(w.x + w.nx * dx - w.nz * dz, w.y + dy, w.z + w.nz * dx + w.nx * dz);
+      const gx = at(e, 0, 0) - at(-e, 0, 0), gy = at(0, e, 0) - at(0, -e, 0), gz = at(0, 0, e) - at(0, 0, -e);
+      const gm = Math.hypot(gx, gy, gz) / (2 * e);
+      for (const dy of [-0.17, 0, 0.17]) for (const dz of [-0.1, 0.1]) {
+        assert.ok(Math.abs(at(0, dy, dz)) / gm <= 0.16, `variant ${variant}: sconce ${w.id} plate is ${(Math.abs(at(0, dy, dz)) / gm).toFixed(2)} m off the wall`);
+      }
+      assert.ok(gx > 0.7 * Math.hypot(gx, gy, gz), `variant ${variant}: sconce ${w.id} faces out of the wall`);
+      assert.ok(at(-0.8, 0, 0) < 0 && at(-1.6, 0, 0) < 0, `variant ${variant}: sconce ${w.id} has rock behind`);
+      assert.ok(at(1, 0, 0) > 0 && at(1.8, 0, 0) > 0 && at(0.6, 1, 0) > 0, `variant ${variant}: sconce ${w.id} has air in front`);
+    }
+  }
 });
 
 test('wall torches: about every 50 m along the tunnels, on the wall, under the roof, dry, never on another island', () => {

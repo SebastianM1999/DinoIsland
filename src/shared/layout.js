@@ -19,7 +19,8 @@ import { CONFIG } from './config.js';
 import { insideOutline, halfWidthAt, flowsOf } from './island.js';
 import { caveOpenSdf } from './caveField.js';
 import { SUMP } from './caveMaze.js';
-import { WALL_TORCH } from './torch.js';
+import { WALL_TORCH, wallMount } from './torch.js';
+import { caveRock } from './caveVolume.js';
 import { SPRING_LIP_OFFSET, SPRING_FLOOR, springColliders } from './springShape.js';
 
 const TAU = Math.PI * 2;
@@ -804,6 +805,7 @@ export function buildLayout(terrain) {
     {
       const wr = makeRng((plan.seed ^ 0x70c4) >>> 0);
       const W = layout.wallTorches;
+      const rock = caveRock(plan);
       const spaced = (x, z, d) => W.every((w) => Math.hypot(w.x - x, w.z - z) >= d);
       let side = wr() < 0.5 ? -1 : 1;
       for (const t of mz.tunnels) {
@@ -814,24 +816,17 @@ export function buildLayout(terrain) {
           const seg = Math.hypot(b.x - a.x, b.z - a.z);
           run -= seg;
           if (run > 0) continue;
-          run = WALL_TORCH.spacing * (0.75 + 0.5 * wr());
           const u = i / (t.pts.length - 1);
           if (t.flooded && u > t.flooded.u0 - 0.05 && u < t.flooded.u1 + 0.05) continue;   // (never over the water)
-          if (wr() < 0.3) side = -side; else if (wr() < 0.5) side = -side;                 // irregular: left, right, sometimes twice the same
-          const dx = (b.x - a.x) / seg, dz = (b.z - a.z) / seg, nx = -dz * side, nz = dx * side;
-          const floor = floorY(b.x, b.z);
           if (!underRoof(b.x, b.z) || terrain.waterDepthAt(b.x, b.z) > 0) continue;
-          // walk to the wall: the first point where the ground rises 1.6 m over the tunnel floor
-          let d = 0;
-          while (d < 15 && floorY(b.x + nx * d, b.z + nz * d) < floor + 1.6) d += 0.25;
-          if (d >= 15 || d < 2) continue;   // (in a chamber the wall is further away)
-          // (solid rock behind it, not a thin sheet over a niche)
-          if ([0.6, 1.2, 2.0].some((k) => floorY(b.x + nx * (d + k), b.z + nz * (d + k)) < floor + 1.6)) continue;
-          const x = b.x + nx * (d - 0.35), z = b.z + nz * (d - 0.35);
-          const y = floor + WALL_TORCH.height;
-          if (!(terrain.ceilingAt(x, z) > y + 1.2) || !spaced(x, z, WALL_TORCH.spacing * 0.5)) continue;
-          if (layout.relics.some((r) => Math.hypot(r.x - x, r.z - z) < 6)) continue;
-          W.push({ id: W.length, x, y, z, nx: -nx, nz: -nz, tunnel: t.id });
+          // (no good wall here: `run` stays used up, the next point of the tunnel tries again)
+          const w = wallMount(rock, floorY(b.x, b.z), b, { x: (b.x - a.x) / seg, z: (b.z - a.z) / seg }, side);
+          if (!w || !(terrain.ceilingAt(w.x, w.z) > w.y + 1.2) || !spaced(w.x, w.z, WALL_TORCH.spacing * 0.5)) continue;
+          if (layout.relics.some((r) => Math.hypot(r.x - w.x, r.z - w.z) < 6)) continue;
+          if (terrain.waterDepthAt(w.x + w.nx * 2.5, w.z + w.nz * 2.5) > 0) continue;
+          W.push({ id: W.length, x: w.x, y: w.y, z: w.z, nx: w.nx, nz: w.nz, tunnel: t.id });
+          run = WALL_TORCH.spacing * (0.75 + 0.5 * wr());
+          if (wr() < 0.3) side = -side; else if (wr() < 0.5) side = -side;   // irregular: left, right, sometimes twice the same
         }
       }
     }
