@@ -15,7 +15,7 @@
 
 ## Entry points
 - `main.js` runs on page load (`<script type="module" src="src/client/main.js">` in `index.html`). Flow:
-  1. Menu: name/server inputs, lobby polling of `/status`, menu music on first gesture, `initSteamLobby`, `initLanAddress`, `initInternetTest`.
+  1. Menu: left-aligned expedition actions and expandable connection details, name/server inputs, lobby polling of `/status`, menu music on first gesture, `initSteamLobby`, `initLanAddress`, `initInternetTest`. Dynamically loads `ui/menuTour.js` after paint for a disposable live tour of the three seeded islands; stops the tour before gameplay starts and restarts it if launch fails. Styles in `css/menu.css` affect the title screen only.
   2. `start(mode)` opens a `Net`: `Net.local` (solo worker, with `?island=`, `?base=`, `?raid=` testing aids), `Net.connect` (online, LAN, internet via `internetTest`), or `Net.steam` (`window.dinoSteam` bridge). Sends the saved outfit (`ui/wardrobe.js`) and profile (`core/profile.js`).
   3. `launch(net)`: loading screen, `preloadDinoModels`, `new Game(canvas, net, reuse)`, `game.gfx.prepare()` (shader precompile), `game.start()`, pointer lock.
   4. On `game.onNewIsland(welcome)` (team set sail) the old game is `dispose()`d and `launch` runs again, reusing renderer, audio and input; creative mode is carried over.

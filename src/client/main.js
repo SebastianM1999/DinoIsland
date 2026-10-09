@@ -56,6 +56,60 @@ document.addEventListener('pointerdown', playMenuMusic, { capture: true });
 document.addEventListener('keydown', playMenuMusic, { capture: true });
 const settingsUi = initSettings();
 
+// Load the real island backdrop after the interactive menu has painted.
+let menuTour = null;
+let tourIsland = 0;
+let tourRequest = 0;
+const tourDescriptions = [
+  'Sunlit trails. Ancient giants. The beginning of your expedition.',
+  'Still water. Tangled roots. Watch what moves beneath the surface.',
+  'Black rock. Rising ash. An island forged in fire.',
+];
+async function startMenuTour() {
+  const request = ++tourRequest;
+  try {
+    const { createMenuTour } = await import('./ui/menuTour.js');
+    if (request !== tourRequest || menu.hidden) return;
+    const tour = await createMenuTour($('menu-tour'), island => {
+      if (request !== tourRequest) return;
+      tourIsland = island.index;
+      $('tour-title').textContent = island.name;
+      $('tour-description').textContent = tourDescriptions[island.index];
+      $('tour-count').textContent = `${String(island.index + 1).padStart(2, '0')} / 03`;
+      $('tour-state').textContent = island.motionEnabled ? 'Exploring the archipelago' : 'Island lookout';
+      $('tour-motion').textContent = island.motionEnabled ? 'Pause tour' : 'Play tour';
+      $('tour-motion').setAttribute('aria-pressed', String(!island.motionEnabled));
+    });
+    if (request !== tourRequest || menu.hidden) { tour.dispose(); return; }
+    menuTour = tour;
+    $('tour-motion').disabled = false;
+    $('tour-next').disabled = false;
+  } catch (error) {
+    console.warn('Island tour unavailable', error);
+    $('tour-state').textContent = 'Welcome, explorer';
+    $('tour-description').textContent = 'Start an expedition to discover the islands.';
+  }
+}
+function stopMenuTour() {
+  ++tourRequest;
+  menuTour?.dispose();
+  menuTour = null;
+  $('tour-motion').disabled = true;
+  $('tour-next').disabled = true;
+}
+$('tour-motion').addEventListener('click', () => menuTour?.toggleMotion());
+$('tour-next').addEventListener('click', () => menuTour?.setIsland(tourIsland + 1));
+// Native Tab/Enter navigation also works; arrows provide quick menu selection.
+menu.querySelector('.menu-buttons').addEventListener('keydown', event => {
+  if (!['ArrowUp', 'ArrowDown', 'Home', 'End'].includes(event.key)) return;
+  const actions = [...menu.querySelector('.menu-buttons').querySelectorAll('button')].filter(button => !button.disabled && !button.hidden);
+  const index = actions.indexOf(document.activeElement);
+  const next = event.key === 'Home' ? 0 : event.key === 'End' ? actions.length - 1 : (index + (event.key === 'ArrowDown' ? 1 : -1) + actions.length) % actions.length;
+  event.preventDefault(); actions[next]?.focus();
+});
+requestAnimationFrame(() => setTimeout(startMenuTour, 100));
+window.addEventListener('pagehide', stopMenuTour);
+
 // The game module graph (about 4/5 of the client code) is not needed to show the
 // menu: load it once the menu is up, so the first paint and clicks are not delayed.
 let gameModule = null;
@@ -102,6 +156,7 @@ async function start(mode, options = {}) {
     return;
   }
   menu.hidden = true;
+  stopMenuTour();
   steamLobby.updateSession(net.steamSession);
   menuAudio?.stopMusic();
   if (await launch(net)) setBusy(false, '');
@@ -139,6 +194,7 @@ async function launch(net, reuse = null) {
     internetTest.stop();
     loading.hidden = true;
     menu.hidden = false;
+    void startMenuTour();
     menuAudio?.startMenuMusic();
     setBusy(false, `Could not start the game: ${err.message}`);
     return false;

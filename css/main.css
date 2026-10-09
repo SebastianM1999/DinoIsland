@@ -89,10 +89,7 @@ input[type="text"], input:not([type]) {
   z-index: 50;
 }
 #menu {
-  background:
-    linear-gradient(180deg, rgba(15, 30, 39, 0.06), rgba(15, 30, 39, 0.22)),
-    url('../assets/images/main-menu-island.webp') center / cover no-repeat,
-    #7cc8f5;
+  background: #162d30; /* Live map tour and title layout: menu.css. */
 }
 #loading { background: rgba(20, 28, 48, 0.6); }
 .loading-text { font-size: 1.6rem; font-weight: 700; text-shadow: 0 2px 0 rgba(0,0,0,.35); }
