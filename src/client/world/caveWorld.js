@@ -19,10 +19,11 @@ export function buildCaveWorld(terrain, layout, gfx, terrainMesh, water) {
   const group = new THREE.Group();
   group.name = 'cave-world';
   const tier = caveTier(gfx);
-  // where the decor hangs from: the roof the volume is carved to (its surface lies within ~0.85 m of it, the noise), so
-  // the stalactites' tops start a little inside the rock
+  // where the decor hangs from: the roof of the volume (the sim's ceiling grid is sampled from the very same field, so it is the
+  // visible roof), the stalactites' tops start a little inside the rock; where the grid has no roof (the rim of a wall) the
+  // designed roof plus the noise's reach
   const plan = layout.plan;
-  const roofY = (x, z) => caveRoofBase(plan, x, z) + 0.9;
+  const roofY = (x, z) => { const c = terrain.ceilingAt(x, z); return c < Infinity ? c + 0.2 : caveRoofBase(plan, x, z) + 0.9; };
   const decor = buildCaveDecor(terrain, layout, { roofY, tier });
   decor.roofY = roofY;
   group.add(decor.group);

@@ -825,6 +825,8 @@ export function buildLayout(terrain) {
           let d = 0;
           while (d < 15 && floorY(b.x + nx * d, b.z + nz * d) < floor + 1.6) d += 0.25;
           if (d >= 15 || d < 2) continue;   // (in a chamber the wall is further away)
+          // (solid rock behind it, not a thin sheet over a niche)
+          if ([0.6, 1.2, 2.0].some((k) => floorY(b.x + nx * (d + k), b.z + nz * (d + k)) < floor + 1.6)) continue;
           const x = b.x + nx * (d - 0.35), z = b.z + nz * (d - 0.35);
           const y = floor + WALL_TORCH.height;
           if (!(terrain.ceilingAt(x, z) > y + 1.2) || !spaced(x, z, WALL_TORCH.spacing * 0.5)) continue;

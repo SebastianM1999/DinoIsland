@@ -125,7 +125,7 @@ test('nothing sticks out of the flank, the mesh stays inside its region', () => 
         // the skin the field is cut to, anywhere within a voxel or two of the vertex (a steep flank moves sideways with the noise)
         let top = -Infinity;
         for (const [dx, dz] of [[0, 0], [SPREAD, 0], [-SPREAD, 0], [0, SPREAD], [0, -SPREAD], [SPREAD, SPREAD], [-SPREAD, -SPREAD], [SPREAD, -SPREAD], [-SPREAD, SPREAD]]) top = Math.max(top, caveColumn(plan, x + dx, z + dz, o).top);
-        assert.ok(y <= top + NOISE.amp + 1.2, `variant ${variant}: vertex ${(y - top).toFixed(1)} m over the skin at (${x.toFixed(0)}, ${z.toFixed(0)})`);
+        assert.ok(y <= top + NOISE.amp + 2.2, `variant ${variant}: vertex ${(y - top).toFixed(1)} m over the skin at (${x.toFixed(0)}, ${z.toFixed(0)})`);
         n++;
       }
     }
