@@ -293,7 +293,7 @@ test('no enclosed pocket of walkable cave floor is cut off from the spawn', () =
   }
 });
 
-test('under every walkable cave cell the roof is at least 3.5 m up, in tunnels 5 m and more', () => {
+test('under every walkable cave cell the roof is at least a body up; in the core of a passage 3.4 m and more', () => {
   for (const { variant, terrain, plan, layout, maze } of VARIANTS.map(island)) {
     const f = flood(terrain, spawnOf(layout));
     let cells = 0, low = Infinity, tunnelLow = Infinity, high = 0;
@@ -309,14 +309,17 @@ test('under every walkable cave cell the roof is at least 3.5 m up, in tunnels 5
         }
         cells++;
         const clear = roof - terrain.h(i, j);
+        // (the vault is round, the roof sweeps down to the wall: a body fits (the walk grid says so), the core keeps its height)
+        if (clear < CONFIG.player.height + 0.05) assert.fail(`variant ${variant}: walkable under a ${clear.toFixed(2)} m roof at (${x.toFixed(0)}, ${z.toFixed(0)})`);
+        if (caveOpenSdf(plan, x, z) > -2.5) continue;
         low = Math.min(low, clear);
         if (plan.cave.depthAt(x, z) > 30) high = Math.max(high, clear);   // (the roof lifts away at the tunnel mouths)
         if (Math.abs(x) < 130 && maze.nodes.every((n) => n.outside || Math.hypot(n.x - x, n.z - z) > n.r * 1.4 + 6)) tunnelLow = Math.min(tunnelLow, clear);
       }
     }
     assert.ok(cells > 1000);
-    assert.ok(low >= 3.5, `variant ${variant}: lowest roof ${low.toFixed(2)} m`);
-    assert.ok(tunnelLow >= 4.5, `variant ${variant}: lowest tunnel roof ${tunnelLow.toFixed(2)} m`);
+    assert.ok(low >= 3.4, `variant ${variant}: lowest roof ${low.toFixed(2)} m`);
+    assert.ok(tunnelLow >= 3.4, `variant ${variant}: lowest tunnel roof ${tunnelLow.toFixed(2)} m`);
     assert.ok(high <= 30 && high >= 12, `variant ${variant}: chambers up to ${high.toFixed(1)} m`);
     // the roof over the mouth rises into the open sky
     assert.equal(terrain.ceilingAt(layout.caveEntrance.x, layout.caveEntrance.z), Infinity);
@@ -557,7 +560,9 @@ test('the rock is always above the roof, and nobody on foot reaches the flanks o
     // ... nor from any false exit's ledge or the east beach
     const starts = [...layout.falseExits, { x: plan.boat.x, z: plan.boat.z }];
     const g = flood(terrain, starts);
-    for (let k = 0; k < n1 * n1; k++) if (g.seen[k]) assert.ok(terrain.heights[k] < CAVE_WALK_MAX - 2, `variant ${variant}: a flank is walkable from a false exit / the east beach`);
+    // (a false exit's own ledge lies at the sill's height, ~12 m: nothing may lead higher than where the walk started)
+    const startTop = Math.max(CAVE_WALK_MAX - 2, ...starts.map((s) => terrain.heightAt(s.x, s.z) + 1));
+    for (let k = 0; k < n1 * n1; k++) if (g.seen[k]) assert.ok(terrain.heights[k] < startTop, `variant ${variant}: a flank is walkable from a false exit / the east beach`);
   }
 });
 

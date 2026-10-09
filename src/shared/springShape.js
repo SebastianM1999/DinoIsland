@@ -18,13 +18,12 @@ const fade = (t) => t * t * t * (t * (t * 6 - 15) + 10);
 export function noise3(x, y, z, seed = 0) {
   const xi = Math.floor(x), yi = Math.floor(y), zi = Math.floor(z);
   const u = fade(x - xi), v = fade(y - yi), w = fade(z - zi);
-  const l = (a, b, t) => a + (b - a) * t;
-  const c = (dx, dy, dz) => hash3(xi + dx, yi + dy, zi + dz, seed);
-  return l(
-    l(l(c(0, 0, 0), c(1, 0, 0), u), l(c(0, 1, 0), c(1, 1, 0), u), v),
-    l(l(c(0, 0, 1), c(1, 0, 1), u), l(c(0, 1, 1), c(1, 1, 1), u), v),
-    w,
-  ) * 2 - 1;
+  // (no closures: this runs millions of times for the cave volume; same arithmetic as lerp a + (b - a) * t)
+  const c000 = hash3(xi, yi, zi, seed), c100 = hash3(xi + 1, yi, zi, seed), c010 = hash3(xi, yi + 1, zi, seed), c110 = hash3(xi + 1, yi + 1, zi, seed);
+  const c001 = hash3(xi, yi, zi + 1, seed), c101 = hash3(xi + 1, yi, zi + 1, seed), c011 = hash3(xi, yi + 1, zi + 1, seed), c111 = hash3(xi + 1, yi + 1, zi + 1, seed);
+  const a0 = c000 + (c100 - c000) * u, b0 = c010 + (c110 - c010) * u, a1 = c001 + (c101 - c001) * u, b1 = c011 + (c111 - c011) * u;
+  const p0 = a0 + (b0 - a0) * v, p1 = a1 + (b1 - a1) * v;
+  return (p0 + (p1 - p0) * w) * 2 - 1;
 }
 
 /** Two-octave smooth noise, roughly [-1, 1]. */

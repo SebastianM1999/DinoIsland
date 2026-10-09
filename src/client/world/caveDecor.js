@@ -306,7 +306,8 @@ export function buildCaveDecor(terrain, layout, { roofY, tier }) {
 
   // --- columns: one lathe each (few), reaching exactly from the floor to the bumpy roof
   const columnGeos = decor.columns.map((c, i) => {
-    const floor = terrain.heightAt(c.x, c.z) - 0.3, top = roofY(c.x, c.z) + 0.4;
+    // (the collider is layout.js: floor y to the ceiling + 0.5; the roof the mesh hangs from is the ceiling + 0.2)
+    const floor = terrain.heightAt(c.x, c.z) - 0.3, top = roofY(c.x, c.z) + 0.3;
     const g = columnGeometry(c.r, top - floor, i * 1.3 + 0.5);
     g.translate(c.x, floor, c.z);
     return g;

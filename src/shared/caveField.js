@@ -166,7 +166,7 @@ function buildField(plan) {
               const w = sd * (1 - smoothstep(1, 1.5, n));
               if (w > sw) { sw = w; sl = fl.level; sy = sl - SUMP.clear; }
             }
-            const dp = lerp(FLOOD_DEPTH, SUMP.depth, sd) * Math.max(wf, sd) * (1 - smoothstep(0.15, lerp(1, 1.35, sd), n));   // (in the sump the wall rises straight from the deep: no dry ledge under the low roof)
+            const dp = lerp(FLOOD_DEPTH, SUMP.depth, sd) * Math.max(wf, sd) * (1 - smoothstep(0.15, lerp(1, 2.15, sd), n));   // (in the sump the wall rises straight from the deep: no dry ledge under the low roof)
             const flat = smoothstep(fl.u0 - 0.22, fl.u0 - 0.08, arc) * (1 - smoothstep(fl.u1 + 0.08, fl.u1 + 0.22, arc)) * (1 - smoothstep(1, 1.7, n));
             if (dp > dep) dep = dp;
             if (flat > fw) { fw = flat; y0 = fl.y0; }

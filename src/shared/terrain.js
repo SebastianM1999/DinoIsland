@@ -7,6 +7,7 @@ import { CONFIG } from './config.js';
 import { WORLD, HUT_GROUND, planIsland, islandHeight, riverQuery, poolAt, bogSample, bridgeAt } from './island.js';
 import { smoothstep } from './rng.js';
 import { caveCeiling, CAVE_SKY } from './caveField.js';
+import { buildCaveWalk } from './caveWalk.js';
 
 /**
  * Heat (volcano): the ground near lava and fumaroles is hot – 1 right at the
@@ -40,6 +41,19 @@ export class Terrain {
       for (let j = 0; j <= segments; j++) {
         for (let i = 0; i <= segments; i++) {
           this.ceilings[j * n1 + i] = caveCeiling(plan, -this.half + i * this.cell, -this.half + j * this.cell);
+        }
+      }
+    }
+    // the Hollow Mountain's walls: floor and roof sampled finely from the very volume the client draws (caveWalk.js)
+    this.walk = null;
+    if (plan.cave) {
+      this.walk = buildCaveWalk(plan, { half: this.half, coarseHeight: (x, z) => this.#coarseHeight(x, z), coarseCeiling: (x, z) => this.#coarseCeiling(x, z) });
+      // (the coarse grid follows it where it is covered: flood fills, the water shader and the sea floor mesh read it)
+      const W = this.walk;
+      for (let j = 0; j <= segments; j++) {
+        for (let i = 0; i <= segments; i++) {
+          const x = -this.half + i * this.cell, z = -this.half + j * this.cell, h = W.height(x, z);
+          if (h === h) { this.heights[j * n1 + i] = h; this.ceilings[j * n1 + i] = W.ceiling(x, z); }
         }
       }
     }
@@ -153,8 +167,13 @@ export class Terrain {
     return this.heights[j * (n + 1) + i];
   }
 
-  /** Height exactly matching the rendered triangle mesh. */
+  /** Height exactly matching the rendered triangle mesh (on the Hollow Mountain: the fine walk grid where it covers, else the island grid). */
   heightAt(x, z) {
+    if (this.walk) { const v = this.walk.height(x, z); if (v === v) return v; }
+    return this.#coarseHeight(x, z);
+  }
+
+  #coarseHeight(x, z) {
     const gx = (x + this.half) / this.cell, gz = (z + this.half) / this.cell;
     const i = Math.floor(gx), j = Math.floor(gz);
     if (i < 0 || j < 0 || i >= this.n || j >= this.n) return -16;
@@ -170,6 +189,15 @@ export class Terrain {
    * rock the value is only the roof that would be there; nobody stands in rock.
    */
   ceilingAt(x, z) {
+    if (!this.ceilings) return Infinity;
+    const v = this.walk ? this.walk.ceiling(x, z) : NaN;
+    if (v === v) return v >= CAVE_SKY ? Infinity : v;
+    const w = this.#coarseCeiling(x, z);
+    return w >= CAVE_SKY ? Infinity : w;
+  }
+
+  /** the island grid's roof value (raw: CAVE_SKY and above is open) */
+  #coarseCeiling(x, z) {
     const c = this.ceilings;
     if (!c) return Infinity;
     const gx = (x + this.half) / this.cell, gz = (z + this.half) / this.cell;
@@ -177,8 +205,7 @@ export class Terrain {
     if (i < 0 || j < 0 || i >= this.n || j >= this.n) return Infinity;
     const fx = gx - i, fz = gz - j, n1 = this.n + 1;
     const c00 = c[j * n1 + i], c10 = c[j * n1 + i + 1], c01 = c[(j + 1) * n1 + i], c11 = c[(j + 1) * n1 + i + 1];
-    const v = fx + fz < 1 ? c00 + (c10 - c00) * fx + (c01 - c00) * fz : c11 + (c01 - c11) * (1 - fx) + (c10 - c11) * (1 - fz);
-    return v >= CAVE_SKY ? Infinity : v;
+    return fx + fz < 1 ? c00 + (c10 - c00) * fx + (c01 - c00) * fz : c11 + (c01 - c11) * (1 - fx) + (c10 - c11) * (1 - fz);
   }
 
   /** Free height between the floor and the roof at (x, z) (Infinity outdoors). */

@@ -13,12 +13,11 @@
 // normals are the field gradient (trilinear, from the same eight samples: continuous across chunk borders).
 // The mesh ends open at the region's edge (the terrain draws on beyond it, under water), everywhere else it is closed.
 
-import { caveRock, volumeField, slopeOf, NOISE, KU, NEAR } from '../../shared/caveVolume.js';
+import { volumeLattice, VOXEL } from '../../shared/caveVolume.js';
 
-export const VOXEL = 1.25;
+export { VOXEL };
 /** cells per chunk side (x and z): 26 * 1.25 = 32.5 m */
 export const CHUNK = 26;
-const GROW = 6;       // (the volume's region is this much larger than the one the terrain gives up)
 
 /**
  * @param {object} plan island plan
@@ -27,88 +26,13 @@ const GROW = 6;       // (the volume's region is this much larger than the one t
  */
 export function meshCaveVolume(plan, { half, voxel = VOXEL, chunk = CHUNK }) {
   const t0 = performance.now();
-  const rock = caveRock(plan), V = voxel, seed = rock.seed;
-  const inRegion = rock.region(GROW);
-  // --- the lattice over the region's bounding box
-  let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
-  for (let z = -half; z <= half; z += 6) for (let x = -half; x <= half; x += 6) {
-    if (!inRegion(x, z)) continue;
-    if (x < x0) x0 = x; if (x > x1) x1 = x; if (z < z0) z0 = z; if (z > z1) z1 = z;
-  }
-  x0 = Math.floor((x0 - 8) / V) * V; z0 = Math.floor((z0 - 8) / V) * V;
-  const NI = Math.ceil((x1 + 8 - x0) / V) + 1, NK = Math.ceil((z1 + 8 - z0) / V) + 1;
+  // --- 1. the columns (shared with the sim's walk grid: shared/caveVolume.js volumeLattice)
+  const lat = volumeLattice(plan, half, voxel);
+  const { rock, V, x0, z0, NI, NK, avail } = lat;
+  const inRegion = lat.region;
   const X = (i) => x0 + i * V, Z = (k) => z0 + k * V;
-  // --- 1. the columns
-  const N = NI * NK;
-  const avail = new Uint8Array(N);
-  const top = new Float32Array(N), floor = new Float32Array(N), roof = new Float32Array(N), sOpen = new Float32Array(N);
-  const col = {};
-  let topMax = -Infinity, topMin = Infinity;
-  for (let k = 0; k < NK; k++) for (let i = 0; i < NI; i++) {
-    const x = X(i), z = Z(k);
-    if (!inRegion(x, z)) continue;
-    const q = k * NI + i;
-    avail[q] = 1;
-    rock.column(x, z, col);
-    top[q] = col.top; floor[q] = col.floor; roof[q] = col.roof; sOpen[q] = col.s;
-    if (col.top > topMax) topMax = col.top;
-    if (col.top < topMin) topMin = col.top;
-  }
   const tColumns = performance.now();
-  // slope of the skin: the field's distance scale
-  const g = new Float32Array(N), inv = new Float32Array(N);
-  for (let k = 0; k < NK; k++) for (let i = 0; i < NI; i++) {
-    const q = k * NI + i;
-    if (!avail[q]) continue;
-    // (the gentler of the two one-sided slopes: a flat seabed at the foot of a cliff stays flat, a real slope has both alike)
-    const t = top[q];
-    const fx = i < NI - 1 && avail[q + 1] ? Math.abs(top[q + 1] - t) : -1, bx = i > 0 && avail[q - 1] ? Math.abs(t - top[q - 1]) : -1;
-    const fz = k < NK - 1 && avail[q + NI] ? Math.abs(top[q + NI] - t) : -1, bz = k > 0 && avail[q - NI] ? Math.abs(t - top[q - NI]) : -1;
-    const gx = (fx < 0 ? bx : bx < 0 ? fx : Math.min(fx, bx)) / V, gz = (fz < 0 ? bz : bz < 0 ? fz : Math.min(fz, bz)) / V;
-    const s = slopeOf(gx, gz);
-    g[q] = s.g; inv[q] = Math.max(0.12, s.inv);
-  }
-  // --- 2. the y bands (in lattice units), widened by the neighbours
-  const Y0 = Math.floor((topMin - 6) / V) * V + 0.37 * V;   // (off the round levels: a flat floor at exactly -16 m would sit on the lattice)
-  const rawLo = new Float32Array(N), rawHi = new Float32Array(N);
-  const reachUp = NOISE.amp + KU;
-  for (let q = 0; q < N; q++) {
-    if (!avail[q]) continue;
-    const B = 1 + reachUp / inv[q];
-    let lo = top[q] - B, hi = top[q] + B;
-    if (roof[q] < 1e3 && sOpen[q] < NEAR) {
-      lo = Math.min(lo, floor[q] - B);
-      hi = Math.max(hi, Math.min(roof[q], topMax) + B);
-    }
-    rawLo[q] = lo; rawHi[q] = hi;
-  }
-  const jlo = new Int32Array(N), jhi = new Int32Array(N).fill(-1), off = new Int32Array(N);
-  let total = 0;
-  for (let k = 0; k < NK; k++) for (let i = 0; i < NI; i++) {
-    const q = k * NI + i;
-    if (!avail[q]) continue;
-    let lo = Infinity, hi = -Infinity;
-    for (let dk = -1; dk <= 1; dk++) for (let di = -1; di <= 1; di++) {
-      const a = i + di, b = k + dk;
-      if (a < 0 || b < 0 || a >= NI || b >= NK) continue;
-      const r = b * NI + a;
-      if (!avail[r]) continue;
-      if (rawLo[r] < lo) lo = rawLo[r];
-      if (rawHi[r] > hi) hi = rawHi[r];
-    }
-    jlo[q] = Math.floor((lo - Y0) / V); jhi[q] = Math.ceil((hi - Y0) / V);
-    off[q] = total; total += jhi[q] - jlo[q] + 1;
-  }
-  // --- 3. the samples
-  const vals = new Float32Array(total);
-  const c = { top: 0, floor: 0, roof: 0, s: 0, inv: 1, g: 0 };
-  for (let k = 0; k < NK; k++) for (let i = 0; i < NI; i++) {
-    const q = k * NI + i;
-    if (!avail[q]) continue;
-    c.top = top[q]; c.floor = floor[q]; c.roof = roof[q]; c.s = sOpen[q]; c.inv = inv[q]; c.g = g[q];
-    const x = X(i), z = Z(k);
-    for (let j = jlo[q], n = off[q]; j <= jhi[q]; j++, n++) vals[n] = volumeField(c, x, Y0 + j * V, z, seed);
-  }
+  const { Y0, jlo, jhi, off, vals, total } = lat;
   const tSamples = performance.now();
   const at = (q, j) => (j < jlo[q] ? -1 : j > jhi[q] ? 1 : vals[off[q] + j - jlo[q]]);
 
