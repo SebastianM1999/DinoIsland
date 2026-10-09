@@ -18,7 +18,8 @@ import { MSG } from '../src/shared/protocol.js';
 import { PlayerController } from '../src/client/player/controller.js';
 
 const LEVEL = 3;
-const VARIANTS = Array.from({ length: 16 }, (_, i) => i + 1);
+// (the fixed map first, then 16 more: the generator must stay valid for every variant)
+const VARIANTS = [...new Set([levelDef(LEVEL).variant, ...Array.from({ length: 16 }, (_, i) => i + 1)])];
 const SLOPE = CONFIG.player.maxWalkSlope;
 const cache = new Map();
 /** Is (x, z) beside the stretch of the sump tunnel that dives (its ramps included)? */

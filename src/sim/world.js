@@ -63,7 +63,7 @@ const SPRINT_STRIKE_WINDOW = 2;
 export class ServerWorld {
   /**
    * @param {{ send:(to:number|'*', msg:object, except?:number)=>void, log?:(...a:any[])=>void }} host
-   * @param {{ level?: number, variant?: number }} [opts] start island (variant = random layout seed)
+   * @param {{ level?: number, variant?: number }} [opts] start island (variant: layout override for testing, default the level's fixed map)
    */
   constructor(host, opts = {}) {
     this.host = host;
@@ -79,8 +79,8 @@ export class ServerWorld {
     this.dinos.spawnAll();
   }
 
-  /** Build the island for `level` (everything that belongs to one island). */
-  #loadLevel(level, variant = 1 + Math.floor(Math.random() * 1e6)) {
+  /** Build the island for `level` (everything that belongs to one island): its fixed map unless `variant` overrides it. */
+  #loadLevel(level, variant = levelDef(level).variant) {
     this.worldEpoch = (this.worldEpoch ?? 0) + 1;
     this.levelIndex = level;
     this.variant = variant;
@@ -105,7 +105,7 @@ export class ServerWorld {
     this.log(`island ${level + 1} "${levelDef(level).name}" variant ${variant}`);
   }
 
-  /** The team set sail: build the next island (after the last one: a fresh first island). */
+  /** The team set sail: build the next island, its fixed map (after the last one: the first island again). */
   nextLevel() {
     this.#loadLevel(this.levelIndex + 1 < LEVEL_COUNT ? this.levelIndex + 1 : 0);
     this.mission.startIsland();

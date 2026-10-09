@@ -95,3 +95,24 @@ test('sailing away from the last island wins and starts a fresh first island', (
   world.nextLevel();
   assert.equal(world.levelIndex, 0);
 });
+
+test('every island is a fixed map: the default load is the same every time, ?variant overrides it', () => {
+  const snapshot = (w) => JSON.stringify({ v: w.variant, seed: w.terrain.plan.seed, relics: w.layout.relics.map((r) => [r.x, r.z]), spawn: w.layout.spawnPoints, boat: w.layout.boat, rocks: w.layout.rocks.length });
+  for (const level of [0, 1, 2, 3]) {
+    const fixed = levelDef(level).variant;
+    assert.ok(Number.isInteger(fixed) && fixed > 0, `level ${level} has a fixed variant`);
+    const a = new ServerWorld({ send() {} }, { level }), b = new ServerWorld({ send() {} }, { level });
+    assert.equal(a.variant, fixed, `level ${level} loads its fixed map`);
+    assert.equal(snapshot(a), snapshot(b), `level ${level}: two default loads build the same island`);
+    const o = new ServerWorld({ send() {} }, { level, variant: fixed + 1 });
+    assert.equal(o.variant, fixed + 1, 'the testing override still works');
+    assert.notEqual(o.terrain.plan.seed, a.terrain.plan.seed);
+  }
+  // sailing on builds the next island's fixed map, even after a start on an override
+  const w = new ServerWorld({ send() {} }, { level: 0, variant: 77 });
+  for (let level = 1; level < 4; level++) {
+    w.nextLevel();
+    assert.equal(w.levelIndex, level);
+    assert.equal(w.variant, levelDef(level).variant);
+  }
+});

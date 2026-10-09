@@ -72,3 +72,11 @@ test('the pin endpoint writes reports only for a local source checkout', async (
     fs.rmSync(root, { recursive: true, force: true });
   }
 });
+
+test('a dev pin revisit link needs no variant on a fixed map, and keeps an override', async () => {
+  const { revisitUrl } = await import('../src/client/core/devPins.js');
+  const { levelDef } = await import('../src/shared/levels.js');
+  const base = 'http://localhost:8080/';
+  assert.equal(revisitUrl({ index: 3, variant: levelDef(3).variant }, base), `${base}?island=4&dev`);
+  assert.equal(revisitUrl({ index: 3, variant: levelDef(3).variant + 5 }, base), `${base}?island=4&variant=${levelDef(3).variant + 5}&dev`);
+});

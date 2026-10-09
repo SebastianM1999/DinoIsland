@@ -7,11 +7,13 @@ import { Terrain } from '../src/shared/terrain.js';
 import { buildLayout } from '../src/shared/layout.js';
 import { TRUNKS } from '../src/shared/treeShapes.js';
 import { CONFIG } from '../src/shared/config.js';
+import { levelDef } from '../src/shared/levels.js';
 
 // (the Hollow Mountain, level 3, has no rivers, trees, hills or mountain paths: its own rules are checked in cave-level.test.js)
 const islands = [];
 for (const level of [0, 1, 2]) {
-  for (let variant = 1; variant <= 16; variant++) {
+  // (the generator must stay valid for every variant; the level's fixed map is always among them)
+  for (const variant of new Set([levelDef(level).variant, ...Array.from({ length: 16 }, (_, i) => i + 1)])) {
     const terrain = new Terrain(planIsland(level, variant));
     islands.push({ level, variant, terrain, plan: terrain.plan, layout: buildLayout(terrain) });
   }

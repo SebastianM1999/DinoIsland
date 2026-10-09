@@ -1,7 +1,8 @@
 // Levels: one island per level. Each island has a biome (look, plants, rocks,
 // dinosaurs, relic sites) and gets harder the further the team sails.
 // Shared by server and client; the island itself is generated from
-// (level index, variant seed) by shared/island.js.
+// (level index, variant seed) by shared/island.js. Every island is a FIXED map:
+// it always loads its `variant` below (`?variant=N` overrides it for testing).
 
 /**
  * Biome definitions. Colors are plain hex strings so the server can load this
@@ -214,15 +215,15 @@ export const LEVELS = [
   // the first island only has raptors and pteranodons – plus the giant locked
   // away in the Primeval Grove (shared/grove.js), a teaser for later islands –
   // and the Boss Arena, a lava islet beside the boat (shared/bossArena.js)
-  { name: 'Emerald Jungle', biome: 'jungle', dinos: { brachio: 0, stego: 0, raptor: 4 }, grove: true, bossArena: true },
+  { name: 'Emerald Jungle', biome: 'jungle', dinos: { brachio: 0, stego: 0, raptor: 4 }, grove: true, bossArena: true, variant: 1 },
   // twice the land area of the first island (incl. its boss islet); the swamp
   // arena in the waist waits for its boss (shared/swampArena.js)
-  { name: 'Misty Swamp', biome: 'swamp', scale: 0.86, swampArena: true, seedIndex: 2 },
+  { name: 'Misty Swamp', biome: 'swamp', scale: 0.86, swampArena: true, seedIndex: 2, variant: 1 },
   // round, about 1.3 times the swamp's land area; the crater arena on top waits
   // for its boss (shared/volcanoArena.js)
-  { name: 'Ashfall Isle', biome: 'volcano', scale: 0.65, seedIndex: 1 },
+  { name: 'Ashfall Isle', biome: 'volcano', scale: 0.65, seedIndex: 1, variant: 1 },
   // the last level: through the mountain from the west cove to the east beach (shared/caveMaze.js)
-  { name: 'Hollow Mountain', biome: 'cave', scale: 1, seedIndex: 3 },
+  { name: 'Hollow Mountain', biome: 'cave', scale: 1, seedIndex: 3, variant: 1 },
 ];
 
 export const LEVEL_COUNT = LEVELS.length;
@@ -248,6 +249,8 @@ export function levelDef(index) {
     swampArena: !!base.swampArena,
     // which seed family the island's variants come from (shared/island.js islandSeed)
     seedIndex: base.seedIndex ?? i,
+    // the fixed map: the island always builds this variant (sim/world.js; `?variant=N` overrides it)
+    variant: base.variant ?? 1,
     // island size: the first island is a small tutorial island, later ones full size
     scale: base.scale ?? (i === 0 ? 0.52 : 0.87),
     last: i === LEVEL_COUNT - 1,
