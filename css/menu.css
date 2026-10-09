@@ -101,6 +101,7 @@
 @media (max-width: 420px) { .explorer-card { grid-template-columns: minmax(0, 1fr) auto; gap: 8px; } .explorer-mark { display: none; } .home-explorer-stats { gap: 8px; } .home-explorer-stats strong { font-size: 1.1rem; } }
 
 /* Wide customization: progression, live explorer and outfit choices side by side. */
+#menu[inert] { overflow: hidden; }
 #menu[inert] .menu-card, #menu[inert] .menu-kicker, #menu[inert] .menu-utilities, #menu[inert] .tour-info { visibility: hidden; }
 #home-explorer-root, #home-explorer-root *, #home-skills, #home-skills * { scrollbar-width: none; }
 #home-explorer-root::-webkit-scrollbar, #home-explorer-root *::-webkit-scrollbar, #home-skills::-webkit-scrollbar, #home-skills *::-webkit-scrollbar { display: none; width: 0; height: 0; }
