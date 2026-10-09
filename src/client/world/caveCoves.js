@@ -5,7 +5,9 @@
 
 import * as THREE from 'three';
 import { makeRng } from '../../shared/rng.js';
-import { MAT } from '../models/kit.js';
+import { MAT, merge, place, rockGeometry } from '../models/kit.js';
+import { caveDepth, caveRoofBase } from '../../shared/caveField.js';
+import { withCaveSky, ROOF_EDGE } from './caveSky.js';
 import { buildBoat } from '../models/props/boat.js';
 import { grassGeometry } from './veg/plants.js';
 
@@ -13,6 +15,9 @@ const V = (x, y, z) => new THREE.Vector3(x, y, z);
 const TAU = Math.PI * 2;
 
 /** Distance from (x, z) to the nearest of `pts`. */
+/** Radius of the lintel stone for an opening `w` m wide: it spans the opening with room to sink into both walls. */
+const r0 = (w) => w * 0.5 + 2.2;
+
 const nearest = (pts, x, z) => pts.reduce((m, p) => Math.min(m, Math.hypot(p.x - x, p.z - z)), Infinity);
 
 export function buildCaveCoves(terrain, layout, { roofY }) {
@@ -33,6 +38,47 @@ export function buildCaveCoves(terrain, layout, { roofY }) {
     boat.setRepaired?.(true);
     group.add(boat.group);
     updaters.push((dt, time) => boat.update?.(dt, time));
+  }
+
+  // ------------------------------------------------------------ rock lintels over the openings
+  // A heavy mass of boulders rests on the roof's front edge of every opening (entrance, exit, false exits) and
+  // sinks into the cliff on both sides: it hides the seam between roof and mountain skin, so nobody outside can
+  // look up into the mountain, and the opening reads as a natural crack under fallen rock. All above head height.
+  {
+    const plan = layout.plan, geos = [];
+    const cols = ['#6f6052', '#5f5249', '#7e6c5c'];
+    const openings = maze.tunnels.filter((t) => t.kind === 'mouth' || t.kind === 'exit' || t.kind === 'falseExit');
+    for (const t of openings) {
+      // walk from the outside end inward to the roof's front edge
+      const pts = t.kind === 'mouth' ? t.pts : [...t.pts].reverse();
+      let i = pts.findIndex((q) => caveDepth(plan, q.x, q.z) >= ROOF_EDGE);
+      if (i < 1) continue;
+      const a = pts[i - 1], b = pts[i];
+      const len = Math.hypot(b.x - a.x, b.z - a.z) || 1, dx = (b.x - a.x) / len, dz = (b.z - a.z) / len;
+      // the exact edge between the two points
+      let lo = 0, hi = 1;
+      for (let k = 0; k < 12; k++) { const m = (lo + hi) / 2; if (caveDepth(plan, a.x + (b.x - a.x) * m, a.z + (b.z - a.z) * m) >= ROOF_EDGE) hi = m; else lo = m; }
+      const ex = a.x + (b.x - a.x) * hi, ez = a.z + (b.z - a.z) * hi;
+      const w = b.w ?? t.width, yaw = Math.atan2(-dz, dx);   // local +x along the tunnel, inward
+      const roof = caveRoofBase(plan, ex + dx * 1.5, ez + dz * 1.5);
+      const floor = terrain.heightAt(ex + dx * 1.5, ez + dz * 1.5);
+      const top = Math.max(roof, floor + 4.6);
+      const rock = (along, side, up, r, sx, sz, squash) => {
+        const g = rockGeometry({ radius: r, seed: rng() * 10, squash, colors: cols, moss: rng() < 0.5 ? '#55663f' : null });
+        const x = ex + dx * along - dz * side, z = ez + dz * along + dx * side;
+        geos.push(place(g, [x, top + up, z], [0, yaw + (rng() - 0.5) * 0.3, 0], [sx, 1, sz]));
+      };
+      // the big lintel stone across the opening, two shoulders sinking into the walls, one behind and above
+      rock(0.6, 0, r0(w) * 0.15 - 0.4, r0(w), 0.75, 1.15, 0.62);   // (its flat underside just below the roof edge)
+      rock(0.2, w * 0.55 + 1.2, 1.1, 3.4, 1, 1, 0.8);
+      rock(0.2, -(w * 0.55 + 1.2), 1.1, 3.4, 1, 1, 0.8);
+      rock(3.5, (rng() - 0.5) * 3, r0(w) * 0.9, r0(w) * 0.8, 1, 1, 0.7);
+    }
+    if (geos.length) {
+      const m = new THREE.Mesh(merge(geos), withCaveSky(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.85, metalness: 0 }), 0));
+      m.name = 'opening-lintels'; m.castShadow = true; m.receiveShadow = true;
+      group.add(m);
+    }
   }
 
   // ------------------------------------------------------------ dune grass

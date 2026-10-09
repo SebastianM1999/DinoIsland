@@ -10,7 +10,7 @@
 - `caveMesh.js` — the roof (smooth, down-facing, chunked, from the field's roof height; double-sided with a dark back).
 - `caveDecor.js` — stalactites, stalagmites, columns, crystals (emissive + halos), mushrooms from `layout.caveDecor`; `glowPoints`.
 - `caveFx.js` — pooled crystal lights (`gfx.addLightPool('crystal')`, intensity only), the cave air (fog/exposure/scene lights from the camera's sky visibility), drips, dust motes, daylight lures.
-- `caveCoves.js` — the two small coves: the arrival boat and dune grass. Nothing man-made at or in the mountain (no lanterns, timber supports or logs).
+- `caveCoves.js` — the two small coves: the arrival boat, dune grass, and a lintel of boulders over every opening (entrance, exit, false exits) resting on the roof's front edge and sinking into the cliff, so nobody outside looks up into the mountain. Nothing man-made at or in the mountain (no lanterns, timber supports or logs).
 - `wallTorches.js` — `buildWallTorches`: the Hollow Mountain's sconces (`layout.wallTorches`): one merged sconce mesh (lit by the sky field), instanced teardrop flames and halos shown only for lit ones (`setLit(ids)`), and a light pool `wallTorch` (2/3/4/4 lights by tier, built before `prepare`) given to the nearest lit torches with fades.
 - `caveStyle.js` — crystal colours and the baked glow field (painted into a texture).
 - `sky.js` — `buildSky`: gradient dome, sun, drifting clouds, distant islands; `mood()` for darker air.

@@ -216,6 +216,9 @@ export function buildCaveTerrainMesh(terrain, layout) {
  * as a dark arch under an overhang. Where it meets solid ground its vertices ARE the terrain's.
  * Returns the mesh (null if nothing is open); `userData.cells` lists the covered cells for tests.
  */
+/** How far behind a mouth's rim the shell stays flat on the roof (metres). */
+const LINTEL_FLAT = 7;
+
 function buildShell({ terrain, layout, sky, geo, T, fillVertex, material }) {
   const { n, cell, half } = terrain, n1 = n + 1, plan = layout.plan;
   const { depth, roof } = sky;
@@ -228,7 +231,9 @@ function buildShell({ terrain, layout, sky, geo, T, fillVertex, material }) {
       if (d <= 0.5) continue;
       const x = -half + i * cell, z = -half + j * cell;
       const top = caveRockTop(plan, x, z);
-      const lintel = roof[k] + 0.3 + 2.0 * Math.max(0, d - ROOF_EDGE);   // (rises from the roof right at the rim: the roof below hides its underside)
+      // (it lies on the roof for the first LINTEL_FLAT m behind the rim, then climbs to the rock: a wedge between roof
+      // and skin that opens at the rim would let anyone outside look up into the mountain)
+      const lintel = roof[k] + 0.3 + 2.0 * Math.max(0, d - ROOF_EDGE - LINTEL_FLAT);
       const y = Math.max(h, Math.min(top, lintel));
       if (y > h + 0.05) { S[k] = y; lifted[k] = 1; }
     }
