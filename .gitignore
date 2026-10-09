@@ -37,6 +37,7 @@ desktop.ini
 # Misc
 .cache/
 coverage/
+output/performance/
 *.tmp
 
 # Playwright MCP screenshots / snapshots

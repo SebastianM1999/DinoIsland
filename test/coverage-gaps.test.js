@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import path from 'node:path';
-import { coverageGaps } from '../scripts/coverage/gaps.mjs';
+import { coverageGaps } from '../scripts/coverage-gaps.mjs';
 
 test('coverage gaps identify failed paths without hiding functions or branches behind covered lines', () => {
   const root = path.resolve('fixture');
