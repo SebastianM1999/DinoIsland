@@ -13,7 +13,7 @@ import { fbm, smoothstep } from '../../shared/rng.js';
 import { caveFloorBase, caveCeiling, caveRockTop } from '../../shared/caveField.js';
 import { withSurfaceDetail, setSurfaceBiome, CAVE_GLOW } from './surfaceDetail.js';
 import { buildGlowField } from './caveStyle.js';
-import { buildSkyField, withCaveSky, CAVE_SKY, ARCH_DEPTH } from './caveSky.js';
+import { buildSkyField, withCaveSky, CAVE_SKY, ROOF_EDGE } from './caveSky.js';
 
 const C = (hex) => new THREE.Color(hex);
 
@@ -228,7 +228,7 @@ function buildShell({ terrain, layout, sky, geo, T, fillVertex, material }) {
       if (d <= 0.5) continue;
       const x = -half + i * cell, z = -half + j * cell;
       const top = caveRockTop(plan, x, z);
-      const lintel = roof[k] + 0.3 + 2.0 * Math.max(0, d - ARCH_DEPTH - 2);
+      const lintel = roof[k] + 0.3 + 2.0 * Math.max(0, d - ROOF_EDGE);   // (rises from the roof right at the rim: the roof below hides its underside)
       const y = Math.max(h, Math.min(top, lintel));
       if (y > h + 0.05) { S[k] = y; lifted[k] = 1; }
     }

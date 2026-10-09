@@ -12,7 +12,7 @@
 
 import * as THREE from 'three';
 import { fbm, smoothstep } from '../../shared/rng.js';
-import { ARCH_DEPTH } from './caveSky.js';
+import { ROOF_EDGE } from './caveSky.js';
 
 const CHUNK = 10;          // grid cells per chunk side
 const SUB = 2;             // subdivision per cell
@@ -21,7 +21,7 @@ function cellHasRoof(terrain, sky, n1, i, j) {
   let open = false;
   for (const [di, dj] of [[0, 0], [1, 0], [0, 1], [1, 1]]) {
     const k = (j + dj) * n1 + i + di;
-    if (sky.depth[k] < ARCH_DEPTH) return false;
+    if (sky.depth[k] < ROOF_EDGE) return false;
     if (terrain.h(i + di, j + dj) <= sky.roof[k] + 1.5) open = true;
   }
   return open;

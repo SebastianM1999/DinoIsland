@@ -17,8 +17,13 @@ import * as THREE from 'three';
 import { smoothstep } from '../../shared/rng.js';
 import { caveOpenSdf, caveRoofBase } from '../../shared/caveField.js';
 
-/** Where the arch of a tunnel mouth begins (metres into the mountain): shell and roof start here. */
+/** How far into the mountain a mouth's daylight counts as open sky (metres): the sky field's sources. */
 export const ARCH_DEPTH = 2;
+/**
+ * Where roof and shell begin at a mouth (metres into the mountain): right at the rim, the same line for both,
+ * so from inside the roof always covers the shell's rising lintel (no gap to see the cliff through).
+ */
+export const ROOF_EDGE = 0.5;
 /** The mouth's daylight reaches this far (metres through the tunnel) before it is dark. */
 const DAYLIGHT_REACH = 13;
 
