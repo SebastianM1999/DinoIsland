@@ -30,6 +30,13 @@ Every main directory has a `package-info.md` with its responsibility, files, ent
 
 Not documented by a package-info: `art/` (Blender sources, see the `dino-blender-creator` skill), `assets/` (runtime models/audio), `scripts/` (offline asset tooling), `docs/` (design notes), `dist/` and `output/` (build output).
 
+## Required coverage skill before pushing
+
+- Codex, Claude and Copilot must read and follow [.claude/skills/test-coverage/SKILL.md](.claude/skills/test-coverage/SKILL.md) for every code change and before pushing a feature branch. This is mandatory even when automatic skill discovery does not select it.
+- The tracked `.claude/skills` directory is the shared source. `npm ci` links `.agents/skills` to it for Codex discovery. If discovery or linking fails, read the tracked skill directly; do not skip it.
+- Before every push, run `npm test`, `npm run test:coverage`, `npm run coverage:gaps`, and `git diff --check` in the owning worktree. Resolve failures before pushing, and report the protected behavior, measured coverage scope, and remaining runtime validation gaps in the PR.
+- Preserve the complete-source scope and enforced floors in `.c8rc.json`. Do not lower thresholds, exclude difficult code, or add assertion-free tests to make a gate pass. The current floors are not a 100% coverage gate; do not describe a passing check as 100% coverage.
+
 ## Parallel agents and integration
 
 - These rules apply to Codex, Claude and Copilot. Read this file at session start; follow `docs/agent-workflow.md` for commands.

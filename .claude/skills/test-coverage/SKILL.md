@@ -1,6 +1,6 @@
 ---
 name: test-coverage
-description: Improve meaningful test coverage and test gameplay performance in Dinosaur Island. Use for coverage gaps, regression tests, FPS or stutter measurements, resource lifetime, and performance budgets; real browser and hardware measurements are required for FPS claims.
+description: Mandatory for every Dinosaur Island code change and before every push by Codex, Claude and Copilot. Improve meaningful test coverage and test gameplay performance; use for coverage gaps, regression tests, FPS or stutter measurements, resource lifetime, and performance budgets. Real browser and hardware measurements are required for FPS claims.
 ---
 
 # Test coverage for Dinosaur Island
@@ -148,9 +148,11 @@ Do not exclude difficult gameplay or host logic to inflate a score.
 
 ## Submission checks and limits
 
-`AGENTS.md` requires `npm test` and `git diff --check` before submission. Run
-`npm run test:coverage` when changing tested behavior or coverage configuration;
-CI enforces its floors. There are no configured `lint`, `lint:layers`, or
+`AGENTS.md` requires all three agents to read and follow this skill for every code
+change and before every push. Run `npm test`, `npm run test:coverage`,
+`npm run coverage:gaps`, and `git diff --check` before pushing; resolve failures
+first. CI enforces the configured coverage floors, not a 100% gate. There are no
+configured `lint`, `lint:layers`, or
 `typecheck` npm scripts; do not claim to have run them.
 
 CI's `Node 22 tests` job also selects hidden integration-controller tests

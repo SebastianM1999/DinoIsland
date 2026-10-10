@@ -13,7 +13,11 @@ The required workflow is:
   checkout or on `main`. An isolated platform task checkout/branch also qualifies.
 - Run all edits, installs, tests and commits inside that feature checkout. Never
   share it with another writer or discard someone else's changes.
-- Run `npm test` and `git diff --check`. Keep focused commits.
+- Read and follow [the shared test-coverage skill](../.claude/skills/test-coverage/SKILL.md)
+  for every code change and before every push, even if skill discovery does not
+  select it. Run `npm test`, `npm run test:coverage`, `npm run coverage:gaps`, and
+  `git diff --check`; resolve failures before pushing. Preserve the coverage scope
+  and floors; a passing check does not mean 100% coverage. Keep focused commits.
 - Never push unless the user explicitly authorizes it. With authorization, push
   the feature branch and create or update exactly one PR targeting `main` after
   local checks pass. The controller adds `ready-to-merge` automatically after
