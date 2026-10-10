@@ -20,7 +20,8 @@ jobs:
   test:
     name: Node 22 tests
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    # Complete-source coverage includes live cave meshing and collision sweeps.
+    timeout-minutes: 25
     env:
       ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
     steps:

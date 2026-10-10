@@ -3,7 +3,7 @@
 // Loaded from trusted main; this helper only observes metadata and wakes the controller.
 module.exports = async function awaitTaskCi({ github, context, core, prNumber, expectedHead,
   sleep = ms => new Promise(resolve => setTimeout(resolve, ms)), now = Date.now,
-  maxWaitMs = 17 * 60 * 1000, pollMs = 15000, candidateOnly = false }) {
+  maxWaitMs = 27 * 60 * 1000, pollMs = 15000, candidateOnly = false }) {
   const sha = value => /^[a-f0-9]{40}$/i.test(value || '');
   if (!Number.isSafeInteger(Number(prNumber)) || Number(prNumber) <= 0 || !sha(expectedHead)) {
     throw new Error('A positive PR number and exact 40-character head SHA are required.');
