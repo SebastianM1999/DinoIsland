@@ -12,6 +12,7 @@
 
 - `torch.test.js` — torch pickup authority, respawn at the spot, `PF.TORCH` gating, `carriesLight`; the close-up shading math (`softCapIrradiance`, ACES estimate: a wall a metre from the torch stays below white, 3 m and 6 m keep their brightness).
 - `helpers/caveRays.js` — vertical rays through the Hollow Mountain's real mesh, shared by `cave-walk.test.js` and `cave-roof.test.js`.
+- `helpers/caveFixture.js` — registers an already generated live walk grid through the real bake API for repeated gameplay-world fixtures; each Terrain decodes independent arrays. Generation/determinism checks build live before registration, and bake rejection tests do not use this helper. Clears registrations after each test file.
 `sarco-model.test.js` validates the Alpha Sarcosuchus boss GLB: near-black green skin, bright red scars, red/yellow emissive eyes, normalized weights, jaw deformation, fourteen clips, braced wind-up contacts and staggered attack steps, loop closure and ground clearance.
 Grouped by the module area they mainly cover. Many simulation tests also check the matching client code.
 

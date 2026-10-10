@@ -13,6 +13,7 @@ import { PlayerController } from '../src/client/player/controller.js';
 import { torchState } from '../src/client/player/actions.js';
 import { ServerWorld } from '../src/sim/world.js';
 import { sumpLurkerBrain } from '../src/sim/ai/sumpLurker.js';
+import { reuseCaveWalk } from './helpers/caveFixture.js';
 
 const LEVEL = 3;
 // The generator must stay valid for every variant: the sump count is checked on the maze plan of all 16 (cheap,
@@ -26,6 +27,7 @@ function island(variant) {
   if (!cache.has(variant)) {
     const terrain = new Terrain(planIsland(LEVEL, variant));
     const layout = buildLayout(terrain);
+    reuseCaveWalk(terrain);
     cache.set(variant, { variant, terrain, plan: terrain.plan, layout, maze: terrain.plan.cave.maze });
   }
   return cache.get(variant);
@@ -292,6 +294,8 @@ test('the breath refills quickly at the surface', () => {
 function wetWorld(variant = 1) {
   const { terrain, layout } = island(variant);
   const world = new ServerWorld({ send() {} }, { level: LEVEL, variant });
+  assert.equal(world.terrain.walk.stats.baked, true, 'uses the generated fixture grid');
+  assert.notEqual(world.terrain.walk.floor, terrain.walk.floor, 'worlds own independent walk arrays');
   const { id } = world.join('Diver');
   const p = world.players.get(id);
   const sm = layout.sumps[0];

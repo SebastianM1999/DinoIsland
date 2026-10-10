@@ -16,6 +16,7 @@ import { CONFIG } from '../src/shared/config.js';
 import { ServerWorld } from '../src/sim/world.js';
 import { MSG } from '../src/shared/protocol.js';
 import { PlayerController } from '../src/client/player/controller.js';
+import { reuseCaveWalk } from './helpers/caveFixture.js';
 
 const LEVEL = 3;
 // (the fixed map first, then 16 more: the generator must stay valid for every variant)
@@ -115,6 +116,7 @@ test('the cave level is deterministic: the same variant builds the same maze, gr
     assert.deepEqual(a.layout.caveDecor, l2.caveDecor);
     assert.deepEqual(a.layout.caveLights, l2.caveLights);
     assert.deepEqual(a.layout.caveDinoSpots, l2.caveDinoSpots);
+    reuseCaveWalk(a.terrain);
   }
   assert.notDeepEqual(island(1).maze.nodes.map((n) => n.x), island(2).maze.nodes.map((n) => n.x), 'variants differ');
 });

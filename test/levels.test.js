@@ -4,11 +4,18 @@ import { ACT, EV, MSG } from '../src/shared/protocol.js';
 import { ServerWorld } from '../src/sim/world.js';
 import { planIsland } from '../src/shared/island.js';
 import { levelDef } from '../src/shared/levels.js';
+import { reuseCaveWalk } from './helpers/caveFixture.js';
+
+function makeWorld(host, opts) {
+  const world = new ServerWorld(host, opts);
+  reuseCaveWalk(world.terrain);
+  return world;
+}
 
 test('every island has a hut beach, a boat beach and three reachable relic spots', () => {
   for (const level of [0, 1, 2, 3]) {
     for (const variant of [1, 2, 3]) {
-      const world = new ServerWorld({ send() {} }, { level, variant });
+      const world = makeWorld({ send() {} }, { level, variant });
       const { layout, terrain } = world;
       assert.equal(layout.relics.length, 3, `level ${level} v${variant} relics`);
       assert.ok(layout.boat.x > layout.hut.x + 150, 'boat is on the far (east) side');
@@ -33,7 +40,7 @@ test('every island has a hut beach, a boat beach and three reachable relic spots
 
 test('find the parts, repair the boat and sail to the next island together', () => {
   const sent = [];
-  const world = new ServerWorld({ send: (to, message) => sent.push({ to, message }) }, { level: 0, variant: 5 });
+  const world = makeWorld({ send: (to, message) => sent.push({ to, message }) }, { level: 0, variant: 5 });
   const a = world.join('Ada');
   const p = world.players.get(a.id);
   p.creative = true;                                   // keep dinosaurs out of the test
@@ -75,7 +82,7 @@ test('find the parts, repair the boat and sail to the next island together', () 
 });
 
 test('lava burns players', () => {
-  const world = new ServerWorld({ send() {} }, { level: 2, variant: 3 });
+  const world = makeWorld({ send() {} }, { level: 2, variant: 3 });
   const a = world.join('Bo');
   const p = world.players.get(a.id);
   // (a point of the first lava flow that is open lava: not under a bridge)
@@ -87,7 +94,7 @@ test('lava burns players', () => {
 });
 
 test('sailing away from the last island wins and starts a fresh first island', () => {
-  const world = new ServerWorld({ send() {} }, { level: 3, variant: 4 });
+  const world = makeWorld({ send() {} }, { level: 3, variant: 4 });
   const a = world.join('Cy');
   world.players.get(a.id).creative = true;
   world.mission.phase = 'sailing';
@@ -101,15 +108,15 @@ test('every island is a fixed map: the default load is the same every time, ?var
   for (const level of [0, 1, 2, 3]) {
     const fixed = levelDef(level).variant;
     assert.ok(Number.isInteger(fixed) && fixed > 0, `level ${level} has a fixed variant`);
-    const a = new ServerWorld({ send() {} }, { level }), b = new ServerWorld({ send() {} }, { level });
+    const a = makeWorld({ send() {} }, { level }), b = makeWorld({ send() {} }, { level });
     assert.equal(a.variant, fixed, `level ${level} loads its fixed map`);
     assert.equal(snapshot(a), snapshot(b), `level ${level}: two default loads build the same island`);
-    const o = new ServerWorld({ send() {} }, { level, variant: fixed + 1 });
+    const o = makeWorld({ send() {} }, { level, variant: fixed + 1 });
     assert.equal(o.variant, fixed + 1, 'the testing override still works');
     assert.notEqual(o.terrain.plan.seed, a.terrain.plan.seed);
   }
   // sailing on builds the next island's fixed map, even after a start on an override
-  const w = new ServerWorld({ send() {} }, { level: 0, variant: 77 });
+  const w = makeWorld({ send() {} }, { level: 0, variant: 77 });
   for (let level = 1; level < 4; level++) {
     w.nextLevel();
     assert.equal(w.levelIndex, level);

@@ -8,6 +8,7 @@ import { ACT, EV, MSG, PF } from '../src/shared/protocol.js';
 import { caveRock } from '../src/shared/caveVolume.js';
 import { levelDef } from '../src/shared/levels.js';
 import { ServerWorld } from '../src/sim/world.js';
+import { reuseCaveWalk } from './helpers/caveFixture.js';
 
 const LEVEL = 3;
 // (Terrain + layout cost ~3 s each, several times that under c8: the fixed map and three more, built once and shared)
@@ -17,6 +18,7 @@ function island(variant) {
   if (!built.has(variant)) {
     const plan = planIsland(LEVEL, variant);
     const terrain = new Terrain(plan);
+    reuseCaveWalk(terrain);
     built.set(variant, { plan, terrain, layout: buildLayout(terrain) });
   }
   return built.get(variant);
