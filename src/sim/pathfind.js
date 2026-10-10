@@ -44,7 +44,7 @@ class Heap {
 const DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]];
 
 /** Can `d` walk straight from (x0, z0) to (x1, z1)? Same rule as DinoSystem.move(): steep only going down. */
-function reachable(sys, d, x0, z0, x1, z1) {
+export function canWalkSegment(sys, d, x0, z0, x1, z1) {
   const t = sys.terrain, len = Math.hypot(x1 - x0, z1 - z0), n = Math.ceil(len / 0.75);
   let prev = t.heightAt(x0, z0);
   for (let s = 1; s <= n; s++) {
@@ -98,7 +98,7 @@ export function findPath(sys, d, fx, fz, tx, tz, reach = 8, maxNodes = MAX_NODES
   // of the steep step it just ran down
   const i0 = Math.floor(fx / CELL), j0 = Math.floor(fz / CELL);
   for (const [i, j] of [[i0, j0], [i0 + 1, j0], [i0, j0 + 1], [i0 + 1, j0 + 1]]) {
-    if (!cell(i, j) || !reachable(sys, d, fx, fz, i * CELL, j * CELL)) continue;
+    if (!cell(i, j) || !canWalkSegment(sys, d, fx, fz, i * CELL, j * CELL)) continue;
     const c = Math.hypot(i * CELL - fx, j * CELL - fz) / CELL;
     g.set(key(i, j), c);
     heap.push({ i, j, f: c + h(i, j) });
@@ -129,7 +129,7 @@ export function findPath(sys, d, fx, fz, tx, tz, reach = 8, maxNodes = MAX_NODES
       // Walkable cell centers can straddle a narrow water channel or steep ridge.
       // Validate the continuous, directed segment with the same rule as movement.
       const edge = `${nk}:${key(i, j)}`;
-      if (!edges.has(edge)) edges.set(edge, reachable(sys, d, n.i * CELL, n.j * CELL, i * CELL, j * CELL));
+      if (!edges.has(edge)) edges.set(edge, canWalkSegment(sys, d, n.i * CELL, n.j * CELL, i * CELL, j * CELL));
       if (!edges.get(edge)) continue;
       const k = key(i, j);
       // bogs (swamp) are slow going: weigh them by the time they take, so the dry paths win

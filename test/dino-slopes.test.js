@@ -5,8 +5,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { ServerWorld } from '../src/sim/world.js';
-import { findPath } from '../src/sim/pathfind.js';
-import { climbSlope } from '../src/sim/dinos.js';
+import { findPath, canWalkSegment } from '../src/sim/pathfind.js';
+import { DinoSystem, climbSlope } from '../src/sim/dinos.js';
 import { insideGrove } from '../src/shared/grove.js';
 import { insideBossArena } from '../src/shared/bossArena.js';
 import { CONFIG } from '../src/shared/config.js';
@@ -183,7 +183,31 @@ test('pathfinding plans the way down a wall and never up one', () => {
   assert.ok(back > 0, `${back} ways back up checked`);
 });
 
-test('after running down, a raptor is not trapped at the foot of the wall', () => {
+test('steering follows the reachable route entry and does not round a blocked corner', () => {
+  for (const start of [{ x: 1.9, z: 1.9 }, { x: 2.4, z: 0.9 }]) {
+    // A small forbidden pool lies between the feet and the second grid center.
+    // The first center is reachable, including when it is within the normal
+    // waypoint proximity threshold. Both shortcuts must keep the entry turn.
+    const terrain = {
+      heightAt: () => 0, slopeAt: () => 0, lavaLevelAt: () => null,
+      waterDepthAt: (x, z) => Math.hypot(x - 2.5, z - 2.5) <= 0.8 ? 2 : 0,
+    };
+    const world = { now: 1, terrain, layout: { level: { difficulty: 1 }, colliders: { circles: [], boxes: [] } }, safeZone: () => null };
+    const sys = new DinoSystem(world);
+    const d = { type: 'raptor', radius: CONFIG.dinos.raptor.radius, ...start, yaw: 0, spd: 0, blockedT: 1, trackDist: 0 };
+    // Exercise the planner and the real steering entry point, without a forward
+    // stride hiding an illegal heading behind local obstacle avoidance.
+    sys.steer(d, 8, 8, 0, 1, 100);
+    const ahead = { x: d.x - Math.sin(d.yaw) * 2, z: d.z - Math.cos(d.yaw) * 2 };
+    assert.ok(canWalkSegment(sys, d, d.x, d.z, ahead.x, ahead.z), `reachable heading from ${start.x},${start.z}`);
+    assert.ok(ahead.z < start.z, 'heads around the pool before turning toward the goal');
+  }
+});
+
+test('after running down, a raptor is not trapped at the foot of the wall', (t) => {
+  const originalRandom = Math.random;
+  t.after(() => { Math.random = originalRandom; });
+  Math.random = lcg(98765);
   let n = 0, away = 0;
   for (const { level, variant } of VARIANTS.slice(0, 8)) {
     const world = new ServerWorld({ send() {} }, { level, variant });

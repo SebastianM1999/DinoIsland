@@ -43,7 +43,7 @@ Grouped by the module area they mainly cover. Many simulation tests also check t
 
 ### Simulation: dinosaurs and combat (src/sim)
 - `sarcosuchus-boss.test.js` — central island 2 boss spawn, harmless telegraphs, committed lunge dodges and miss recovery, shoulder shove, swept tail knockback, low-health chains, safe-zone exclusion, arena damage boundaries and no respawn; bank targeting across fifteen variants, backwards retreats, floating corpse continuity, late-join phase synchronization, vertical strike avoidance and emergence without shore-height pops.
-- `dino-slopes.test.js` — dinosaurs run down steep slopes to players, climbing stays limited (`findPath`, `climbSlope`) over seeded island variants.
+- `dino-slopes.test.js` — dinosaurs run down steep slopes to players, climbing stays limited (`findPath`, `climbSlope`) over seeded island variants. Detour steering preserves the reachable entry and does not cut forbidden corners; foot-of-wall recovery uses scoped seeded AI randomness for replayable results.
 - `dino-contact.test.js` — player-vs-dinosaur body contact (`resolveDinoContact`) and contact damage events.
 - `sump-lurker.test.js` — Sump Lurker config, flooded-spot-only spawning (never on levels 0-2), submerged lurk, edge lunge and drag back, staying near water, retreat when hurt, GLB clips (`sumpLurkerBrain`, fake pool terrain).
 - `crystal-plodder.test.js` — Crystal Plodder config, cave-only count, hall choice over the fixed map + variants 1-3 (`plodderChambers`), no stacking with gloom packs, peaceful until hurt/crowded, short charge, club sweep and hit-once strike.
@@ -98,7 +98,7 @@ Grouped by the module area they mainly cover. Many simulation tests also check t
 
 ## Entry points
 - `npm test` runs `node --test`, which discovers every `*.test.js` file here. A single file runs with `node --test test/<name>.test.js`.
-- Cave test budget (CI cancels `npm run test:coverage` at 15 min; c8 makes the Terrain/volume builds ~6x slower): rules that only read the maze or plan sweep every variant through `planIsland` alone; geometric rules (Terrain, layout, volume mesh) run on the fixed map plus 3 variants and share one build per variant per file. Never build a Terrain/mesh twice in a file when one build and a comparison does it.
+- Cave test budget (CI cancels `npm run test:coverage` at 25 min; c8 makes the Terrain/volume builds ~6x slower): rules that only read the maze or plan sweep every variant through `planIsland` alone; geometric rules (Terrain, layout, volume mesh) run on the fixed map plus 3 variants and share one build per variant per file. Never build a Terrain/mesh twice in a file when one build and a comparison does it.
 - `npm run test:coverage` runs the same suite through c8. `.c8rc.json` includes all source modules, with unimported modules at zero; reports are in ignored `coverage/`. `npm run coverage:gaps -- <topic>` reads the last report and checks that no source file is missing. A focused report is not the full-suite baseline.
 - There is no shared helper module; each file defines its own small fixtures (`setup()`, `fixture()`, `solo()` and similar).
 
