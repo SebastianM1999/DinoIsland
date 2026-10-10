@@ -1,11 +1,13 @@
 'use strict';
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
 const awaitCi = require('./await-task-ci.cjs');
 const head = 'a'.repeat(40);
 const candidate = 'b'.repeat(40);
 const name = 'owner/game';
-function fixture({ frames, maxWaitMs = 30, pollMs = 10, candidateOnly = false }) {
+function fixture({ frames, maxWaitMs = 30, pollMs = 10, candidateOnly = false, useDefaultBudget = false }) {
   let index = 0;
   let clock = 0;
   const dispatches = [];
@@ -24,7 +26,7 @@ function fixture({ frames, maxWaitMs = 30, pollMs = 10, candidateOnly = false })
     issues: { addLabels: async args => holds.push(args), createComment: async args => comments.push(args) }
   }, paginate: async (_method, args) => (frame().runs || []).map(run).filter(item => item.head_sha === args.head_sha) };
   return { run, dispatches, holds, comments, start: () => awaitCi({ github, context: { repo: { owner: 'owner', repo: 'game' } },
-    core: { info() {} }, prNumber: 1, expectedHead: head, maxWaitMs, pollMs, candidateOnly,
+    core: { info() {} }, prNumber: 1, expectedHead: head, ...(useDefaultBudget ? {} : { maxWaitMs }), pollMs, candidateOnly,
     now: () => clock, sleep: async ms => { clock += ms; index++; } }), clock: () => clock };
 }
 test('pending task CI wakes once when success completes', async () => {
@@ -72,6 +74,36 @@ test('pending timeout holds PR without repeated dispatch or exceeding deadline',
   assert.equal(f.dispatches.length, 0);
   assert.equal(f.holds.length, 1);
   assert.match(f.comments[0].body, /manually run integration.yml/);
+});
+
+test('the default deadline allows long CI and still holds the PR at exactly 27 minutes', async () => {
+  const f = fixture({ frames: [{ runs: [{}] }], useDefaultBudget: true, pollMs: 17 * 60000 });
+  assert.match(await f.start(), /timed out/);
+  assert.equal(f.clock(), 27 * 60000);
+  assert.equal(f.dispatches.length, 0);
+  assert.equal(f.holds.length, 1);
+  assert.equal(f.comments.length, 1);
+  assert.match(f.comments[0].body, /within 27 minutes/);
+});
+
+test('CI completes within the helper budget and every metadata job leaves time for a timeout hold', async () => {
+  const f = fixture({ frames: [{ runs: [{}] }], useDefaultBudget: true, pollMs: 60 * 60000 });
+  await f.start();
+  const waitMinutes = f.clock() / 60000;
+  const timeout = (file, job) => {
+    const lines = fs.readFileSync(path.join(__dirname, '..', 'workflows', file), 'utf8').split(/\r?\n/);
+    const start = lines.indexOf(`  ${job}:`);
+    assert.ok(start >= 0, `${file} has job ${job}`);
+    const block = [];
+    for (let i = start + 1; i < lines.length && !/^  [\w-]+:/.test(lines[i]); i++) block.push(lines[i]);
+    const match = block.join('\n').match(/^    timeout-minutes: (\d+)$/m);
+    assert.ok(match, `${file} ${job} declares a bounded timeout`);
+    return Number(match[1]);
+  };
+  assert.ok(timeout('ci.yml', 'test') + 2 <= waitMinutes, 'helper outlasts the CI job with a startup margin');
+  for (const [file, job] of [['integration.yml', 'await-candidate-ci'], ['integration-rebase.yml', 'await-ci'], ['integration-repair.yml', 'await-ci']]) {
+    assert.ok(timeout(file, job) >= waitMinutes + 3, `${file} leaves setup and timeout reporting time`);
+  }
 });
 test('ineligible author stops before dispatch', async () => {
   const f = fixture({ frames: [{ permission: 'read' }] });
