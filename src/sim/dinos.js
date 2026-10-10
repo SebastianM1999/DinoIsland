@@ -22,7 +22,7 @@ import { sumpLurkerBrain } from './ai/sumpLurker.js';
 import { crystalPlodderBrain } from './ai/crystalPlodder.js';
 import { aquaticGroundHeight, carcassSurface } from './ai/aquatic.js';
 import { raiderStep } from './raids.js';
-import { findPath } from './pathfind.js';
+import { findPath, canWalkSegment } from './pathfind.js';
 
 const BRAINS = { brachio: brachioBrain, stego: stegoBrain, raptor: raptorBrain, 'gloom-raptor': gloomRaptorBrain, ptera: pteraBrain, trex: trexBrain, 'alpha-sarcosuchus': sarcosuchusBrain, 'sump-lurker': sumpLurkerBrain, 'crystal-plodder': crystalPlodderBrain };
 const r2 = (v) => Math.round(v * 100) / 100;
@@ -255,12 +255,19 @@ export class DinoSystem {
         pts = findPath(this, d, d.x, d.z, tx, tz, reach, DETOUR.nodes, { every: 1 });
         if (!pts) d.scrambleUntil = 0;
       }
-      r = d.route = pts && pts.length > 1 ? { pts, i: 1, gx: tx, gz: tz, until: now + DETOUR.keep } : null;
+      // The first grid center is the entry to the route, not the animal's position.
+      // Skipping it can cut across the steep bank the planner went around.
+      r = d.route = pts?.length ? { pts, i: 0, gx: tx, gz: tz, until: now + DETOUR.keep } : null;
     }
     if (!r) return { x: tx, z: tz };
     // next waypoint not yet reached (the last one leads straight on to the goal)
     const near = Math.max(2.5, radiusOf(d));
-    while (r.i < r.pts.length && Math.hypot(r.pts[r.i].x - d.x, r.pts[r.i].z - d.z) < near) r.i++;
+    while (r.i < r.pts.length && Math.hypot(r.pts[r.i].x - d.x, r.pts[r.i].z - d.z) < near) {
+      const next = r.pts[r.i + 1] || { x: tx, z: tz };
+      // Only round a corner when the shortcut is walkable from the actual feet.
+      if (!canWalkSegment(this, d, d.x, d.z, next.x, next.z)) break;
+      r.i++;
+    }
     if (r.i >= r.pts.length) { d.route = null; d.scrambleUntil = 0; return { x: tx, z: tz }; }
     return r.pts[r.i];
   }
