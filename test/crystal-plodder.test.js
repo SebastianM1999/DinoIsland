@@ -12,6 +12,7 @@ import { ServerWorld } from '../src/sim/world.js';
 import { crystalPlodderBrain, clubSweep, clubRelative, PLODDER_TIMING } from '../src/sim/ai/crystalPlodder.js';
 import { GLB_DINOS } from '../src/client/models/dino/glbCatalog.js';
 import { SPECIES } from '../src/client/entities/dinoViews.js';
+import { reuseCaveWalk } from './helpers/caveFixture.js';
 
 const TYPE = 'crystal-plodder';
 const C = CONFIG.dinos[TYPE], DT = 1 / CONFIG.net.tickRate;
@@ -51,7 +52,11 @@ test('club sweep: harmless wind-up, the strike crosses the whole arc behind the 
 const VARIANTS = [...new Set([levelDef(3).variant, 1, 2, 3])];
 const layouts = new Map();
 function layoutOf(variant) {
-  if (!layouts.has(variant)) layouts.set(variant, buildLayout(new Terrain(planIsland(3, variant))));
+  if (!layouts.has(variant)) {
+    const terrain = new Terrain(planIsland(3, variant));
+    layouts.set(variant, buildLayout(terrain));
+    reuseCaveWalk(terrain);
+  }
   return layouts.get(variant);
 }
 
@@ -76,6 +81,7 @@ test('plodder chambers: big halls only, crystal halls first, one each, never rel
 
 test('the cave world spawns a plodder per hall and the gloom packs never share one', () => {
   for (const variant of [1, 2, 3]) {
+    layoutOf(variant);
     const world = new ServerWorld({ send() {} }, { level: 3, variant });
     const plodders = world.dinos.list.filter((d) => d.type === TYPE);
     const homes = plodderChambers(world.layout);
