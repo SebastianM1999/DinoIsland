@@ -63,6 +63,14 @@ measurements are required for the final construction and menu warm-up changes.
 
 ## Validation limits
 
+Final `npm test` and `npm run test:coverage`: 549 passed, one skipped, zero
+failures (550 tests). Complete-source c8 measured 214 files: 71.41%
+lines/statements, 84.43% functions and 88.97% branches; all configured floors
+passed. `npm run coverage:gaps` and `git diff --check` also passed. A dev-pin
+fixture's 20 ms sleep was replaced with bounded response-completion waiting
+after the full run exposed its timing race; production endpoint behavior was
+unchanged.
+
 Regression tests protect full terrain-cell coverage, streaming eviction,
 nested mesh warm-up, cancellation cleanup, seeded synchronous/staged world
 and vegetation parity, spatial detail selection, stale postcards, slow-frame
