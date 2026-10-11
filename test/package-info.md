@@ -79,7 +79,7 @@ Grouped by the module area they mainly cover. Many simulation tests also check t
 - `terrain-streaming.test.js` — terrain chunk topology/attribute seam preservation, bounded mesh activation, GPU eviction/revisit/disposal, and cancellable UI construction scheduling.
 - `interpolation.test.js` — packet reordering, bounded extrapolation, short-path angle interpolation and bounded long-session snapshot storage.
 - `resource-lifetime.test.js` — owned GPU resource disposal once across scenes, cache resource retention, shader uniform textures and per-instance buffer cleanup.
-- `spatial-instances.test.js` — per-object foliage LOD within a shared spatial batch, hysteresis, stable buffers and density, fog recovery, foliage-only shadow policy and LOD buffer disposal.
+- `spatial-instances.test.js` — per-object foliage LOD within a shared spatial batch, hysteresis, stable buffers/density, fog recovery, foliage-only shadow policy and disposal; seeded sync/cooperative vegetation and swamp-decor parity, bounded work steps and cancellation cleanup.
 - `performance-samples.test.js` — frame-time percentiles expose stalls, remain bounded over long sessions and reject invalid timing samples; deterministic checks, not an FPS benchmark.
 - `player-actions.test.js` — real PlayerActions input routing with headless viewmodel/effects: weapon resource handling and cooldowns, obstruction, reload rejection, fruit selection/giving, revive and butcher confirmation/cancellation, auto-loot capacities and request throttling, camp interactions, carry HUD and spotted compass markers.
 - `tracking-minimap.test.js` — dinosaur discovery by sustained sighting, server sighting checks, minimap does not reveal the boss arena.
