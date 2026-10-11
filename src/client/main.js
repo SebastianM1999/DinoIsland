@@ -240,6 +240,7 @@ async function start(mode, options = {}) {
  */
 let keepCreative = false;
 async function launch(net, reuse = null, { openMenu = false } = {}) {
+  net.beginLoading();
   let disconnectReason = 'Disconnected while loading the island';
   const buildAbort = new AbortController();
   net.onClose = reason => {
@@ -311,6 +312,8 @@ async function launch(net, reuse = null, { openMenu = false } = {}) {
     net.welcome = welcome;
     launch(net, shared);
   };
+  net.endLoading();
+  if (net.closed) { backToMenu('Disconnected while loading the island'); return false; }
   loadingUi.stop();
   game.start();
   if (keepCreative) game.setCreative(true);
