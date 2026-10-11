@@ -38,10 +38,11 @@ function fireRingGeometry() {
   const stones = [];
   for (let i = 0; i < 7; i++) {
     const a = (i / 7) * Math.PI * 2;
-    stones.push(place(paint(new THREE.DodecahedronGeometry(0.11, 0), i % 2 ? '#9a94a0' : '#7f7a86'), [Math.cos(a) * 0.38, 0.05, Math.sin(a) * 0.38], [a, i, 0], [1, 0.7, 1.2]));
+    stones.push(place(paint(new THREE.DodecahedronGeometry(0.11, 0), i % 2 ? '#9a94a0' : '#7f7a86'), [Math.cos(a) * 0.38, 0.03, Math.sin(a) * 0.38], [0, a, 0], [1, 0.7, 1.2]));
   }
-  const stick = (r) => place(limb(0.035, 0.03, 0.55, '#2b2220', 5), [0, 0.05, 0], [Math.PI / 2, r, 0]);
-  return merge([...stones, place(stick(0.4), [-0.2, 0, 0.1]), place(stick(-0.5), [0.2, 0, -0.15])]);
+  // (a stick lies along X, centred, then turned about Y)
+  const stick = (yaw, x, z) => place(place(limb(0.035, 0.03, 0.55, '#2b2220', 5), [0.275, 0.04, 0], [0, 0, Math.PI / 2]), [x, 0, z], [0, yaw, 0]);
+  return merge([...stones, stick(0.5, -0.05, 0.05), stick(-0.6, 0.05, -0.05)]);
 }
 
 export function buildBowCamp(terrain, layout) {
