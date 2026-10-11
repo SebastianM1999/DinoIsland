@@ -2,7 +2,7 @@
 > The client side of the network protocol: one `Net` session to an authoritative `ServerWorld`, whatever the transport (WebSocket, Steam bridge or solo Web Worker), plus clock sync, snapshot ordering and interpolation.
 
 ## Files
-- `net.js` — `Net`: transports (`connect`, `steam`, `local`), handler registry, `send`/`act`/`sendState`, server clock estimate, adaptive interpolation delay, snapshot acceptance/ordering, profile receipt, telemetry.
+- `net.js` — `Net`: transports (`connect`, `steam`, `local`), handler registry, `send`/`act`/`sendState`, server clock estimate, adaptive interpolation delay, snapshot acceptance/ordering, profile receipt, telemetry; `beginLoading`/`endLoading` preserve reliable world changes and the latest valid snapshot during cooperative client construction.
 - `interp.js` — `InterpBuffer`: time-stamped value frames for remote entities, interpolated between the two surrounding snapshots (angle-aware).
 - `steamTransport.js` — `connectSteam`: adapts the Electron preload Steam bridge (`window.dinoSteam`) into a `Net` transport and waits for the welcome.
 - `lan.js` — `websocketAddress` (normalises a typed IP/URL into a `ws://`/`wss://` address with the default port), `initLanAddress` (fills the host-address UI from the server's `/connection` endpoint, copy button).
@@ -23,6 +23,7 @@
 - Remote entities are drawn at `renderNow()` = server time minus an interpolation delay that adapts to jitter between `CONFIG.net.interpDelayMin` and `interpDelayMax`; render time never runs backwards.
 - A profile received in `MSG.PROF` is sanitised and saved here (`saveProfile`), except creative-mode profiles, which are never kept.
 - A heartbeat ping every 2 s keeps RTT/clock estimates fresh.
+- Call `beginLoading()` before asynchronous launch work and `endLoading()` only after every Game callback is registered. Metadata, clock sync and profile persistence remain live; reliable deliveries replay in arrival order before the latest still-current snapshot. The queue is bounded by message count and serialized bytes; overflow or a replacement welcome during construction disconnects explicitly rather than silently applying incomplete/wrong-island state.
 - Lag compensation input: clients send `rt` (their render time) with hits; the server clamps and uses it (`src/sim/world.js` `hitPose`).
 
 ## Not here

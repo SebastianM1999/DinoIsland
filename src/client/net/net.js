@@ -35,6 +35,7 @@ export class Net {
     this.worldEpoch = null;
     this.prof = null;               // newest private progression from the server (sanitized); the Game reads it when it is built
     this.pendingSnapshot = null;
+    this.loading = null;           // bounded delivery queue while Game constructs its handlers
     this.lastRenderTime = -Infinity;
     this.offsetSamples = [];
     this.pongSamples = [];
@@ -43,6 +44,7 @@ export class Net {
     transport.onMessage = (msg) => this.#dispatch(msg);
     transport.onClose = (reason) => {
       this.closed = true;
+      this.loading = null;
       clearInterval(this.heartbeat);
       this.onClose?.(reason);
     };
@@ -139,6 +141,57 @@ export class Net {
     this.handlers.get(type).push(fn);
   }
 
+  /** Preserve world changes while cooperative construction yields to networking. */
+  beginLoading({ maxMessages = 2048, maxBytes = 4 * 1024 * 1024 } = {}) {
+    if (this.closed || this.loading) return;
+    if (!Number.isInteger(maxMessages) || maxMessages < 1 || !Number.isInteger(maxBytes) || maxBytes < 1) throw new RangeError('Invalid loading buffer limits');
+    this.loading = { messages: [], snapshot: null, bytes: 0, maxMessages, maxBytes };
+  }
+
+  /** Register every game callback before replay; metadata is already processed. */
+  endLoading() {
+    const queue = this.loading;
+    if (!queue || this.closed) return;
+    for (const message of queue.messages) {
+      if (this.closed || this.loading !== queue) return;
+      this.#deliver(message);
+    }
+    this.loading = null;
+    const snapshot = queue.snapshot?.message;
+    // A newer reliable change can invalidate the last loading snapshot (e.g.
+    // death or inventory state). Wait for a fresh one instead of undoing it.
+    if (!this.closed && !this.loading && snapshot &&
+        (!Number.isFinite(snapshot.r) || snapshot.r >= this.reliableSeq)) this.#deliver(snapshot);
+  }
+
+  #failLoading(reason) {
+    const notify = this.onClose;
+    this.onClose = null;
+    this.close();
+    notify?.(reason);
+  }
+
+  #deliver(message) {
+    const key = message.t === MSG.EV ? `ev:${message.e}` : message.t;
+    const list = this.handlers.get(key);
+    if (list) for (const fn of list) fn(message);
+  }
+
+  #deliverOrBuffer(message) {
+    const queue = this.loading;
+    if (!queue || message.t === MSG.PONG || message.t === MSG.WELCOME) { this.#deliver(message); return; }
+    const bytes = new TextEncoder().encode(JSON.stringify(message)).byteLength;
+    const replaced = message.t === MSG.SNAP ? queue.snapshot?.bytes ?? 0 : 0;
+    if (queue.bytes - replaced + bytes > queue.maxBytes ||
+        (message.t !== MSG.SNAP && queue.messages.length >= queue.maxMessages)) {
+      this.#failLoading('Too many world changes while loading. Reconnect to continue.');
+      return;
+    }
+    queue.bytes += bytes - replaced;
+    if (message.t === MSG.SNAP) queue.snapshot = { message, bytes };
+    else queue.messages.push(message);
+  }
+
   send(msg) {
     if (!this.closed) this.transport.send(msg);
   }
@@ -153,6 +206,7 @@ export class Net {
 
   close() {
     this.closed = true;
+    this.loading = null;
     clearInterval(this.heartbeat);
     this.transport.close();
   }
@@ -244,6 +298,12 @@ export class Net {
     if (this.closed || !msg || typeof msg !== 'object') return;
     const local = performance.now() / 1000;
     if (msg.t === MSG.WELCOME) {
+      // A game under construction is tied to its welcome. Do not silently
+      // populate that island with events from a replacement world.
+      if (this.loading && this.myId !== null) {
+        this.#failLoading('The island changed while loading. Reconnect to continue.');
+        return;
+      }
       this.myId = msg.id;
       this.epoch = msg.k ?? 0;
       this.minSnapNow = msg.now;
@@ -272,9 +332,7 @@ export class Net {
     }
     if (msg.t !== MSG.SNAP && Number.isFinite(msg.r)) this.reliableSeq = Math.max(this.reliableSeq, msg.r);
     if ((msg.t === MSG.SNAP || msg.t === MSG.WELCOME || msg.t === MSG.PONG) && Number.isFinite(msg.now)) this.#clock(msg, local);
-    const key = msg.t === MSG.EV ? `ev:${msg.e}` : msg.t;
-    const list = this.handlers.get(key);
-    if (list) for (const fn of list) fn(msg);
+    this.#deliverOrBuffer(msg);
     if (msg.t !== MSG.SNAP && this.pendingSnapshot && this.pendingSnapshot.r <= this.reliableSeq) {
       const pending = this.pendingSnapshot;
       this.pendingSnapshot = null;
