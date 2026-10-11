@@ -107,6 +107,9 @@ export async function createMenuTour(canvas, onIsland = () => {}, { signal } = {
       shadowTime = time;
     }
     WIND.uTime.value = time;
+    const terrainGroup = updaters[0]?.group;
+    if (terrainGroup?.loadAround) terrainGroup.range = (biome.sky.fogFar + 40) *
+      Math.sqrt(1 + (Math.tan(camera.fov * Math.PI / 360) * camera.aspect) ** 2);
     for (const updater of updaters) updater.update?.(dt, time, camera.position);
   }
 
