@@ -12,7 +12,7 @@ import { WIND } from '../models/kit.js';
 import { buildTerrainMeshAsync } from '../world/terrainMesh.js';
 import { buildSky } from '../world/sky.js';
 import { buildWater } from '../world/water.js';
-import { buildVegetation } from '../world/vegetation.js';
+import { buildVegetationAsync } from '../world/vegetation.js';
 import { buildRocks } from '../world/rocks.js';
 import { buildLogs } from '../world/logs.js';
 import { buildHut } from '../world/hut.js';
@@ -173,7 +173,7 @@ export async function createMenuTour(canvas, onIsland = () => {}, { signal } = {
       }); return { group, update: group.update?.bind(group) }; },
       () => buildSky({ scene: islandScene, sunDir }, layout),
       () => buildWater(islandTerrain, layout, sunDir),
-      () => buildVegetation(islandTerrain, corridor), () => buildRocks(islandTerrain, corridor),
+      () => buildVegetationAsync(islandTerrain, corridor, { signal: buildSignal }), () => buildRocks(islandTerrain, corridor),
       () => buildLogs(islandTerrain, corridor), () => buildFruitPlants(islandTerrain, corridor),
       () => buildHut(islandTerrain, layout, { landing: hasBasePlots(layout) }), () => buildSites(islandTerrain, layout),
       () => buildBossArena(islandTerrain, layout), () => buildSwampArena(islandTerrain, corridor),

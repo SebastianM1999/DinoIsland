@@ -22,7 +22,7 @@ import { buildTerrainMeshSteps } from '../world/terrainMesh.js';
 import { runBuildSteps } from './buildSteps.js';
 import { buildSky } from '../world/sky.js';
 import { buildWater } from '../world/water.js';
-import { buildVegetation } from '../world/vegetation.js';
+import { buildVegetationSteps } from '../world/vegetation.js';
 import { buildRocks } from '../world/rocks.js';
 import { setSurfaceQuality } from '../world/surfaceDetail.js';
 import { buildFruitPlants } from '../world/fruitPlants.js';
@@ -334,7 +334,7 @@ export class Game {
     this.water = buildWater(this.terrain, this.layout, this.gfx.sunDir);
     scene.add(this.water.group);
     yield;
-    this.vegetation = buildVegetation(this.terrain, this.layout);
+    this.vegetation = yield* buildVegetationSteps(this.terrain, this.layout);
     scene.add(this.vegetation.group);
     yield;
     this.rocks = buildRocks(this.terrain, this.layout);
