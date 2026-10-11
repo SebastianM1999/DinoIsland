@@ -195,8 +195,15 @@ test('a ballista cannot hit a pterosaur in the air, an arrow tower can', () => {
   // circles right above the base (its circling area is the base itself)
   const ptera = world.dinos.spawn('ptera', p.x, p.z, { nest: { x: p.x, z: p.z }, area: { x: p.x, z: p.z }, slot: 0 });
   ptera.x = p.x; ptera.z = p.z;
-  // pinned in place: its random circling start angle could carry it out of the arrow tower's range
-  const keepFlying = () => { ptera.x = p.x; ptera.z = p.z; ptera.y = world.terrain.heightAt(p.x, p.z) + 12; ptera.raid = { target: null }; };
+  // pinned in place and on a fixed course: its random circling angle and attack timer (Math.random
+  // in init) would otherwise steer it, or start a dive at the builder, between pinning and aiming
+  ptera.angle = 0;
+  const keepFlying = () => {
+    ptera.x = p.x; ptera.z = p.z; ptera.y = world.terrain.heightAt(p.x, p.z) + 12;
+    ptera.vx = ptera.vy = ptera.vz = 0;
+    ptera.mode = 'circle'; ptera.cool = 60;
+    ptera.raid = { target: null };
+  };
   keepFlying();
   events.length = 0;
   for (let i = 0; i < 40; i++) { keepFlying(); run(0.1); }
