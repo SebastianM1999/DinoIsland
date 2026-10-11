@@ -44,7 +44,7 @@ tier instead of permitting auto-tuning to reduce quality during a slow run.
 Production auto-tuning is unchanged. Render scale/contact shading use fresh
 context defaults (100%/30%), and their applied values are recorded.
 
-Each island has its own server and fresh browser context. A small fixture HTML
+The three islands are the fixed maps (`levelDef(i).variant`); `--variant=N` only asserts that this is the expected map. Each island has its own server and fresh browser context. A small fixture HTML
 document replaces the menu so its scenery cannot consume GPU time alongside
 gameplay. The actual HTTP asset host, `Net.connect`, `Game`, frame loop, physics,
 HUD, audio, models, world builders, WebSocket snapshots and live dinosaur AI
@@ -76,7 +76,7 @@ The script rejects empty rendering/movement/snapshot workloads, missing visible
 dinosaurs, incapacitated players, missing clients and uncaught browser exceptions.
 
 Customize duration with `--seconds=30 --warmup-seconds=10`, viewport with
-`--width=1920 --height=1080`, seed with `--variant=42`, and target metadata with
+`--width=1920 --height=1080`, target metadata with
 `--target-fps=120`. `--channel=chrome` uses installed Chrome; omit it for bundled
 Chromium. `--software` explicitly requests SwiftShader for portability.
 Software GPU results establish functional execution and relative regressions;
@@ -92,10 +92,8 @@ node scripts/performance/startup.mjs --channel=chrome --runs=3 --seconds=30 --ou
 ```
 
 It opens the real entry document in fresh 1920×1080/DPR-1 contexts, measures
-selected-photo/menu readiness and solo launch, then samples the real first-island
-landing camera using Worker hosting and live dinosaurs. Run one starts while the
-live tour is pending to exercise cancellation; later runs wait for that tour.
-The menu must retain one island and request no other islands' photographs/cave
+selected-photo/menu readiness (the menu is a photograph slideshow without WebGL; the report asserts that it draws no canvas) and solo launch, then samples the real first-island
+landing camera using Worker hosting and live dinosaurs. The menu must retain one island and request no other islands' photographs/cave
 bake. The report records asset errors, long tasks, frame/GPU/render CPU percentiles,
 draw calls and triangles. Medium is frozen during gameplay. The stationary landing
 route has one player; it complements the four-player observation workload. Headless

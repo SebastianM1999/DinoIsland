@@ -6,14 +6,17 @@ import { makeRng } from '../../src/shared/rng.js';
 import { goodSpot, standable } from '../../src/sim/unstuck.js';
 import { PF } from '../../src/shared/protocol.js';
 import { CONFIG } from '../../src/shared/config.js';
+import { levelDef } from '../../src/shared/levels.js';
 import { options, number, distribution, environment, report } from './common.mjs';
 
 const opts = options(['seconds', 'warmup-seconds', 'variant', 'max-frame-p95-ms', 'max-frame-p99-ms', 'max-stalls', 'headed', 'software', 'width', 'height', 'target-fps', 'channel', 'output']);
 for (const name of ['headed', 'software']) assert(opts[name] === undefined || opts[name] === true, `Use --${name} without a value`);
 const duration = number(opts, 'seconds', 15, 1);
 const warmup = number(opts, 'warmup-seconds', 8);
-const variant = number(opts, 'variant', 42, 1);
-assert(Number.isInteger(variant) && variant <= 1000000);
+// Islands are fixed maps (levelDef(level).variant). The server host takes no world options, so --variant can only
+// confirm the expected map; it no longer picks a random one.
+const variantOption = opts.variant === undefined ? null : number(opts, 'variant', 1, 1);
+assert(variantOption === null || Number.isInteger(variantOption) && variantOption <= 1000000);
 const frameLimit = opts['max-frame-p95-ms'] === undefined ? null : number(opts, 'max-frame-p95-ms', 0);
 const stallLimit = opts['max-stalls'] === undefined ? null : number(opts, 'max-stalls', 0);
 const headless = !opts.headed;
@@ -76,20 +79,16 @@ try {
     const stops = [];
     let server, context;
     try {
-      // Existing host has no world-options argument. Control just its initial
-      // random variant draw; subsequent AI keeps seeded, live simulation.
-      const rng = makeRng(variant + level * 1000);
-      let draw = 0;
-      Math.random = () => ++draw === 2 ? (variant - 1) / 1e6 : rng();
+      // The host builds each island's fixed map; only the seeded AI randomness is controlled here.
+      const rng = makeRng(42 + level * 1000);
+      Math.random = rng;
       server = createGameServer();
-      for (let index = 0; index < level; index++) {
-        let first = true;
-        Math.random = () => { if (first) { first = false; return (variant - 1) / 1e6; } return rng(); };
-        server.host.world.nextLevel();
-      }
+      for (let index = 0; index < level; index++) server.host.world.nextLevel();
       Math.random = rng;
       const world = server.host.world;
+      const variant = levelDef(level).variant;
       assert.equal(world.variant, variant);
+      assert(variantOption === null || variantOption === variant, `--variant=${variantOption} but island ${level + 1} is the fixed map ${variant}`);
       // Observe live dinosaurs outside the protected landing camp. Find a
       // legal player position near a real spawn; never freeze/remove AI.
       const candidates = world.dinos.list.filter(d => ['stego', 'brachio'].includes(d.type));
