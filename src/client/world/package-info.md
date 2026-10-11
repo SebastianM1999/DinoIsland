@@ -45,7 +45,7 @@
 - `veg/plants.js` — small plants (bush, fern, big leaf, shrub, reed with cattails, grass, flower, berry bush, dragon plant, swamp marsh shrub and glow lotus, volcano chili shrub and obsidian-fig cactus); `BUSH_TYPES`.
 - `veg/swampDecor.js` — `buildSwampDecor`: lily pads and duckweed on the bogs, breathing-root fields on their mud shores (instanced, handed to `SpatialInstances`).
 - `veg/shapes.js` — shared vegetation helpers (`clump`, `leafStrip`, `arcPath`, `LEAF_MAT`, `windPair`, `glowMaterial`, `instanced`, `foliageTint`, geometry-detail scope).
-- `veg/spatialInstances.js` — `SpatialInstances`: splits instances into 80 m chunks so each batch is culled separately (and hidden past `setCullDistance`); quality/density control.
+- `veg/spatialInstances.js` — `SpatialInstances`: 80 m batches with per-instance distance LOD and fog culling, fixed-capacity compact draw buffers refreshed after 2 m movement or settings changes, hysteresis and stable density prefixes; `foliage` batches honor the tier's foliage-shadow policy, other props retain shadows. Cached geometry is shared; island teardown disposes every LOD draw's instance buffers.
 
 ## Entry points
 - `terrainChunks.js` splits outdoor terrain cells without changing globally computed normals/colours. `TerrainChunks` retains CPU geometry and loads camera-neighbour GPU meshes in bounded batches, preloads a fog margin, and evicts distant buffers with hysteresis. `buildTerrainMeshAsync` yields between vertex rows/chunks; cave rendering continues to use its bake. Release a chunk controller before disposing its attached scene resources.
