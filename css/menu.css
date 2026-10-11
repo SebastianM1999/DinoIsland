@@ -206,9 +206,9 @@
 @media (max-width: 800px) { #menu-preview { top: 0; } .preview-placeholder { left: 8%; } }
 @media (prefers-reduced-motion: reduce) { #menu-tour { transition: none; } }
 
-/* A quiet startup state replaces incomplete scenery until the tour is warmed. */
+/* Loading live scenery never covers the immediately usable photograph/menu. */
 #menu-startup { position: absolute; inset: 0; z-index: 4; display: none; background: #111c28; color: #fff1d0; align-items: center; justify-content: center; flex-direction: column; padding-left: 35%; }
-#menu-preview.is-booting #menu-startup { display: flex; }
+#menu-preview.is-booting:not(.has-preview) #menu-startup { display: flex; background: transparent; pointer-events: none; }
 #menu-startup p { font-size: 1.2rem; margin: 20px 0 8px; }
 #menu-startup small { color: #b9c7bf; }
 .dino-loading-icon { display: block; flex-shrink: 0; width: 56px; height: 56px; background: url('../assets/images/dino-loading-paw.png') center / contain no-repeat; animation: dino-loading-step 1.2s ease-in-out infinite; }

@@ -6,7 +6,8 @@
 - `coverage-gaps.test.js` — reporting of uncovered lines, functions and branches, including topic filters.
 - `performance-harness.test.js` — benchmark percentile correctness, invalid-sample rejection and fail-closed timing-budget arguments; deterministic checks, without timing thresholds.
 
-- `map-previews.test.js` — all island photographs preload/decode once, cache reuse and missing-photo fallback isolation.
+- `map-previews.test.js` — selected island photographs preload/decode once, independent loads, cache reuse and missing-photo fallback isolation.
+- `menu-postcards.test.js` — immediate controller availability while photographs decode; obsolete selections and disposal cannot repaint the menu.
 
 - `mission-summary.test.js` — compact phase/relic goals, pinned contracts and win/travel copy; verifies host mission data stays unchanged.
 

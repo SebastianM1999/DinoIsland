@@ -4,10 +4,11 @@ import { planIsland } from '../../shared/island.js';
 import { Terrain } from '../../shared/terrain.js';
 import { buildLayout } from '../../shared/layout.js';
 import { LEVELS } from '../../shared/levels.js';
+import { preloadCaveBake } from '../../shared/caveBakeLoad.js';
 import { hasBasePlots } from '../../shared/base.js';
 import { disposeIslandScenes } from '../core/resources.js';
 import { WIND } from '../models/kit.js';
-import { buildTerrainMesh } from '../world/terrainMesh.js';
+import { buildTerrainMeshAsync } from '../world/terrainMesh.js';
 import { buildSky } from '../world/sky.js';
 import { buildWater } from '../world/water.js';
 import { buildVegetation } from '../world/vegetation.js';
@@ -50,16 +51,17 @@ export async function createMenuTour(canvas, onIsland = () => {}, { signal } = {
   let scene, terrain, sun, updaters = [], path = [], length = 0, biome;
   let index = 0, elapsed = 0, time = 0, frameId = 0, previous = 0, disposed = false;
   let motionEnabled = !motionPreference.matches;
-  let suspended = false, loading = false, preloading = true, request = 0, shadowTime = -Infinity;
+  let suspended = false, loading = false, request = 0, shadowTime = -Infinity;
   let buildQueue = Promise.resolve();
+  let buildAbort = null;
   const scenes = new Map();
   const pendingScenes = new Set();
-  // Cache only the three short camera corridors, not three entire playable worlds.
-  // Revisiting an island then takes no procedural rebuild or shader warmup.
+  const released = new WeakSet();
+  // Only the selected corridor is retained: unvisited maps cost nothing.
   const yieldToMenu = () => new Promise(resolve => setTimeout(resolve, 20));
 
   function notify(selected = index) {
-    onIsland({ index: preloading ? 0 : selected, number: preloading ? 1 : selected + 1, name: LEVELS[preloading ? 0 : selected].name, motionEnabled, loading: loading || preloading, available: !preloading });
+    onIsland({ index: selected, number: selected + 1, name: LEVELS[selected].name, motionEnabled, loading, available: !!scene && !loading });
   }
 
   function resize() {
@@ -108,12 +110,18 @@ export async function createMenuTour(canvas, onIsland = () => {}, { signal } = {
     renderer.render(scene, camera);
   }
 
-  async function buildIsland(selected, ticket) {
+  async function buildIsland(selected, ticket, buildSignal) {
     const started = performance.now();
     const current = () => !disposed && ticket === request;
     await yieldToMenu();
     if (!current()) return null;
-    const islandTerrain = new Terrain(planIsland(selected, 1));
+    const variant = LEVELS[selected].variant ?? 1;
+    // Use the same fixed map and bake as gameplay; never mesh the cave live
+    // just to decorate the menu if its committed bake cannot be loaded.
+    const baked = await preloadCaveBake(selected, variant);
+    if (!current()) return null;
+    if (LEVELS[selected].biome === 'cave' && !baked) throw new Error('Cave preview bake unavailable');
+    const islandTerrain = new Terrain(planIsland(selected, variant));
     await yieldToMenu();
     if (!current()) return null;
     const layout = buildLayout(islandTerrain), sky = layout.biome.sky;
@@ -158,7 +166,9 @@ export async function createMenuTour(canvas, onIsland = () => {}, { signal } = {
     setSurfaceBiome(layout.biome);
     setSurfaceQuality(QUALITY);
     const builders = [
-      () => ({ group: buildTerrainMesh(islandTerrain, layout) }),
+      async () => { const group = await buildTerrainMeshAsync(islandTerrain, layout, {
+        signal: buildSignal, position: { x: result.path[0].x, y: islandTerrain.heightAt(result.path[0].x, result.path[0].z) + 2.1, z: result.path[0].z }, range: reach,
+      }); return { group, update: group.update?.bind(group) }; },
       () => buildSky({ scene: islandScene, sunDir }, layout),
       () => buildWater(islandTerrain, layout, sunDir),
       () => buildVegetation(islandTerrain, corridor), () => buildRocks(islandTerrain, corridor),
@@ -171,7 +181,13 @@ export async function createMenuTour(canvas, onIsland = () => {}, { signal } = {
       for (const build of builders) {
         await yieldToMenu();
         if (!current()) { release(result); return null; }
-        const updater = build();
+        const updater = await build();
+        if (!current()) {
+          // A builder can finish after disposal; free its unattached resources.
+          updater.group?.release?.();
+          disposeIslandScenes(updater.group);
+          release(result); return null;
+        }
         updater.setQuality?.(QUALITY);
         updater.setDensity?.(QUALITY.grass);
         updater.spatial?.setCullDistance(reach);
@@ -185,7 +201,9 @@ export async function createMenuTour(canvas, onIsland = () => {}, { signal } = {
   }
 
   function release(island) {
-    if (!island) return;
+    if (!island || released.has(island)) return;
+    released.add(island);
+    for (const updater of island.updaters) updater.group?.release?.();
     disposeIslandScenes(island.scene);
     island.sun.shadow.dispose();
     pendingScenes.delete(island);
@@ -196,6 +214,8 @@ export async function createMenuTour(canvas, onIsland = () => {}, { signal } = {
     selected = ((Math.trunc(selected) % LEVELS.length) + LEVELS.length) % LEVELS.length;
     if (!Number.isFinite(selected)) selected = 0;
     const ticket = ++request;
+    buildAbort?.abort();
+    const controller = buildAbort = new AbortController();
     loading = true;
     stopFrames();
     notify(selected);
@@ -203,9 +223,12 @@ export async function createMenuTour(canvas, onIsland = () => {}, { signal } = {
     // safe even if selection changes while a previous scene is still building.
     const operation = buildQueue.then(async () => {
       if (disposed || ticket !== request) return;
-      const island = scenes.get(selected) ?? await buildIsland(selected, ticket);
+      const island = scenes.get(selected) ?? await buildIsland(selected, ticket, controller.signal);
       if (!island) return;
       if (disposed || ticket !== request) { if (!scenes.has(selected)) release(island); return; }
+      for (const [other, cached] of scenes) if (other !== selected) {
+        release(cached); scenes.delete(other);
+      }
       scenes.set(selected, island);
       ({ scene, terrain, sun, updaters, path, length, biome } = island);
       index = selected;
@@ -229,7 +252,9 @@ export async function createMenuTour(canvas, onIsland = () => {}, { signal } = {
     buildQueue = operation.catch(() => {});
     try { await operation; }
     catch (error) {
-      if (ticket === request && !disposed) { loading = false; notify(); resumeFrames(); }
+      if (ticket !== request || disposed) return;
+      // Keep the selected photograph on a failed build. Resuming the previous
+      // scene would silently change the player's selected starting island.
       throw error;
     }
   }
@@ -242,7 +267,7 @@ export async function createMenuTour(canvas, onIsland = () => {}, { signal } = {
 
   function frame(now) {
     frameId = 0;
-    if (disposed || document.hidden || !motionEnabled || suspended || loading || preloading) return;
+    if (disposed || document.hidden || !motionEnabled || suspended || loading) return;
     if (!previous) previous = now;
     const delta = (now - previous) / 1000;
     if (delta >= 1 / 30) {
@@ -258,7 +283,7 @@ export async function createMenuTour(canvas, onIsland = () => {}, { signal } = {
 
   function resumeFrames() {
     stopFrames();
-    if (!disposed && !document.hidden && motionEnabled && !suspended && !loading && !preloading && scene) frameId = requestAnimationFrame(frame);
+    if (!disposed && !document.hidden && motionEnabled && !suspended && !loading && scene) frameId = requestAnimationFrame(frame);
   }
 
   function preferenceChanged() {
@@ -272,6 +297,7 @@ export async function createMenuTour(canvas, onIsland = () => {}, { signal } = {
     disposed = true;
     signal?.removeEventListener('abort', dispose);
     ++request;
+    buildAbort?.abort();
     stopFrames();
     removeEventListener('resize', resize);
     document.removeEventListener('visibilitychange', resumeFrames);
@@ -291,11 +317,6 @@ export async function createMenuTour(canvas, onIsland = () => {}, { signal } = {
     if (signal?.aborted) throw new DOMException('Tour cancelled', 'AbortError');
     signal?.addEventListener('abort', dispose, { once: true });
     resize();
-    // Preload every corridor behind the photograph fallback.
-    for (let selected = 0; selected < LEVELS.length; selected++) await setIsland(selected);
-    preloading = false;
-    await setIsland(0);
-    if (disposed) throw new DOMException('Tour cancelled', 'AbortError');
     addEventListener('resize', resize);
     document.addEventListener('visibilitychange', resumeFrames);
     motionPreference.addEventListener('change', preferenceChanged);

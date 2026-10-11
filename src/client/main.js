@@ -16,7 +16,7 @@ import { initHomeMenu } from './ui/homeMenu.js';
 import { initHomeExplorer } from './ui/homeExplorer.js';
 import { initHomeSkills } from './ui/homeSkills.js';
 import { initLoadingScreen } from './ui/loadingScreen.js';
-import { mapPreviewFrames } from './ui/mapPreviews.js';
+import { mapPreviewFrames, preloadMapPreviews } from './ui/mapPreviews.js';
 import { LEVELS } from '../shared/levels.js';
 import { BRAND, storageKey, migrateStorage } from '../shared/brand.js';
 import { preloadCaveBake } from '../shared/caveBakeLoad.js';
@@ -80,37 +80,39 @@ async function startMenuTour() {
   const request = ++tourRequest;
   tourAbort?.abort();
   tourAbort = new AbortController();
-  $('menu-preview').classList.add('is-booting');
-  $('tour-next').disabled = true;
+  $('menu-preview').classList.remove('is-booting', 'has-live-tour');
+  $('tour-next').disabled = false;
   const selected = island => {
     if (request !== tourRequest) return;
     tourIsland = island.index;
     $('play-island').value = String(unlockedStartingIsland(island.index));
-    $('tour-next').disabled = !!island.loading;
+    // Selection remains usable while the previous preview is being cancelled.
+    $('tour-next').disabled = false;
+    $('menu-preview').classList.toggle('has-live-tour', !!menuTour && menuTour !== menuPostcards && !island.loading && island.available);
   };
   try {
     const { createMenuPostcards } = await import('./ui/menuPostcards.js');
     const postcards = await createMenuPostcards($('menu-preview'), island => {
-      if (menuTour && menuTour === menuPostcards) selected(island);
+      if (!menuTour || menuTour === menuPostcards) selected(island);
     }, { signal: tourAbort.signal });
     if (request !== tourRequest || menu.hidden) { postcards.dispose(); return; }
     menuPostcards = postcards;
+    menuTour = postcards;
     syncTourSuspension();
     const { createMenuTour } = await import('./ui/menuTour.js');
     if (request !== tourRequest || menu.hidden) return;
     const tour = await createMenuTour($('menu-tour'), selected, { signal: tourAbort.signal });
     if (request !== tourRequest || menu.hidden) { tour.dispose(); return; }
-    menuPostcards?.dispose();
-    menuPostcards = null;
-    $('menu-preview').classList.add('has-live-tour');
-    $('menu-preview').classList.remove('is-booting');
     menuTour = tour;
     if (DEBUG_QUERY.has('debug')) window.__menuTour = tour;
     syncTourSuspension();
+    await tour.setIsland(tourIsland);
+    if (request !== tourRequest || menu.hidden) return;
     $('tour-next').disabled = false;
   } catch (error) {
     if (request !== tourRequest || error.name === 'AbortError') return;
     console.warn('Island tour unavailable', error);
+    if (menuTour !== menuPostcards) menuTour?.dispose();
     menuTour = menuPostcards;
     $('menu-preview').classList.remove('is-booting');
     $('tour-next').disabled = !menuTour;
@@ -127,8 +129,17 @@ function stopMenuTour() {
   $('tour-next').disabled = true;
 }
 async function selectPreviewIsland(index) {
-  try { await menuTour?.setIsland(index); }
-  catch (error) { console.warn('Island preview failed', error); }
+  const tour = menuTour;
+  tourIsland = index;
+  $('play-island').value = String(unlockedStartingIsland(index));
+  $('menu-preview').classList.remove('has-live-tour');
+  try {
+    if (menuPostcards && menuPostcards !== tour) void menuPostcards.setIsland(index);
+    await tour?.setIsland(index);
+  } catch (error) {
+    if (menuTour === tour) $('menu-preview').classList.remove('has-live-tour');
+    console.warn('Island preview failed', error);
+  }
 }
 $('tour-next').addEventListener('click', () => { void selectPreviewIsland((tourIsland + 1) % (availableStartingIsland() + 1)); });
 function syncTourSuspension() {
@@ -195,7 +206,8 @@ async function start(mode, options = {}) {
   setBusy(true, mode === 'online' ? 'Connecting…' : 'Starting…');
   const startingIsland = unlockedStartingIsland(Number($('play-island').value));
   void loadingUi.start({ islandName: LEVELS[startingIsland].name, frames: mapPreviewFrames(startingIsland) });
-  menuTour?.setSuspended(true);
+  // Stop construction before starting the worker/network, not after connecting.
+  stopMenuTour();
   let net;
   try {
     const outfit = savedOutfit();
@@ -207,7 +219,7 @@ async function start(mode, options = {}) {
     if (mode === 'internet') internetTest.stop();
     busy = false;
     loadingUi.stop();
-    syncTourSuspension();
+    void startMenuTour();
     setBusy(false, err.message || String(err));
     return;
   }
@@ -231,6 +243,8 @@ async function launch(net, reuse = null, { openMenu = false } = {}) {
   let disconnectReason = 'Disconnected while loading the island';
   net.onClose = reason => { disconnectReason = reason || disconnectReason; };
   const lv = net.welcome.world.level;
+  // Decorative photographs must never delay simulation or shader loading.
+  void preloadMapPreviews(lv.index);
   void loadingUi.start({ islandName: LEVELS[lv.index]?.name || `Island ${lv.index + 1}`, frames: mapPreviewFrames(lv.index) });
   loadingUi.setStage('dinosaurs');
   // Let the loading screen paint before the heavy world build.
@@ -244,7 +258,7 @@ async function launch(net, reuse = null, { openMenu = false } = {}) {
     // the Hollow Mountain's baked mesh and walk grid, if the site has them (assets/cave): the island then builds in a second, not seven
     await preloadCaveBake(lv.index, lv.variant);
     const { Game } = await loadGameModule();
-    game = new Game(canvas, net, reuse ?? (menuAudio ? { audio: menuAudio } : null));
+    game = await Game.create(canvas, net, reuse ?? (menuAudio ? { audio: menuAudio } : null));
     net.on(`ev:${EV.MISSION}`, ({ mission }) => {
       // This comes from the host after parts, repair and sailing are complete.
       // Creative expeditions and scenery previews do not earn map unlocks.
