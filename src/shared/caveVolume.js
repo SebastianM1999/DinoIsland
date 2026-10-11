@@ -105,6 +105,14 @@ export function releaseVolumeLattice(plan) { latticeCache.delete(plan); }
  * `avail[q]` is 0 outside the region. Index q = k * NI + i, position (x0 + i * V, z0 + k * V).
  */
 export function volumeLattice(plan, half, voxel = VOXEL) {
+  const steps = volumeLatticeSteps(plan, half, voxel);
+  let step;
+  while (!(step = steps.next()).done);
+  return step.value;
+}
+
+/** The same lattice built one row of columns per `yield`, so a client can keep painting between rows (it returns the lattice). */
+export function* volumeLatticeSteps(plan, half, voxel = VOXEL) {
   let per = latticeCache.get(plan);
   if (!per) latticeCache.set(plan, per = new Map());
   const key = `${half}/${voxel}`;
@@ -124,15 +132,18 @@ export function volumeLattice(plan, half, voxel = VOXEL) {
   const top = new Float32Array(N), floor = new Float32Array(N), roof = new Float32Array(N), sOpen = new Float32Array(N);
   const col = {};
   let topMax = -Infinity, topMin = Infinity;
-  for (let k = 0; k < NK; k++) for (let i = 0; i < NI; i++) {
-    const x = x0 + i * V, z = z0 + k * V;
-    if (!inRegion(x, z)) continue;
-    const q = k * NI + i;
-    avail[q] = 1;
-    rock.column(x, z, col);
-    top[q] = col.top; floor[q] = col.floor; roof[q] = col.roof; sOpen[q] = col.s;
-    if (col.top > topMax) topMax = col.top;
-    if (col.top < topMin) topMin = col.top;
+  for (let k = 0; k < NK; k++) {
+    for (let i = 0; i < NI; i++) {
+      const x = x0 + i * V, z = z0 + k * V;
+      if (!inRegion(x, z)) continue;
+      const q = k * NI + i;
+      avail[q] = 1;
+      rock.column(x, z, col);
+      top[q] = col.top; floor[q] = col.floor; roof[q] = col.roof; sOpen[q] = col.s;
+      if (col.top > topMax) topMax = col.top;
+      if (col.top < topMin) topMin = col.top;
+    }
+    yield;
   }
   // slope of the skin: the field's distance scale
   const g = new Float32Array(N), inv = new Float32Array(N);
@@ -181,12 +192,15 @@ export function volumeLattice(plan, half, voxel = VOXEL) {
   // --- 3. the samples
   const vals = new Float32Array(total);
   const c = { top: 0, floor: 0, roof: 0, s: 0, inv: 1, g: 0 };
-  for (let k = 0; k < NK; k++) for (let i = 0; i < NI; i++) {
-    const q = k * NI + i;
-    if (!avail[q]) continue;
-    c.top = top[q]; c.floor = floor[q]; c.roof = roof[q]; c.s = sOpen[q]; c.inv = inv[q]; c.g = g[q];
-    const x = x0 + i * V, z = z0 + k * V;
-    for (let j = jlo[q], n = off[q]; j <= jhi[q]; j++, n++) vals[n] = volumeField(c, x, Y0 + j * V, z, seed);
+  for (let k = 0; k < NK; k++) {
+    for (let i = 0; i < NI; i++) {
+      const q = k * NI + i;
+      if (!avail[q]) continue;
+      c.top = top[q]; c.floor = floor[q]; c.roof = roof[q]; c.s = sOpen[q]; c.inv = inv[q]; c.g = g[q];
+      const x = x0 + i * V, z = z0 + k * V;
+      for (let j = jlo[q], n = off[q]; j <= jhi[q]; j++, n++) vals[n] = volumeField(c, x, Y0 + j * V, z, seed);
+    }
+    yield;
   }
   const at = (q, j) => (j < jlo[q] ? -1 : j > jhi[q] ? 1 : vals[off[q] + j - jlo[q]]);
   const lat = { rock, V, x0, z0, NI, NK, N, avail, top, floor, roof, sOpen, g, inv, topMax, topMin, region: inRegion, Y0, jlo, jhi, off, vals, total, at };

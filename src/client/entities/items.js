@@ -79,7 +79,7 @@ function glowRing(color) {
 const RING = { resin: '#ffc04a', ironwood: '#d8b48a', herb: '#bff59a', meat: '#ff6a5a', hide: '#ffc46a', teeth: '#fff4d0', plates: '#ff8a4a', claws: '#fff4d0', bones: '#fff4d0', skull: '#fff4d0', arrow: '#ffe07a', spear: '#ffe07a', torch: '#ffb347' };
 
 export class Items {
-  constructor(game) {
+  constructor(game, { deferWarmUp = false } = {}) {
     this.game = game;
     this.scene = game.gfx.scene;
     this.items = new Map();   // id -> { data, obj }
@@ -91,7 +91,8 @@ export class Items {
     net.on(`ev:${EV.TRAP_ADD}`, (m) => this.addTrap(m.trap));
     net.on(`ev:${EV.TRAP_REMOVE}`, (m) => this.removeTrap(m.id));
     net.on(`ev:${EV.TRAP_SNAP}`, (m) => this.snapTrap(m.id));
-    this.#addWarmUp();
+    // the warm-up copies are built in steps by the game's loading sequence (`yield* items.warmUpSteps()`)
+    if (!deferWarmUp) { const steps = this.warmUpSteps(); while (!steps.next().done); }
   }
 
   /** The model of one loot kind (the same for every drop of it), or null when the kind has none. */
@@ -109,13 +110,14 @@ export class Items {
    * (`Renderer.prepare`) draws hidden things too, so their programs, textures and
    * buffers exist before the first drop of a kind (a first pistol or fig cost 160-230 ms).
    */
-  #addWarmUp() {
+  *warmUpSteps() {
     const group = new THREE.Group();
     group.visible = false;
     group.position.y = -1000;
     for (const kind of [...Object.keys(LOOT_GEO), 'pistol', 'rifle', 'torch', ...Object.keys(CONFIG.fruit.types), ...Object.keys(CONFIG.resources.regrow)]) {
       const m = this.#model(kind);
       if (m) group.add(m);
+      yield;   // (the two firearms are a few hundred ms each: one step per model)
     }
     group.add(mesh(trapGeometry(false)), mesh(trapGeometry(true)));
     this.scene.add(group);

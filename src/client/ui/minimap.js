@@ -6,7 +6,7 @@
 
 import { Terrain } from '../../shared/terrain.js';
 import { SWAMP_ARENA } from '../../shared/swampArena.js';
-import { buildCaveMapBase } from './caveMap.js';
+import { buildCaveMapBaseSteps } from './caveMap.js';
 
 const TAU = Math.PI * 2;
 
@@ -37,12 +37,20 @@ const clamp01 = (v) => (v < 0 ? 0 : v > 1 ? 1 : v);
  * @param {import('../../shared/terrain.js').Terrain} terrain
  */
 export function buildMapBase(terrain, layout, res = 640) {
+  const steps = buildMapBaseSteps(terrain, layout, res);
+  let step;
+  while (!(step = steps.next()).done);
+  return step.value;
+}
+
+/** The same map, yielding between bands of rows so the loading screen keeps painting. */
+export function* buildMapBaseSteps(terrain, layout, res = 640) {
   // the Hollow Mountain: its own dark palette and a fog of war over the maze (caveMap.js)
-  if (layout?.plan?.cave) return buildCaveMapBase(terrain, layout, res);
+  if (layout?.plan?.cave) return yield* buildCaveMapBaseSteps(terrain, layout, res);
   // Keep the secret arena and its causeway out of the map's terrain as well
   // as its markers. Only this map copy changes; gameplay uses the real terrain.
   if (layout?.bossArena && terrain.plan) {
-    terrain = new Terrain({ ...terrain.plan, bossArena: null, pools: terrain.plan.pools.filter(p => !p.annex) });
+    terrain = yield* Terrain.createSteps({ ...terrain.plan, bossArena: null, pools: terrain.plan.pools.filter(p => !p.annex) });
   }
   const size = terrain.size;
   const half = size / 2;
@@ -60,6 +68,7 @@ export function buildMapBase(terrain, layout, res = 640) {
   const lx = -0.7, lz = -0.7;
 
   for (let py = 0; py < res; py++) {
+    if ((py & 15) === 15) yield;
     const z = -half + (py + 0.5) * mpp;
     for (let px = 0; px < res; px++) {
       const x = -half + (px + 0.5) * mpp;

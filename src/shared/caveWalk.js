@@ -19,7 +19,7 @@ import { CONFIG } from './config.js';
 import { smoothstep } from './rng.js';
 import { CAVE_GEOM as G } from './caveMaze.js';
 import { CAVE_SKY } from './caveField.js';
-import { volumeLattice, NEAR } from './caveVolume.js';
+import { volumeLatticeSteps, NEAR } from './caveVolume.js';
 
 /** Bump when the sampling changes: a baked grid (assets/cave) of an older version is ignored. */
 export const WALK_VERSION = 2;
@@ -105,9 +105,17 @@ function weightOf(x, z, top, g, s) {
  * @param {{half:number, coarseHeight:(x:number,z:number)=>number, coarseCeiling:(x:number,z:number)=>number}} src the island's coarse grid
  * @returns {CaveWalk}
  */
-export function buildCaveWalk(plan, { half, coarseHeight, coarseCeiling }) {
+export function buildCaveWalk(plan, source) {
+  const steps = buildCaveWalkSteps(plan, source);
+  let step;
+  while (!(step = steps.next()).done);
+  return step.value;
+}
+
+/** The same walk grid, yielding after every lattice row and every tile so a client can paint between them. */
+export function* buildCaveWalkSteps(plan, { half, coarseHeight, coarseCeiling }) {
   const t0 = performance.now();
-  const lat = volumeLattice(plan, half);
+  const lat = yield* volumeLatticeSteps(plan, half);
   const { V, x0, z0, NI, NK, avail, top: lTop, g: lG, sOpen, Y0, jlo, jhi, at } = lat;
   const tLattice = performance.now();
   const F = WALK.cell, T = WALK.tile, r = WALK.erode;
@@ -224,6 +232,7 @@ export function buildCaveWalk(plan, { half, coarseHeight, coarseCeiling }) {
       }
       floor[o] = fv; ceil[o] = cv;
     }
+    yield;
   }
   return new CaveWalk({
     ox: -half, oz: -half, cell: F, tile: T, nx, nt, tileIndex, floor, ceil,

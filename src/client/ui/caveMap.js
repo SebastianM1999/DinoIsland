@@ -25,6 +25,14 @@ const clamp01 = (v) => (v < 0 ? 0 : v > 1 ? 1 : v);
  * @returns {{canvas:HTMLCanvasElement, size:number, half:number, res:number, mpp:number, island:{A:number,B:number}, fog:object}}
  */
 export function buildCaveMapBase(terrain, layout, res = 640) {
+  const steps = buildCaveMapBaseSteps(terrain, layout, res);
+  let step;
+  while (!(step = steps.next()).done);
+  return step.value;
+}
+
+/** The same map, yielding between bands of rows. */
+export function* buildCaveMapBaseSteps(terrain, layout, res = 640) {
   const size = terrain.size, half = size / 2, mpp = size / res;
   const depthAt = layout.plan.cave.depthAt;
   const cv = document.createElement('canvas');
@@ -34,6 +42,7 @@ export function buildCaveMapBase(terrain, layout, res = 640) {
   const d = img.data;
   const lx = -0.7, lz = -0.7;
   for (let py = 0; py < res; py++) {
+    if ((py & 7) === 7) yield;
     const z = -half + (py + 0.5) * mpp;
     for (let px = 0; px < res; px++) {
       const x = -half + (px + 0.5) * mpp;
@@ -68,6 +77,7 @@ export function buildCaveMapBase(terrain, layout, res = 640) {
   const fimg = fctx.createImageData(res, res);
   const f = fimg.data;
   for (let py = 0; py < res; py++) {
+    if ((py & 31) === 31) yield;
     const z = -half + (py + 0.5) * mpp;
     for (let px = 0; px < res; px++) {
       const x = -half + (px + 0.5) * mpp;
