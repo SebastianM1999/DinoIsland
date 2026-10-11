@@ -9,6 +9,8 @@ import { bowGeometry, arrowGeometry } from '../models/weapons.js';
 
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
 const STUMP_TOP = 0.55;
+/** The camp is drawn a little larger than life, so it reads from the trail. */
+const SCALE = 1.25;
 
 function stumpGeometry() {
   const bark = paint(new THREE.CylinderGeometry(0.4, 0.5, STUMP_TOP, 11, 2), (c, n) =>
@@ -18,7 +20,7 @@ function stumpGeometry() {
 }
 
 function quiverGeometry() {
-  const body = paint(new THREE.CylinderGeometry(0.075, 0.06, 0.55, 9, 1, true), (c) => (Math.abs(c.y) > 0.2 ? '#4a2e1c' : '#8a5a32'));
+  const body = paint(new THREE.CylinderGeometry(0.085, 0.07, 0.55, 9, 1, true), (c) => (Math.abs(c.y) > 0.2 ? '#6b4026' : '#b07a44'));
   const bottom = paint(new THREE.CircleGeometry(0.06, 9), '#4a2e1c');
   const strap = place(tube([V(0.07, -0.2, 0), V(0.12, 0, 0.02), V(0.07, 0.22, 0)], () => 0.012, { radial: 4, color: () => '#c7995a' }), [0, 0, 0]);
   const arrows = [-0.03, 0.02, 0.035].map((x, i) => place(arrowGeometry(), [x, 0.05, (i - 1) * 0.03], [0, i, 0], 0.62));
@@ -26,9 +28,20 @@ function quiverGeometry() {
 }
 
 function basketGeometry() {
-  const wall = paint(new THREE.CylinderGeometry(0.26, 0.2, 0.3, 12, 3, true), (c) => (Math.floor((c.y + 0.15) * 20 + Math.atan2(c.z, c.x) * 2) % 2 ? '#d6b06a' : '#b98f4a'));
-  const floor = paint(new THREE.CircleGeometry(0.2, 12), '#a8803f');
+  const wall = paint(new THREE.CylinderGeometry(0.26, 0.2, 0.3, 12, 3, true), (c) => (Math.floor((c.y + 0.15) * 20 + Math.atan2(c.z, c.x) * 2) % 2 ? '#e8c47a' : '#c99d52'));
+  const floor = paint(new THREE.CircleGeometry(0.2, 12), '#b48a46');
   return merge([wall, place(floor, [0, -0.15, 0], [Math.PI / 2, 0, 0])]);
+}
+
+/** A cold fire ring: a few grey stones round two charred sticks. */
+function fireRingGeometry() {
+  const stones = [];
+  for (let i = 0; i < 7; i++) {
+    const a = (i / 7) * Math.PI * 2;
+    stones.push(place(paint(new THREE.DodecahedronGeometry(0.11, 0), i % 2 ? '#9a94a0' : '#7f7a86'), [Math.cos(a) * 0.38, 0.05, Math.sin(a) * 0.38], [a, i, 0], [1, 0.7, 1.2]));
+  }
+  const stick = (r) => place(limb(0.035, 0.03, 0.55, '#2b2220', 5), [0, 0.05, 0], [Math.PI / 2, r, 0]);
+  return merge([...stones, place(stick(0.4), [-0.2, 0, 0.1]), place(stick(-0.5), [0.2, 0, -0.15])]);
 }
 
 export function buildBowCamp(terrain, layout) {
@@ -37,19 +50,23 @@ export function buildBowCamp(terrain, layout) {
   const c = layout.bowCamp;
   if (!c) return { group, setTaken() {}, minimapMarkers: () => [], update() {} };
   group.position.set(c.x, c.y, c.z);
-  group.rotation.y = c.rot;
+  group.rotation.y = c.rot;          // (local +Z faces the trail)
+  group.scale.setScalar(SCALE);
 
   const props = mesh(merge([
     stumpGeometry(),
-    place(quiverGeometry(), [0.5, 0.25, 0.12], [0.1, 0.4, -0.35]),
-    place(basketGeometry(), [-0.75, 0.2, -0.35], [0, 0.6, 1.35]),
+    // the quiver leans on the stump's trail side, the basket lies tipped over beside it
+    place(quiverGeometry(), [0.42, 0.3, 0.38], [-0.35, 0.3, -0.2]),
+    place(basketGeometry(), [-0.62, 0.25, 0.42], [Math.PI / 2 - 0.15, 0, 0.5]),
+    place(fireRingGeometry(), [0.1, 0, 1.25]),
   ]), MAT.standard);
   group.add(props);
 
   // the bow, lying across the stump; and a soft golden glow on the ground round it
   const bow = mesh(bowGeometry(), MAT.standard);
   bow.position.set(0, STUMP_TOP + 0.04, 0);
-  bow.rotation.set(Math.PI / 2, 0, 0.35);
+  bow.rotation.set(Math.PI / 2, 0, 0.9);
+  bow.scale.setScalar(1.15);
   const glowMat = new THREE.MeshBasicMaterial({ color: '#ffd36a', transparent: true, opacity: 0.35, depthWrite: false, blending: THREE.AdditiveBlending });
   const glow = new THREE.Mesh(new THREE.RingGeometry(0.55, 1.4, 32), glowMat);
   glow.rotation.x = -Math.PI / 2;
