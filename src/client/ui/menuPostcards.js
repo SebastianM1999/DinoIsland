@@ -5,7 +5,7 @@ import { preloadMapPreviews, mapPreviewFrames } from './mapPreviews.js';
 export async function createMenuPostcards(root, onIsland = () => {}, { signal } = {}) {
   const layers = [...root.querySelectorAll('.menu-preview-image')];
   const preference = matchMedia('(prefers-reduced-motion: reduce)');
-  let index = 0, shot = 0, front = 0, timer = null, disposed = false, suspended = false;
+  let index = 0, shot = 0, front = 0, timer = null, disposed = false, suspended = false, request = 0;
   let motionEnabled = !preference.matches;
   function notify(loading = false) {
     onIsland({ index, number: index + 1, name: LEVELS[index].name, motionEnabled,
@@ -30,29 +30,30 @@ export async function createMenuPostcards(root, onIsland = () => {}, { signal } 
     layers[front].classList.remove('is-front');
     front = next;
   }
-  function setIsland(selected) {
+  async function setIsland(selected) {
     if (disposed) return;
     index = ((Math.trunc(selected) % LEVELS.length) + LEVELS.length) % LEVELS.length;
     if (!Number.isFinite(index)) index = 0;
     shot = 0;
+    const ticket = ++request;
+    show(); notify(true); schedule();
+    await preloadMapPreviews(index);
+    if (disposed || ticket !== request) return;
     show(); notify(); schedule();
   }
   function changed() { motionEnabled = !preference.matches; schedule(); notify(); }
   function dispose() {
     if (disposed) return;
-    disposed = true; clearTimeout(timer);
+    disposed = true; ++request; clearTimeout(timer);
     document.removeEventListener('visibilitychange', schedule);
     preference.removeEventListener('change', changed);
     signal?.removeEventListener('abort', dispose);
   }
   if (signal?.aborted) throw new DOMException('Tour cancelled', 'AbortError');
   signal?.addEventListener('abort', dispose, { once: true });
-  notify(true);
-  await preloadMapPreviews();
-  if (disposed) throw new DOMException('Tour cancelled', 'AbortError');
   document.addEventListener('visibilitychange', schedule);
   preference.addEventListener('change', changed);
-  setIsland(0);
+  void setIsland(0);
   return {
     dispose, setIsland,
     setSuspended(value) { suspended = Boolean(value); schedule(); },
