@@ -21,6 +21,9 @@ Implementation branch: `codex/lag-analysis`, based on `ea5a9ff`.
   two world-target MSAA samples and disables foliage shadow casters.
 - Cancellation and teardown release owned instance buffers and event listeners
   while preserving shared geometry/material caches.
+- Reliable network changes are buffered during construction and replayed after
+  handlers are installed, followed by the latest valid snapshot. Bounded queues
+  and replacement-world detection fail explicitly instead of losing co-op state.
 
 ## Hardware diagnostics
 
