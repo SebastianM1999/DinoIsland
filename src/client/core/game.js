@@ -378,7 +378,7 @@ export class Game {
         if (Math.hypot(x - this.player.pos.x, z - this.player.pos.z) < 14) this.shake = Math.max(this.shake, 0.35);
       },
     });
-    scene.add(this.sky.group, this.water.group, this.vegetation.group, this.rocks.group, this.fruitPlants.group, this.resourceNodes.group, this.hut.group, this.baseView.group, this.sites.group, this.grove.group, this.logs.group, this.bossArena.group, this.swampArena.group, this.swampFx.group, this.volcanoArena.group, this.volcanoFx.group);
+    scene.add(this.swampFx.group, this.volcanoArena.group, this.volcanoFx.group);
     // the Hollow Mountain: roof, cave air, decor, crystal lights, drips (world/caveWorld.js)
     this.caveWorld = this.layout.plan.cave ? buildCaveWorld(this.terrain, this.layout, this.gfx, terrainMesh, this.water) : null;
     if (this.caveWorld) { scene.add(this.caveWorld.group); this.caveWorld.audio = this.audio; }
