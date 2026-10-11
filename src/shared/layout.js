@@ -4,7 +4,7 @@
 // for AI, relic pickups and the boat.
 
 import { makeRng, fbm, smoothstep } from './rng.js';
-import { TRUNKS, TREE_SINK, treeColliders } from './treeShapes.js';
+import { TRUNKS, TREE_SINK, treeColliders, treeVariant } from './treeShapes.js';
 import { placeRock, rockSurfaceAt, PEBBLE_SCALE } from './rockShapes.js';
 import { RELIC_FOR_SITE } from './relics.js';
 import { caveColliders, caveInterior, caveMouth, caveRockPiles } from './caveShape.js';
@@ -62,6 +62,7 @@ export function buildLayout(terrain) {
     rocks: [],
     bushes: [],
     fruitSpots: [],
+    resourceSpots: [],
     colliders: { circles: [], boxes: [] },
     dinoZones: { brachio: [], stego: [], raptor: [] },
     nests: [],
@@ -1314,6 +1315,51 @@ export function buildLayout(terrain) {
         if (!free(cx, cz, cs * 0.6) || !clear(cx, cz, 0.5)) continue;
         addRock(cx, cz, cs, { mossy: h > 2.4 && rr() < R.mossChance * 0.7 }, rr);
         small++;
+      }
+    }
+  }
+
+  // ------------------------------------------------------ resource spots
+  // Map resources (levels.js biome.resources, config.js resources) at fixed spots,
+  // gathered like fruit (sim/world.js ACT.GATHER). Placed after everything else with
+  // their own random stream, so nothing above moves. Each kind spreads over the island.
+  {
+    const want = biome.resources || {};
+    const rr = makeRng(S ^ 0x7e50c);
+    const spread = CONFIG.resources.spread;
+    const add = (type, x, z, extra = {}) => {
+      layout.resourceSpots.push({ id: layout.resourceSpots.length, type, x, z, y: terrain.heightAt(x, z), rot: rr() * TAU, ...extra });
+      reserve(x, z, 0.9);
+    };
+    const count = (type) => layout.resourceSpots.filter((s) => s.type === type).length;
+    const apart = (type, x, z) => layout.resourceSpots.every((s) => s.type !== type || Math.hypot(s.x - x, s.z - z) >= spread);
+    const open = (x, z) => inside(x, z, 0.92) && dry(x, z, 0.8) && !nearHut(x, z, 4) && !nearBoat(x, z, 4) &&
+      distToPath(x, z) > 2.5 && outsideGrove(x, z, 4) && terrain.heatAt(x, z) < 0.1;
+    const meadowAt = (x, z) => plan.meadows.some((m) => Math.hypot(x - m.x, z - m.z) < m.r * 0.9);
+    const byRock = (x, z) => layout.rocks.some((r) => r.scale > PEBBLE_SCALE && Math.hypot(r.x - x, r.z - z) < r.R + 6);
+    // resin: a drop of amber on the bark of a round or tall tree, at hip height (the
+    // client puts it on the visible trunk); the spot lies just in front of the bark
+    const hosts = layout.trees.filter((t) => t.type === 'round' || t.type === 'tall');
+    for (let i = 0; i < 6000 && hosts.length && count('resin') < (want.resin || 0); i++) {
+      const t = hosts[rr.int(0, hosts.length - 1)];
+      const side = rr() * TAU, r = TRUNKS[t.type][treeVariant(t)].r(0.12) * t.scale + 0.35;
+      const x = t.x + Math.cos(side) * r, z = t.z + Math.sin(side) * r;
+      if (!open(x, z) || terrain.slopeAt(x, z) > 0.6 || !apart('resin', x, z)) continue;
+      add('resin', x, z, { host: 'tree:' + t.id, side });
+    }
+    // ironwood: a dark branch on the hillsides, beside a rock (anywhere on a hillside if those run out)
+    // healing herb: on the meadows and the river banks (any flat ground if those run out)
+    const loose = [
+      ['ironwood', (x, z, strict) => { const s = terrain.slopeAt(x, z); return s > (strict ? 0.25 : 0.12) && s < 0.7 && (!strict || byRock(x, z)); }],
+      ['herb', (x, z, strict) => { if (terrain.slopeAt(x, z) > 0.3) return false; if (!strict) return true; const d = riverDist(x, z); return meadowAt(x, z) || (d > 3 && d < 10); }],
+    ];
+    for (const [type, fits] of loose) {
+      for (const strict of [true, false]) {
+        for (let i = 0; i < 16000 && count(type) < (want[type] || 0); i++) {
+          const x = rr.range(-plan.A, plan.A), z = rr.range(-plan.B, plan.B);
+          if (!open(x, z) || !fits(x, z, strict) || !free(x, z, 0.8) || !apart(type, x, z)) continue;
+          add(type, x, z);
+        }
       }
     }
   }

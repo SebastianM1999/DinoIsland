@@ -23,7 +23,7 @@ src/shared/ ──▶ src/shared/ only       (no DOM, no three, no Math.random, 
 - **Steam:** `desktop/steam*.cjs/js` + `client/net/steamTransport.js` carry the same protocol over Steam P2P.
 
 ## Authority model (details at the top of `shared/protocol.js`)
-- The server owns dinosaurs, items, fruit, traps, health, inventories, missions, the hut store and the base.
+- The server owns dinosaurs, items, fruit, map resources, traps, health, inventories, missions, the hut store and the base.
 - Clients own only their own movement and send it about 20 times a second. They report hits; the server checks the hits against the dinos' past poses (lag compensation, `CONFIG.net.lagCompMax`).
 - The island layout is deterministic from (level, variant seed), so client and server build the same world. Every island is a fixed map: its variant comes from `shared/levels.js` (`?variant=N` overrides it for testing). Sim spawns and AI use `Math.random` and are **not** deterministic.
 
@@ -46,6 +46,7 @@ Where each feature lives in each layer. Paths are relative to `src/` unless they
 | Traps | crafting.js (recipe) | dinos.js (trigger), world.js (`ACT.TRAP`) | player/actions.js, entities/items.js | weapons, inventory-drop |
 | Items, inventory, loot | protocol.js, config.js (loot) | world.js (items section) | entities/items.js, ui/hud.js, ui/itemInfo.js, ui/icons.js | inventory-drop, butcher |
 | Fruit (per island: `biome.fruit`; buffs) | config.js (fruit), levels.js, layout.js (fruit spots) | world.js (regrowth, eat, `applyFruit`, buffs) | world/fruitPlants.js, models/fruit.js, player/controller.js (buffs), ui/hud.js (`setBuffs`) | discovery-fruit, swamp-fruit, volcano-fruit |
+| Map resources (island 1: resin, ironwood, healing herb; per island: `biome.resources`) | config.js (loot, `resources`), levels.js, layout.js (`resourceSpots`), crafting.js (tier 1 costs), protocol.js (`GATHER`, `RESOURCE`) | world.js (`ACT.GATHER`, `addLoot`, regrowth) | world/resourceNodes.js, models/props/resources.js, player/actions.js (E prompt), entities/items.js (dropped), ui/icons.js | resources, crafting |
 | Crafting | crafting.js | world.js (`craft`) | ui/craftingPanel.js, world/hut/props.js | crafting |
 | Skills, XP, downed/revive | skills.js | world.js (skills, downed sections) | ui/skillPanel.js, skillModel.js, core/profile.js, ui/hud.js | skills, skills-server, skills-movement, skills-ui |
 | Base, towers, raids | base.js | world.js (base), towers.js, raids.js | world/base.js, ui/basePanel.js | base, raids, raptor-fear |

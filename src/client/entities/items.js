@@ -10,6 +10,7 @@ import { MAT, paint, place, part, merge, mesh, blob, spike, tube, deform, jitter
 import { spearGeometry, arrowGeometry, trapGeometry, meatGeometry } from '../models/weapons.js';
 import { makeFruitMesh } from '../models/fruit.js';
 import { makeTorch } from '../models/torch.js';
+import { makeResourceMesh } from '../models/props/resources.js';
 
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
 const geoCache = new Map();
@@ -75,7 +76,7 @@ function glowRing(color) {
   return r;
 }
 
-const RING = { meat: '#ff6a5a', hide: '#ffc46a', teeth: '#fff4d0', plates: '#ff8a4a', claws: '#fff4d0', bones: '#fff4d0', skull: '#fff4d0', arrow: '#ffe07a', spear: '#ffe07a', torch: '#ffb347' };
+const RING = { resin: '#ffc04a', ironwood: '#d8b48a', herb: '#bff59a', meat: '#ff6a5a', hide: '#ffc46a', teeth: '#fff4d0', plates: '#ff8a4a', claws: '#fff4d0', bones: '#fff4d0', skull: '#fff4d0', arrow: '#ffe07a', spear: '#ffe07a', torch: '#ffb347' };
 
 export class Items {
   constructor(game) {
@@ -99,6 +100,7 @@ export class Items {
     if (kind === 'pistol' || kind === 'rifle') return makeFirearm(kind);
     if (kind === 'torch') return makeTorch();   // burning on the ground: visible from afar in the dark
     if (Object.hasOwn(CONFIG.fruit.types, kind)) return makeFruitMesh(kind);
+    if (Object.hasOwn(CONFIG.resources.regrow, kind)) return makeResourceMesh(kind);   // resin, ironwood, herb
     return make ? mesh(make(), kind === 'meat' ? MAT.glossy : MAT.standard) : null;
   }
 
@@ -111,7 +113,7 @@ export class Items {
     const group = new THREE.Group();
     group.visible = false;
     group.position.y = -1000;
-    for (const kind of [...Object.keys(LOOT_GEO), 'pistol', 'rifle', 'torch', ...Object.keys(CONFIG.fruit.types)]) {
+    for (const kind of [...Object.keys(LOOT_GEO), 'pistol', 'rifle', 'torch', ...Object.keys(CONFIG.fruit.types), ...Object.keys(CONFIG.resources.regrow)]) {
       const m = this.#model(kind);
       if (m) group.add(m);
     }

@@ -13,9 +13,9 @@ export const RECIPES = [
   { id: 'spear',   kind: 'supply', icon: 'spear', name: 'Spare spear', text: 'A new spear if you lost yours.', cost: { teeth: 1, hide: 1 }, give: { spear: 1 } },
 
   // ---- upgrades, tier 1 (island 1)
-  { id: 'bow1',    kind: 'upgrade', tier: 1, line: 'bow',   icon: 'bow',    name: 'Reinforced bow', text: '+20% arrow damage.', cost: { hide: 2, teeth: 3 }, mods: { bowDamage: 0.2 } },
-  { id: 'spear1',  kind: 'upgrade', tier: 1, line: 'spear', icon: 'spear',  name: 'Stone spearhead', text: '+20% stab and throw damage.', cost: { hide: 1, teeth: 2 }, mods: { spearDamage: 0.2 } },
-  { id: 'quiver1', kind: 'upgrade', tier: 1, line: 'gear',  icon: 'quiver', name: 'Leather quiver', text: '+4 arrows in the quiver.', cost: { hide: 2 }, mods: { quiver: 4 } },
+  { id: 'bow1',    kind: 'upgrade', tier: 1, line: 'bow',   icon: 'bow',    name: 'Reinforced bow', text: '+20% arrow damage.', cost: { ironwood: 2, resin: 2, herb: 1 }, mods: { bowDamage: 0.2 } },
+  { id: 'spear1',  kind: 'upgrade', tier: 1, line: 'spear', icon: 'spear',  name: 'Stone spearhead', text: '+20% stab and throw damage.', cost: { ironwood: 2, resin: 1 }, mods: { spearDamage: 0.2 } },
+  { id: 'quiver1', kind: 'upgrade', tier: 1, line: 'gear',  icon: 'quiver', name: 'Leather quiver', text: '+4 arrows in the quiver.', cost: { hide: 1, herb: 2 }, mods: { quiver: 4 } },
   // ---- tier 2 (island 2)
   { id: 'bow2',    kind: 'upgrade', tier: 2, line: 'bow',   icon: 'bow',    name: 'Longbow', text: 'Faster arrows and +15% arrow damage.', cost: { claws: 2, plates: 2, teeth: 3 }, requires: 'bow1', mods: { bowDamage: 0.15, bowSpeed: 8 } },
   { id: 'spear2',  kind: 'upgrade', tier: 2, line: 'spear', icon: 'spear',  name: 'Barbed spear', text: 'Farther throws and a quicker next throw.', cost: { claws: 2, teeth: 2 }, requires: 'spear1', mods: { throwSpeed: 0.15, throwCooldown: -0.25 } },

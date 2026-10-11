@@ -27,6 +27,19 @@ test('every recipe only costs known loot and every upgrade has a tier', () => {
   }
 });
 
+test('the first upgrades of spear and bow cost the forest resources of island 1', () => {
+  assert.deepEqual(RECIPE_BY_ID.spear1.cost, { ironwood: 2, resin: 1 });
+  assert.deepEqual(RECIPE_BY_ID.bow1.cost, { ironwood: 2, resin: 2, herb: 1 });
+  const { world, craft, stock } = setup();
+  stock({ hide: 9, teeth: 9 });
+  craft('spear1');
+  assert.ok(!world.upgrades.has('spear1'), 'hide and teeth no longer buy it');
+  stock({ ironwood: 2, resin: 1 });
+  craft('spear1');
+  assert.ok(world.upgrades.has('spear1'));
+  assert.equal(world.store.ironwood + world.store.resin, 0);
+});
+
 test('crafting arrows pays from the hut store and fills the quiver', () => {
   const { world, player, craft, stock } = setup();
   stock({ teeth: 2 });
@@ -83,12 +96,13 @@ test('a lost spear can be crafted again, but not while you hold one', () => {
 
 test('upgrades are built once for the team and change damage and limits', () => {
   const { world, player, craft, stock, messages } = setup();
-  stock({ hide: 9, teeth: 9 });
+  stock({ hide: 9, teeth: 9, resin: 9, ironwood: 9, herb: 9 });
   craft('bow1');
   assert.ok(world.upgrades.has('bow1'));
-  assert.equal(world.store.hide, 7);
+  assert.deepEqual([world.store.ironwood, world.store.resin, world.store.herb], [7, 7, 8], 'the bow upgrade costs the forest resources');
+  assert.equal(world.store.hide, 9);
   craft('bow1');
-  assert.equal(world.store.hide, 7, 'already built');
+  assert.equal(world.store.ironwood, 7, 'already built');
   assert.deepEqual(messages.filter((m) => m.msg.t === MSG.INV).at(-1).msg.inv.upgrades, ['bow1']);
 
   craft('quiver1');
@@ -108,7 +122,7 @@ test('upgrades are built once for the team and change damage and limits', () => 
 
 test('tier 2 upgrades unlock on island 2 and need their tier 1 upgrade', () => {
   const { world, craft, stock } = setup();
-  stock({ hide: 9, teeth: 9, claws: 9, plates: 9 });
+  stock({ hide: 9, teeth: 9, claws: 9, plates: 9, resin: 9, ironwood: 9, herb: 9 });
   craft('bow2');
   assert.ok(!world.upgrades.has('bow2'), 'locked on island 1');
 

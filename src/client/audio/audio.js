@@ -426,6 +426,11 @@ export class GameAudio {
         this.#osc('triangle', 660, 660, t, 0.08, out, 0.35);
         this.#osc('triangle', 990, 990, t + 0.07, 0.12, out, 0.35);
         break;
+      case 'gather':
+        // a resource comes loose: a rustle and a soft, bright pluck
+        this.#noise(t, 0.16, out, { vol: 0.25, f0: 3200, f1: 1600, q: 1.2 });
+        this.#osc('triangle', 520, 780, t + 0.05, 0.12, out, 0.25);
+        break;
       case 'full':
         // soft "nope": two low descending blips
         this.#osc('triangle', 330, 300, t, 0.09, out, 0.35);

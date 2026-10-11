@@ -47,6 +47,8 @@ export const BIOMES = {
     water: { shallow: '#57e6dc', mid: '#1fb4e0', deep: '#1560c4', foam: '#f4fcff', sky: '#a9dcf8' },
     dinos: { brachio: 1, stego: 1, raptor: 2, ptera: 3, trex: 0 },   // herds / groups / packs / flyers / rexes
     music: 'calm',
+    // map resources: how many spots of each (shared/layout.js resourceSpots, config.js resources)
+    resources: { resin: 12, ironwood: 10, herb: 14 },
   },
 
   // Ashfall Isle: a round island round one huge caldera (shared/island.js

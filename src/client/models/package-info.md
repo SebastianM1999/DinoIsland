@@ -19,6 +19,7 @@
 - `props/ruins.js` — `buildRuins(r, biome)`: stone plaza, pillars, arch, altar; re-exports `RUINS_ALTAR_TOP`.
 - `props/nest.js` — `buildNest(n)`: twig nest with eggs and a free centre for the golden egg relic; `NEST_EGG_Y`.
 - `props/relics.js` — boat-part relic models (incl. the cave level's bell and compass): `relicModel`, `relicMesh` (hovering pickup with beam), `relicGlow`, `relicHeight`.
+- `props/resources.js` — map resource models (resin drops, an ironwood branch, a healing herb): `resourceGeometry`, `resourceMaterial` (own soft glow, `RESOURCE_GLOW`), `makeResourceMesh`; used by `world/resourceNodes.js` and `entities/items.js`.
 - `props/volcano.js` — `buildVolcanoFx(v)`: smoke plume, embers, glow haze and crater light.
 
 ## Entry points
