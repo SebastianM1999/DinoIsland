@@ -1,6 +1,5 @@
 /* Home screen: expedition actions on the left, live island scenery on the right. */
 #menu { display: flex; flex-direction: column; align-items: flex-start; justify-content: flex-start; padding: clamp(24px, 5vh, 64px) clamp(24px, 5vw, 96px); background: #111c28; isolation: isolate; scrollbar-width: thin; }
-#menu-tour { position: fixed; inset: 0; width: 100%; height: 100%; z-index: -2; pointer-events: none; }
 #menu::before { content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none; background: linear-gradient(90deg, #0c1b1ef5, #0c1b1ed9 25%, #0c1b1e59 49%, transparent 74%), linear-gradient(0deg, #0c1b1ea6, transparent 35%); }
 #menu .menu-card { width: min(440px, 42vw); padding: 0; margin: auto 0; text-align: left; }
 .menu-eyebrow { font-size: .8rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: #d5dfc9; margin: 0 0 12px; }
@@ -176,10 +175,21 @@ body.is-demo [data-explorer-skills], body.is-demo .home-explorer-skills, body.is
 #menu::before { background: none; }
 #menu-preview { position: absolute; left: 46%; right: 0; top: 0; bottom: 0; z-index: -1; overflow: hidden; background: radial-gradient(ellipse at 70% 40%, #304055, #121c29 70%); }
 #menu-preview::after { content: ''; position: absolute; inset: 0; pointer-events: none; background: linear-gradient(90deg, #111c28, #111c2822 30%, transparent 60%), linear-gradient(0deg, #111c28ee, transparent 68%); }
-.menu-preview-image { position: absolute; width: 100%; height: 100%; inset: 0; object-fit: cover; opacity: 0; transition: opacity .28s ease; animation: island-postcard-drift 16s ease-in-out alternate infinite; animation-play-state: paused; }
-.menu-preview-image.is-front { opacity: 1; animation-play-state: running; }
+/* Slideshow: two stacked layers crossfade; each shot gets a slow Ken Burns zoom/pan (kb-0..3, chosen in
+   ui/menuPostcards.js). Transform and opacity only, so the compositor does all the work. Zoom stays within
+   the pan limit (|translate| <= (scale-1)/2) so no layer edge is ever revealed. SHOT_MS + FADE_MS in JS. */
+.menu-preview-image { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity 1.8s ease-in-out; transform-origin: 50% 50%; will-change: opacity, transform; }
+.menu-preview-image.is-front { opacity: 1; }
+.menu-preview-image.is-front, .menu-preview-image.is-leaving { animation: 11.5s linear both; }
+.menu-preview-image.kb-0 { animation-name: kb-0; }
+.menu-preview-image.kb-1 { animation-name: kb-1; }
+.menu-preview-image.kb-2 { animation-name: kb-2; }
+.menu-preview-image.kb-3 { animation-name: kb-3; }
 #menu-preview.is-still .menu-preview-image { animation-play-state: paused; }
-@keyframes island-postcard-drift { from { transform: scale(1.06) translate(-1%, -.5%); } to { transform: scale(1.12) translate(1%, .5%); } }
+@keyframes kb-0 { from { transform: translate3d(-1.5%, 1%, 0) scale(1.04); } to { transform: translate3d(4%, -2%, 0) scale(1.14); } }
+@keyframes kb-1 { from { transform: translate3d(1.5%, -1%, 0) scale(1.04); } to { transform: translate3d(-4%, 2%, 0) scale(1.14); } }
+@keyframes kb-2 { from { transform: translate3d(3%, 2.5%, 0) scale(1.14); } to { transform: translate3d(-1%, -1%, 0) scale(1.04); } }
+@keyframes kb-3 { from { transform: translate3d(-3%, -2.5%, 0) scale(1.14); } to { transform: translate3d(1%, 1%, 0) scale(1.04); } }
 .preview-placeholder { position: absolute; inset: 12% 10% 45% 16%; z-index: 1; display: flex; flex-direction: column; justify-content: center; gap: 16px; color: #fff1d0; }
 .preview-placeholder span { text-transform: uppercase; letter-spacing: .12em; font-size: 14px; color: #d0dbd1; }
 .preview-placeholder strong { font-size: clamp(24px, 2.5vw, 38px); line-height: 1.15; }
@@ -197,17 +207,13 @@ body.is-demo [data-explorer-skills], body.is-demo .home-explorer-skills, body.is
   .tour-info { width: 100%; margin-top: 24px; padding: 18px; background: #111c28dd; border-radius: 8px; }
   .preview-placeholder { inset: 15% 8% 30%; }
 }
-@media (prefers-reduced-motion: reduce) { .menu-preview-image { animation: none; transition: none; } }
+@media (prefers-reduced-motion: reduce) { .menu-preview-image { animation: none !important; transition: none; transform: scale(1.04); } }
 
 /* Broad scenery fills the screen, with a stable readable action rail. */
 #menu-preview { position: fixed; inset: 0; width: 100%; height: 100%; }
-#menu-preview::after { background: linear-gradient(90deg, #111c28f5 0%, #111c28e8 24%, #111c2870 42%, transparent 68%), linear-gradient(0deg, #111c28c9, transparent 45%); z-index: 2; }
-#menu-tour { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1; opacity: 0; transition: opacity .25s ease; }
-#menu-preview.has-live-tour #menu-tour { opacity: 1; }
-#menu-preview.has-live-tour .menu-preview-image { opacity: 0; animation: none; }
+#menu-preview::after { background: linear-gradient(90deg, #111c28f5 0%, #111c28e8 24%, #111c2870 42%, transparent 68%), linear-gradient(0deg, #111c2899, transparent 38%); z-index: 2; }
 .preview-placeholder { left: 52%; right: 8%; }
 @media (max-width: 800px) { #menu-preview { top: 0; } .preview-placeholder { left: 8%; } }
-@media (prefers-reduced-motion: reduce) { #menu-tour { transition: none; } }
 
 /* Loading live scenery never covers the immediately usable photograph/menu. */
 #menu-startup { position: absolute; inset: 0; z-index: 4; display: none; background: #111c28; color: #fff1d0; align-items: center; justify-content: center; flex-direction: column; padding-left: 35%; }

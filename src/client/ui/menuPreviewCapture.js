@@ -1,320 +1,70 @@
-// Developer-only capture tool; never imported by the normal home menu.
-// A quiet, live tour of the actual seeded islands, independent of a game session.
+// Developer-only capture tool (`?capturePreviews=1`); never imported by a normal session.
+// It turns the running game into a photo studio: the real renderer at its top graphics tier, a free camera
+// placed by `pose()`, no HUD, no viewmodel. `scripts/capturePreviews.mjs` drives it with Playwright and
+// writes assets/previews/island-{n}-{k}.webp (see assets/previews/README.md).
 import * as THREE from 'three';
-import { planIsland } from '../../shared/island.js';
-import { Terrain } from '../../shared/terrain.js';
-import { buildLayout } from '../../shared/layout.js';
-import { LEVELS } from '../../shared/levels.js';
-import { hasBasePlots } from '../../shared/base.js';
-import { disposeIslandScenes } from '../core/resources.js';
-import { WIND } from '../models/kit.js';
-import { buildTerrainMesh } from '../world/terrainMesh.js';
-import { buildSky } from '../world/sky.js';
-import { buildWater } from '../world/water.js';
-import { buildVegetation } from '../world/vegetation.js';
-import { buildRocks } from '../world/rocks.js';
-import { buildLogs } from '../world/logs.js';
-import { buildHut } from '../world/hut.js';
-import { buildSites } from '../world/sites.js';
-import { buildFruitPlants } from '../world/fruitPlants.js';
-import { buildBossArena } from '../world/bossArena.js';
-import { buildSwampArena } from '../world/swampArena.js';
-import { buildSwampFx } from '../world/swampFx.js';
-import { buildVolcanoArena } from '../world/volcanoArena.js';
-import { setSurfaceBiome, setSurfaceQuality, SURFACE } from '../world/surfaceDetail.js';
-
-const QUALITY = { name: 'Medium', grass: 0.65, lodNear: 45, shadowRange: 40 };
-const SHOT_SECONDS = 38;
-const SPEED = 1.65;
+import { ACT } from '../../shared/protocol.js';
 
 /**
- * Lazily import this module only while the home menu is visible.
- * onIsland receives { index, number, name, motionEnabled } on every selection
- * and motion change. Pausing freezes both the camera and scenery animation.
+ * @param {import('../core/game.js').Game} game a running game on the island to photograph
+ * @returns {{ pose(spec), release(), ground(x:number, z:number):number, info():object }}
  */
-export async function createMenuTour(canvas, onIsland = () => {}, { signal } = {}) {
-  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance', preserveDrawingBuffer: true });
-  renderer.outputColorSpace = THREE.SRGBColorSpace;
-  renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.shadowMap.enabled = true;
-  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-  // A decorative full-screen background should not render at a 4K display's
-  // native device pixel ratio. Refresh shadows occasionally, not every frame.
-  renderer.shadowMap.autoUpdate = false;
-  renderer.setPixelRatio(Math.min(devicePixelRatio, 1));
-  const camera = new THREE.PerspectiveCamera(62, 1, 0.15, 650);
-  const sunDir = new THREE.Vector3(-0.45, 0.78, 0.43).normalize();
-  const look = new THREE.Vector3(), point = new THREE.Vector3();
-  const motionPreference = matchMedia('(prefers-reduced-motion: reduce)');
-  const savedSurface = Object.fromEntries(Object.entries(SURFACE).map(([key, uniform]) => [key, uniform.value]));
-  const savedWind = WIND.uTime.value;
-  let scene, terrain, sun, updaters = [], path = [], length = 0, biome;
-  let index = 0, elapsed = 0, time = 0, frameId = 0, previous = 0, disposed = false;
-  let motionEnabled = !motionPreference.matches;
-  let suspended = false, loading = false, request = 0, shadowTime = -Infinity;
-  let buildQueue = Promise.resolve();
-  const scenes = new Map();
-  const pendingScenes = new Set();
-  // Cache only the three short camera corridors, not three entire playable worlds.
-  // Revisiting an island then takes no procedural rebuild or shader warmup.
-  const yieldToMenu = () => new Promise(resolve => setTimeout(resolve, 20));
+export function installPreviewCapture(game) {
+  const gfx = game.gfx;
+  const camera = gfx.camera;
+  const from = new THREE.Vector3(), to = new THREE.Vector3();
+  let current = null, hideDinos = false;
+  const baseFov = camera.fov;
+  const ground = (x, z) => game.terrain.heightAt(x, z);
 
-  function notify(selected = index) {
-    onIsland({ index: selected, number: selected + 1, name: LEVELS[selected].name, motionEnabled, loading });
-  }
+  // Top tier, and never let the auto-tuner step down while the studio waits for a still.
+  gfx.autoTune.frame = () => {};
+  gfx.setTier(3);
+  gfx.viewScene.visible = false;                     // the hand-held weapon
+  game.setCreative(true);                            // invincible, and the server lets the player be moved (ACT.DEV_TP)
+  const hud = document.getElementById('hud');
 
-  function resize() {
-    if (disposed) return;
-    const bounds = canvas.getBoundingClientRect();
-    const width = Math.max(1, bounds.width), height = Math.max(1, bounds.height);
-    renderer.setSize(width, height, false);
-    camera.aspect = width / height;
-    camera.updateProjectionMatrix();
-    if (scene && !suspended && !loading) draw(0);
-  }
-
-  function sample(distance, target) {
-    distance = Math.min(length, Math.max(0, distance));
-    let next = 1;
-    while (next < path.length - 1 && path[next].distance < distance) next++;
-    const a = path[next - 1], b = path[next];
-    const k = (distance - a.distance) / Math.max(0.001, b.distance - a.distance);
-    const x = THREE.MathUtils.lerp(a.x, b.x, k), z = THREE.MathUtils.lerp(a.z, b.z, k);
-    // Stay at player height above the actual terrain, including bridge decks.
-    target.set(x, terrain.heightAt(x, z) + 2.1, z);
-    return target;
-  }
-
-  function draw(dt) {
-    const distance = Math.min(length - 14, 8 + elapsed * SPEED);
-    sample(distance, point);
-    // Smoothing ground height prevents tiny terrain grid bumps from shaking the shot.
-    if (dt > 0) camera.position.lerp(point, 1 - Math.exp(-dt * 4));
-    else camera.position.copy(point);
-    sample(distance + 13, look);
-    look.y = camera.position.y + 0.25;
-    camera.lookAt(look);
-    sun.target.position.copy(camera.position);
-    sun.position.copy(camera.position).addScaledVector(sunDir, 160);
-    setSurfaceBiome(biome);
-    setSurfaceQuality(QUALITY);
-    if (time - shadowTime >= 0.25 || dt === 0) {
-      renderer.shadowMap.needsUpdate = true;
-      shadowTime = time;
+  const render = gfx.render.bind(gfx);
+  gfx.render = (dt) => {
+    hud.hidden = true;                                 // (the game shows it again when it starts)
+    if (game.overlay) game.overlay.hidden = true;
+    if (current) {
+      camera.position.copy(from);
+      camera.lookAt(to);
+      camera.updateMatrixWorld(true);
+      for (const view of game.dinos?.map?.values() ?? []) if (view.root) view.root.visible = !hideDinos;
     }
-    WIND.uTime.value = time;
-    for (const updater of updaters) updater.update?.(dt, time, camera.position);
-    renderer.render(scene, camera);
-  }
-
-  async function buildIsland(selected, ticket) {
-    const started = performance.now();
-    const current = () => !disposed && ticket === request;
-    await yieldToMenu();
-    if (!current()) return null;
-    const islandTerrain = new Terrain(planIsland(selected, 1));
-    await yieldToMenu();
-    if (!current()) return null;
-    const layout = buildLayout(islandTerrain), sky = layout.biome.sky;
-    await yieldToMenu();
-    if (!current()) return null;
-    const islandScene = new THREE.Scene();
-    const islandSun = new THREE.DirectionalLight(sky.sun, sky.sunIntensity * 1.03);
-    const result = { scene: islandScene, terrain: islandTerrain, sun: islandSun,
-      updaters: [], path: [], length: 0, biome: layout.biome, buildMs: 0 };
-    pendingScenes.add(result);
-    islandScene.fog = new THREE.Fog(sky.fog, sky.fogNear, sky.fogFar);
-    islandSun.castShadow = true;
-    islandSun.shadow.mapSize.set(1024, 1024);
-    Object.assign(islandSun.shadow.camera, { left: -40, right: 40, top: 40, bottom: -40, near: 1, far: 400 });
-    islandSun.shadow.bias = -0.0004;
-    islandSun.shadow.normalBias = 0.6;
-    islandSun.position.copy(sunDir).multiplyScalar(160);
-    islandScene.add(islandSun, islandSun.target, new THREE.HemisphereLight(sky.hemiSky, sky.hemiGround, sky.hemiIntensity * 0.9));
-    const trail = islandTerrain.plan.trail;
-    const start = selected === 0 ? 0 : Math.floor(trail.length * (selected === 1 ? 0.38 : 0.24));
-    result.path = trail.slice(start).map((p, i, points) => {
-      if (i) result.length += Math.hypot(p.x - points[i - 1].x, p.z - points[i - 1].z);
-      return { x: p.x, z: p.z, distance: result.length };
-    });
-    const reach = sky.fogFar + 40;
-    const cameraPath = result.path.filter((p, i, all) => !i || all[i - 1].distance <= 8 + SHOT_SECONDS * SPEED + 14);
-    const inShot = p => cameraPath.some(c => Math.hypot(p.x - c.x, p.z - c.z) < reach + (p.r ?? p.radius ?? 15));
-    const corridor = { ...layout };
-    for (const key of ['trees', 'bushes', 'rocks', 'logs', 'fruitSpots', 'seaStacks']) corridor[key] = layout[key].filter(inShot);
-    // Decorative grass count is lower; tree, rock and trail positions still
-    // come unchanged from the game's seeded layout.
-    corridor.biome = { ...layout.biome, vegetation: { ...layout.biome.vegetation,
-      grass: layout.biome.vegetation.grass * 0.4, flowers: layout.biome.vegetation.flowers * 0.4 } };
-    if (layout.swampArena) {
-      const minZ = Math.min(...cameraPath.map(p => p.z)) - reach;
-      const maxZ = Math.max(...cameraPath.map(p => p.z)) + reach;
-      corridor.swampArena = { ...layout.swampArena,
-        roots: layout.swampArena.roots.filter(inShot),
-        waist: layout.swampArena.waist.map(w => ({ ...w,
-          z0: THREE.MathUtils.clamp(w.z0, minZ, maxZ), z1: THREE.MathUtils.clamp(w.z1, minZ, maxZ) })) };
-    }
-    setSurfaceBiome(layout.biome);
-    setSurfaceQuality(QUALITY);
-    const builders = [
-      () => ({ group: buildTerrainMesh(islandTerrain, layout) }),
-      () => buildSky({ scene: islandScene, sunDir }, layout),
-      () => buildWater(islandTerrain, layout, sunDir),
-      () => buildVegetation(islandTerrain, corridor), () => buildRocks(islandTerrain, corridor),
-      () => buildLogs(islandTerrain, corridor), () => buildFruitPlants(islandTerrain, corridor),
-      () => buildHut(islandTerrain, layout, { landing: hasBasePlots(layout) }), () => buildSites(islandTerrain, layout),
-      () => buildBossArena(islandTerrain, layout), () => buildSwampArena(islandTerrain, corridor),
-      () => buildSwampFx(islandTerrain, layout, camera), () => buildVolcanoArena(islandTerrain, layout),
-    ];
-    try {
-      for (const build of builders) {
-        await yieldToMenu();
-        if (!current()) { release(result); return null; }
-        const updater = build();
-        updater.setQuality?.(QUALITY);
-        updater.setDensity?.(QUALITY.grass);
-        updater.spatial?.setCullDistance(reach);
-        result.updaters.push(updater);
-        islandScene.add(updater.group);
-      }
-      result.buildMs = Math.round(performance.now() - started);
-      pendingScenes.delete(result);
-      return result;
-    } catch (error) { release(result); throw error; }
-  }
-
-  function release(island) {
-    if (!island) return;
-    disposeIslandScenes(island.scene);
-    island.sun.shadow.dispose();
-    pendingScenes.delete(island);
-  }
-
-  async function setIsland(selected) {
-    if (disposed) return;
-    selected = ((Math.trunc(selected) % LEVELS.length) + LEVELS.length) % LEVELS.length;
-    if (!Number.isFinite(selected)) selected = 0;
-    const ticket = ++request;
-    loading = true;
-    stopFrames();
-    notify(selected);
-    const island = await buildIsland(selected, ticket);
-    if (!island || disposed) return;
-    scenes.set(selected, island);
-    ({ scene, terrain, sun, updaters, path, length, biome } = island);
-    index = selected;
-    renderer.setSize(1280, 800, false);
-    camera.aspect = 1.6;
-    camera.updateProjectionMatrix();
-    renderer.toneMappingExposure = biome.sky.exposure;
-    elapsed = 0;
-    draw(0);
-    await renderer.compileAsync(scene, camera);
-    const shots = [];
-    for (let shot = 0; shot < 3; shot++) {
-      await yieldToMenu();
-      if (disposed) return;
-      elapsed = shot * 12;
-      time = shot * 12;
-      draw(0);
-      const src = canvas.toDataURL('image/jpeg', .88);
-      shots.push(src);
-      const image = document.createElement('img');
-      image.className = 'tour-preload';
-      image.hidden = true;
-      image.dataset.island = String(selected);
-      image.dataset.shot = String(shot);
-      image.src = src;
-      canvas.after(image);
-    }
-
-    loading = false;
-    notify();
-  }
-
-  function stopFrames() {
-    cancelAnimationFrame(frameId);
-    frameId = 0;
-    previous = 0;
-  }
-
-  function frame(now) {
-    frameId = 0;
-    if (disposed || document.hidden || !motionEnabled || suspended || loading) return;
-    if (!previous) previous = now;
-    const delta = (now - previous) / 1000;
-    if (delta >= 1 / 120) {
-      previous = now;
-      const dt = Math.min(delta, 0.1);
-      elapsed += dt;
-      time += dt;
-      if (elapsed >= SHOT_SECONDS) { void setIsland(index + 1).catch(error => console.warn('Island tour transition failed', error)); return; }
-      else draw(dt);
-    }
-    frameId = requestAnimationFrame(frame);
-  }
-
-  function resumeFrames() {
-    stopFrames();
-    // Captures are static; no animation loop.
-  }
-
-  function preferenceChanged() {
-    motionEnabled = !motionPreference.matches;
-    resumeFrames();
-    notify();
-  }
-
-  function dispose() {
-    if (disposed) return;
-    disposed = true;
-    signal?.removeEventListener('abort', dispose);
-    ++request;
-    stopFrames();
-    removeEventListener('resize', resize);
-    document.removeEventListener('visibilitychange', resumeFrames);
-    motionPreference.removeEventListener('change', preferenceChanged);
-    for (const island of scenes.values()) release(island);
-    for (const island of [...pendingScenes]) release(island);
-    scenes.clear();
-    updaters = [];
-    renderer.renderLists.dispose();
-    renderer.dispose();
-    renderer.forceContextLoss();
-    for (const [key, value] of Object.entries(savedSurface)) SURFACE[key].value = value;
-    WIND.uTime.value = savedWind;
-  }
-
-  try {
-    if (signal?.aborted) throw new DOMException('Tour cancelled', 'AbortError');
-    signal?.addEventListener('abort', dispose, { once: true });
-    resize();
-    for (let selected = 0; selected < LEVELS.length; selected++) await setIsland(selected);
-    if (disposed) throw new DOMException('Tour cancelled', 'AbortError');
-    addEventListener('resize', resize);
-    // Capture only.
-    motionPreference.addEventListener('change', preferenceChanged);
-    // Capture-only renderer: no continuing frames.
-  } catch (error) {
-    dispose();
-    throw error;
-  }
+    render(dt);
+  };
 
   return {
-    dispose, setIsland,
-    setSuspended(value) {
-      suspended = Boolean(value);
-      if (!suspended && scene && !loading) draw(0);
-      resumeFrames();
+    /**
+     * `from`/`to`: [x, z, heightAboveGround]; `fov` degrees (default the game's); `hideDinos` to keep the shot clear.
+     * Heights are metres over `terrain.heightAt`, so a pose survives terrain tweaks.
+     */
+    pose({ from: f, to: t, fov = baseFov, dinos = true }) {
+      from.set(f[0], ground(f[0], f[1]) + f[2], f[1]);
+      to.set(t[0], ground(t[0], t[1]) + t[2], t[1]);
+      hideDinos = !dinos;
+      // The terrain, vegetation and cave stream in around the player, so the player goes where the camera is.
+      const p = game.player;
+      p.flying = true;
+      p.teleport(f[0], f[1], 0);
+      p.pos.y = from.y; p.vel.x = p.vel.y = p.vel.z = 0;
+      game.net.act(ACT.DEV_TP, { x: from.x, y: from.y, z: from.z });
+      if (camera.fov !== fov) { camera.fov = fov; camera.updateProjectionMatrix(); }
+      current = { f, t };
+      return { x: from.x, y: from.y, z: from.z };
     },
-    get diagnostics() { return { cachedIslands: scenes.size, buildMs: scenes.get(index)?.buildMs ?? 0,
-      calls: renderer.info.render.calls, triangles: renderer.info.render.triangles }; },
-    get motionEnabled() { return motionEnabled; },
-    toggleMotion() {
-      motionEnabled = !motionEnabled;
-      resumeFrames();
-      notify();
-      return motionEnabled;
+    release() { current = null; camera.fov = baseFov; camera.updateProjectionMatrix(); },
+    ground,
+    info() {
+      const lv = game.level, layout = game.layout, plan = layout.plan;
+      const pt = (p) => p && { x: Math.round(p.x), z: Math.round(p.z) };
+      return { level: lv, size: game.terrain.size, tier: gfx.graphics.name, hut: pt(layout.hut), boat: pt(layout.boat),
+        waterfall: pt(plan.waterfall), sites: Object.fromEntries(Object.entries(plan.sites ?? {}).map(([k, v]) => [k, Array.isArray(v) ? v.map(pt) : pt(v)])),
+        cave: plan.cave && { entrance: pt(plan.cave.entrance), exit: pt(plan.cave.exit), tunnels: plan.cave.maze.tunnels.slice(0, 4).map((t) => ({ id: t.id, kind: t.kind, length: Math.round(t.length), pts: t.pts.filter((_, i) => i % 4 === 0).map(pt) })), rooms: plan.cave.maze.nodes.map((n) => ({ kind: n.kind, ...pt(n), r: Math.round(n.r) })) },
+        volcano: plan.volcano && { ...pt(plan.volcano), radius: plan.volcano.radius }, trail: [plan.trail[0], plan.trail[plan.trail.length >> 1], plan.trail.at(-1)].map(pt) };
     },
   };
 }

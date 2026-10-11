@@ -40,16 +40,14 @@ try {
       await page.waitForFunction(() => !document.getElementById('btn-solo').disabled && document.querySelector('.menu-preview-image.is-front')?.naturalWidth > 0, null, { timeout: 60000 });
       const interactiveMs = await page.evaluate(() => performance.now());
       console.log(`[startup] run ${run + 1}: menu interactive at ${interactiveMs.toFixed(0)} ms`);
-      // First run starts while the tour is pending; later runs exercise its
-      // completed lifecycle. All runs start on the normal first-island spawn.
-      let preview = null;
-      if (run > 0) {
-        await page.waitForFunction(() => document.getElementById('menu-preview').classList.contains('has-live-tour'), null, { timeout: 120000 });
-        preview = await page.evaluate(() => ({ readyMs: performance.now(), ...window.__menuTour?.diagnostics }));
-        assert.equal(preview.cachedIslands, 1, 'menu must only retain the selected island');
-      }
+      // The menu is a photograph slideshow (no WebGL, no map models); wait until the selected island's shots are cached.
+      await page.waitForFunction(() => window.__menuPostcards?.diagnostics.frames > 0, null, { timeout: 120000 });
+      const preview = await page.evaluate(() => ({ readyMs: performance.now(), ...window.__menuPostcards.diagnostics,
+        canvases: document.querySelectorAll('#menu canvas').length }));
+      assert.equal(preview.cachedIslands, 1, 'menu must only retain the selected island');
+      assert.equal(preview.canvases, 0, 'the menu draws no canvas');
       const menuRequests = requests.slice();
-      assert(!menuRequests.some(path => /island-[234]-\d\.jpg$|\/assets\/cave\//.test(path)), 'first island menu must not download other maps');
+      assert(!menuRequests.some(path => /island-[234]-\d\.webp$|\/assets\/cave\//.test(path)), 'first island menu must not download other maps');
       const startAt = await page.evaluate(() => performance.now());
       await page.locator('#btn-solo').click();
       await page.waitForFunction(() => window.__game?.running, null, { timeout: 120000 });

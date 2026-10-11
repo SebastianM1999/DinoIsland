@@ -81,88 +81,57 @@ document.addEventListener('pointerdown', playMenuMusic, { capture: true });
 document.addEventListener('keydown', playMenuMusic, { capture: true });
 const settingsUi = initSettings();
 
-// Load the real island backdrop after the interactive menu has painted.
-let menuTour = null;
+// Photograph slideshow behind the menu (no WebGL, no map models): see ui/menuPostcards.js.
 let menuPostcards = null;
-let tourAbort = null;
-let tourIsland = 0;
-let tourRequest = 0;
-async function startMenuTour() {
-  const request = ++tourRequest;
-  tourAbort?.abort();
-  tourAbort = new AbortController();
-  $('menu-preview').classList.remove('is-booting', 'has-live-tour');
+let postcardAbort = null;
+let postcardIsland = 0;
+let postcardRequest = 0;
+async function startMenuPostcards() {
+  const request = ++postcardRequest;
+  postcardAbort?.abort();
+  postcardAbort = new AbortController();
+  $('menu-preview').classList.remove('is-booting');
   $('tour-next').disabled = false;
-  const selected = island => {
-    if (request !== tourRequest) return;
-    tourIsland = island.index;
-    $('play-island').value = String(demo ? 0 : unlockedStartingIsland(island.index));
-    // Selection remains usable while the previous preview is being cancelled.
-    $('tour-next').disabled = false;
-    $('menu-preview').classList.toggle('has-live-tour', !!menuTour && menuTour !== menuPostcards && !island.loading && island.available);
-  };
   try {
     const { createMenuPostcards } = await import('./ui/menuPostcards.js');
     const postcards = await createMenuPostcards($('menu-preview'), island => {
-      if (!menuTour || menuTour === menuPostcards) selected(island);
-    }, { signal: tourAbort.signal });
-    if (request !== tourRequest || menu.hidden) { postcards.dispose(); return; }
+      if (request !== postcardRequest) return;
+      postcardIsland = island.index;
+      $('play-island').value = String(demo ? 0 : unlockedStartingIsland(island.index));
+      $('tour-next').disabled = false;
+    }, { signal: postcardAbort.signal });
+    if (request !== postcardRequest || menu.hidden) { postcards.dispose(); return; }
     menuPostcards = postcards;
-    menuTour = postcards;
-    syncTourSuspension();
-    const { createMenuTour } = await import('./ui/menuTour.js');
-    if (request !== tourRequest || menu.hidden) return;
-    const tour = await createMenuTour($('menu-tour'), selected, { signal: tourAbort.signal });
-    if (request !== tourRequest || menu.hidden) { tour.dispose(); return; }
-    menuTour = tour;
-    if (DEBUG_QUERY.has('debug')) window.__menuTour = tour;
-    syncTourSuspension();
-    await tour.setIsland(tourIsland);
-    if (request !== tourRequest || menu.hidden) return;
-    $('tour-next').disabled = false;
+    if (DEBUG_QUERY.has('debug')) window.__menuPostcards = postcards;
+    syncPostcardSuspension();
   } catch (error) {
-    if (request !== tourRequest || error.name === 'AbortError') return;
-    console.warn('Island tour unavailable', error);
-    if (menuTour !== menuPostcards) menuTour?.dispose();
-    menuTour = menuPostcards;
-    $('menu-preview').classList.remove('is-booting');
-    $('tour-next').disabled = !menuTour;
+    if (request !== postcardRequest || error.name === 'AbortError') return;
+    console.warn('Island slideshow unavailable', error);
+    $('tour-next').disabled = true;
   }
 }
-function stopMenuTour() {
-  ++tourRequest;
-  tourAbort?.abort();
-  menuTour?.dispose();
+function stopMenuPostcards() {
+  ++postcardRequest;
+  postcardAbort?.abort();
   menuPostcards?.dispose();
   menuPostcards = null;
-  $('menu-preview').classList.remove('has-live-tour', 'is-booting');
-  menuTour = null;
   $('tour-next').disabled = true;
 }
 async function selectPreviewIsland(index) {
-  const tour = menuTour;
-  tourIsland = index;
-  $('play-island').value = String(unlockedStartingIsland(index));
-  $('menu-preview').classList.remove('has-live-tour');
-  try {
-    if (menuPostcards && menuPostcards !== tour) void menuPostcards.setIsland(index);
-    await tour?.setIsland(index);
-  } catch (error) {
-    if (menuTour === tour) $('menu-preview').classList.remove('has-live-tour');
-    console.warn('Island preview failed', error);
-  }
+  postcardIsland = index;
+  $('play-island').value = String(demo ? 0 : unlockedStartingIsland(index));
+  await menuPostcards?.setIsland(index);
 }
-$('tour-next').addEventListener('click', () => { void selectPreviewIsland((tourIsland + 1) % (availableStartingIsland() + 1)); });
-function syncTourSuspension() {
+$('tour-next').addEventListener('click', () => { void selectPreviewIsland((postcardIsland + 1) % (availableStartingIsland() + 1)); });
+function syncPostcardSuspension() {
   const suspended = [...document.querySelectorAll('.home-dialog, #settings, #steam-friends')].some(root => !root.hidden);
-  menuTour?.setSuspended?.(suspended);
-  menuPostcards?.setSuspended?.(suspended);
+  menuPostcards?.setSuspended(suspended);
 }
-const tourOverlayObserver = new MutationObserver(syncTourSuspension);
+const postcardOverlayObserver = new MutationObserver(syncPostcardSuspension);
 for (const root of document.querySelectorAll('.home-dialog, #settings, #steam-friends')) {
-  tourOverlayObserver.observe(root, { attributes: true, attributeFilter: ['hidden'] });
+  postcardOverlayObserver.observe(root, { attributes: true, attributeFilter: ['hidden'] });
 }
-window.addEventListener('pagehide', () => tourOverlayObserver.disconnect());
+window.addEventListener('pagehide', () => postcardOverlayObserver.disconnect());
 // Native Tab/Enter navigation also works; arrows provide quick menu selection.
 menu.querySelector('.menu-buttons').addEventListener('keydown', event => {
   if (!['ArrowUp', 'ArrowDown', 'Home', 'End'].includes(event.key)) return;
@@ -171,8 +140,8 @@ menu.querySelector('.menu-buttons').addEventListener('keydown', event => {
   const next = event.key === 'Home' ? 0 : event.key === 'End' ? actions.length - 1 : (index + (event.key === 'ArrowDown' ? 1 : -1) + actions.length) % actions.length;
   event.preventDefault(); actions[next]?.focus();
 });
-requestAnimationFrame(() => setTimeout(startMenuTour, 100));
-window.addEventListener('pagehide', stopMenuTour);
+requestAnimationFrame(() => setTimeout(startMenuPostcards, 100));
+window.addEventListener('pagehide', stopMenuPostcards);
 
 // The game module graph (about 4/5 of the client code) is not needed to show the
 // menu: load it once the menu is up, so the first paint and clicks are not delayed.
@@ -218,7 +187,7 @@ async function start(mode, options = {}) {
   const startingIsland = unlockedStartingIsland(Number($('play-island').value));
   void loadingUi.start({ islandName: LEVELS[startingIsland].name, frames: mapPreviewFrames(startingIsland) });
   // Stop construction before starting the worker/network, not after connecting.
-  stopMenuTour();
+  stopMenuPostcards();
   let net;
   try {
     const outfit = savedOutfit();
@@ -230,7 +199,7 @@ async function start(mode, options = {}) {
     if (mode === 'internet') internetTest.stop();
     busy = false;
     loadingUi.stop();
-    void startMenuTour();
+    void startMenuPostcards();
     setBusy(false, err.message || String(err));
     return;
   }
@@ -238,7 +207,7 @@ async function start(mode, options = {}) {
   homeMenu.close();
   homeExplorer.close();
   homeSkills.close();
-  stopMenuTour();
+  stopMenuPostcards();
   steamLobby.updateSession(net.steamSession);
   menuAudio?.stopMusic();
   if (await launch(net, null, { openMenu: !!options.openMenu })) setBusy(false, '');
@@ -283,6 +252,8 @@ async function launch(net, reuse = null, { openMenu = false } = {}) {
       }
     });
     if (DEBUG_QUERY.has('debug')) window.dinoGame = game;   // testing aid: inspect the running game
+    // Developer photo studio for the menu photographs (scripts/capturePreviews.mjs); never loaded otherwise.
+    if (DEBUG_QUERY.has('capturePreviews')) void import('./ui/menuPreviewCapture.js').then(({ installPreviewCapture }) => { window.__previewCapture = installPreviewCapture(game); });
     loadingUi.setStage('shaders');
     // Compile up front so the first playable frames do not hitch; optional.
     await game.gfx.prepare().catch((e) => console.warn('Shader precompile failed', e));
@@ -296,7 +267,7 @@ async function launch(net, reuse = null, { openMenu = false } = {}) {
     // cannot survive behind a new menu or another launch.
     if (reuse) { backToMenu(`Could not start the game: ${err.message}`); return false; }
     menu.hidden = false;
-    void startMenuTour();
+    void startMenuPostcards();
     menuAudio?.startMenuMusic();
     setBusy(false, `Could not start the game: ${err.message}`);
     return false;
@@ -468,15 +439,3 @@ async function pollLobby() {
 }
 pollLobby();
 void initLanAddress();
-
-// Explicit developer capture mode only: rebuild postcards after map art changes.
-if (DEBUG_QUERY.has('capturePreviews')) {
-  const captureRoot = document.createElement('div');
-  captureRoot.hidden = true;
-  const captureCanvas = document.createElement('canvas');
-  captureRoot.append(captureCanvas); document.body.append(captureRoot);
-  import('./ui/menuPreviewCapture.js').then(async ({ createMenuTour }) => {
-    const capture = await createMenuTour(captureCanvas);
-    capture.dispose();
-  }).catch(error => console.warn('Postcard capture failed', error));
-}
