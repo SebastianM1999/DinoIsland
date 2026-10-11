@@ -71,6 +71,7 @@ Grouped by the module area they mainly cover. Many simulation tests also check t
 - `raids.test.js` — raids on the team's base and base repair (`src/sim/raids.js`); four scoped random seeds include a narrow-channel navigation regression, with a focused continuous-path edge check.
 - `inventory-drop.test.js` — dropping, picking up and depositing inventory stacks without duplication.
 - `resources.test.js` — map resources: island 1's spots (count, spread, dry, off the path, resin on its tree, deterministic; none elsewhere), gathering, refusals, regrowth, late join, depositing and paying for an upgrade, the client nodes.
+- `bow-find.test.js` — the hunter's camp on island 1 (placement over variants, none elsewhere), starting without a bow, taking it per explorer, keeping it through death and the voyage, refills/respawns, later islands and creative, the client camp.
 - `discovery-fruit.test.js` — fruit plant harvests/regrowth, shared dinosaur sightings, fruit plant visuals.
 - `outfits.test.js` — outfit sanitizing, server outfit changes, player model outfits.
 

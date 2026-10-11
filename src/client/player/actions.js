@@ -186,7 +186,7 @@ export class PlayerActions {
       if (canAct && input.wasPressed('primary') && this.cooldown <= 0 && this.inv.spear) this.stab();
       if (canAct && input.wasPressed('secondary') && this.cooldown <= 0 && this.inv.spear) this.throwSpear();
     } else if (tool === 'bow') {
-      if (canAct && input.isHeld('primary') && this.inv.arrows > 0 && this.cooldown <= 0) {
+      if (canAct && input.isHeld('primary') && this.inv.bow !== false && this.inv.arrows > 0 && this.cooldown <= 0) {
         if (!this.drawing) g.audio?.play('bowDraw');
         this.drawing = true;
         this.drawT = Math.min(W.bow.maxDrawTime, this.drawT + dt);
@@ -275,6 +275,8 @@ export class PlayerActions {
 
   select(i) {
     if (i === this.game.eq) return;
+    // (island 1: no bow in hand until you found yours at the hunter's camp)
+    if (EQUIP[i] === 'bow' && this.inv.bow === false) return this.fullAlert("No bow yet – find it at the hunter's camp before the mountain", 'bow');
     this.game.eq = i;
     this.drawing = false;
     this.drawT = 0;
@@ -310,7 +312,7 @@ export class PlayerActions {
 
   shootArrow() {
     const g = this.game;
-    if (this.inv.arrows <= 0) return;
+    if (this.inv.bow === false || this.inv.arrows <= 0) return;
     const power = Math.min(1, this.drawT / W.bow.maxDrawTime);
     const { origin, dir, right, up } = this.aim();
     const speed = W.bow.minSpeed + (W.bow.maxSpeed + this.mods.bowSpeed - W.bow.minSpeed) * power;
@@ -701,7 +703,9 @@ export class PlayerActions {
     const inv = this.inv;
     hud.setHotbar([
       { id: 'spear', label: `${SLOT_LABEL.spear} health`, count: inv.spear ? `${inv.spearHealth ?? 100}%` : null, enabled: inv.spear },
-      { id: 'bow', label: SLOT_LABEL.bow, count: inv.arrows, enabled: inv.arrows > 0 },
+      // (island 1: no bow until you find it at the hunter's camp)
+      inv.bow === false ? { id: 'bow', label: `${SLOT_LABEL.bow} – not found yet`, count: null, enabled: false }
+        : { id: 'bow', label: SLOT_LABEL.bow, count: inv.arrows, enabled: inv.arrows > 0 },
       { id: 'trap', label: SLOT_LABEL.trap, count: inv.traps, enabled: inv.traps > 0 },
       { id: 'fruit', label: SLOT_LABEL.fruit, count: inv.fruit.length, enabled: inv.fruit.length > 0, sub: fruitType || undefined },
       ...['pistol', 'rifle'].map(id => ({ id, label: `${SLOT_LABEL[id]} - R reload`, count: inv.guns?.[id]?.loaded ?? 0, enabled: (inv.guns?.[id]?.loaded ?? 0) > 0 })),

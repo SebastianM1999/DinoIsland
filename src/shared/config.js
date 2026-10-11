@@ -116,6 +116,8 @@ export const CONFIG = {
       startArrows: 12,
       uses: 3,
       arrowLifetime: 60,     // seconds an arrow stays on the ground as pickup
+      // the hunter's camp on island 1 (shared/layout.js bowCamp): walk up to it to take your bow
+      pickupReach: 2.6,
     },
     // spread: random cone half-angle (radians) of each shot; moving adds up to spreadMove on top
     pistol: { damage: 26, range: 85, cooldown: 0.28, magazine: 12, reserve: 48, reloadTime: 1.25, spread: 0.012, spreadMove: 0.02 },

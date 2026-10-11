@@ -27,6 +27,7 @@ import { buildRocks } from '../world/rocks.js';
 import { setSurfaceQuality } from '../world/surfaceDetail.js';
 import { buildFruitPlants } from '../world/fruitPlants.js';
 import { buildResourceNodes } from '../world/resourceNodes.js';
+import { buildBowCamp } from '../world/bowCamp.js';
 import { buildHut } from '../world/hut.js';
 import { buildBaseView } from '../world/base.js';
 import { BasePanel } from '../ui/basePanel.js';
@@ -346,6 +347,10 @@ export class Game {
     this.resourceNodes = buildResourceNodes(this.terrain, this.layout);
     scene.add(this.resourceNodes.group);
     yield;
+    this.bowCamp = buildBowCamp(this.terrain, this.layout);
+    this.bowCamp.setTaken(this.me.inv?.bow !== false);
+    scene.add(this.bowCamp.group);
+    yield;
     // islands with building plots start at a small landing camp; the team builds its own base
     this.hut = buildHut(this.terrain, this.layout, { landing: hasBasePlots(this.layout) });
     scene.add(this.hut.group);
@@ -382,7 +387,7 @@ export class Game {
     // the Hollow Mountain: roof, cave air, decor, crystal lights, drips (world/caveWorld.js)
     this.caveWorld = this.layout.plan.cave ? buildCaveWorld(this.terrain, this.layout, this.gfx, terrainMesh, this.water) : null;
     if (this.caveWorld) { scene.add(this.caveWorld.group); this.caveWorld.audio = this.audio; }
-    this.worldUpdaters = [terrainMesh, this.sky, this.water, this.vegetation, this.rocks, this.fruitPlants, this.resourceNodes, this.hut, this.baseView, this.sites, this.grove, this.bossArena, this.swampArena, this.swampFx, this.volcanoArena, this.volcanoFx, ...(this.caveWorld ? [this.caveWorld] : [])];
+    this.worldUpdaters = [terrainMesh, this.sky, this.water, this.vegetation, this.rocks, this.fruitPlants, this.resourceNodes, this.bowCamp, this.hut, this.baseView, this.sites, this.grove, this.bossArena, this.swampArena, this.swampFx, this.volcanoArena, this.volcanoFx, ...(this.caveWorld ? [this.caveWorld] : [])];
     yield;
     // under the water: tinted short fog, bubbles and motes (world/underwater.js, #underwaterView)
     this.underwater = buildUnderwater();
@@ -451,9 +456,11 @@ export class Game {
     const id = this.hud.trackedContract;
     const i = CONTRACTS.findIndex((c) => c.id === id);
     const c = i >= 0 ? m.contracts?.[i] : null;
+    // (island 1: until you have your bow, finding it heads the list – only on this explorer's screen)
+    const own = this.layout?.bowCamp && this.me.inv?.bow === false ? [{ text: "Find your bow at the hunter's camp before the mountain", done: false }] : [];
     const objectives = c
-      ? [...m.objectives, { text: `${CONTRACTS[i].title}: ${c.progress}/${CONTRACTS[i].goal}`, done: c.done }]
-      : m.objectives;
+      ? [...own, ...m.objectives, { text: `${CONTRACTS[i].title}: ${c.progress}/${CONTRACTS[i].goal}`, done: c.done }]
+      : [...own, ...m.objectives];
     this.hud.setMission({ ...m, objectives, trackedObjective: c ? objectives.at(-1) : null });
   }
 
@@ -565,7 +572,14 @@ export class Game {
       }
       for (const sys of this.systems) sys.onSnapshot?.(m);
     });
-    net.on(MSG.INV, (m) => { this.me.inv = m.inv; this.player?.setBuffs?.(m.inv.buffs); this.#syncCrafting(); });
+    net.on(MSG.INV, (m) => {
+      const found = this.me.inv?.bow === false && m.inv.bow !== false;
+      this.me.inv = m.inv;
+      this.bowCamp?.setTaken(m.inv.bow !== false);
+      if (found) this.#showMission();
+      this.player?.setBuffs?.(m.inv.buffs);
+      this.#syncCrafting();
+    });
     // the net layer already sanitized and saved m.prof; here it reaches the movement mods, the HUD ring and the panel
     net.on(MSG.PROF, (m) => this.#setProfile(m.prof));
     net.on(`ev:${EV.XP}`, (m) => this.hud.xpGain(m));
@@ -609,6 +623,11 @@ export class Game {
       if (m.up) return;
       const at = this.resourceNodes.getAnchor(m.spot);
       this.audio.play('gather', at ? { pos: { x: at.x, y: at.y, z: at.z } } : {});
+    });
+    net.on(`ev:${EV.BOW_FOUND}`, (m) => {
+      if (m.id !== this.me.id) return;
+      const c = this.layout.bowCamp;
+      this.audio.play('pickup', c ? { pos: { x: c.x, y: c.y + 0.6, z: c.z } } : {});
     });
     net.on(`ev:${EV.TOAST}`, (m) => this.hud.toast(m.text, m.icon));
     net.on(`ev:${EV.FULL}`, (m) => this.actions.fullAlert(m.text, m.icon));
@@ -1176,7 +1195,7 @@ export class Game {
       x: p.pos.x, z: p.pos.z, yaw: p.yaw,
       players: [...this.remotes.map.values()].map((rp) => ({ x: rp.pos.x, z: rp.pos.z, yaw: rp.yaw, color: CONFIG.playerColors[rp.slot % 4] })),
       hut: this.stations().home,
-      markers: [...this.#collect('minimapMarkers'), ...this.volcanoArena.minimapMarkers()],
+      markers: [...this.#collect('minimapMarkers'), ...this.volcanoArena.minimapMarkers(), ...this.bowCamp.minimapMarkers()],
     });
     if (!this.me.alive) {
       hud.setDeath(true, Math.ceil(this.me.deathT));

@@ -23,7 +23,7 @@
 
 ### Areas inside `world.js` (~1500 lines, find by the `// ----- <area>` banners)
 - constructor / `#loadLevel` / `nextLevel`: builds terrain + layout from `shared/` (`planIsland`, `buildLayout`), resets per-island state; `worldEpoch` bumps per island.
-- players: `join`, `leave`, `freshInventory`, `caps`, `carryWeight`, `hurtPlayer`.
+- players: `join`, `leave`, `freshInventory` (`inv.bow`: false on an island with a hunter's camp – no arrows, no arrow shots, no arrow refills until found; `nextLevel` to a camp-less island hands it out), `caps`, `carryWeight`, `hurtPlayer`.
 - knife: butchering carcasses (`startButcher`/`updateButcher`); successful completion emits `EV.BUTCHER` with `done: true`, cancellation omits it.
 - downed/revive/death: `killPlayer`, `downPlayer`, `defeatPlayer`, `startRevive`/`updateRevive`, `updateDowned`, `respawnPlayer`.
 - skills / XP: `awardXp`, `skillAction`, `refreshMods`, `grantDash`, `damageMul`, `sendProf`.
@@ -32,7 +32,7 @@
 - `craft`, `validMeleeHit`, `validProjectileLanding`, `canSpotDino`, `groveBlocks`, `unstuck`.
 - items: `spawnItem`, `removeItem`, `dropInventoryItem`, `dropLoot`, `addTrack`.
 - fruit: `applyFruit` (heal, heal over time, fruit buffs in `p.buffs`, e.g. Lotus Skin's lower damage in `hurtPlayer`), `buffsLeft` (sent with every inventory), `bestFruitIndex`.
-- tick: `step(dt)` (player upkeep, eating/regen/aura, lava, relic pickup, campfire healing, fruit regrowth, map resource regrowth, item/projectile/track expiry, then dinos, towers, raids, volcano, dino history, player-dino contact, mission), `snapshotDue`, `hitPose`, `snapshot`, `fullState`.
+- tick: `step(dt)` (player upkeep, eating/regen/aura, lava, relic pickup, the hunter's camp (per-explorer `inv.bow`, starting arrows and `EV.BOW_FOUND`), campfire healing, fruit regrowth, map resource regrowth, item/projectile/track expiry, then dinos, towers, raids, volcano, dino history, player-dino contact, mission), `snapshotDue`, `hitPose`, `snapshot`, `fullState`.
 
 ## Entry points
 - `ServerWorld` (`world.js`): constructed by `server/gameHost.js` (online/LAN/Steam host) and by `worker.js` (solo). Hosts call `join`, `leave`, `receive(id, msg)`, `step(dt)` at `CONFIG.net.tickRate`, `snapshotDue(dt)` + `snapshot()`, and supply `host.send(to, msg, except)`.

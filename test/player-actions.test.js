@@ -334,3 +334,25 @@ test('base interaction routes unclaimed stakes and existing camp management thro
   assert.equal(actions.findInteraction(game.player.pos).text, 'Your base'); assert.deepEqual(opened.at(-1), ['Base', -1]);
   game.player.pos.set(100, 0, 100); assert.equal(actions.findInteraction(game.player.pos), null);
 });
+
+test('without a bow (island 1, before the hunter\'s camp) the bow slot is locked: no selecting, drawing or shooting', t => {
+  const { game, actions, equip, held, frame, shots, requests } = fixture(t);
+  game.me.inv.bow = false;          // arrows picked up from the ground do not make a bow
+  frame();
+  const slot = game.hotbar.find((s) => s.id === 'bow');
+  assert.equal(slot.enabled, false);
+  assert.match(slot.label, /not found yet/);
+  equip('bow');
+  assert.notEqual(EQUIP[game.eq], 'bow', 'the slot cannot be selected');
+  game.eq = EQUIP.indexOf('bow');   // (even if it were: no draw, no shot)
+  held.add('primary'); frame(CONFIG.weapons.bow.maxDrawTime); held.clear(); frame();
+  assert.equal(actions.drawing, false);
+  assert.equal(shots.length, 0);
+  assert.equal(game.me.inv.arrows, 3);
+  assert.ok(!requests.some((r) => r.a === ACT.FIRE));
+
+  game.me.inv.bow = true;           // found it
+  game.eq = 0; equip('bow');
+  held.add('primary'); frame(CONFIG.weapons.bow.maxDrawTime); held.clear(); frame();
+  assert.equal(shots.length, 1);
+});
