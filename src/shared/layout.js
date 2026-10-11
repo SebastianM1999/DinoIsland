@@ -1430,7 +1430,7 @@ export function* buildLayoutSteps(terrain) {
       layout.bowCamp = { x: c.x, z: c.z, y: terrain.heightAt(c.x, c.z), rot: Math.atan2(-c.nx, -c.nz) };
       reserve(c.x, c.z, 3);
       layout.bushes = layout.bushes.filter((bu) => Math.hypot(bu.x - c.x, bu.z - c.z) > 2.6);
-      circles.push({ x: c.x, z: c.z, r: 0.42, top: layout.bowCamp.y + 0.55, stand: true, kind: 'stump' });
+      circles.push({ x: c.x, z: c.z, r: 0.55, top: layout.bowCamp.y + 0.68, stand: true, kind: 'stump' });   // (client/world/bowCamp.js draws it 1.25 x life size)
     }
   }
 
