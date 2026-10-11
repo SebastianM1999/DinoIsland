@@ -43,6 +43,14 @@ function weighted(rng, table) {
 
 /** @param {import('./terrain.js').Terrain} terrain */
 export function buildLayout(terrain) {
+  const steps = buildLayoutSteps(terrain);
+  let step;
+  do { step = steps.next(); } while (!step.done);
+  return step.value;
+}
+
+/** Clock-free deterministic placement steps; only the client schedules paints. */
+export function* buildLayoutSteps(terrain) {
   const plan = terrain.plan;
   const biome = plan.biome;
   const veg = biome.vegetation;
@@ -700,6 +708,7 @@ export function buildLayout(terrain) {
     layout.caveDecor = decor;
     // hanging from the roof
     for (let i = 0, n = 0; i < 4000 && n < 280; i++) {
+      if (i % 64 === 0) yield;
       const p = sample((x, z) => terrain.clearanceAt(x, z) > 4.5);
       if (!p) continue;
       const ceil = terrain.ceilingAt(p.x, p.z), clear = ceil - floorY(p.x, p.z);
@@ -717,6 +726,7 @@ export function buildLayout(terrain) {
       return best;
     };
     for (let i = 0, n = 0; i < 5000 && n < 220; i++) {
+      if (i % 64 === 0) yield;
       const p = sample(() => true, 30);
       if (!p || !free(p.x, p.z, 1.4) || terrain.slopeAt(p.x, p.z) > 0.7) continue;
       if (!p.an.room && centerDist(p.x, p.z) < 0.55) continue;
@@ -884,6 +894,7 @@ export function buildLayout(terrain) {
   // Beach trees along the coast band.
   if (beachTypes.length) {
     for (let i = 0; i < 2600 && layout.trees.length < (volcanic ? 50 : 120); i++) {
+      if (i % 64 === 0) yield;
       const a = rng() * TAU, k = rng.range(0.82, 1.0);
       const x = Math.cos(a) * plan.A * k, z = Math.sin(a) * halfWidthAt(plan, x) * k;
       const h = terrain.heightAt(x, z);
@@ -913,6 +924,7 @@ export function buildLayout(terrain) {
       }
     }
     for (let i = 0; i < 24000 && placed < 540; i++) {
+      if (i % 64 === 0) yield;
       const x = rm.range(-plan.A, plan.A), z = rm.range(-plan.B, plan.B);
       const b = terrain.bogAt(x, z);
       if (b < 0.12 || b > 0.9 || terrain.waterDepthAt(x, z) > 0.3) continue;
@@ -928,6 +940,7 @@ export function buildLayout(terrain) {
   // Inland trees.
   const minTreeH = veg.minTreeHeight ?? 2.2;
   for (let i = 0; i < 30000 && layout.trees.length < veg.maxTrees; i++) {
+    if (i % 64 === 0) yield;
     const x = rng.range(-plan.A, plan.A), z = rng.range(-plan.B, plan.B);
     if (!inside(x, z, 0.95)) continue;
     const h = terrain.heightAt(x, z);
@@ -958,6 +971,7 @@ export function buildLayout(terrain) {
     const rl = makeRng(S ^ 0x10c5);
     const want = caveLevel ? 0 : volcanic ? 14 : 24;
     for (let i = 0; i < 6000 && layout.logs.length < want; i++) {
+      if (i % 64 === 0) yield;
       const x = rl.range(-plan.A * 0.9, plan.A * 0.9), z = rl.range(-plan.B * 0.9, plan.B * 0.9);
       if (!inside(x, z, 0.9) || nearHut(x, z, 10) || nearBoat(x, z, 6) || !outsideGrove(x, z, 12)) continue;
       const len = rl.range(5, 11), r = rl.range(0.3, 0.52), rot = rl() * TAU;
@@ -1018,6 +1032,7 @@ export function buildLayout(terrain) {
   };
   const rockCount = (n) => Math.round(n * R.count);
   for (let i = 0; i < 9000 && layout.rocks.length < rockCount(240); i++) {
+    if (i % 64 === 0) yield;
     const x = rng.range(-plan.A, plan.A), z = rng.range(-plan.B, plan.B);
     if (!inside(x, z, 1.02)) continue;
     const h = terrain.heightAt(x, z);
@@ -1048,6 +1063,7 @@ export function buildLayout(terrain) {
 
   // ------------------------------------------------------ bushes (visual)
   for (let i = 0; i < 20000 && layout.bushes.length < veg.maxBushes; i++) {
+    if (i % 64 === 0) yield;
     const x = rng.range(-plan.A, plan.A), z = rng.range(-plan.B, plan.B);
     if (!inside(x, z, 0.97)) continue;
     if (!dry(x, z, 1.2) || nearHut(x, z, -4) || distToPath(x, z) < 2 || nearBoat(x, z, 2)) continue;
@@ -1075,6 +1091,7 @@ export function buildLayout(terrain) {
   {
     let placed = 0;
     for (let i = 0; i < 6000 && placed < fruitCounts.berry; i++) {
+      if (i % 64 === 0) yield;
       const x = rng.range(-plan.A * 0.9, plan.A * 0.9), z = rng.range(-plan.B * 0.9, plan.B * 0.9);
       if (!dry(x, z, lowGround ? 1.0 : 1.5) || nearHut(x, z, 3) || terrain.slopeAt(x, z) > 0.45) continue;
       const pd = distToPath(x, z);
@@ -1092,6 +1109,7 @@ export function buildLayout(terrain) {
   {
     let placed = 0;
     for (let i = 0; i < (volcanic ? 9000 : 6000) && placed < fruitCounts.mango; i++) {
+      if (i % 64 === 0) yield;
       const x = rng.range(-plan.A * 0.8, plan.A * 0.8), z = rng.range(-plan.B * 0.8, plan.B * 0.8);
       if (!dry(x, z, lowGround ? 1.3 : 2.2) || nearHut(x, z, 8) || terrain.slopeAt(x, z) > 0.4 || terrain.heightAt(x, z) > 20) continue;
       // (the volcano: in the green pockets; if they are too few, on any cool ground)
@@ -1221,6 +1239,7 @@ export function buildLayout(terrain) {
     // Big boulders: landmarks on hillsides, meadow edges and cliff bases.
     let big = 0;
     for (let i = 0; i < 12000 && big < rockCount(46); i++) {
+      if (i % 64 === 0) yield;
       const x = rr.range(-plan.A, plan.A), z = rr.range(-plan.B, plan.B);
       const s = rr.range(2.6, 4.4);
       if (!inside(x, z, 0.95) || !dry(x, z, 1.8) || nearHut(x, z, 12) || distToPath(x, z) < s * 1.2 + 3) continue;
@@ -1264,6 +1283,7 @@ export function buildLayout(terrain) {
     // Rock formations: wide, five ledges high – climb them ledge by ledge.
     let formations = 0;
     for (let i = 0; i < 14000 && formations < rockCount(14); i++) {
+      if (i % 64 === 0) yield;
       const x = rf.range(-plan.A * 0.9, plan.A * 0.9), z = rf.range(-plan.B * 0.9, plan.B * 0.9);
       const s = rf.range(4.5, 7.5);
       const Rr = s * 1.2;
@@ -1282,6 +1302,7 @@ export function buildLayout(terrain) {
     // Stepped rocks: three ledges, low enough to hop up.
     let stepped = 0;
     for (let i = 0; i < 12000 && stepped < rockCount(70); i++) {
+      if (i % 64 === 0) yield;
       const x = rf.range(-plan.A, plan.A), z = rf.range(-plan.B, plan.B);
       const s = rf.range(1.4, 2.8);
       if (!inside(x, z, 0.95) || !dry(x, z, 1.2) || nearHut(x, z, 8) || distToPath(x, z) < s * 1.3 + 2 || patrolDist(x, z) < s + 3) continue;
@@ -1294,6 +1315,7 @@ export function buildLayout(terrain) {
     // More mid-sized rocks (knee to waist high) scattered over the island.
     let mid = 0;
     for (let i = 0; i < 14000 && mid < rockCount(220); i++) {
+      if (i % 64 === 0) yield;
       const x = rf.range(-plan.A, plan.A), z = rf.range(-plan.B, plan.B);
       const s = rf.range(0.55, 1.5);
       if (!inside(x, z, 1.0) || !dry(x, z, 0.8) || nearHut(x, z, 3) || distToPath(x, z) < s + 1.5 || terrain.slopeAt(x, z) > 0.9) continue;
@@ -1305,6 +1327,7 @@ export function buildLayout(terrain) {
     // Little rocks: scattered pebbles and small clusters (walkable).
     let small = 0;
     for (let i = 0; i < 28000 && small < rockCount(1000); i++) {
+      if (i % 64 === 0) yield;
       const x = rr.range(-plan.A, plan.A), z = rr.range(-plan.B, plan.B);
       const h = terrain.heightAt(x, z);
       if (!inside(x, z, 1.05) || h < -0.2 || nearHut(x, z, -2) || distToPath(x, z) < 1.2 || terrain.waterDepthAt(x, z) > 0.3 || terrain.lavaLevelAt(x, z) !== null) continue;
