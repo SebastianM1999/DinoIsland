@@ -18,7 +18,8 @@ import { Renderer } from './renderer.js';
 import { Input } from '../input/input.js';
 import { PlayerController } from '../player/controller.js';
 import { StuckDetector } from '../player/stuck.js';
-import { buildTerrainMesh } from '../world/terrainMesh.js';
+import { buildTerrainMeshSteps } from '../world/terrainMesh.js';
+import { runBuildSteps } from './buildSteps.js';
 import { buildSky } from '../world/sky.js';
 import { buildWater } from '../world/water.js';
 import { buildVegetation } from '../world/vegetation.js';
@@ -91,13 +92,38 @@ export class Game {
    * @param {import('../net/net.js').Net} net connected session (welcome received)
    * @param {{gfx, audio, input}|null} [reuse] renderer/audio/input of the previous island
    */
-  constructor(canvas, net, reuse = null) {
+  constructor(canvas, net, reuse = null, { deferred = false } = {}) {
+    this.net = net;
+    this.buildSteps = this.#initialize(canvas, net, reuse);
+    if (!deferred) {
+      while (!this.buildSteps.next().done);
+      this.buildSteps = null;
+    }
+  }
+
+  /** Build between UI paints; don't start gameplay until every system is ready. */
+  static async create(canvas, net, reuse = null, { signal } = {}) {
+    const game = new Game(canvas, net, reuse, { deferred: true });
+    try {
+      await runBuildSteps(game.buildSteps, { signal });
+      game.buildSteps = null;
+      return game;
+    } catch (error) {
+      game.buildSteps = null;
+      game.dispose();
+      throw error;
+    }
+  }
+
+  *#initialize(canvas, net, reuse) {
     this.canvas = canvas;
     this.net = net;
     const lv = net.welcome.world.level || { index: 0, variant: 1 };
     this.level = lv;
     this.terrain = new Terrain(planIsland(lv.index, lv.variant));
+    yield;
     this.layout = buildLayout(this.terrain);
+    yield;
     this.gfx = reuse?.gfx ?? new Renderer(canvas);
     if (reuse?.gfx) this.gfx.reset();
     this.gfx.applyBiome(this.layout.biome.skyOutside ?? this.layout.biome.sky);   // (the Hollow Mountain starts in its daylit cove)
@@ -195,7 +221,7 @@ export class Game {
     this.hud.onCloseBoard = () => this.input.onPanelToggle('close');
     this.hud.onCloseInventory = () => this.input.onPanelToggle('close');
 
-    this.#buildWorld();
+    yield* this.#buildWorld();
     this.stats = new PerfStats(this.overlay);
     this.unsubSettings = onSettings((s) => {
       this.stats.setMode(s.stats);
@@ -231,6 +257,10 @@ export class Game {
     this.torches = new Torches(this);   // after the island is built, before gfx.prepare(): creates its light pool
     this.systems.push(this.torches);
     this.#applyWelcome(w);
+    const cam = this.player.pos;
+    this.terrainView.loadAround?.(cam, this.layout.biome.sky.fogFar);
+    while (this.terrainView.pending?.length) { this.terrainView.pump(4); yield; }
+    yield;
     this.wardrobe = new Wardrobe({
       slot: this.me.slot,
       outfit: this.me.outfit,
@@ -286,25 +316,48 @@ export class Game {
     this.lastFrameAt = -Infinity;   // FPS limiter
   }
 
-  #buildWorld() {
+  *#buildWorld() {
     const scene = this.gfx.scene;
-    const terrainMesh = buildTerrainMesh(this.terrain, this.layout);
+    const terrainMesh = this.terrainView = yield* buildTerrainMeshSteps(this.terrain, this.layout);
     scene.add(terrainMesh);
+    yield;
 
     this.sky = buildSky(this.gfx, this.layout);
+    scene.add(this.sky.group);
+    yield;
     this.water = buildWater(this.terrain, this.layout, this.gfx.sunDir);
+    scene.add(this.water.group);
+    yield;
     this.vegetation = buildVegetation(this.terrain, this.layout);
+    scene.add(this.vegetation.group);
+    yield;
     this.rocks = buildRocks(this.terrain, this.layout);
+    scene.add(this.rocks.group);
+    yield;
     this.fruitPlants = buildFruitPlants(this.terrain, this.layout);
+    scene.add(this.fruitPlants.group);
+    yield;
     this.resourceNodes = buildResourceNodes(this.terrain, this.layout);
+    scene.add(this.resourceNodes.group);
+    yield;
     // islands with building plots start at a small landing camp; the team builds its own base
     this.hut = buildHut(this.terrain, this.layout, { landing: hasBasePlots(this.layout) });
+    scene.add(this.hut.group);
+    yield;
     this.baseView = buildBaseView(this.terrain, this.layout);
+    scene.add(this.baseView.group);
+    yield;
     this.sites = buildSites(this.terrain, this.layout);
+    scene.add(this.sites.group);
+    yield;
     this.grove = buildGrove(this.terrain, this.layout);
     this.logs = buildLogs(this.terrain, this.layout);
+    scene.add(this.grove.group, this.logs.group);
+    yield;
     this.bossArena = buildBossArena(this.terrain, this.layout);
     this.swampArena = buildSwampArena(this.terrain, this.layout);
+    scene.add(this.bossArena.group, this.swampArena.group);
+    yield;
     // the swamp's fog draws in where the mist is thick (swampFx.js mistiness)
     const swampSky = this.layout.biome.sky, swampThick = thickSky(swampSky || {});
     this.swampFx = buildSwampFx(this.terrain, this.layout, this.gfx.camera, (k) => this.gfx.blendBiome(swampSky, swampThick, k));
@@ -323,7 +376,8 @@ export class Game {
     // the Hollow Mountain: roof, cave air, decor, crystal lights, drips (world/caveWorld.js)
     this.caveWorld = this.layout.plan.cave ? buildCaveWorld(this.terrain, this.layout, this.gfx, terrainMesh, this.water) : null;
     if (this.caveWorld) { scene.add(this.caveWorld.group); this.caveWorld.audio = this.audio; }
-    this.worldUpdaters = [this.sky, this.water, this.vegetation, this.rocks, this.fruitPlants, this.resourceNodes, this.hut, this.baseView, this.sites, this.grove, this.bossArena, this.swampArena, this.swampFx, this.volcanoArena, this.volcanoFx, ...(this.caveWorld ? [this.caveWorld] : [])];
+    this.worldUpdaters = [terrainMesh, this.sky, this.water, this.vegetation, this.rocks, this.fruitPlants, this.resourceNodes, this.hut, this.baseView, this.sites, this.grove, this.bossArena, this.swampArena, this.swampFx, this.volcanoArena, this.volcanoFx, ...(this.caveWorld ? [this.caveWorld] : [])];
+    yield;
     // under the water: tinted short fog, bubbles and motes (world/underwater.js, #underwaterView)
     this.underwater = buildUnderwater();
     scene.add(this.underwater.group);
@@ -743,9 +797,8 @@ export class Game {
 
   stop() {
     this.running = false;
-    this.audio.stopMusic();
-    this.input.enabled = false;
-    this.input.exitLock();
+    this.audio?.stopMusic();
+    if (this.input) { this.input.enabled = false; this.input.exitLock(); }
   }
 
   /**
@@ -754,21 +807,21 @@ export class Game {
    */
   dispose() {
     this.stop();
-    this.unsubSettings();
-    this.unsubGraphics();
-    this.dinos.dispose();
-    disposeIslandScenes(this.gfx.scene, this.gfx.viewScene);
-    this.hud.dispose();
-    this.overlay.remove();
-    this.wardrobe.dispose?.();
-    this.skillPanel.dispose();
-    this.net.clearHandlers();
-    this.net.stateProvider = null;
-    this.net.onStateSent = null;
-    this.hud.show(false);
-    this.input.onPanelToggle = null;
-    this.input.onLockChange = null;
-    this.audio.update?.(0, { coast: 0, water: {}, danger: false });   // water loops fade out
+    this.unsubSettings?.();
+    this.unsubGraphics?.();
+    this.dinos?.dispose();
+    this.terrainView?.release?.();
+    disposeIslandScenes(this.gfx?.scene, this.gfx?.viewScene);
+    this.terrainView?.clear?.();
+    this.hud?.dispose();
+    this.overlay?.remove();
+    this.wardrobe?.dispose?.();
+    this.skillPanel?.dispose();
+    this.net?.clearHandlers();
+    if (this.net) { this.net.stateProvider = null; this.net.onStateSent = null; }
+    this.hud?.show(false);
+    if (this.input) { this.input.onPanelToggle = null; this.input.onLockChange = null; }
+    this.audio?.update?.(0, { coast: 0, water: {}, danger: false });   // water loops fade out
     return { gfx: this.gfx, audio: this.audio, input: this.input };
   }
 

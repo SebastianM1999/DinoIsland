@@ -9,6 +9,8 @@ import { BIOMES } from '../../shared/levels.js';
 import { causewayQuery } from '../../shared/bossArena.js';
 import { withSurfaceDetail, setSurfaceBiome } from './surfaceDetail.js';
 import { buildCaveTerrainMesh } from './caveTerrain.js';
+import { TerrainChunks, splitTerrainGeometry } from './terrainChunks.js';
+import { runBuildSteps } from '../core/buildSteps.js';
 
 const JUNGLE = {
   sandDry: '#f6d08a', sand: '#efc176', sandWet: '#d9a862', seabed: '#e2bd7a', seabedDeep: '#b99a68',
@@ -29,6 +31,38 @@ const WET_MOSS = new THREE.Color('#3f6e3a');
  * @param {ReturnType<import('../../shared/layout.js').buildLayout>} layout
  */
 export function buildTerrainMesh(terrain, layout) {
+  const steps = buildTerrainMeshSteps(terrain, layout);
+  let step;
+  do { step = steps.next(); } while (!step.done);
+  const mesh = step.value;
+  // Synchronous callers retain the complete view (offline tools and tests).
+  if (mesh instanceof TerrainChunks) {
+    mesh.loadAround({ x: 0, z: 0 }, terrain.size * 2);
+    mesh.pump(Infinity);
+  }
+  return mesh;
+}
+
+export async function buildTerrainMeshAsync(terrain, layout, { signal, position = { x: 0, z: 0 }, range = terrain.size * 2 } = {}) {
+  const mesh = await runBuildSteps(buildTerrainMeshSteps(terrain, layout), { signal });
+  if (mesh instanceof TerrainChunks) {
+    mesh.range = range;
+    mesh.loadAround(position, range);
+    try {
+      await runBuildSteps((function* () {
+        while (mesh.pending.length) { mesh.pump(4); yield; }
+      })(), { signal });
+    } catch (error) {
+      for (const child of mesh.children) child.geometry.dispose();
+      mesh.material.dispose();
+      mesh.release();
+      throw error;
+    }
+  }
+  return mesh;
+}
+
+export function* buildTerrainMeshSteps(terrain, layout) {
   if (layout.plan.cave) return buildCaveTerrainMesh(terrain, layout);   // the Hollow Mountain: caveTerrain.js
   const n = terrain.n, cell = terrain.cell, half = terrain.half;
   const stride = n + 1;
@@ -217,6 +251,7 @@ export function buildTerrainMesh(terrain, layout) {
       sf[ks] = surf.sand; sf[ks + 1] = surf.rock; sf[ks + 2] = surf.path; sf[ks + 3] = surf.forest;
       sf2[k2] = surf.wet; sf2[k2 + 1] = surf.ash;
     }
+    yield;
   }
 
   // Matches Terrain.heightAt(): T1 = (00, 01, 10), T2 = (10, 01, 11)
@@ -228,6 +263,7 @@ export function buildTerrainMesh(terrain, layout) {
       if (pos[a * 3 + 1] < -13 && pos[b * 3 + 1] < -13 && pos[c * 3 + 1] < -13 && pos[d * 3 + 1] < -13) continue;
       idx.push(a, c, b, b, c, d);
     }
+    yield;
   }
 
   const geo = new THREE.BufferGeometry();
@@ -240,8 +276,15 @@ export function buildTerrainMesh(terrain, layout) {
   geo.computeBoundingSphere();
   setSurfaceBiome(layout.biome);
   const mat = withSurfaceDetail(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, metalness: 0 }), 'terrain');
-  const mesh = new THREE.Mesh(geo, mat);
-  mesh.receiveShadow = true;
-  mesh.name = 'terrain';
-  return mesh;
+  let complete = false;
+  try {
+    const chunks = yield* splitTerrainGeometry(geo, n);
+    const mesh = new TerrainChunks(chunks, mat, terrain.cell * 24);
+    mesh.range = layout.biome.sky.fogFar;
+    complete = true;
+    return mesh;
+  } finally {
+    if (!complete) mat.dispose();
+    geo.dispose();
+  }
 }

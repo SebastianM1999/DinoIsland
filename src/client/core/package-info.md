@@ -26,6 +26,7 @@
 - `devPins.js` — dev pin tool (`?dev` or `?pin=` in the URL, solo; installed by `main.js`): F8 captures where you stand and look, what the crosshair hits (object path, mesh, material, face, instance), terrain/cave facts there and at the player, level/variant/seed, graphics stats and a screenshot, asks for a note and posts it to the dev server (`server/devPins.js`). Draws red markers for pins of the current layout; `?island=N&dev&pin=<id>` revisits a pin (creative, `ACT.DEV_TP`); `revisitUrl` adds `&variant=V` only for a pin taken on a `?variant` override.
 
 ## Entry points
+- `buildSteps.js` runs cancellable generator construction in short tasks; each individual step must be small enough to avoid blocking UI paints. `Game.create` uses it for launch; the synchronous constructor remains available to offline fixtures.
 - `Game` is constructed and started by `src/client/main.js` (`launch`), which also calls `gfx.prepare()`, `dispose()`, `setCreative()` and sets `onLeave`, `onNewIsland`, `onPanelChange`.
 - Systems receive the `Game` instance (`new DinoViews(this)` etc.) and may implement `onWelcome`, `onSnapshot`, `update(dt, renderTime)`, `minimapMarkers`, `compassMarkers`.
 - `Renderer` is also used by `src/client/player/weapon-preview.js`.
