@@ -1302,6 +1302,8 @@
 .hud-portrait-wrap { position: relative; z-index: 1; width: 5.2em; height: 5.2em; flex: none; }
 /* the demo (CONFIG.demo): no XP or skill points */
 body.is-demo .hud-xpring, body.is-demo .hud-level, body.is-demo .hud-points, body.is-demo .hud-xp-pops { display: none; }
+/* (and no firearm slots: the hotbar ends after the fruit) */
+body.is-demo .hud-slot.is-empty { display: none; }
 .hud-portrait-wrap .hud-portrait { position: absolute; inset: 0; width: auto; height: auto; }
 /* `.hud .hud-xpring`: the generic `.hud svg { width: 100% }` would otherwise shrink the ring to the portrait and leave it off-centre */
 .hud .hud-xpring {
