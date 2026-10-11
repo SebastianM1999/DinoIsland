@@ -97,13 +97,40 @@ class SteamHub {
   }
 }
 
-function setup(t, count = 2) {
+function setup(t, count = 2, options = {}) {
   const hub = new SteamHub();
   const events = Array.from({ length: count }, () => []);
-  const sessions = events.map((ev, i) => new SteamSession(hub.createUser(i), { emit: event => ev.push(event) }));
+  const sessions = events.map((ev, i) => new SteamSession(hub.createUser(i), { ...options, emit: event => ev.push(event) }));
   t.after(() => sessions.forEach(session => session.dispose()));
   return { hub, sessions, events, async pump() { sessions.forEach(session => session.tick()); await new Promise(resolve => setImmediate(resolve)); } };
 }
+
+test('Steam demo hosting keeps its two-player cap and authoritative weapon and profile restrictions', async t => {
+  const { sessions: [host, guest, extra], hub, events: [he, ge], pump } = setup(t, 3, { demo: true });
+  const h = await host.hostGame();
+  host.send(h.sessionId, { t: 'hello', name: 'Host', profile: { xp: 5000, skills: { thickSkin: 1 } } });
+  const g = await guest.joinGame(h.lobbyId);
+  guest.send(g.sessionId, { t: 'hello', name: 'Guest' });
+  await pump(); await pump(); await pump();
+  assert.equal(hub.lobbies.get(h.lobbyId).max, 2);
+  assert.equal(host.host.world.players.size, 2);
+  for (const events of [he, ge]) {
+    const welcome = events.find(e => e.message?.t === 'welcome').message;
+    assert.equal(welcome.world.demo, true);
+    assert.equal(welcome.world.level.index, 0);
+    assert.deepEqual(welcome.inv.guns, {});
+    assert.equal(welcome.inv.bow, false);
+    assert.equal(welcome.inv.arrows, 0);
+  }
+  assert.ok([...host.host.world.players.values()].every(p => p.prof.xp === 0 && !Object.keys(p.prof.skills).length));
+  await assert.rejects(extra.joinGame(h.lobbyId), /full/);
+  const full = new SteamSession(hub.createUser(4));
+  t.after(() => full.dispose());
+  guest.leave();
+  await assert.rejects(full.joinGame(h.lobbyId), /demo and full game/);
+  const ordinary = await full.hostGame();
+  await assert.rejects(extra.joinGame(ordinary.lobbyId), /demo and full game/);
+});
 
 test('Steam co-op routes two real players through the authoritative world and handles host loss', async t => {
   const { sessions: [host, guest], events: [he, ge], pump } = setup(t);

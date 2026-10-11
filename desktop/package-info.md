@@ -5,7 +5,7 @@
 - `main.cjs` — Electron main process: imports `createGameServer()` from `server/index.js`, listens on `0.0.0.0` (port from `DINO_DESKTOP_PORT`, else random), opens a sandboxed `BrowserWindow` on `http://127.0.0.1:<port>/` (`--demo` / `DINO_DEMO=1`: hosts the demo and opens `?demo=1`), installs Steam, and stops everything on quit.
 - `preload.cjs` — exposes `window.dinoSteam` (status, friends, lobbies, host, join, leave, invite, dismissInvite, send, onEvent) via `contextBridge`, forwarding to `dino:steam:*` IPC channels.
 - `steam.cjs` — `installSteam(app, win, localUrl)`: loads the Steamworks SDK (`steamworks-ffi-node`) if an App ID and the runtime DLL are present, creates a `SteamSession`, pumps it every 4 ms, and registers the IPC handlers with a trusted-sender check. Returns a cleanup function.
-- `steam-session.js` — `SteamSession` (ES module): hosts or joins a Steam lobby, wraps Steam P2P connections as WebSocket-like `Peer`s and attaches them to a `startGameHost()` game host (no HTTP server). Also exports `STEAM_PROTOCOL` and `validSteamId()`.
+- `steam-session.js` — `SteamSession` (ES module): carries the desktop demo flag into its authoritative host, enforces its two-player lobby cap, and keeps demo/full expeditions separate; hosts or joins a Steam lobby, wraps Steam P2P connections as WebSocket-like `Peer`s and attaches them to a `startGameHost()` game host (no HTTP server). Also exports `STEAM_PROTOCOL` and `validSteamId()`.
 - `steam-config.json` — holds the Steam `appId` (currently `null`, which disables Steam co-op).
 
 ## Entry points
@@ -20,7 +20,7 @@
 - Without a valid App ID, the DLL (`steamworks_sdk/redistributable_bin/win64/steam_api64.dll`), or a running Steam, Steam stays disabled and `status` reports `{ available: false, reason }`; the game still runs (solo / LAN / internet test).
 - Steam message limits: renderer-to-host and peer input messages are capped at 8192 bytes, host-to-client world messages at 512 KiB; only JSON objects are sent.
 - Messages starting with `{"t":"snap"` or `{"t":"state"` go over Steam's unreliable channel (when available); everything else is reliable and ordered. This relies on `JSON.stringify` putting `t` first.
-- Lobbies are tagged with `game = BRAND.slug`, `protocol = STEAM_PROTOCOL` (`<slug>-1`), `host` and `ready`; joins fail on a mismatching game/protocol or a host that is no longer owner/ready. Hosts admit only lobby members, no duplicates, at most `CONFIG.net.maxPlayers - 1` remote peers.
+- Lobbies are tagged with `game = BRAND.slug`, `protocol = STEAM_PROTOCOL` (`<slug>-1`), `host` and `ready`; joins fail on a mismatching game/protocol or a host that is no longer owner/ready. Hosts admit only lobby members, no duplicates, at most `(demo ? CONFIG.demo.maxPlayers : CONFIG.net.maxPlayers) - 1` remote peers.
 - Steam IDs are validated with `validSteamId()` (16-20 digit decimal string, at most 64-bit) before use.
 - One operation at a time: a `generation` counter cancels stale host/join attempts; `leave()` tears down host, peers, connections, lobby and rich presence.
 

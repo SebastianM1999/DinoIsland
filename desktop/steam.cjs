@@ -2,7 +2,7 @@ const { ipcMain } = require('electron');
 const path = require('node:path');
 const fs = require('node:fs');
 
-async function installSteam(app, win, localUrl) {
+async function installSteam(app, win, localUrl, { demo = false } = {}) {
   let session = null;
   let sdk = null;
   let pump = null;
@@ -24,7 +24,7 @@ async function installSteam(app, win, localUrl) {
         sdk.setSdkPath(sdkPath);
         if (!sdk.init({ appId })) throw new Error('Start Steam, sign in, and restart the game to use Steam co-op.');
         const { SteamSession } = await import('./steam-session.js');
-        session = new SteamSession(sdk, { emit });
+        session = new SteamSession(sdk, { emit, demo });
         const lobbyId = sdk.matchmaking.getConnectLobbyIdFromCommandLine();
         if (lobbyId) session.requestJoin(lobbyId);
         pump = setInterval(() => {

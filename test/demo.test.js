@@ -42,7 +42,8 @@ test('no firearms in the demo: none in the pack, gun actions do nothing, spear a
   const p = world.players.get(world.join('Hunter').id);
   assert.deepEqual(p.inv.guns, {});
   assert.equal(p.inv.spear, true);
-  assert.ok(p.inv.arrows > 0);
+  assert.equal(p.inv.bow, false);
+  assert.equal(p.inv.arrows, 0, 'the demo also starts before finding the bow');
   p.eq = 4;   // (a pistol slot, if a client sent one)
   world.receive(p.id, { t: MSG.ACT, a: ACT.SHOT, kind: 'pistol', o: [p.x, p.y + 1.6, p.z], dir: [0, 0, -1] });
   world.receive(p.id, { t: MSG.ACT, a: ACT.RELOAD, kind: 'pistol' });
@@ -58,6 +59,33 @@ test('no firearms in the demo: none in the pack, gun actions do nothing, spear a
   world.receive(p.id, { t: MSG.ACT, a: ACT.CREATIVE, on: true });
   world.step(0.6);
   assert.deepEqual(p.inv.guns, {});
+});
+
+test('demo explorers find their own bow once and keep it through respawn and the island 1 restart', () => {
+  const { world, sent } = demoWorld();
+  const a = world.players.get(world.join('Ana').id);
+  const b = world.players.get(world.join('Ben').id);
+  world.respawnPlayer(a);
+  assert.equal(a.inv.bow, false);
+  assert.equal(a.inv.arrows, 0);
+  const camp = world.layout.bowCamp;
+  Object.assign(a, { x: camp.x + 1, y: camp.y, z: camp.z });
+  world.step(0.05);
+  world.step(0.05);
+  assert.equal(a.inv.bow, true);
+  assert.equal(a.inv.arrows, CONFIG.weapons.bow.startArrows);
+  assert.equal(b.inv.bow, false);
+  assert.equal(sent.filter(({ msg }) => msg.e === EV.BOW_FOUND).length, 1);
+  a.inv.arrows = 0; a.inv.arrowUses = [];
+  world.respawnPlayer(a);
+  assert.equal(a.inv.bow, true);
+  assert.equal(a.inv.arrows, CONFIG.weapons.bow.startArrows);
+  world.nextLevel();
+  assert.equal(world.levelIndex, 0);
+  assert.equal(a.inv.bow, true);
+  assert.equal(b.inv.bow, false, 'an explorer who never visited the camp still has no bow');
+  assert.deepEqual(a.inv.guns, {});
+  assert.deepEqual(b.inv.guns, {});
 });
 
 test('no XP or skills in the demo: a saved profile is neither used nor overwritten', () => {
