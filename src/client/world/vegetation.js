@@ -70,8 +70,8 @@ export function buildVegetation(terrain, layout) {
       const b = 0.88 + 0.12 * ((t.hue * 7.3) % 1);
       trunk.setColorAt(i, col.setRGB(b, b * 0.98, b * 0.96));
     });
-    spatial.add(trunk, { wind });
-    spatial.add(leaves, { wind, geometries: [geo.foliage, treeGeometry(type, +variant, 1, +crown).foliage, treeGeometry(type, +variant, 2, +crown).foliage] });
+    spatial.add(trunk, { wind, foliage: true });
+    spatial.add(leaves, { wind, foliage: true, geometries: [geo.foliage, treeGeometry(type, +variant, 1, +crown).foliage, treeGeometry(type, +variant, 2, +crown).foliage] });
   }
 
   // ---------------------------------------------------- bushes and ferns
