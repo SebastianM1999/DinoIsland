@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { planIsland } from '../../shared/island.js';
 import { Terrain } from '../../shared/terrain.js';
 import { buildLayoutSteps } from '../../shared/layout.js';
-import { runBuildSteps } from '../core/buildSteps.js';
+import { runBuildSteps, warmSceneBatches } from '../core/buildSteps.js';
 import { LEVELS } from '../../shared/levels.js';
 import { preloadCaveBake } from '../../shared/caveBakeLoad.js';
 import { hasBasePlots } from '../../shared/base.js';
@@ -88,7 +88,7 @@ export async function createMenuTour(canvas, onIsland = () => {}, { signal } = {
     return target;
   }
 
-  function draw(dt) {
+  function prepareDraw(dt) {
     const travel = elapsed <= SHOT_SECONDS ? elapsed : SHOT_SECONDS * 2 - elapsed;
     const distance = Math.min(length - 14, 8 + travel * SPEED);
     sample(distance, point);
@@ -108,6 +108,10 @@ export async function createMenuTour(canvas, onIsland = () => {}, { signal } = {
     }
     WIND.uTime.value = time;
     for (const updater of updaters) updater.update?.(dt, time, camera.position);
+  }
+
+  function draw(dt) {
+    prepareDraw(dt);
     renderer.render(scene, camera);
   }
 
@@ -243,7 +247,12 @@ export async function createMenuTour(canvas, onIsland = () => {}, { signal } = {
         sample(21, look); camera.lookAt(look);
         await renderer.compileAsync(scene, camera);
         if (disposed || ticket !== request) return;
-        draw(0);
+        prepareDraw(0);
+        await warmSceneBatches([scene], () => {
+          renderer.shadowMap.needsUpdate = true;
+          renderer.render(scene, camera);
+        }, { signal: controller.signal });
+        if (disposed || ticket !== request) return;
         island.ready = true;
       }
       loading = false;
