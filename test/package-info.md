@@ -72,7 +72,7 @@ Grouped by the module area they mainly cover. Many simulation tests also check t
 - `inventory-drop.test.js` — dropping, picking up and depositing inventory stacks without duplication.
 - `resources.test.js` — map resources: island 1's spots (count, spread, dry, off the path, resin on its tree, deterministic; none elsewhere), gathering, refusals, regrowth, late join, depositing and paying for an upgrade, the client nodes.
 - `bow-find.test.js` — the hunter's camp on island 1 (placement over variants, none elsewhere), starting without a bow, taking it per explorer, keeping it through death and the voyage, refills/respawns, later islands and creative, the client camp.
-- `demo.test.js` — the demo (`opts.demo`): island 1 only, two explorers, no firearms (and no crash on gun actions), no XP/skills and the saved profile untouched, the win after island 1 and the restart, a demo server's status.
+- `demo.test.js` — the demo (`opts.demo`): island 1 only, two explorers, no firearms (and no crash on gun actions), no XP/skills and the saved profile untouched, the win after island 1 and the restart, a demo server's status and per-explorer bow acquisition across respawn/restart.
 - `discovery-fruit.test.js` — fruit plant harvests/regrowth, shared dinosaur sightings, fruit plant visuals.
 - `outfits.test.js` — outfit sanitizing, server outfit changes, player model outfits.
 
@@ -101,7 +101,7 @@ Grouped by the module area they mainly cover. Many simulation tests also check t
 - `static-files.test.js` — static file responses: brotli/gzip bodies decode to the source, ETag answers 304, one-day caching for Three.js and the font, `index.html` carries `modulepreload` links for the menu graph but not for `core/game.js`, the menu background is a small WebP.
 - `lan-address.test.js` — LAN address list, join-field parsing (`src/client/net/lan.js`), `/connection` port info.
 - `internet-host.test.js` — internet relay admits only token WebSockets, control endpoint origin checks, startup failure and stop handling.
-- `steam-coop.test.js` — `SteamSession` with a modelled Steam API: two players through the real game host, lobby caps, invalid lobbies, invites, renderer transport (`connectSteam`).
+- `steam-coop.test.js` — `SteamSession` with a modelled Steam API: two players through the real game host, lobby caps, demo host restrictions and demo/full separation, invalid lobbies, invites, renderer transport (`connectSteam`).
 
 ## Entry points
 - `npm test` runs `node --test`, which discovers every `*.test.js` file here. A single file runs with `node --test test/<name>.test.js`.

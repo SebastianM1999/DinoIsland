@@ -58,7 +58,7 @@ async function launch() {
   win.webContents.on('will-navigate', (event, url) => {
     if (!url.startsWith(localUrl)) event.preventDefault();
   });
-  stopSteam = await installSteam(app, win, localUrl);
+  stopSteam = await installSteam(app, win, localUrl, { demo });
   await win.loadURL(demo ? `${localUrl}?demo=1` : localUrl);
 }
 

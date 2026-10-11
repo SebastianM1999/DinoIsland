@@ -32,11 +32,13 @@ class Peer extends EventEmitter {
 }
 
 export class SteamSession {
-  constructor(steam, { emit = () => {}, createHost = startGameHost, now = Date.now } = {}) {
+  constructor(steam, { emit = () => {}, createHost = startGameHost, now = Date.now, demo = false } = {}) {
     this.steam = steam;
     this.emit = emit;
     this.createHost = createHost;
     this.now = now;
+    this.demo = !!demo;
+    this.maxPlayers = this.demo ? CONFIG.demo.maxPlayers : CONFIG.net.maxPlayers;
     this.peers = new Map();
     this.sessionId = null;
     this.generation = 0;
@@ -73,6 +75,7 @@ export class SteamSession {
     const mm = this.steam.matchmaking;
     mm.addRequestLobbyListStringFilter('game', BRAND.slug, 0);
     mm.addRequestLobbyListStringFilter('protocol', STEAM_PROTOCOL, 0);
+    mm.addRequestLobbyListStringFilter('demo', this.demo ? '1' : '0', 0);
     mm.addRequestLobbyListStringFilter('ready', '1', 0);
     mm.addRequestLobbyListFilterSlotsAvailable(1);
     mm.addRequestLobbyListResultCountFilter(30);
@@ -106,15 +109,15 @@ export class SteamSession {
     if (!['friends', 'private', 'public'].includes(visibility)) throw new Error('Invalid lobby visibility.');
     const generation = this.begin();
     try {
-      const result = await this.steam.matchmaking.createLobby({ private: 0, friends: 1, public: 2 }[visibility], CONFIG.net.maxPlayers);
+      const result = await this.steam.matchmaking.createLobby({ private: 0, friends: 1, public: 2 }[visibility], this.maxPlayers);
       if (!result.success || !validSteamId(result.lobbyId)) throw new Error('Steam could not create the lobby. Check your connection and try again.');
       this.checkOperation(generation, result.lobbyId);
       this.lobbyId = result.lobbyId;
       this.hostId = this.steam.getStatus().steamId;
-      const metadata = { game: BRAND.slug, protocol: STEAM_PROTOCOL, host: this.hostId, ready: '1' };
+      const metadata = { game: BRAND.slug, protocol: STEAM_PROTOCOL, demo: this.demo ? '1' : '0', host: this.hostId, ready: '1' };
       this.listenSocket = this.steam.networkingSockets.createListenSocketP2P(0);
       if (!this.listenSocket) throw new Error('Steam could not open a host connection.');
-      this.host = this.createHost();
+      this.host = this.createHost(null, { demo: this.demo });
       for (const [key, value] of Object.entries(metadata)) {
         if (!this.steam.matchmaking.setLobbyData(this.lobbyId, key, value)) throw new Error('Steam could not publish the lobby.');
       }
@@ -144,6 +147,7 @@ export class SteamSession {
       if (mm.getLobbyData(lobbyId, 'game') !== BRAND.slug || mm.getLobbyData(lobbyId, 'protocol') !== STEAM_PROTOCOL) {
         throw new Error('This lobby uses a different game version. Update both games and try again.');
       }
+      if ((mm.getLobbyData(lobbyId, 'demo') === '1') !== this.demo) throw new Error('The demo and full game use separate expeditions.');
       this.hostId = mm.getLobbyData(lobbyId, 'host');
       if (!validSteamId(this.hostId) || mm.getLobbyOwner(lobbyId) !== this.hostId || mm.getLobbyData(lobbyId, 'ready') !== '1') {
         throw new Error('The host has left this game.');
@@ -197,7 +201,7 @@ export class SteamSession {
     if (newState === 1 && info.listenSocket) {
       const member = this.lobbyId && this.steam.matchmaking.getLobbyMembers(this.lobbyId).includes(info.identityRemote);
       const duplicate = [...this.peers.values()].some(peer => peer.steamId === info.identityRemote);
-      if (!this.host || info.listenSocket !== this.listenSocket || !member || duplicate || this.peers.size >= CONFIG.net.maxPlayers - 1) {
+      if (!this.host || info.listenSocket !== this.listenSocket || !member || duplicate || this.peers.size >= this.maxPlayers - 1) {
         sockets.closeConnection(connection, 0, 'Not admitted to this lobby', false);
         return;
       }
