@@ -16,6 +16,7 @@ import { caveRock } from './caveVolume.js';
 import { VOXEL } from './caveVolume.js';
 import { CaveWalk, WALK_VERSION } from './caveWalk.js';
 import { levelDef } from './levels.js';
+import * as dmath from './dmath.js';
 
 /** Container layout version. */
 export const BAKE_FORMAT = 2;
@@ -128,7 +129,7 @@ function octDecode(u, v, out, o) {
   const z = 1 - Math.abs(u) - Math.abs(v);
   let x = u, y = v;
   if (z < 0) { x = (1 - Math.abs(v)) * (u >= 0 ? 1 : -1); y = (1 - Math.abs(u)) * (v >= 0 ? 1 : -1); }
-  const l = Math.hypot(x, y, z) || 1;
+  const l = dmath.hypot(x, y, z) || 1;
   out[o] = x / l; out[o + 1] = y / l; out[o + 2] = z / l;
 }
 const COLOR_MAX = 2;   // (colours are stored over 0..2, as the square root: the dark end keeps its resolution)

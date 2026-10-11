@@ -21,7 +21,8 @@
 // Coordinates are world metres. Gameplay data derived from it: island.js
 // (plan.cave), layout.js (relics, caveDinoSpots, caveDecor, caveLights).
 
-import { makeRng, valueNoise, clamp } from './rng.js';
+import { makeRng, valueNoise, clamp, sortV8Order } from './rng.js';
+import * as dmath from './dmath.js';
 
 /** Fixed geometry of the level (the mountain, its two coves). */
 export const CAVE_GEOM = {
@@ -43,12 +44,12 @@ export const CAVE_GEOM = {
  */
 export const SUMP = { len: [9.5, 14], ramp: 7, clear: 0.6, depth: 5.8, edge: 0.05, cache: { teeth: 4, claws: 4, plates: 2, bones: 3, skull: 1 } };
 
-const dist = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
+const dist = (a, b) => dmath.hypot(a.x - b.x, a.z - b.z);
 
 function segDist(px, pz, ax, az, bx, bz) {
   const vx = bx - ax, vz = bz - az;
   const t = clamp(((px - ax) * vx + (pz - az) * vz) / (vx * vx + vz * vz || 1), 0, 1);
-  return Math.hypot(ax + vx * t - px, az + vz * t - pz);
+  return dmath.hypot(ax + vx * t - px, az + vz * t - pz);
 }
 
 /**
@@ -81,7 +82,7 @@ function tryMaze(seed, depthAt, G, attempt) {
     const r = rng.range(13, 24);
     const x = rng.range(-G.face + 52, G.face - 52), z = rng.range(-245, 245);
     if (depthAt(x, z) < r + G.rockMargin + 4) continue;
-    if (nodes.some((n) => Math.hypot(n.x - x, n.z - z) < n.r + r + spacing)) continue;
+    if (nodes.some((n) => dmath.hypot(n.x - x, n.z - z) < n.r + r + spacing)) continue;
     // keep a free lane between the two halls
     const asp = rng.range(1, 1.45);
     addNode({ kind: 'hub', x, z, r, aspect: asp, rot: rng() * Math.PI, roof: clamp(r * 0.62 + rng.range(2, 5), 11, 17) });
@@ -102,10 +103,10 @@ function tryMaze(seed, depthAt, G, attempt) {
       const shared = [o.a, o.b].filter((id) => id === tn.a || id === tn.b);
       for (const p of tn.pts) {
         for (const q of o.pts) {
-          const d = Math.hypot(p.x - q.x, p.z - q.z);
+          const d = dmath.hypot(p.x - q.x, p.z - q.z);
           if (d >= (p.w + q.w) / 2 + margin) continue;
           // tunnels meeting in a shared chamber come close there
-          if (shared.some((id) => Math.hypot(p.x - nodes[id].x, p.z - nodes[id].z) < nodes[id].r * 1.9 + 14 && Math.hypot(q.x - nodes[id].x, q.z - nodes[id].z) < nodes[id].r * 1.9 + 14)) continue;
+          if (shared.some((id) => dmath.hypot(p.x - nodes[id].x, p.z - nodes[id].z) < nodes[id].r * 1.9 + 14 && dmath.hypot(q.x - nodes[id].x, q.z - nodes[id].z) < nodes[id].r * 1.9 + 14)) continue;
           return false;
         }
       }
@@ -123,7 +124,7 @@ function tryMaze(seed, depthAt, G, attempt) {
     for (let i = 0; i <= n; i++) {
       const t = i / n;
       const arch = 4 * t * (1 - t);
-      const wob = valueNoise(t * L / 55 + 3.1, 0.5, s) * 5 * Math.sin(Math.PI * t);
+      const wob = valueNoise(t * L / 55 + 3.1, 0.5, s) * 5 * dmath.sin(Math.PI * t);
       pts.push({
         x: A.x + dx * t + nx * (bend * arch + wob),
         z: A.z + dz * t + nz * (bend * arch + wob),
@@ -132,7 +133,7 @@ function tryMaze(seed, depthAt, G, attempt) {
       });
     }
     let length = 0;
-    for (let i = 1; i < pts.length; i++) length += Math.hypot(pts[i].x - pts[i - 1].x, pts[i].z - pts[i - 1].z);
+    for (let i = 1; i < pts.length; i++) length += dmath.hypot(pts[i].x - pts[i - 1].x, pts[i].z - pts[i - 1].z);
     return { id: -1, a, b, kind, pts, width: wBase, roof: roofBase, length, flooded: null, tags: [] };
   };
   const push = (tn) => { tn.id = tunnels.length; tunnels.push(tn); return tn; };
@@ -215,7 +216,8 @@ function tryMaze(seed, depthAt, G, attempt) {
   for (const minGap of [150, 110, 70, 0]) {
     relicNodes.length = 0;
     // prefer the deep ones, but spread them: north, south and middle
-    const pool = cand.slice().sort((p, q) => (fromRoute.get(q.id) + (rng() - 0.5) * 2) - (fromRoute.get(p.id) + (rng() - 0.5) * 2));
+    // (a comparator drawing random numbers: sortV8Order calls it in the same order in every engine)
+    const pool = sortV8Order(cand.slice(), (p, q) => (fromRoute.get(q.id) + (rng() - 0.5) * 2) - (fromRoute.get(p.id) + (rng() - 0.5) * 2));
     for (const n of pool) {
       if (relicNodes.length >= 3) break;
       if (relicNodes.every((m) => dist(m, n) >= minGap)) relicNodes.push(n);
@@ -311,8 +313,8 @@ function tryMaze(seed, depthAt, G, attempt) {
   for (let i = 0; i < 400 && pockets < 3; i++) {
     const host = rng.pick(real.filter((n) => n.kind === 'hub' || n.kind === 'relic'));
     const a = rng() * Math.PI * 2, d = host.r + rng.range(48, 72), r = rng.range(9, 12);
-    const x = host.x + Math.cos(a) * d, z = host.z + Math.sin(a) * d;
-    if (depthAt(x, z) < r + G.rockMargin + 4 || nodes.some((n) => n.r > 1 && Math.hypot(n.x - x, n.z - z) < n.r * Math.max(1, n.aspect) + r + 30)) continue;
+    const x = host.x + dmath.cos(a) * d, z = host.z + dmath.sin(a) * d;
+    if (depthAt(x, z) < r + G.rockMargin + 4 || nodes.some((n) => n.r > 1 && dmath.hypot(n.x - x, n.z - z) < n.r * Math.max(1, n.aspect) + r + 30)) continue;
     // (and the new chamber keeps clear of every tunnel it does not belong to)
     if (tunnels.some((t) => t.pts.some((q, i) => i < t.pts.length - 1 && segDist(x, z, q.x, q.z, t.pts[i + 1].x, t.pts[i + 1].z) < r * 1.2 + t.width / 2 + 16))) continue;
     const p = addNode({ kind: 'pocket', x, z, r, roof: 9.5, tags: ['deadend'] });

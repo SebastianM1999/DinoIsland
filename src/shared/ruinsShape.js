@@ -9,6 +9,7 @@
 
 import { makeRng } from './rng.js';
 import { toWorld, siteBox } from './siteFrame.js';
+import * as dmath from './dmath.js';
 
 /** Height of the altar top above r.y (the relic stands on it). */
 export const RUINS_ALTAR_TOP = 1.1;
@@ -36,17 +37,17 @@ export function ruinsLayout(r) {
   const pillars = [];
   for (let k = 0; k < 8; k++) {
     const phi = ((22.5 + 45 * k) * Math.PI) / 180;       // 0 = local +z (back)
-    if (Math.cos(phi) < -0.85) continue;                   // entrance: the arch stands there
+    if (dmath.cos(phi) < -0.85) continue;                   // entrance: the arch stands there
     const roll = rng();
     const state = roll < 0.35 ? 'full' : roll < 0.8 ? 'broken' : 'stump';
     const h = state === 'full' ? rng.range(3.6, 4.2) : state === 'broken' ? rng.range(1.3, 2.7) : rng.range(0.45, 0.7);
-    pillars.push({ x: Math.sin(phi) * 5.6, z: Math.cos(phi) * 5.6, h, state, r: 0.42 });
+    pillars.push({ x: dmath.sin(phi) * 5.6, z: dmath.cos(phi) * 5.6, h, state, r: 0.42 });
   }
   const arch = { x: 0, z: -6.0, span: 3.8, h: 3.7, broken: rng() < 0.5 ? -1 : 1 };
   const walls = [
     { phi: (45 + rng.range(-8, 8)) * Math.PI / 180, len: rng.range(3.2, 4.0), h: rng.range(1.3, 1.9) },
     { phi: (-90 + rng.range(-10, 10)) * Math.PI / 180, len: rng.range(2.6, 3.4), h: rng.range(0.9, 1.4) },
-  ].map((w) => ({ x: Math.sin(w.phi) * 6.9, z: Math.cos(w.phi) * 6.9, len: w.len, h: w.h, yaw: w.phi }));
+  ].map((w) => ({ x: dmath.sin(w.phi) * 6.9, z: dmath.cos(w.phi) * 6.9, len: w.len, h: w.h, yaw: w.phi }));
   const fallen = [
     { x: 2.6 + rng.range(-0.3, 0.3), z: -2.5, len: 2.2, r: 0.4, yaw: rng.range(0.3, 0.9) },
     { x: -3.0, z: 2.2 + rng.range(-0.3, 0.3), len: 1.6, r: 0.4, yaw: rng.range(-1.2, -0.5) },
@@ -55,18 +56,18 @@ export function ruinsLayout(r) {
   const solids = [];
   for (const p of pillars) solids.push({ x: p.x, z: p.z, r: 0.6 });
   for (const sgn of [-1, 1]) solids.push({ x: arch.x + sgn * arch.span / 2, z: arch.z, r: 0.62 });
-  for (const w of walls) solids.push({ x: w.x, z: w.z, r: 0.4, hx: Math.cos(w.yaw) * w.len / 2, hz: -Math.sin(w.yaw) * w.len / 2 });
-  for (const f of fallen) solids.push({ x: f.x, z: f.z, r: f.r, hx: Math.cos(f.yaw) * f.len / 2, hz: -Math.sin(f.yaw) * f.len / 2 });
+  for (const w of walls) solids.push({ x: w.x, z: w.z, r: 0.4, hx: dmath.cos(w.yaw) * w.len / 2, hz: -dmath.sin(w.yaw) * w.len / 2 });
+  for (const f of fallen) solids.push({ x: f.x, z: f.z, r: f.r, hx: dmath.cos(f.yaw) * f.len / 2, hz: -dmath.sin(f.yaw) * f.len / 2 });
   solids.push({ x: 0, z: 0, r: 1.3 });
   const entrance = (x, z, pad) => z < -2 && Math.abs(x) < 2.6 + pad;   // walkway through the arch
 
   const rubble = [];
   for (let tries = 0; tries < 60 && rubble.length < 5; tries++) {
     const phi = rng() * Math.PI * 2;
-    if (Math.cos(phi) < -0.55) continue;                                // not in front of the arch
+    if (dmath.cos(phi) < -0.55) continue;                                // not in front of the arch
     const rad = rng.range(7.4, 9.8);
     const r = rng.range(0.9, 1.5), h = rng.range(0.5, 1.1);
-    const x = Math.sin(phi) * rad, z = Math.cos(phi) * rad;
+    const x = dmath.sin(phi) * rad, z = dmath.cos(phi) * rad;
     if (entrance(x, z, r) || gap(x, z, r) < RUINS_MIN_GAP) continue;
     rubble.push({ x, z, r, h });
     solids.push({ x, z, r });
@@ -74,19 +75,19 @@ export function ruinsLayout(r) {
   // low heaps (no collider) beside snapped pillars
   for (const p of pillars) {
     if (p.state !== 'broken' || rubble.length >= 8) continue;
-    const a = Math.atan2(p.x, p.z) + rng.range(-0.5, 0.5);
-    const x = p.x - Math.sin(a) * 1.3, z = p.z - Math.cos(a) * 1.3;
+    const a = dmath.atan2(p.x, p.z) + rng.range(-0.5, 0.5);
+    const x = p.x - dmath.sin(a) * 1.3, z = p.z - dmath.cos(a) * 1.3;
     if (entrance(x, z, 0.6)) continue;
     rubble.push({ x, z, r: 0.6, h: 0.35 });
   }
   const slabs = [];
   for (let tries = 0; tries < 40 && slabs.length < 2; tries++) {
     const phi = rng() * Math.PI * 2;
-    if (Math.cos(phi) < -0.3) continue;
+    if (dmath.cos(phi) < -0.3) continue;
     const rad = rng.range(8.0, 9.6), len = rng.range(2.2, 3.2);
     const yaw = phi + rng.range(-0.35, 0.35);
-    const x = Math.sin(phi) * rad, z = Math.cos(phi) * rad;
-    const hx = Math.cos(yaw) * len / 2, hz = -Math.sin(yaw) * len / 2;
+    const x = dmath.sin(phi) * rad, z = dmath.cos(phi) * rad;
+    const hx = dmath.cos(yaw) * len / 2, hz = -dmath.sin(yaw) * len / 2;
     if (gap(x, z, 0.45, hx, hz) < RUINS_MIN_GAP) continue;
     slabs.push({ x, z, len, h: rng.range(0.9, 1.5), yaw, tilt: rng.range(0.25, 0.5) * (rng() < 0.5 ? -1 : 1) });
     solids.push({ x, z, r: 0.45, hx, hz });
@@ -94,8 +95,8 @@ export function ruinsLayout(r) {
   const roots = [];
   for (let k = 0; k < 5; k++) {
     const phi = (k / 5) * Math.PI * 2 + rng.range(-0.4, 0.4);
-    if (Math.cos(phi) < -0.8) continue;
-    roots.push({ x: Math.sin(phi) * 10.5, z: Math.cos(phi) * 10.5, yaw: phi + Math.PI + rng.range(-0.5, 0.5), len: rng.range(4.5, 7) });
+    if (dmath.cos(phi) < -0.8) continue;
+    roots.push({ x: dmath.sin(phi) * 10.5, z: dmath.cos(phi) * 10.5, yaw: phi + Math.PI + rng.range(-0.5, 0.5), len: rng.range(4.5, 7) });
   }
   // (drawn last, so the pieces above keep their places)
   // drums broken off the snapped pillars: lying outward from the pillar's foot
@@ -104,10 +105,10 @@ export function ruinsLayout(r) {
     const own = solids.find((o) => o.x === p.x && o.z === p.z);
     const len = rng.range(0.8, 1.4);
     for (let tries = 0; tries < 8; tries++) {
-      const a = Math.atan2(p.x, p.z) + rng.range(-1.4, 1.4);
+      const a = dmath.atan2(p.x, p.z) + rng.range(-1.4, 1.4);
       const d = 0.62 + len / 2;
-      const x = p.x + Math.sin(a) * d, z = p.z + Math.cos(a) * d, yaw = a - Math.PI / 2;
-      const hx = Math.cos(yaw) * len / 2, hz = -Math.sin(yaw) * len / 2;
+      const x = p.x + dmath.sin(a) * d, z = p.z + dmath.cos(a) * d, yaw = a - Math.PI / 2;
+      const hx = dmath.cos(yaw) * len / 2, hz = -dmath.sin(yaw) * len / 2;
       if (entrance(x, z, 0.5) || gap(x, z, p.r, hx, hz, own) < RUINS_MIN_GAP) continue;
       fallen.push({ x, z, len, r: p.r, yaw, piece: true });
       solids.push({ x, z, r: p.r, hx, hz });
@@ -124,7 +125,7 @@ export function ruinsLayout(r) {
   for (const w of walls) {
     for (let k = 0; k < 2; k++) {
       const u = (rng() - 0.5) * w.len;
-      blocks.push({ x: w.x + Math.cos(w.yaw) * u - Math.sin(w.yaw) * 1.0, z: w.z - Math.sin(w.yaw) * u - Math.cos(w.yaw) * 1.0,
+      blocks.push({ x: w.x + dmath.cos(w.yaw) * u - dmath.sin(w.yaw) * 1.0, z: w.z - dmath.sin(w.yaw) * u - dmath.cos(w.yaw) * 1.0,
         w: 0.8, h: 0.43, d: 0.7, y: 0.2, yaw: rng() * Math.PI * 2, tilt: rng.range(-0.08, 0.08) });
     }
   }
@@ -146,8 +147,8 @@ export const wallTop = (w) => Math.max(2, Math.round(w.h / 0.45)) * 0.45;
  * slab model: courses from -0.6 m up to tall, 0.7 m thick, tilted about x).
  */
 export function slabSpan(sl) {
-  const tall = sl.h / Math.cos(sl.tilt) + 0.6;
-  const c = Math.cos(sl.tilt), s = Math.sin(sl.tilt);
+  const tall = sl.h / dmath.cos(sl.tilt) + 0.6;
+  const c = dmath.cos(sl.tilt), s = dmath.sin(sl.tilt);
   const yg = 0.6 / c;                       // where the face comes out of the ground
   let z0 = Infinity, z1 = -Infinity;
   for (const y of [yg, tall]) for (const zz of [-0.37, 0.37]) {
@@ -169,7 +170,7 @@ function segDist(x, z, hx, hz, o) {
     const px = x + hx * t, pz = z + hz * t;
     const L = ohx * ohx + ohz * ohz;
     const u = L > 1e-9 ? Math.max(-1, Math.min(1, ((px - o.x) * ohx + (pz - o.z) * ohz) / L)) : 0;
-    best = Math.min(best, Math.hypot(px - o.x - ohx * u, pz - o.z - ohz * u));
+    best = Math.min(best, dmath.hypot(px - o.x - ohx * u, pz - o.z - ohz * u));
   }
   return best;
 }
@@ -215,7 +216,7 @@ export function ruinsColliders(r) {
   for (const sl of L.slabs) {
     const { z0, z1 } = slabSpan(sl);
     const off = (z0 + z1) / 2;
-    box(sl.x + Math.sin(sl.yaw) * off, sl.z + Math.cos(sl.yaw) * off, sl.len / 2, (z1 - z0) / 2, sl.h + 0.1, sl.yaw);
+    box(sl.x + dmath.sin(sl.yaw) * off, sl.z + dmath.cos(sl.yaw) * off, sl.len / 2, (z1 - z0) / 2, sl.h + 0.1, sl.yaw);
   }
   for (const b of L.blocks) box(b.x, b.z, b.w / 2, b.d / 2, b.y + b.h / 2, b.yaw);
   return { circles, boxes };

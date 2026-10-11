@@ -18,6 +18,7 @@
 
 import { smoothstep } from '../../shared/rng.js';
 import { GLOW_RANGE } from './caveStyle.js';
+import * as dmath from '../../shared/dmath.js';
 
 /** Bump when anything below changes what it makes (the bake's key also hashes a probe of the sources). */
 export const LIGHT_VERSION = 2;
@@ -51,7 +52,7 @@ export function latticeSampler(lat) {
   };
 }
 
-const TILT = 0.8, SIN = Math.sin(TILT), COS = Math.cos(TILT);
+const TILT = 0.8, SIN = dmath.sin(TILT), COS = dmath.cos(TILT);
 const AO_DIRS = 6;
 const AO_H = [0.45, 1.3, 2.9];
 const AO_W = [1, 0.75, 0.5];
@@ -84,9 +85,9 @@ export function* bakeCaveLightSteps(lat, chunks, { sources, visAt, waterAt }) {
       }
     }
   }
-  const soft = (m) => (m <= 0.55 ? m : 0.55 + 0.5 * (1 - Math.exp(-(m - 0.55) / 0.5)));
+  const soft = (m) => (m <= 0.55 ? m : 0.55 + 0.5 * (1 - dmath.exp(-(m - 0.55) / 0.5)));
   const dirs = [];   // (cos phi, sin phi) of the tilted directions
-  for (let a = 0; a < AO_DIRS; a++) dirs.push([Math.cos(a * Math.PI * 2 / AO_DIRS + 0.3), Math.sin(a * Math.PI * 2 / AO_DIRS + 0.3)]);
+  for (let a = 0; a < AO_DIRS; a++) dirs.push([dmath.cos(a * Math.PI * 2 / AO_DIRS + 0.3), dmath.sin(a * Math.PI * 2 / AO_DIRS + 0.3)]);
   let verts = 0, glowVerts = 0, shimVerts = 0, aoSum = 0;
 
   for (const ch of chunks) {
@@ -100,7 +101,7 @@ export function* bakeCaveLightSteps(lat, chunks, { sources, visAt, waterAt }) {
       // tangent frame
       let tx, ty, tz;
       if (Math.abs(ny) < 0.9) { tx = nz; ty = 0; tz = -nx; } else { tx = 0; ty = -nz; tz = ny; }
-      const tl = Math.hypot(tx, ty, tz) || 1; tx /= tl; ty /= tl; tz /= tl;
+      const tl = dmath.hypot(tx, ty, tz) || 1; tx /= tl; ty /= tl; tz /= tl;
       const bx = ny * tz - nz * ty, by = nz * tx - nx * tz, bz = nx * ty - ny * tx;
       let occ = 0, wsum = 0;
       for (let s = 0; s < AO_H.length; s++) {
@@ -130,7 +131,7 @@ export function* bakeCaveLightSteps(lat, chunks, { sources, visAt, waterAt }) {
         for (let r = 0; r < 9; r++) {
           const rr = r === 0 ? 0 : r <= 4 ? 1.8 : 4;
           const a = (r <= 4 ? r - 1 : r - 5) * Math.PI / 2 + 0.4;
-          const w = waterAt(x + Math.cos(a) * rr, z + Math.sin(a) * rr);
+          const w = waterAt(x + dmath.cos(a) * rr, z + dmath.sin(a) * rr);
           if (w !== null && w !== undefined) { near++; if (w > lvl) lvl = w; }
         }
         if (near > 0) {
@@ -150,10 +151,10 @@ export function* bakeCaveLightSteps(lat, chunks, { sources, visAt, waterAt }) {
           const d2 = dx * dx + dy * dy * 0.6 + dz * dz;
           if (d2 >= s.r * s.r) continue;
           const d = Math.sqrt(d2) || 1e-3;
-          const facing = (nx * dx + ny * dy + nz * dz) / Math.hypot(dx, dy, dz);
+          const facing = (nx * dx + ny * dy + nz * dz) / dmath.hypot(dx, dy, dz);
           if (facing < -0.35) continue;   // (the far side of a wall)
           // line of sight: march from just off the surface to the source
-          const ex = s.x - sx, ey = s.y - sy, ez = s.z - sz, len = Math.hypot(ex, ey, ez);
+          const ex = s.x - sx, ey = s.y - sy, ez = s.z - sz, len = dmath.hypot(ex, ey, ez);
           let minF = 9;
           const n = Math.max(2, Math.min(40, Math.ceil(len / 0.8)));
           for (let i = 1; i < n; i++) {

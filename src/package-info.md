@@ -25,14 +25,14 @@ src/shared/ ──▶ src/shared/ only       (no DOM, no three, no Math.random, 
 ## Authority model (details at the top of `shared/protocol.js`)
 - The server owns dinosaurs, items, fruit, map resources, traps, health, inventories, missions, the hut store and the base.
 - Clients own only their own movement and send it about 20 times a second. They report hits; the server checks the hits against the dinos' past poses (lag compensation, `CONFIG.net.lagCompMax`).
-- The island layout is deterministic from (level, variant seed), so client and server build the same world. Every island is a fixed map: its variant comes from `shared/levels.js` (`?variant=N` overrides it for testing). Sim spawns and AI use `Math.random` and are **not** deterministic.
+- The island layout is deterministic from (level, variant seed), so client and server build the same world: bit for bit in every JS engine (Node, Chrome, Electron, Firefox, Safari), because shared code uses `shared/dmath.js` instead of the engines' transcendental `Math` functions. Every island is a fixed map: its variant comes from `shared/levels.js` (`?variant=N` overrides it for testing). Sim spawns and AI use `Math.random` and are **not** deterministic.
 
 ## Feature map
 Where each feature lives in each layer. Paths are relative to `src/` unless they start with `test/`, `server/` or `desktop/`.
 
 | Feature | shared | sim | client | tests |
 |---|---|---|---|---|
-| Island gen, terrain, layout | island.js, terrain.js, layout.js, levels.js, rng.js | world.js (`#loadLevel`) | world/terrainMesh.js, sky.js, vegetation.js, veg/, rocks.js, logs.js, sites.js | map-rules, levels, traversal |
+| Island gen, terrain, layout | island.js, terrain.js, layout.js, levels.js, rng.js, dmath.js (same bits in every JS engine) | world.js (`#loadLevel`) | world/terrainMesh.js, sky.js, vegetation.js, veg/, rocks.js, logs.js, sites.js | map-rules, levels, traversal, dmath, cross-engine, shared-math-lint |
 | Collision, movement | collision.js, siteFrame.js, *Shape.js | world.js (`onState`), unstuck.js | player/controller.js, player/stuck.js | movement, traversal, spring-collision |
 | Netcode, lag comp | protocol.js, config.js (net) | world.js (`receive`, `hitPose`), dinos.js (pose history), hitCheck.js | net/net.js, net/interp.js | netcode, ordering, world-authority |
 | Dinos (all) | dinoContact.js | dinos.js, pathfind.js, ai/*.js | entities/dinoViews.js, models/dino/ | dino-visibility, dino-glb, dino-skin, dino-slopes, dino-contact |

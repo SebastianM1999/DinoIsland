@@ -2,6 +2,7 @@
 // systems (dinosaur brains, later) ask about it. Pure data, no DOM, no three.
 
 import { PF } from './protocol.js';
+import * as dmath from './dmath.js';
 
 export const TORCH = {
   /** Seconds until a taken torch reappears at its ground spot (`layout.torchSpots`). */
@@ -65,8 +66,8 @@ export function wallMount(rock, floor, b, dir, side) {
     const sx = px + tx * hi, sz = pz + tz * hi, e = 0.15;
     const gx = rock.rock(sx + e, y, sz) - rock.rock(sx - e, y, sz), gz = rock.rock(sx, y, sz + e) - rock.rock(sx, y, sz - e);
     const gy = rock.rock(sx, y + e, sz) - rock.rock(sx, y - e, sz);
-    const h = Math.hypot(gx, gz), gm = Math.hypot(h, gy) / (2 * e);   // (|gradient|: field units per metre)
-    if (h < 0.85 * Math.hypot(h, gy) || h < 1e-6) continue;   // (a vertical wall, not a slope)
+    const h = dmath.hypot(gx, gz), gm = dmath.hypot(h, gy) / (2 * e);   // (|gradient|: field units per metre)
+    if (h < 0.85 * dmath.hypot(h, gy) || h < 1e-6) continue;   // (a vertical wall, not a slope)
     const nx = gx / h, nz = gz / h;
     if (nx * -tx + nz * -tz < 0.5) continue;                 // (facing into the tunnel)
     const R = (dx, dy, dz) => rock.rock(sx + nx * dx - nz * dz, y + dy, sz + nz * dx + nx * dz);
@@ -93,7 +94,7 @@ export function softCapIrradiance(e) {
 }
 /** Irradiance of a point light (three.js: intensity in cd, `distance` window, `decay`) at `d` metres. */
 export function pointIrradiance({ intensity, distance, decay }, d) {
-  const f = 1 / Math.pow(Math.max(d, 0.01), decay);
-  const w = distance > 0 ? Math.min(1, Math.max(0, 1 - Math.pow(d / distance, 4))) ** 2 : 1;   // (three's getDistanceAttenuation window)
+  const f = 1 / dmath.pow(Math.max(d, 0.01), decay);
+  const w = distance > 0 ? Math.min(1, Math.max(0, 1 - dmath.pow(d / distance, 4))) ** 2 : 1;   // (three's getDistanceAttenuation window)
   return intensity * f * w;
 }

@@ -4,6 +4,7 @@ export const SPRING_FLOOR = -0.12;
 export const SPRING_WATER_OFFSET = 0.04;
 
 import { makeRng, smoothstep } from './rng.js';
+import * as dmath from './dmath.js';
 
 // Pure geometry helpers: this shape is shared by the mesh and world collision.
 function hash3(x, y, z, s) {
@@ -33,13 +34,13 @@ export function fbm3(x, y, z, seed = 0) {
 
 
 export const ell3 = (x, y, z, a, b, c) => {
-  const k0 = Math.hypot(x / a, y / b, z / c);
-  const k1 = Math.hypot(x / (a * a), y / (b * b), z / (c * c));
+  const k0 = dmath.hypot(x / a, y / b, z / c);
+  const k1 = dmath.hypot(x / (a * a), y / (b * b), z / (c * c));
   return k1 < 1e-9 ? -Math.min(a, b, c) : (k0 * (k0 - 1)) / k1;
 };
 export const ell2 = (x, y, a, b) => {
-  const k0 = Math.hypot(x / a, y / b);
-  const k1 = Math.hypot(x / (a * a), y / (b * b));
+  const k0 = dmath.hypot(x / a, y / b);
+  const k1 = dmath.hypot(x / (a * a), y / (b * b));
   return k1 < 1e-9 ? -Math.min(a, b) : (k0 * (k0 - 1)) / k1;
 };
 export const smax = (a, b, k) => {
@@ -93,9 +94,9 @@ export function springSdf(width, seed) {
       if (Math.abs(dx) > m.rx + 2.5 || Math.abs(dy) > m.ry + 2.5 || Math.abs(dz) > m.rz + 2.5) continue;
       d = smin(d, ell3(dx, dy, dz, m.rx, m.ry, m.rz), 1.4);
     }
-    d += 0.12 * Math.sin(y * 2.2 + 1.5 * noise3(x * 0.25, y * 0.1, z * 0.25, seed + 9));   // rock layers
+    d += 0.12 * dmath.sin(y * 2.2 + 1.5 * noise3(x * 0.25, y * 0.1, z * 0.25, seed + 9));   // rock layers
     // calmer rock right at the lip so the water always leaves at the same spot
-    const k = 0.2 + 0.8 * smoothstep(0.6, 2.4, Math.hypot(Math.max(0, Math.abs(x) - W / 2), y + 0.3, z + SPRING_LIP_OFFSET));
+    const k = 0.2 + 0.8 * smoothstep(0.6, 2.4, dmath.hypot(Math.max(0, Math.abs(x) - W / 2), y + 0.3, z + SPRING_LIP_OFFSET));
     return d - k * 0.4 * fbm3(x * 0.35, y * 0.35, z * 0.35, seed) - k * 0.2 * noise3(x * 0.15, y * 0.15, z * 0.15, seed + 3);
   };
   // keep the free-fall zone below the lip clear so the water never clips rock
@@ -120,7 +121,7 @@ export function springColliders(source) {
   const sz = (bounds.max[2] - bounds.min[2]) / nz;
   const ny = Math.ceil((bounds.max[1] - bounds.min[1]) / yStep);
   const sy = (bounds.max[1] - bounds.min[1]) / ny;
-  const rot = source.rot || 0, cos = Math.cos(rot), sin = Math.sin(rot);
+  const rot = source.rot || 0, cos = dmath.cos(rot), sin = dmath.sin(rot);
   const boxes = [];
   for (let ix = 0; ix < nx; ix++) for (let iz = 0; iz < nz; iz++) {
     const x = bounds.min[0] + (ix + 0.5) * sx;

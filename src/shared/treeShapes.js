@@ -3,6 +3,8 @@
 // tube along these centerlines; the colliders are built from the same numbers,
 // so the hitbox follows every bend and lean of the visible trunk.
 
+import * as dmath from './dmath.js';
+
 /**
  * @typedef {Object} TrunkShape
  * @property {number[][]} pts   centerline control points [x, y, z] (local, ground at y=0)
@@ -17,7 +19,7 @@ const palm = (variant) => {
   const pts = [];
   for (let i = 0; i <= 7; i++) {
     const t = i / 7;
-    pts.push([bend * t * t, H * t, wob * Math.sin(t * 3.2)]);
+    pts.push([bend * t * t, H * t, wob * dmath.sin(t * 3.2)]);
   }
   return { pts, r: (t) => 0.33 - 0.13 * t + (t < 0.05 ? 0.12 : 0) };
 };
@@ -133,9 +135,9 @@ export const TREE_SINK = 0.12;
 export function treePoint(t, [x, y, z], sink = t.sink ?? TREE_SINK) {
   x *= t.scale; y *= t.scale; z *= t.scale;
   const c = t.lean * 0.5, a = t.lean, b = t.rot;
-  let x1 = x * Math.cos(c) - y * Math.sin(c), y1 = x * Math.sin(c) + y * Math.cos(c);    // Z
-  const y2 = y1 * Math.cos(a) - z * Math.sin(a), z2 = y1 * Math.sin(a) + z * Math.cos(a); // X
-  const x3 = x1 * Math.cos(b) + z2 * Math.sin(b), z3 = -x1 * Math.sin(b) + z2 * Math.cos(b); // Y
+  let x1 = x * dmath.cos(c) - y * dmath.sin(c), y1 = x * dmath.sin(c) + y * dmath.cos(c);    // Z
+  const y2 = y1 * dmath.cos(a) - z * dmath.sin(a), z2 = y1 * dmath.sin(a) + z * dmath.cos(a); // X
+  const x3 = x1 * dmath.cos(b) + z2 * dmath.sin(b), z3 = -x1 * dmath.sin(b) + z2 * dmath.cos(b); // Y
   return [t.x + x3, t.y - sink + y2, t.z + z3];
 }
 
@@ -148,7 +150,7 @@ export function treeColliders(t) {
   const pts = shape.pts;
   // arc length along the (polyline) centerline, so t matches the tube's radius parameter
   const len = [0];
-  for (let i = 1; i < pts.length; i++) len.push(len[i - 1] + Math.hypot(...pts[i].map((v, k) => v - pts[i - 1][k])));
+  for (let i = 1; i < pts.length; i++) len.push(len[i - 1] + dmath.hypot(...pts[i].map((v, k) => v - pts[i - 1][k])));
   const total = len[len.length - 1];
   const at = (s) => {
     let i = 1;
@@ -159,11 +161,11 @@ export function treeColliders(t) {
   const out = [];
   const push = (a, b, r) => {
     const cx = (a[0] + b[0]) / 2, cz = (a[2] + b[2]) / 2;
-    const half = Math.hypot(a[0] - b[0], a[2] - b[2]) / 2;
+    const half = dmath.hypot(a[0] - b[0], a[2] - b[2]) / 2;
     const c = { x: cx, z: cz, r: r * t.scale + half, bottom: Math.min(a[1], b[1]), top: Math.max(a[1], b[1]), kind: 'tree' };
     const prev = out[out.length - 1];
     // merge straight runs into one taller slice (grown to still enclose the merged part)
-    const drift = prev ? Math.hypot(prev.x - c.x, prev.z - c.z) : Infinity;
+    const drift = prev ? dmath.hypot(prev.x - c.x, prev.z - c.z) : Infinity;
     if (drift < 0.15 && Math.abs(prev.r - c.r) < 0.1) {
       prev.r = Math.max(prev.r, c.r + drift);
       prev.top = Math.max(prev.top, c.top);

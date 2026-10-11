@@ -1,12 +1,13 @@
 import { CONFIG } from './config.js';
 import { resolveCircle } from './collision.js';
+import * as dmath from './dmath.js';
 
 export const DINO_CONTACT = { damage: 3, knockback: 3, cooldown: 1 };
 
 /** The same footprint used by dinosaur movement against scenery. */
 export function* dinoBodyCircles(d, x = d.x, z = d.z, yaw = d.yaw) {
   const spec = CONFIG.dinos[d.type], scale = d.scale || 1;
-  const fx = -Math.sin(yaw), fz = -Math.cos(yaw);
+  const fx = -dmath.sin(yaw), fz = -dmath.cos(yaw);
   for (const [offset, radius] of spec.body || [[0, spec.radius * 0.6]]) {
     yield [x + fx * offset * scale, z + fz * offset * scale, radius * scale];
   }
@@ -23,7 +24,7 @@ export function resolveDinoContact(from, to, dinos, colliders, onContact = () =>
     for (const [x, z, r] of dinoBodyCircles(d, pos.x, pos.z)) bodies.push({ d, x, z, r });
   }
   if (!bodies.length) return { x: to.x, z: to.z, hit: false };
-  const steps = Math.max(1, Math.ceil(Math.hypot(to.x - from.x, to.z - from.z) / 0.15));
+  const steps = Math.max(1, Math.ceil(dmath.hypot(to.x - from.x, to.z - from.z) / 0.15));
   const dx = (to.x - from.x) / steps, dz = (to.z - from.z) / steps;
   const result = { x: from.x, z: from.z, hit: false };
   const touched = new Set();
@@ -33,11 +34,11 @@ export function resolveDinoContact(from, to, dinos, colliders, onContact = () =>
       let pushed = false;
       for (const b of bodies) {
         const vx = result.x - b.x, vz = result.z - b.z;
-        const distance = Math.hypot(vx, vz), radius = b.r + CONFIG.player.radius;
+        const distance = dmath.hypot(vx, vz), radius = b.r + CONFIG.player.radius;
         // The server also sees client-predicted positions just outside the body.
         if (distance > radius + 0.03) continue;
         // At exact coincidence choose the approach side, with a deterministic fallback.
-        const fallback = Math.hypot(from.x - b.x, from.z - b.z);
+        const fallback = dmath.hypot(from.x - b.x, from.z - b.z);
         const nx = distance > 1e-8 ? vx / distance : fallback > 1e-8 ? (from.x - b.x) / fallback : 1;
         const nz = distance > 1e-8 ? vz / distance : fallback > 1e-8 ? (from.z - b.z) / fallback : 0;
         if (distance < radius) {

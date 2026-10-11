@@ -12,6 +12,7 @@
 
 import { CONFIG } from './config.js';
 import { toWorld, siteBox } from './siteFrame.js';
+import * as dmath from './dmath.js';
 
 export const BASE_PLOT_RADIUS = 18;   // flattened, tree-free clearing (the pad is a little larger)
 export const BUILD_TIME = 15;         // seconds of scaffolding before a stage stands
@@ -148,9 +149,9 @@ export function palisadeSegments() {
   const out = [];
   for (let i = 0; i < PALISADE_SEGMENTS; i++) {
     const a = (i / PALISADE_SEGMENTS) * Math.PI * 2;
-    const toFront = Math.abs(Math.atan2(Math.sin(a - Math.PI), Math.cos(a - Math.PI)));
+    const toFront = Math.abs(dmath.atan2(dmath.sin(a - Math.PI), dmath.cos(a - Math.PI)));
     if (toFront < GATE_HALF_ANGLE) continue;
-    out.push({ a, lx: Math.sin(a) * PALISADE_R, lz: Math.cos(a) * PALISADE_R });
+    out.push({ a, lx: dmath.sin(a) * PALISADE_R, lz: dmath.cos(a) * PALISADE_R });
   }
   return out;
 }
@@ -161,7 +162,7 @@ export function baseSpawnPoints(plot) {
   const pts = [];
   for (let i = 0; i < 4; i++) {
     const a = (i - 1.5) * 0.5;
-    const p = toWorld(plot, fx + Math.sin(a) * 4.5, fz - Math.cos(a) * 4.5);
+    const p = toWorld(plot, fx + dmath.sin(a) * 4.5, fz - dmath.cos(a) * 4.5);
     pts.push({ x: p.x, z: p.z, yaw: plot.rot });   // looking out of the base, toward the landing
   }
   return pts;
@@ -272,7 +273,7 @@ export function safeZone(layout, base, levelIndex) {
 export function plotAt(layout, x, z) {
   let best = -1, bd = Infinity;
   (layout.basePlots || []).forEach((plot, i) => {
-    const d = Math.hypot(plot.x - x, plot.z - z);
+    const d = dmath.hypot(plot.x - x, plot.z - z);
     if (d < plot.r + PLOT_REACH && d < bd) { bd = d; best = i; }
   });
   return best;

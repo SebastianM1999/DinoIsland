@@ -18,6 +18,7 @@ import { planVolcanoArena, moatFlow, VOLCANO_ARENA } from './volcanoArena.js';
 import { BASE_PLOT_RADIUS } from './base.js';
 import { planCaveMaze, CAVE_GEOM } from './caveMaze.js';
 import { caveHeight, mountainDepth, floorLevel, FLOOD_LEVEL } from './caveField.js';
+import * as dmath from './dmath.js';
 
 const TAU = Math.PI * 2;
 
@@ -46,7 +47,7 @@ export const HOURGLASS = { depth: 0.63, width: 0.2 };
  */
 export function halfWidthAt(plan, x) {
   if (plan.shape !== 'hourglass') return plan.B;
-  return plan.B * (1 - HOURGLASS.depth * Math.exp(-((x / (HOURGLASS.width * plan.A)) ** 2)));
+  return plan.B * (1 - HOURGLASS.depth * dmath.exp(-((x / (HOURGLASS.width * plan.A)) ** 2)));
 }
 
 /** Inside the island's outline at normalized radius < k (roughly, ignoring coast wobble). */
@@ -59,13 +60,13 @@ function coastHeight(plan, x, z) {
   const { A, seed } = plan;
   const B = halfWidthAt(plan, x);
   const nx = x / A, nz = z / B;
-  const ang = Math.atan2(nz, nx);
+  const ang = dmath.atan2(nz, nx);
   // bays and headlands only along the long sides – the tips stay clean beaches
-  const side = smoothstep(0.2, 0.55, Math.abs(Math.sin(ang)));
-  const warp = 1 + side * (0.12 * valueNoise(Math.cos(ang) * 1.9 + 3, Math.sin(ang) * 1.9, seed + 1)
-    + 0.06 * valueNoise(Math.cos(ang) * 5.3 + 9, Math.sin(ang) * 5.3, seed + 2));
+  const side = smoothstep(0.2, 0.55, Math.abs(dmath.sin(ang)));
+  const warp = 1 + side * (0.12 * valueNoise(dmath.cos(ang) * 1.9 + 3, dmath.sin(ang) * 1.9, seed + 1)
+    + 0.06 * valueNoise(dmath.cos(ang) * 5.3 + 9, dmath.sin(ang) * 5.3, seed + 2));
   const d = Math.sqrt(nx * nx + nz * nz) / warp;
-  const scale = B + (A - B) * Math.cos(ang) ** 2;        // meters per unit of d along this direction
+  const scale = B + (A - B) * dmath.cos(ang) ** 2;        // meters per unit of d along this direction
   const inland = (1 - d) * scale;                         // meters from the coastline
   if (inland < 0) {
     const out = -inland;
@@ -85,18 +86,18 @@ function coastHeight(plan, x, z) {
 function hillHeight(f, x, z, seed) {
   let dx = x - f.x, dz = z - f.z;
   if (f.stretch) {                                   // elongated ridge along angle f.rot
-    const c = Math.cos(f.rot), s = Math.sin(f.rot);
+    const c = dmath.cos(f.rot), s = dmath.sin(f.rot);
     const u = dx * c + dz * s, v = -dx * s + dz * c;
     dx = u / f.stretch; dz = v;
   }
   const r0 = Math.sqrt(dx * dx + dz * dz);
   if (r0 > f.radius * 1.3) return 0;
-  const ang = Math.atan2(dz, dx);
-  const warp = 1 + 0.2 * valueNoise(Math.cos(ang) * 2.1 + f.x * 0.01, Math.sin(ang) * 2.1, seed + 7)
-    + 0.08 * valueNoise(Math.cos(ang) * 5.7, Math.sin(ang) * 5.7 + f.z * 0.01, seed + 8);
+  const ang = dmath.atan2(dz, dx);
+  const warp = 1 + 0.2 * valueNoise(dmath.cos(ang) * 2.1 + f.x * 0.01, dmath.sin(ang) * 2.1, seed + 7)
+    + 0.08 * valueNoise(dmath.cos(ang) * 5.7, dmath.sin(ang) * 5.7 + f.z * 0.01, seed + 8);
   const r = r0 / (f.radius * warp);
   if (r >= 1) return 0;
-  let h = f.height * Math.pow(1 - smoothstep(f.core ?? 0.1, 1.0, r), f.shape ?? 0.8);
+  let h = f.height * dmath.pow(1 - smoothstep(f.core ?? 0.1, 1.0, r), f.shape ?? 0.8);
   h += fbm(x * 0.03, z * 0.03, 3, seed + 11) * f.rough * (1 - r);
   if (f.terrace > 0) {
     const tt = h / f.terrace;
@@ -118,15 +119,15 @@ function volcanoHeight(v, x, z, seed) {
   const dx = x - v.x, dz = z - v.z;
   const r = Math.sqrt(dx * dx + dz * dz);
   if (r > v.radius * 1.15) return 0;
-  const ang = Math.atan2(dz, dx);
-  const ridges = 1 + 0.06 * Math.sin(ang * 7 + seed) + 0.05 * valueNoise(Math.cos(ang) * 3, Math.sin(ang) * 3, seed + 21);
+  const ang = dmath.atan2(dz, dx);
+  const ridges = 1 + 0.06 * dmath.sin(ang * 7 + seed) + 0.05 * valueNoise(dmath.cos(ang) * 3, dmath.sin(ang) * 3, seed + 21);
   const span = v.radius - v.craterR;
   const u = clamp((r / ridges - v.craterR) / span, 0, 1);
   // concave cone: steep under the rim, spreading lava plains at the foot
-  let h = v.rimH * Math.pow(1 - u, 1.5);
+  let h = v.rimH * dmath.pow(1 - u, 1.5);
   h += fbm(x * 0.04, z * 0.04, 3, seed + 22) * 3 * (1 - u) * u * 2;
   // gullies running down the flanks
-  h -= Math.max(0, Math.sin(ang * 11 + fbm(x * 0.02, z * 0.02, 2, seed + 23) * 3)) * 2.2 * u * (1 - u) * 2;
+  h -= Math.max(0, dmath.sin(ang * 11 + fbm(x * 0.02, z * 0.02, 2, seed + 23) * 3)) * 2.2 * u * (1 - u) * 2;
   // a crest along the rim (the crater inside: calderaInner)
   h += 2 * (1 - smoothstep(0, 7, Math.abs(r - v.craterR)));
   return h;
@@ -138,14 +139,14 @@ function volcanoHeight(v, x, z, seed) {
  * notch – a pass cut through the rim where the mountain path comes in.
  */
 function calderaInner(v, x, z, h, seed) {
-  const dx = x - v.x, dz = z - v.z, r = Math.hypot(dx, dz);
+  const dx = x - v.x, dz = z - v.z, r = dmath.hypot(dx, dz);
   if (r > v.craterR + 16) return h;
   if (r < v.craterR + 3) {
     const wall = smoothstep(v.floorR, v.craterR, r);
     const inner = lerp(v.floorY + fbm(x * 0.09, z * 0.09, 2, seed + 24) * 0.25, v.rimY + 2, wall * wall * (3 - 2 * wall));
     h = lerp(inner, h, smoothstep(v.craterR - 1, v.craterR + 3, r));
   }
-  const notch = Math.cos(Math.atan2(dz, dx) - v.notchAngle);
+  const notch = dmath.cos(dmath.atan2(dz, dx) - v.notchAngle);
   if (notch > 0.9 && r > v.floorR - 4) {
     const nk = smoothstep(0.9, 0.97, notch) * smoothstep(v.floorR - 4, v.floorR, r) * (1 - smoothstep(v.craterR + 8, v.craterR + 16, r));
     h = lerp(h, Math.min(h, v.floorY + 1.5 + Math.max(0, r - v.craterR) * 0.35), nk);
@@ -170,7 +171,7 @@ function poolEffect(plan, x, z, h) {
   for (const p of plan.pools) {
     if (p.kind === 'lava' && (p.crater || p.annex)) continue;   // the crater / boss arena shape their own bowls
     // (bank: how far out the raised rim reaches – 2.5 radii unless the pool says)
-    const dd = Math.hypot(x - p.x, z - p.z), bank = p.bank ?? p.r * 2.5;
+    const dd = dmath.hypot(x - p.x, z - p.z), bank = p.bank ?? p.r * 2.5;
     if (dd > bank + p.r * 0.1) continue;
     const rim = 1 - smoothstep(p.r * 1.2, bank, dd);
     h = lerp(h, Math.max(h, p.level + (p.rim ?? 0.8) + fbm(x * 0.1, z * 0.1, 2, plan.seed + 13) * 0.35), rim);
@@ -178,7 +179,7 @@ function poolEffect(plan, x, z, h) {
     h = lerp(h, p.level - p.depth, bowl);
     // (an islet of basalt standing out of it: lavaTreasure)
     if (p.islet) {
-      const di = Math.hypot(x - p.islet.x, z - p.islet.z);
+      const di = dmath.hypot(x - p.islet.x, z - p.islet.z);
       h = lerp(h, Math.max(h, p.islet.top + fbm(x * 0.5, z * 0.5, 2, plan.seed + 17) * 0.15), 1 - smoothstep(p.islet.r, p.islet.r + 0.9, di));
     }
   }
@@ -193,17 +194,17 @@ function ventEffect(plan, x, z, h) {
   // the young flow runs between high banks down the steep flank
   const q = riverQuery(plan, x, z, 12, 'lava');
   // (not at a bridge: the path comes down level onto its deck)
-  if (q && q.flow.vent && q.i <= 4 && q.d > q.width / 2 && !(plan.bridges || []).some((b) => Math.hypot(x - b.x, z - b.z) < b.r + 8)) {
+  if (q && q.flow.vent && q.i <= 4 && q.d > q.width / 2 && !(plan.bridges || []).some((b) => dmath.hypot(x - b.x, z - b.z) < b.r + 8)) {
     const k = 1 - smoothstep(q.width / 2 + 4, q.width / 2 + 9, q.d);
     h = Math.max(h, lerp(h, q.surface + 1.6, k));
   }
   for (const f of plan.flows) {
     const v = f.vent;
     if (!v) continue;
-    const d = Math.hypot(x - v.x, z - v.z);
+    const d = dmath.hypot(x - v.x, z - v.z);
     if (d > VENT.r * 2) continue;
     // a crest round the mouth on a low mound (it holds the young flow's banks high)
-    const ring = Math.exp(-(((d - VENT.r) / VENT.w) ** 2));
+    const ring = dmath.exp(-(((d - VENT.r) / VENT.w) ** 2));
     const mound = 1 - smoothstep(VENT.r, VENT.r * 2.2, d);
     h += (ring * VENT.h + mound * 0.9) * (1 + fbm(x * 0.4, z * 0.4, 2, plan.seed + 141) * 0.25);
   }
@@ -269,7 +270,7 @@ function riverCarve(plan, x, z, h) {
     const sb = plan.sandbank;
     if (sb) {
       // a low, rounded sand island rising out of the water
-      const u = Math.hypot(x - sb.x, z - sb.z) / sb.r;
+      const u = dmath.hypot(x - sb.x, z - sb.z) / sb.r;
       if (u < 1.8) bed = Math.max(bed, sb.top - 0.9 * u * u);
     }
     return bed;
@@ -297,14 +298,14 @@ const RIDGE = { width: 5, ditch: 2.8, depth: 3.5, drop: 1.6, reach: 16 };
 
 function rampEffect(plan, x, z, h) {
   for (const r of plan.ramps) {
-    if (Math.hypot(x - r.cx, z - r.cz) > r.reach) continue;
+    if (dmath.hypot(x - r.cx, z - r.cz) > r.reach) continue;
     let bd = Infinity, by = 0, bk = 0;
     const pts = r.pts;
     for (let i = 0; i < pts.length - 1; i++) {
       const a = pts[i], b = pts[i + 1];
       const vx = b.x - a.x, vz = b.z - a.z;
       const u = clamp(((x - a.x) * vx + (z - a.z) * vz) / (vx * vx + vz * vz || 1), 0, 1);
-      const d = Math.hypot(a.x + vx * u - x, a.z + vz * u - z);
+      const d = dmath.hypot(a.x + vx * u - x, a.z + vz * u - z);
       if (d < bd) { bd = d; by = lerp(a.y, b.y, u); bk = r.ridge ? lerp(a.ridge ?? 0, b.ridge ?? 0, u) : 0; }
     }
     if (bk > 0) {
@@ -333,7 +334,7 @@ function rampEffect(plan, x, z, h) {
 
 function padEffect(plan, x, z, h) {
   for (const p of plan.pads) {
-    const dd = Math.hypot(x - p.x, z - p.z);
+    const dd = dmath.hypot(x - p.x, z - p.z);
     if (dd > p.r * 1.8) continue;
     const w = 1 - smoothstep(p.r * 0.8, p.r * 1.8, dd);
     h = lerp(h, p.h, w);
@@ -356,7 +357,7 @@ function segsDist(segs, x, z) {
   for (const [ax, az, bx, bz] of segs) {
     const vx = bx - ax, vz = bz - az;
     const u = clamp(((x - ax) * vx + (z - az) * vz) / (vx * vx + vz * vz || 1), 0, 1);
-    const d = Math.hypot(ax + vx * u - x, az + vz * u - z);
+    const d = dmath.hypot(ax + vx * u - x, az + vz * u - z);
     if (d < best) best = d;
   }
   return best;
@@ -374,11 +375,11 @@ export function bogSample(plan, x, z) {
   for (const b of bogs) {
     const dx = x - b.x, dz = z - b.z;
     if (Math.abs(dx) > b.reach || Math.abs(dz) > b.reach) continue;
-    const ang = Math.atan2(dz, dx);
+    const ang = dmath.atan2(dz, dx);
     // an organic shoreline: lobes and inlets around the circle
-    const warp = b.round ? 1 : 1 + 0.2 * valueNoise(Math.cos(ang) * 1.6 + b.id * 3.1, Math.sin(ang) * 1.6, plan.seed + 91)
-      + 0.08 * valueNoise(Math.cos(ang) * 4.1, Math.sin(ang) * 4.1 + b.id * 1.7, plan.seed + 92);
-    const k = Math.hypot(dx, dz) / (b.r * warp);
+    const warp = b.round ? 1 : 1 + 0.2 * valueNoise(dmath.cos(ang) * 1.6 + b.id * 3.1, dmath.sin(ang) * 1.6, plan.seed + 91)
+      + 0.08 * valueNoise(dmath.cos(ang) * 4.1, dmath.sin(ang) * 4.1 + b.id * 1.7, plan.seed + 92);
+    const k = dmath.hypot(dx, dz) / (b.r * warp);
     if (k >= 1.15 || (best && k >= best.k)) continue;
     best = { bog: b, k };
   }
@@ -422,7 +423,7 @@ export function bridgeAt(plan, x, z) {
 
 function bridgeEffect(plan, x, z, h) {
   for (const b of plan.bridges) {
-    const d = Math.hypot(x - b.x, z - b.z);
+    const d = dmath.hypot(x - b.x, z - b.z);
     if (d > b.r + 5) continue;
     const w = 1 - smoothstep(b.r - 1, b.r + 5, d);
     h = lerp(h, Math.max(h, b.y), w);
@@ -432,7 +433,7 @@ function bridgeEffect(plan, x, z, h) {
 
 /** Inside a water pool's basin (its bowl, a little past the waterline)? */
 function inWaterPool(plan, x, z) {
-  for (const p of plan.pools) if (p.kind === 'water' && Math.hypot(x - p.x, z - p.z) < p.r * 1.1) return true;
+  for (const p of plan.pools) if (p.kind === 'water' && dmath.hypot(x - p.x, z - p.z) < p.r * 1.1) return true;
   return false;
 }
 
@@ -483,7 +484,7 @@ export function islandHeight(plan, x, z) {
 // ------------------------------------------------------------------ planning helpers
 
 function slopeOf(fn, x, z, e = 2) {
-  return Math.hypot(fn(x + e, z) - fn(x - e, z), fn(x, z + e) - fn(x, z - e)) / (2 * e);
+  return dmath.hypot(fn(x + e, z) - fn(x - e, z), fn(x, z + e) - fn(x, z - e)) / (2 * e);
 }
 
 /** Inside the outline (ellipse or hourglass) at normalized radius < k. */
@@ -495,7 +496,7 @@ function distToPolyline(pts, x, z) {
     const a = pts[i], b = pts[i + 1];
     const vx = b.x - a.x, vz = b.z - a.z;
     const u = clamp(((x - a.x) * vx + (z - a.z) * vz) / (vx * vx + vz * vz || 1), 0, 1);
-    best = Math.min(best, Math.hypot(a.x + vx * u - x, a.z + vz * u - z));
+    best = Math.min(best, dmath.hypot(a.x + vx * u - x, a.z + vz * u - z));
   }
   return best;
 }
@@ -507,7 +508,7 @@ function traceFlow(plan, start, goals, { kind, width0, width1, surface0, stopAt 
   const fn = (x, z) => poolEffect(plan, x, z, naturalHeight(plan, x, z));
   const pts = [];
   let x = start.x, z = start.z;
-  let heading = Math.atan2(goal.z - z, goal.x - x);
+  let heading = dmath.atan2(goal.z - z, goal.x - x);
   let surface = surface0;
   const step = 5;
   for (let i = 0; i < 160; i++) {
@@ -518,21 +519,21 @@ function traceFlow(plan, start, goals, { kind, width0, width1, surface0, stopAt 
     pts.push({ x, z, y: surface, w: lerp(width0, width1, t) });
     if (stopAt === 'sea' && nat < -0.3) break;
     if (stopAt !== 'sea' && nat < stopAt) break;
-    if (goals.length && Math.hypot(goal.x - x, goal.z - z) < 30) goal = goals.shift();
+    if (goals.length && dmath.hypot(goal.x - x, goal.z - z) < 30) goal = goals.shift();
     // candidate headings: toward the goal, prefer lower ground, gentle meander
-    const toGoal = Math.atan2(goal.z - z, goal.x - x);
+    const toGoal = dmath.atan2(goal.z - z, goal.x - x);
     let bestA = heading, bestS = Infinity;
     for (let k = -3; k <= 3; k++) {
       const a = heading + k * 0.22;
-      const tx = x + Math.cos(a) * step * 3, tz = z + Math.sin(a) * step * 3;
-      const turn = Math.abs(Math.atan2(Math.sin(a - toGoal), Math.cos(a - toGoal)));
+      const tx = x + dmath.cos(a) * step * 3, tz = z + dmath.sin(a) * step * 3;
+      const turn = Math.abs(dmath.atan2(dmath.sin(a - toGoal), dmath.cos(a - toGoal)));
       const s = fn(tx, tz) + turn * (i < 25 ? 2.5 : 5) + Math.abs(k) * 0.4;
       if (s < bestS) { bestS = s; bestA = a; }
     }
     const wiggle = valueNoise(i * 0.35, 0.5, plan.seed + 61) * 0.35;
     heading = lerp(heading, bestA, 0.6) + wiggle * 0.3;
-    x += Math.cos(heading) * step;
-    z += Math.sin(heading) * step;
+    x += dmath.cos(heading) * step;
+    z += dmath.sin(heading) * step;
   }
   return { kind, pts };
 }
@@ -604,7 +605,7 @@ export function planIsland(levelIndex = 0, variant = 1) {
   // the swamp arena fills the middle of the waist (shared/swampArena.js): the way to the second half
   if (level.swampArena) plan.swampArena = planSwampArena(plan);
   const sa = plan.swampArena;
-  const clearOfArena = (x, z, r) => !sa || Math.hypot(x - sa.x, z - sa.z) > sa.r + r;
+  const clearOfArena = (x, z, r) => !sa || dmath.hypot(x - sa.x, z - sa.z) > sa.r + r;
 
   // --- hut (west beach) and boat (east beach)
   plan.hut = { x: -A + 34, z: rng.range(-10, 10) * K, radius: 21, ground: HUT_GROUND };
@@ -613,7 +614,7 @@ export function planIsland(levelIndex = 0, variant = 1) {
   // --- relief
   let hid = 0;
   const addHill = (f) => { f.id = hid++; plan.hills.push(f); return f; };
-  const clearOf = (x, z, r) => Math.hypot(x - plan.hut.x, z - plan.hut.z) > r + 60 * Math.max(0.7, K) && Math.hypot(x - plan.boat.x, z - plan.boat.z) > r + 45 * Math.max(0.7, K);
+  const clearOf = (x, z, r) => dmath.hypot(x - plan.hut.x, z - plan.hut.z) > r + 60 * Math.max(0.7, K) && dmath.hypot(x - plan.boat.x, z - plan.boat.z) > r + 45 * Math.max(0.7, K);
   const place = (tries, pred) => {
     for (let i = 0; i < tries; i++) {
       const x = rng.range(-A * 0.72, A * 0.72), z = rng.range(-B * 0.62, B * 0.62);
@@ -629,7 +630,7 @@ export function planIsland(levelIndex = 0, variant = 1) {
     if (hill) addHill({ ...hill, radius: rng.range(26, 32), height: rng.range(8, 11), terrace: 0, rough: 1.5, core: 0.2, shape: 0.9, moor: true });
     for (let i = 0; i < 14; i++) {
       const p = place(120, (x, z) => clearOf(x, z, 16) && clearOfArena(x, z, 22) && insideEllipse(plan, x, z, 0.78)
-        && plan.hills.every((h) => Math.hypot(x - h.x, z - h.z) > h.radius * 0.8 + 14));
+        && plan.hills.every((h) => dmath.hypot(x - h.x, z - h.z) > h.radius * 0.8 + 14));
       if (p) addHill({ ...p, radius: rng.range(12, 22), height: rng.range(1.6, 3.6), terrace: 0, rough: 0.8, core: 0.1, shape: 1.3 });
     }
   } else if (volcanic) {
@@ -645,15 +646,15 @@ export function planIsland(levelIndex = 0, variant = 1) {
     const vr = plan.volcano.radius;
     // rocky hills on the lowland ring round it (the tallest carries the peak site) ...
     for (let i = 0; i < 3; i++) {
-      const p = place(300, (x, z) => clearOf(x, z, 18) && Math.hypot(x, z) > vr * 1.1 + 24 && insideEllipse(plan, x, z, 0.8)
-        && plan.hills.every((h) => Math.hypot(x - h.x, z - h.z) > h.radius + 26));
+      const p = place(300, (x, z) => clearOf(x, z, 18) && dmath.hypot(x, z) > vr * 1.1 + 24 && insideEllipse(plan, x, z, 0.8)
+        && plan.hills.every((h) => dmath.hypot(x - h.x, z - h.z) > h.radius + 26));
       // (gentle enough to walk up anywhere: no terraces, no paths of their own)
       if (p) addHill({ ...p, radius: rng.range(24, 28), height: rng.range(13, 18), terrace: 0, rough: 2, core: 0.18, shape: 0.8 });
     }
     // ... and basalt spires
     for (let i = 0; i < 9; i++) {
-      const p = place(150, (x, z) => clearOf(x, z, 10) && insideEllipse(plan, x, z, 0.84) && Math.hypot(x, z) > vr * 1.05 + 8
-        && plan.hills.every((h) => Math.hypot(x - h.x, z - h.z) > h.radius + 10));
+      const p = place(150, (x, z) => clearOf(x, z, 10) && insideEllipse(plan, x, z, 0.84) && dmath.hypot(x, z) > vr * 1.05 + 8
+        && plan.hills.every((h) => dmath.hypot(x - h.x, z - h.z) > h.radius + 10));
       if (p) addHill({ ...p, radius: rng.range(6, 10), height: rng.range(9, 16), terrace: 0, rough: 2, core: 0.3, shape: 0.35 });
     }
   } else {
@@ -674,7 +675,7 @@ export function planIsland(levelIndex = 0, variant = 1) {
     const n = Math.round(rng.int(4, 6) * Math.max(0.6, K));
     for (let i = 0; i < n; i++) {
       const p = place(250, (x, z) => clearOf(x, z, 40 * K) && insideEllipse(plan, x, z, 0.72)
-        && plan.hills.every((h) => Math.hypot(x - h.x, z - h.z) > h.radius * 0.8 + 28 * K));
+        && plan.hills.every((h) => dmath.hypot(x - h.x, z - h.z) > h.radius * 0.8 + 28 * K));
       if (!p) continue;
       const ridge = rng() < 0.45;
       addHill({
@@ -685,14 +686,14 @@ export function planIsland(levelIndex = 0, variant = 1) {
     // knolls and bumps so the lowland is never flat
     for (let i = 0; i < Math.round(16 * K); i++) {
       const p = place(80, (x, z) => clearOf(x, z, 18) && insideEllipse(plan, x, z, 0.78)
-        && plan.hills.every((h) => Math.hypot(x - h.x, z - h.z) > h.radius * 0.7 + 12));
+        && plan.hills.every((h) => dmath.hypot(x - h.x, z - h.z) > h.radius * 0.7 + 12));
       if (p) addHill({ ...p, radius: rng.range(10, 20), height: rng.range(3.5, 9), terrace: 0, rough: 1.2, core: 0.05, shape: 1.2 });
     }
     // First-island waterfall faces the western spawn; other jungle islands use
     // the side of the peak with the most land along the island.
     const dir = { x: main.x > 0 ? -1 : 1, z: rng.range(-0.45, 0.45) };
     if (level.index === 0) { dir.x = -1; dir.z = 0; }
-    const dl = Math.hypot(dir.x, dir.z);
+    const dl = dmath.hypot(dir.x, dir.z);
     dir.x /= dl; dir.z /= dl;
     const spur = addHill({
       x: main.x + dir.x * main.radius * 0.7, z: main.z + dir.z * main.radius * 0.7,
@@ -703,7 +704,7 @@ export function planIsland(levelIndex = 0, variant = 1) {
     let ring = 0;
     for (let k = 0; k < 12; k++) {
       const a = (k / 12) * TAU;
-      ring += naturalHeight(plan, pool.x + Math.cos(a) * pool.r * 1.6, pool.z + Math.sin(a) * pool.r * 1.6);
+      ring += naturalHeight(plan, pool.x + dmath.cos(a) * pool.r * 1.6, pool.z + dmath.sin(a) * pool.r * 1.6);
     }
     pool.level = Math.max(2.2, ring / 12 - 0.4);
     plan.pools.push(pool);
@@ -725,7 +726,7 @@ export function planIsland(levelIndex = 0, variant = 1) {
       let top = { x: f.x, z: f.z, y: naturalHeight(plan, f.x, f.z) };
       for (let i = 0; i < 160; i++) {
         const a = rng() * TAU, r = Math.sqrt(rng()) * f.radius * 0.3;
-        const x = f.x + Math.cos(a) * r, z = f.z + Math.sin(a) * r;
+        const x = f.x + dmath.cos(a) * r, z = f.z + dmath.sin(a) * r;
         const y = naturalHeight(plan, x, z);
         if (y > top.y) top = { x, z, y };
       }
@@ -746,12 +747,12 @@ export function planIsland(levelIndex = 0, variant = 1) {
       // the waterfall is on this mountain's own flank: wind most of the way
       // around, starting beside the cliff and ending before coming back to it
       if (cliff && attempt >= 6) {
-        a0 = Math.atan2(cliff.z - f.z, cliff.x - f.x) + dirSign * rng.range(0.55, 0.75);
+        a0 = dmath.atan2(cliff.z - f.z, cliff.x - f.x) + dirSign * rng.range(0.55, 0.75);
         turns = rng.range(0.68, 0.8);
       }
       const pts = [];
       const steps = 110;
-      const base = naturalHeight(plan, f.x + Math.cos(a0) * R0, f.z + Math.sin(a0) * R0);
+      const base = naturalHeight(plan, f.x + dmath.cos(a0) * R0, f.z + dmath.sin(a0) * R0);
       const s = plan.seed + f.id * 7 + attempt * 13;
       for (let i = 0; i <= steps; i++) {
         const t = i / steps;
@@ -759,17 +760,17 @@ export function planIsland(levelIndex = 0, variant = 1) {
         const a = a0 + dirSign * (t * turns * TAU + valueNoise(t * 4, 1.3, s) * 0.55);
         const wob = 1 + valueNoise(t * 6, 7.1, s + 1) * 0.16;
         const r = (R0 * (1 - t) + 3 * t) * wob;
-        const x = top.x + (f.x - top.x) * (1 - t) + Math.cos(a) * r;
-        const z = top.z + (f.z - top.z) * (1 - t) + Math.sin(a) * r;
+        const x = top.x + (f.x - top.x) * (1 - t) + dmath.cos(a) * r;
+        const z = top.z + (f.z - top.z) * (1 - t) + dmath.sin(a) * r;
         // steady climb with small flats and steeper bits
         const climb = t + valueNoise(t * 5, 3.7, s + 2) * 0.03;
         pts.push({ x, z, y: lerp(base, top.y, clamp(smoothstep(0, 1, climb) * 0.25 + climb * 0.75, 0, 1)) });
       }
       const p0 = pts[0];
       let bad = 0;
-      if (Math.hypot(p0.x - plan.hut.x, p0.z - plan.hut.z) < plan.hut.radius * 1.8 + 10) bad++;
-      if (Math.hypot(p0.x - plan.boat.x, p0.z - plan.boat.z) < 30) bad++;
-      if (cliff && pts.some((p) => Math.hypot(p.x - cliff.x, p.z - cliff.z) < 14)) bad += 2;
+      if (dmath.hypot(p0.x - plan.hut.x, p0.z - plan.hut.z) < plan.hut.radius * 1.8 + 10) bad++;
+      if (dmath.hypot(p0.x - plan.boat.x, p0.z - plan.boat.z) < 30) bad++;
+      if (cliff && pts.some((p) => dmath.hypot(p.x - cliff.x, p.z - cliff.z) < 14)) bad += 2;
       const ramp = { pts, width: rng.range(4.6, 5.4), cx: f.x, cz: f.z, reach: R0 * 1.2 + 12, hill: f.id };
       if (!best || bad < best.bad) best = { ramp, bad };
       if (!bad) break;
@@ -786,7 +787,7 @@ export function planIsland(levelIndex = 0, variant = 1) {
     // hut and boat beaches and of the notch; the crater's lava moat is one more
     const v = plan.volcano;
     const angles = [];
-    const off = (a, b) => Math.abs(Math.atan2(Math.sin(a - b), Math.cos(a - b)));
+    const off = (a, b) => Math.abs(dmath.atan2(dmath.sin(a - b), dmath.cos(a - b)));
     for (let i = 0; i < 600 && angles.length < 3; i++) {
       const a = rng.range(-Math.PI, Math.PI);
       if (off(a, Math.PI) < 0.8 || off(a, 0) < 0.65 || off(a, v.notchAngle) < 0.4 || angles.some((b) => off(a, b) < 1.25)) continue;
@@ -799,12 +800,12 @@ export function planIsland(levelIndex = 0, variant = 1) {
       let vr = 0;
       for (let k = 0; k < 24; k++) {
         const r = v.craterR + (v.radius - v.craterR) * rng.range(0.2, 0.55);
-        const gap = distToPolyline(climb, v.x + Math.cos(a) * r, v.z + Math.sin(a) * r);
+        const gap = distToPolyline(climb, v.x + dmath.cos(a) * r, v.z + dmath.sin(a) * r);
         if (gap > 22) { vr = r; break; }
-        if (!vr || gap > distToPolyline(climb, v.x + Math.cos(a) * vr, v.z + Math.sin(a) * vr)) vr = r;
+        if (!vr || gap > distToPolyline(climb, v.x + dmath.cos(a) * vr, v.z + dmath.sin(a) * vr)) vr = r;
       }
-      const start = { x: v.x + Math.cos(a) * vr, z: v.z + Math.sin(a) * vr };
-      const goal = { x: Math.cos(a) * A * 1.35, z: Math.sin(a) * A * 1.35 };
+      const start = { x: v.x + dmath.cos(a) * vr, z: v.z + dmath.sin(a) * vr };
+      const goal = { x: dmath.cos(a) * A * 1.35, z: dmath.sin(a) * A * 1.35 };
       const y0 = naturalHeight(plan, start.x, start.z);
       const flow = traceFlow(plan, start, goal, { kind: 'lava', width0: 4, width1: 7.5, surface0: y0 - 0.6, stopAt: 0.5 });
       flow.vent = { x: start.x, z: start.z, y: y0 };
@@ -825,7 +826,7 @@ export function planIsland(levelIndex = 0, variant = 1) {
     let ring = 0;
     for (let k = 0; k < 12; k++) {
       const a = (k / 12) * TAU;
-      ring += naturalHeight(plan, pool.x + Math.cos(a) * pool.r * 1.6, pool.z + Math.sin(a) * pool.r * 1.6);
+      ring += naturalHeight(plan, pool.x + dmath.cos(a) * pool.r * 1.6, pool.z + dmath.sin(a) * pool.r * 1.6);
     }
     pool.level = Math.max(1.6, ring / 12 - 0.35);
     plan.pools.push(pool);
@@ -892,10 +893,10 @@ export function planIsland(levelIndex = 0, variant = 1) {
     const pts = [{ x: plan.hut.x + 8, z: plan.hut.z - 6 }];
     let z = plan.hut.z;
     const lavaPenalty = (x, zz) => (volcanic ? Math.max(0, 40 - flowDist(plan, x, zz)) * 3 : 0)
-      + (plan.volcano ? Math.max(0, plan.volcano.radius * 0.75 - Math.hypot(x - plan.volcano.x, zz - plan.volcano.z)) * 2 : 0)
+      + (plan.volcano ? Math.max(0, plan.volcano.radius * 0.75 - dmath.hypot(x - plan.volcano.x, zz - plan.volcano.z)) * 2 : 0)
       // through the swamp's waist: straight through the arena, gate to gate; round the creek's spring
       + (sa && Math.abs(x - sa.x) < sa.r + 24 ? Math.abs(zz - sa.z) * 20 : 0)
-      + (swamp ? plan.pools.reduce((s, q) => s + Math.max(0, q.r * 1.6 + 8 - Math.hypot(x - q.x, zz - q.z)) * 6, 0) : 0);
+      + (swamp ? plan.pools.reduce((s, q) => s + Math.max(0, q.r * 1.6 + 8 - dmath.hypot(x - q.x, zz - q.z)) * 6, 0) : 0);
     for (let x = plan.hut.x + 40; x < plan.boat.x - 25; x += 34) {
       let bestZ = z, bestS = Infinity;
       for (let k = -8; k <= 8; k++) {
@@ -937,12 +938,12 @@ export function planIsland(levelIndex = 0, variant = 1) {
       // (measured along the path from where it crosses: not the loop above or below)
       const pts = r.pts;
       let j0 = -1, bd = b.r;
-      pts.forEach((p, j) => { const d = Math.hypot(p.x - b.x, p.z - b.z); if (d < bd) { bd = d; j0 = j; } });
+      pts.forEach((p, j) => { const d = dmath.hypot(p.x - b.x, p.z - b.z); if (d < bd) { bd = d; j0 = j; } });
       if (j0 < 0) continue;
       for (const dir of [-1, 1]) {
         let s = bd;
         for (let j = j0; j >= 0 && j < pts.length && s < b.r + 40; j += dir) {
-          if (j !== j0) s += Math.hypot(pts[j].x - pts[j - dir].x, pts[j].z - pts[j - dir].z);
+          if (j !== j0) s += dmath.hypot(pts[j].x - pts[j - dir].x, pts[j].z - pts[j - dir].z);
           pts[j].y = Math.max(pts[j].y, b.y - 0.2 * Math.max(0, s - b.r * 0.6));
         }
       }
@@ -974,13 +975,13 @@ export function planIsland(levelIndex = 0, variant = 1) {
     for (let i = 0; i < 900; i++) {
       const x = rng.range(-A * 0.75, A * 0.75), z = rng.range(-B * 0.7, B * 0.7);
       if (!insideEllipse(plan, x, z, 0.8)) continue;
-      if (taken.some((t) => Math.hypot(t.x - x, t.z - z) < t.r + r)) continue;
+      if (taken.some((t) => dmath.hypot(t.x - x, t.z - z) < t.r + r)) continue;
       const h = fnN(x, z);
       if (h < minH || h > maxH || slopeOf(fnN, x, z, r * 0.5) > maxSlope) continue;
       if (distToPolyline(plan.trail, x, z) < trailGap + r) continue;
       if (flowDist(plan, x, z) < riverGap + r) continue;
       // a flattened site must not cut a cliff into a mountain path
-      if (plan.ramps.some((rp) => rp.pts.some((p) => Math.hypot(p.x - x, p.z - z) < r * 1.8 + 6))) continue;
+      if (plan.ramps.some((rp) => rp.pts.some((p) => dmath.hypot(p.x - x, p.z - z) < r * 1.8 + 6))) continue;
       taken.push({ x, z, r: r + 8 });
       return { x, z, h };
     }
@@ -1000,13 +1001,15 @@ export function planIsland(levelIndex = 0, variant = 1) {
   if (CAVES_ENABLED) {
     // caves are dug into the flank of a hill or mountain: the slope rises behind
     // and around them, the entrance looks out over the lowland
-    const hosts = plan.hills.filter((h) => !h.spur && h.height > 7 && h.radius > 12).sort(() => rng() - 0.5);
-    const rampNear = (x, z, pad) => plan.ramps.some((r) => r.pts.some((p) => Math.hypot(p.x - x, p.z - z) < pad));
+    // (shuffled by drawn keys: a random comparator would depend on the engine's sort algorithm)
+    const hosts = plan.hills.filter((h) => !h.spur && h.height > 7 && h.radius > 12)
+      .map((h) => [rng(), h]).sort((a, b) => a[0] - b[0]).map(([, h]) => h);
+    const rampNear = (x, z, pad) => plan.ramps.some((r) => r.pts.some((p) => dmath.hypot(p.x - x, p.z - z) < pad));
     for (const f of hosts) {
       if (plan.sites.caves.length >= 2) break;
       for (let tries = 0; tries < 40; tries++) {
         const a = rng() * TAU;
-        const ox = Math.cos(a), oz = Math.sin(a);
+        const ox = dmath.cos(a), oz = dmath.sin(a);
         // walk outward from the hill until the ground is ~4-9 m above the foot
         let spot = null;
         for (let r = f.radius * 0.35; r < f.radius * 1.2; r += 1) {
@@ -1017,10 +1020,10 @@ export function planIsland(levelIndex = 0, variant = 1) {
         }
         if (!spot || !insideEllipse(plan, spot.x, spot.z, 0.82)) continue;
         // (mountains themselves are fine hosts – only other sites and pools are in the way)
-        if (taken.some((t) => !t.hill && Math.hypot(t.x - spot.x, t.z - spot.z) < t.r + 9)) continue;
+        if (taken.some((t) => !t.hill && dmath.hypot(t.x - spot.x, t.z - spot.z) < t.r + 9)) continue;
         if (flowDist(plan, spot.x, spot.z) < 18 || distToPolyline(plan.trail, spot.x, spot.z) < 10 || rampNear(spot.x, spot.z, 19)) continue;
         // entrance (local -z) faces outward, away from the hill
-        const rot = Math.atan2(-ox, -oz);
+        const rot = dmath.atan2(-ox, -oz);
         plan.sites.caves.push({ x: spot.x, z: spot.z, y: spot.h, rot, seed: rng.int(1, 9999), host: f.id });
         // flatten the floor and the approach in front, not the hill behind
         plan.pads.push({ x: spot.x, z: spot.z, r: 7.5, h: spot.h });
@@ -1063,12 +1066,12 @@ export function planIsland(levelIndex = 0, variant = 1) {
     for (let x = -A * 0.85; x <= A * 0.85; x += 7) {
       for (let z = -B * 0.8; z <= B * 0.8; z += 7) {
         if (!insideEllipse(plan, x, z, 0.84)) continue;
-        if (taken.some((t) => Math.hypot(t.x - x, t.z - z) < t.r + R)) continue;
+        if (taken.some((t) => dmath.hypot(t.x - x, t.z - z) < t.r + R)) continue;
         const h = fnN(x, z);
         if (h < (swamp ? 1.4 : 1.8) || h > 32) continue;
         const trail = distToPolyline(plan.trail, x, z), river = flowDist(plan, x, z);
         if (trail < R + 1 || river < R + riverGap) continue;
-        if (plan.ramps.some((rp) => rp.pts.some((p) => Math.hypot(p.x - x, p.z - z) < R * 1.6 + 6))) continue;
+        if (plan.ramps.some((rp) => rp.pts.some((p) => dmath.hypot(p.x - x, p.z - z) < R * 1.6 + 6))) continue;
         const slope = slopeOf(fnN, x, z, R * 0.5);
         if (slope > 0.5) continue;
         // the ground around the plot must meet the flattened pad gently – no
@@ -1076,10 +1079,10 @@ export function planIsland(levelIndex = 0, variant = 1) {
         let rim = 0;
         for (let k = 0; k < 8; k++) {
           const a = (k / 8) * Math.PI * 2;
-          for (const rr of [R + 4, R + 10]) rim = Math.max(rim, Math.abs(fnN(x + Math.cos(a) * rr, z + Math.sin(a) * rr) - h) / (rr - R + 2));
+          for (const rr of [R + 4, R + 10]) rim = Math.max(rim, Math.abs(fnN(x + dmath.cos(a) * rr, z + dmath.sin(a) * rr) - h) / (rr - R + 2));
         }
         if (rim > 0.65) continue;
-        cands.push({ x, z, h, slope, rim, hut: Math.hypot(x - plan.hut.x, z - plan.hut.z), river });
+        cands.push({ x, z, h, slope, rim, hut: dmath.hypot(x - plan.hut.x, z - plan.hut.z), river });
       }
     }
     const kinds = [
@@ -1098,7 +1101,7 @@ export function planIsland(levelIndex = 0, variant = 1) {
         if (plan.basePlots.some((p) => p.kind === k.kind)) continue;
         let best = null, bs = Infinity;
         for (const c of cands) {
-          if (c.rim > pass.rim || plan.basePlots.some((p) => Math.hypot(p.x - c.x, p.z - c.z) < pass.gap)) continue;
+          if (c.rim > pass.rim || plan.basePlots.some((p) => dmath.hypot(p.x - c.x, p.z - c.z) < pass.gap)) continue;
           const sc = k.score(c);
           if (sc < bs) { bs = sc; best = c; }
         }
@@ -1124,7 +1127,7 @@ export function planIsland(levelIndex = 0, variant = 1) {
       let best = null;
       for (let i = 0; i < 400; i++) {
         const a = rng() * TAU, r = Math.sqrt(rng()) * top.radius * 0.45;
-        const x = top.x + Math.cos(a) * r, z = top.z + Math.sin(a) * r;
+        const x = top.x + dmath.cos(a) * r, z = top.z + dmath.sin(a) * r;
         const h = islandHeight(plan, x, z);
         if (slopeOf((xx, zz) => islandHeight(plan, xx, zz), x, z, 1.5) < 0.35 && (!best || h > best.y)) best = { x, z, y: h };
       }
@@ -1192,7 +1195,7 @@ function planCave(level, variant, seed) {
   for (const t of tunnels) {
     if (!t.flooded) continue;
     const cum = [0];
-    for (let i = 1; i < t.pts.length; i++) cum.push(cum[i - 1] + Math.hypot(t.pts[i].x - t.pts[i - 1].x, t.pts[i].z - t.pts[i - 1].z));
+    for (let i = 1; i < t.pts.length; i++) cum.push(cum[i - 1] + dmath.hypot(t.pts[i].x - t.pts[i - 1].x, t.pts[i].z - t.pts[i - 1].z));
     const total = cum[cum.length - 1];
     // the dry floor beside the water is level, and no lower than the natural floor round it: the water never lies above dry ground
     let lowest = Infinity;
@@ -1233,7 +1236,7 @@ function planCave(level, variant, seed) {
   // a short way from the hut to the tunnel mouth, from the exit tunnel to the boat (nothing inside the mountain)
   const lane = (x0, z0, x1, z1, wobble) => Array.from({ length: 9 }, (_, i) => {
     const t = i / 8;
-    return { x: lerp(x0, x1, t), z: lerp(z0, z1, t) + valueNoise(t * 3 + 2, 0.4, seed + 77) * wobble * Math.sin(Math.PI * t) };
+    return { x: lerp(x0, x1, t), z: lerp(z0, z1, t) + valueNoise(t * 3 + 2, 0.4, seed + 77) * wobble * dmath.sin(Math.PI * t) };
   });
   plan.trail = lane(plan.hut.x + 8, plan.hut.z - 6, maze.entrance.x, maze.entrance.z, 7);
   plan.paths = [lane(maze.exit.x, maze.exit.z, plan.boat.x - 10, plan.boat.z, 6)];
@@ -1252,7 +1255,7 @@ function calderaPath(plan, rng) {
   const yEnd = v.floorY + 1.5 + 9 * 0.35;              // the notch's floor there (volcanoHeight, on the lowland)
   const footR = v.radius * 1.02;
   const a0 = v.notchAngle - dir * turns * TAU;
-  const y0 = Math.max(1, naturalHeight(plan, v.x + Math.cos(a0) * footR, v.z + Math.sin(a0) * footR));
+  const y0 = Math.max(1, naturalHeight(plan, v.x + dmath.cos(a0) * footR, v.z + dmath.sin(a0) * footR));
   const steps = 150;
   // on each bearing, the radius where the flank (ridges and gullies included) has the path's height
   const rs = [];
@@ -1262,7 +1265,7 @@ function calderaPath(plan, rng) {
     let lo = outer, hi = footR;
     for (let k = 0; k < 16; k++) {
       const mid = (lo + hi) / 2;
-      if (naturalHeight(plan, v.x + Math.cos(a) * mid, v.z + Math.sin(a) * mid) > y) lo = mid; else hi = mid;
+      if (naturalHeight(plan, v.x + dmath.cos(a) * mid, v.z + dmath.sin(a) * mid) > y) lo = mid; else hi = mid;
     }
     rs.push((lo + hi) / 2);
   }
@@ -1275,10 +1278,10 @@ function calderaPath(plan, rng) {
     const r = clamp(sum / n, outer, footR);
     const a = a0 + dir * t * turns * TAU;
     // (a ridge from a little way up the foot to just below the notch)
-    pts.push({ x: v.x + Math.cos(a) * r, z: v.z + Math.sin(a) * r, y: lerp(y0, yEnd, t), ridge: smoothstep(0.015, 0.05, t) * (1 - smoothstep(0.95, 0.99, t)) });
+    pts.push({ x: v.x + dmath.cos(a) * r, z: v.z + dmath.sin(a) * r, y: lerp(y0, yEnd, t), ridge: smoothstep(0.015, 0.05, t) * (1 - smoothstep(0.95, 0.99, t)) });
   }
   // through the notch and down onto the floor (across the moat's gap)
-  const c = Math.cos(v.notchAngle), s = Math.sin(v.notchAngle);
+  const c = dmath.cos(v.notchAngle), s = dmath.sin(v.notchAngle);
   for (const [r, y] of [[v.craterR + 3, v.floorY + 2.6], [v.craterR - 2, v.floorY + 1.1], [v.floorR - 3, v.floorY + 0.15], [VOLCANO_ARENA.r - 6, v.floorY + 0.1]]) {
     pts.push({ x: v.x + c * r, z: v.z + s * r, y });
   }
@@ -1297,7 +1300,7 @@ function ridgeGutters(plan) {
   const ok = (i) => {
     const p = pts[i];
     if ((p.ridge ?? 0) < 0.6) return false;
-    if (plan.bridges.some((b) => Math.hypot(b.x - p.x, b.z - p.z) < b.r)) return false;
+    if (plan.bridges.some((b) => dmath.hypot(b.x - p.x, b.z - p.z) < b.r)) return false;
     if (plan.fields.some((fd) => len[i] > fd.a0 - FIELDS.dam - 2 && len[i] < fd.a1 + FIELDS.dam + 2)) return false;
     // (it runs on into a lava flow crossing the path: drains into it)
     return plan.flows.every((f) => f.ring || f.field || distToPolyline(f.pts, p.x, p.z) > f.pts[0].w / 2 + 3);
@@ -1324,7 +1327,7 @@ function ridgeGutters(plan) {
 /** Cumulative length along a path's points. */
 function pathLengths(pts) {
   const len = [0];
-  for (let i = 1; i < pts.length; i++) len.push(len[i - 1] + Math.hypot(pts[i].x - pts[i - 1].x, pts[i].z - pts[i - 1].z));
+  for (let i = 1; i < pts.length; i++) len.push(len[i - 1] + dmath.hypot(pts[i].x - pts[i - 1].x, pts[i].z - pts[i - 1].z));
   return len;
 }
 
@@ -1332,7 +1335,7 @@ function pathLengths(pts) {
 function upSide(plan, pts, k) {
   const v = plan.volcano, n = pts.length;
   const a = pts[Math.max(0, k - 1)], b = pts[Math.min(n - 1, k + 1)], p = pts[k];
-  const tl = Math.hypot(b.x - a.x, b.z - a.z) || 1;
+  const tl = dmath.hypot(b.x - a.x, b.z - a.z) || 1;
   let nx = -(b.z - a.z) / tl, nz = (b.x - a.x) / tl;
   if (nx * (v.x - p.x) + nz * (v.z - p.z) < 0) { nx = -nx; nz = -nz; }
   return { nx, nz };
@@ -1359,7 +1362,7 @@ function lavaFields(plan, rng) {
   };
   const clear = (i) => {
     const p = pts[i];
-    return (p.ridge ?? 0) >= 0.99 && plan.bridges.every((b) => Math.hypot(b.x - p.x, b.z - p.z) > b.r + 22)
+    return (p.ridge ?? 0) >= 0.99 && plan.bridges.every((b) => dmath.hypot(b.x - p.x, b.z - p.z) > b.r + 22)
       && plan.flows.every((f) => f.ring || distToPolyline(f.pts, p.x, p.z) > f.pts[0].w / 2 + 18);
   };
   for (const t of FIELDS.at) {
@@ -1399,9 +1402,9 @@ function lavaFields(plan, rng) {
     // a basalt curb along its lower edge (shared/layout.js: a wall one cannot stand on)
     const curb = [];
     for (let a = a0 - 1; a <= a1 + 1; a += 2) {
-      const p = at(a), q = at(a + 2), l = Math.hypot(q.x - p.x, q.z - p.z) || 1;
+      const p = at(a), q = at(a + 2), l = dmath.hypot(q.x - p.x, q.z - p.z) || 1;
       const off = FIELDS.from - FIELDS.curb.w / 2 + 0.25;
-      curb.push({ x: (p.x + q.x) / 2 + p.nx * off, z: (p.z + q.z) / 2 + p.nz * off, len: l + 0.15, rot: Math.atan2(q.z - p.z, q.x - p.x), top: Math.max(p.y, q.y) - FIELDS.below + FIELDS.curb.h });
+      curb.push({ x: (p.x + q.x) / 2 + p.nx * off, z: (p.z + q.z) / 2 + p.nz * off, len: l + 0.15, rot: dmath.atan2(q.z - p.z, q.x - p.x), top: Math.max(p.y, q.y) - FIELDS.below + FIELDS.curb.h });
     }
     plan.fields.push({ a0, a1, line, curb, cx: c.x, cz: c.z, reach: FIELDS.length / 2 + FIELDS.dam + 14 });
     // the columns: from the walkway's edge at the bottom end to the one at the top
@@ -1442,7 +1445,7 @@ function columnRun(plan, rng, { at, a0, a1, from, to, surf, jump = FIELDS.jump }
         pm = at(am);
         sx = pm.x + pm.nx * prev.s;
         sz = pm.z + pm.nz * prev.s;
-        if ((fits = Math.hypot(sx - prev.x, sz - prev.z) - rr - prev.r >= jump[0])) break;
+        if ((fits = dmath.hypot(sx - prev.x, sz - prev.z) - rr - prev.r >= jump[0])) break;
       }
       if (!fits) break;                               // (then the jump to the ground has to do)
       const top = Math.max(surf(am) + FIELDS.above, Math.min(surf(am) + rng.range(FIELDS.above, 1.4), prev.top + FIELDS.rise));
@@ -1460,7 +1463,7 @@ function columnRun(plan, rng, { at, a0, a1, from, to, surf, jump = FIELDS.jump }
     // (measured where it stands: on the inside of a bend it comes closer)
     let p = at(a);
     for (let tries = 0; tries < 10; tries++) {
-      const real = Math.hypot(p.x + p.nx * s - prev.x, p.z + p.nz * s - prev.z) - r - prev.r;
+      const real = dmath.hypot(p.x + p.nx * s - prev.x, p.z + p.nz * s - prev.z) - r - prev.r;
       if (real >= jump[0]) break;
       a += jump[0] - real + 0.05;
       p = at(a);
@@ -1496,13 +1499,13 @@ const FIELDS = { at: [0.36, 0.72], length: 32, below: 0.6, from: -RIDGE.width / 
  */
 function fieldEffect(plan, x, z, h) {
   for (const fd of plan.fields) {
-    if (Math.hypot(x - fd.cx, z - fd.cz) > fd.reach) continue;
+    if (dmath.hypot(x - fd.cx, z - fd.cz) > fd.reach) continue;
     let best = Infinity, a = 0, s = 0, y = 0;
     for (let k = 0; k < fd.line.length - 1; k++) {
       const p = fd.line[k], q = fd.line[k + 1];
       const vx = q.x - p.x, vz = q.z - p.z;
       const u = clamp(((x - p.x) * vx + (z - p.z) * vz) / (vx * vx + vz * vz || 1), 0, 1);
-      const px = p.x + vx * u, pz = p.z + vz * u, d = Math.hypot(x - px, z - pz);
+      const px = p.x + vx * u, pz = p.z + vz * u, d = dmath.hypot(x - px, z - pz);
       if (d < best) { best = d; a = lerp(p.a, q.a, u); y = lerp(p.y, q.y, u); s = (x - px) * lerp(p.nx, q.nx, u) + (z - pz) * lerp(p.nz, q.nz, u); }
     }
     if (best > 12) continue;
@@ -1555,7 +1558,7 @@ function lavaBridges(plan) {
           const lava = lerp(a.y, b.y, hit.t), w = lerp(a.w, b.w, hit.t);
           const pathY = c.y != null ? lerp(c.y, d.y, hit.u) : naturalHeight(plan, x, z);
           const br = { x, z, r: w / 2 + 3.5, y: Math.max(pathY, lava + 0.9) };
-          const near = out.find((o) => Math.hypot(o.x - x, o.z - z) < o.r + br.r);
+          const near = out.find((o) => dmath.hypot(o.x - x, o.z - z) < o.r + br.r);
           if (near) { near.y = Math.max(near.y, br.y); continue; }
           out.push(br);
         }
@@ -1567,10 +1570,10 @@ function lavaBridges(plan) {
           const c = line[j], d = line[j + 1];
           const vx = d.x - c.x, vz = d.z - c.z;
           const u = clamp(((p.x - c.x) * vx + (p.z - c.z) * vz) / (vx * vx + vz * vz || 1), 0, 1);
-          const dd = Math.hypot(c.x + vx * u - p.x, c.z + vz * u - p.z);
+          const dd = dmath.hypot(c.x + vx * u - p.x, c.z + vz * u - p.z);
           if (dd < bd) { bd = dd; by = c.y != null ? lerp(c.y, d.y, u) : naturalHeight(plan, p.x, p.z); }
         }
-        if (bd > p.w / 2 + 4 || out.some((o) => Math.hypot(o.x - p.x, o.z - p.z) < o.r + 4)) continue;
+        if (bd > p.w / 2 + 4 || out.some((o) => dmath.hypot(o.x - p.x, o.z - p.z) < o.r + 4)) continue;
         out.push({ x: p.x, z: p.z, r: p.w / 2 + 3.5 + bd, y: Math.max(by, p.y + 0.9) });
       }
     }
@@ -1587,10 +1590,10 @@ function planFumaroles(plan, taken, rng, fnN) {
     if (!insideEllipse(plan, x, z, 0.82) || insideVolcanoCrater(plan, x, z, 8)) continue;
     const h = fnN(x, z);
     if (h < 1.5 || h > 34 || slopeOf(fnN, x, z, 2) > 0.6) continue;
-    if (Math.hypot(x - plan.hut.x, z - plan.hut.z) < 48 || Math.hypot(x - plan.boat.x, z - plan.boat.z) < 30) continue;
-    if (taken.some((t) => !t.hill && t.r < 60 && Math.hypot(t.x - x, t.z - z) < t.r + 4)) continue;
+    if (dmath.hypot(x - plan.hut.x, z - plan.hut.z) < 48 || dmath.hypot(x - plan.boat.x, z - plan.boat.z) < 30) continue;
+    if (taken.some((t) => !t.hill && t.r < 60 && dmath.hypot(t.x - x, t.z - z) < t.r + 4)) continue;
     if (flowDist(plan, x, z) < 12 || lines.some((l) => distToPolyline(l, x, z) < 7)) continue;
-    if (plan.fumaroles.some((f) => Math.hypot(f.x - x, f.z - z) < 26)) continue;
+    if (plan.fumaroles.some((f) => dmath.hypot(f.x - x, f.z - z) < 26)) continue;
     plan.fumaroles.push({ id: plan.fumaroles.length, x, z });
   }
 }
@@ -1608,7 +1611,7 @@ function planLavaCraters(plan, taken, rng, fnN) {
     let lo = Infinity, hi = -Infinity, sum = 0;
     for (let k = 0; k < 12; k++) {
       const a = (k / 12) * TAU;
-      const y = fnN(x + Math.cos(a) * rr, z + Math.sin(a) * rr);
+      const y = fnN(x + dmath.cos(a) * rr, z + dmath.sin(a) * rr);
       lo = Math.min(lo, y); hi = Math.max(hi, y); sum += y;
     }
     return { lo, hi, mean: sum / 12 };
@@ -1619,19 +1622,19 @@ function planLavaCraters(plan, taken, rng, fnN) {
   for (let i = 0; i < tries && made < n; i++) {
     // (anywhere between the volcano's crater and the beach)
     const ang = rng() * TAU, dist = Math.sqrt(rng.range(0.06, 0.64)) * A;
-    const x = Math.cos(ang) * dist, z = Math.sin(ang) * dist;
+    const x = dmath.cos(ang) * dist, z = dmath.sin(ang) * dist;
     const r = rng.range(r0, r1), R = r * 1.2 + 6;   // R: the outer foot of its rim
     if (!insideEllipse(plan, x, z, 0.8) || insideVolcanoCrater(plan, x, z, 12)) continue;
-    if (Math.hypot(x - plan.hut.x, z - plan.hut.z) < 50 || Math.hypot(x - plan.boat.x, z - plan.boat.z) < 35) continue;
-    if (taken.some((t) => !t.hill && t.r < 60 && Math.hypot(t.x - x, t.z - z) < t.r + R - 4)) continue;
+    if (dmath.hypot(x - plan.hut.x, z - plan.hut.z) < 50 || dmath.hypot(x - plan.boat.x, z - plan.boat.z) < 35) continue;
+    if (taken.some((t) => !t.hill && t.r < 60 && dmath.hypot(t.x - x, t.z - z) < t.r + R - 4)) continue;
     // (not on a hilltop: its summit pad levels the ground there afterwards; not
     // up against a basalt spire)
-    if (plan.hills.some((f) => Math.hypot(f.x - x, f.z - z) < (f.radius > 15 ? f.radius * 0.6 : f.radius + 4) + R)) continue;
+    if (plan.hills.some((f) => dmath.hypot(f.x - x, f.z - z) < (f.radius > 15 ? f.radius * 0.6 : f.radius + 4) + R)) continue;
     if (lines.some((l) => distToPolyline(l, x, z) < R + 3)) continue;
     if (flowDist(plan, x, z) < R + 7) continue;
-    if (plan.bridges.some((b) => Math.hypot(b.x - x, b.z - z) < b.r + R + 4)) continue;
-    if (plan.fumaroles.some((f) => Math.hypot(f.x - x, f.z - z) < R + 8)) continue;
-    if (plan.pools.some((p) => Math.hypot(p.x - x, p.z - z) < (p.bank ?? p.r * 2.6) + R + 3)) continue;
+    if (plan.bridges.some((b) => dmath.hypot(b.x - x, b.z - z) < b.r + R + 4)) continue;
+    if (plan.fumaroles.some((f) => dmath.hypot(f.x - x, f.z - z) < R + 8)) continue;
+    if (plan.pools.some((p) => dmath.hypot(p.x - x, p.z - z) < (p.bank ?? p.r * 2.6) + R + 3)) continue;
     // gentle ground: poolEffect raises the rim all round (a little bank on the
     // lower side), so the lava never hangs over a slope
     const inner = ringAt(x, z, r * 1.4);
@@ -1660,8 +1663,8 @@ function lavaGeysers(plan, rng) {
       const i = Math.round(n * t) + (o % 2 ? o : -o) / 2 | 0, p = pts[i];
       if (!p || (p.ridge ?? 0) < 0.99) continue;
       if (plan.fields.some((fd) => len[i] > fd.a0 - 20 && len[i] < fd.a1 + 20)) continue;
-      if (plan.bridges.some((b) => Math.hypot(b.x - p.x, b.z - p.z) < b.r + 15)) continue;
-      if (plan.geysers.some((g) => Math.hypot(g.x - p.x, g.z - p.z) < 25)) continue;
+      if (plan.bridges.some((b) => dmath.hypot(b.x - p.x, b.z - p.z) < b.r + 15)) continue;
+      if (plan.geysers.some((g) => dmath.hypot(g.x - p.x, g.z - p.z) < 25)) continue;
       add(p.x, p.z, p.y);
       break;
     }
@@ -1673,7 +1676,7 @@ function lavaGeysers(plan, rng) {
       if (q.a < fd.a0 + 4 || q.a > fd.a1 - 4) continue;
       for (let o = FIELDS.from + 1.5; o < FIELDS.to - 1.5; o += 0.5) {
         const x = q.x + q.nx * o, z = q.z + q.nz * o;
-        const room = Math.min(...plan.steps.map((st) => Math.hypot(st.x - x, st.z - z) - st.r));
+        const room = Math.min(...plan.steps.map((st) => dmath.hypot(st.x - x, st.z - z) - st.r));
         if (!best || room > best.room) best = { x, z, y: q.y - FIELDS.below, room };
       }
     }
@@ -1695,21 +1698,21 @@ function lavaTreasure(plan, rng) {
   const lines = [plan.trail, ...plan.ramps.map((r) => r.pts)];
   // toward the nearest path
   let best = null;
-  for (const l of lines) for (const p of l) { const d = Math.hypot(p.x - lake.x, p.z - lake.z); if (!best || d < best.d) best = { d, p }; }
+  for (const l of lines) for (const p of l) { const d = dmath.hypot(p.x - lake.x, p.z - lake.z); if (!best || d < best.d) best = { d, p }; }
   // the islet in the lake's middle (well clear of its shore: lava all round it); the row:
   // in from the shore nearest the path, round the middle in an arc, then in onto the islet
-  const th0 = Math.atan2(best.p.z - lake.z, best.p.x - lake.x), turn = rng() < 0.5 ? 1 : -1;
+  const th0 = dmath.atan2(best.p.z - lake.z, best.p.x - lake.x), turn = rng() < 0.5 ? 1 : -1;
   const rho = lake.r * 0.45, r0 = lake.r * 0.72, seg = r0 - rho, sweep = TREASURE.sweep;
   const islet = { x: lake.x, z: lake.z, r: TREASURE.islet, top: lake.level + 0.9 };
   lake.islet = islet;
   plan.treasure = { x: islet.x, z: islet.z, y: islet.top };
-  const radial = (th, r) => ({ x: lake.x + Math.cos(th) * r, z: lake.z + Math.sin(th) * r, y: lake.level + 1.4, nx: -Math.sin(th), nz: Math.cos(th) });
+  const radial = (th, r) => ({ x: lake.x + dmath.cos(th) * r, z: lake.z + dmath.sin(th) * r, y: lake.level + 1.4, nx: -dmath.sin(th), nz: dmath.cos(th) });
   const arc = seg + rho * sweep, th1 = th0 + turn * sweep;
   const at = (a) => {
     if (a < seg) return radial(th0, r0 - a);
     if (a < arc) {
       const th = th0 + turn * (a - seg) / rho;
-      return { x: lake.x + Math.cos(th) * rho, z: lake.z + Math.sin(th) * rho, y: lake.level + 1.4, nx: Math.cos(th), nz: Math.sin(th) };
+      return { x: lake.x + dmath.cos(th) * rho, z: lake.z + dmath.sin(th) * rho, y: lake.level + 1.4, nx: dmath.cos(th), nz: dmath.sin(th) };
     }
     return radial(th1, rho - (a - arc));
   };
@@ -1720,7 +1723,7 @@ function lavaTreasure(plan, rng) {
 /** The lava lake treasure: the islet's radius, the jumps out to it (edge to edge, m), how far round the lake the row bends (rad). */
 const TREASURE = { islet: 1.8, jump: [1, 1.7], sweep: 3.4 };
 
-const insideVolcanoCrater = (plan, x, z, pad) => !!plan.volcano && Math.hypot(x - plan.volcano.x, z - plan.volcano.z) < plan.volcano.craterR + pad;
+const insideVolcanoCrater = (plan, x, z, pad) => !!plan.volcano && dmath.hypot(x - plan.volcano.x, z - plan.volcano.z) < plan.volcano.craterR + pad;
 
 /**
  * Side paths (swamp): from the nearest trail point out to the sites, base plots
@@ -1734,11 +1737,11 @@ function planSwampPaths(plan, taken) {
   if (plan.sites.peak) targets.push({ x: plan.sites.peak.x, z: plan.sites.peak.z, stop: 2 });
   for (const p of plan.basePlots) targets.push({ x: p.x, z: p.z, stop: p.r - 2 });
   // never through the arena (only up to its gate) or the creek's spring pool
-  const blocked = (p) => (sa && Math.hypot(p.x - sa.x, p.z - sa.z) < sa.r + 2)
-    || plan.pools.some((q) => q.kind === 'water' && Math.hypot(p.x - q.x, p.z - q.z) < q.r * 1.5 + 2);
+  const blocked = (p) => (sa && dmath.hypot(p.x - sa.x, p.z - sa.z) < sa.r + 2)
+    || plan.pools.some((q) => q.kind === 'water' && dmath.hypot(p.x - q.x, p.z - q.z) < q.r * 1.5 + 2);
   for (const t of targets) {
     // from the nearest trail point whose way out is clear
-    const starts = plan.trail.map((p) => ({ p, d: Math.hypot(p.x - t.x, p.z - t.z) })).sort((a, b) => a.d - b.d);
+    const starts = plan.trail.map((p) => ({ p, d: dmath.hypot(p.x - t.x, p.z - t.z) })).sort((a, b) => a.d - b.d);
     if (!starts.length || starts[0].d < t.stop + 6) continue;
     for (const { p: best, d: bd } of starts.slice(0, 24)) {
       const len = bd - t.stop;
@@ -1747,7 +1750,7 @@ function planSwampPaths(plan, taken) {
       const pts = [];
       for (let i = 0; i <= n; i++) {
         const u = i / n;
-        const wob = i > 0 && i < n ? valueNoise(best.x * 0.1 + u * 3, best.z * 0.1, plan.seed + 97) * Math.min(5, len * 0.12) * Math.sin(Math.PI * u) : 0;
+        const wob = i > 0 && i < n ? valueNoise(best.x * 0.1 + u * 3, best.z * 0.1, plan.seed + 97) * Math.min(5, len * 0.12) * dmath.sin(Math.PI * u) : 0;
         pts.push({ x: best.x + dx * len * u - dz * wob, z: best.z + dz * len * u + dx * wob });
       }
       if (pts.some(blocked)) continue;
@@ -1782,14 +1785,14 @@ function planBogs(plan, taken, rng, fnN) {
     let lo = Infinity;
     for (let k = 0; k < 14; k++) {
       const a = (k / 14) * TAU;
-      lo = Math.min(lo, fnN(x + Math.cos(a) * r, z + Math.sin(a) * r));
+      lo = Math.min(lo, fnN(x + dmath.cos(a) * r, z + dmath.sin(a) * r));
     }
     return lo;
   };
   if (sa) {
     // below the median of the ground round the ring (its coast side may dip toward the beach)
     const ring = [];
-    for (let k = 0; k < 16; k++) ring.push(fnN(sa.x + Math.cos((k / 16) * TAU) * (sa.r + 4), sa.z + Math.sin((k / 16) * TAU) * (sa.r + 4)));
+    for (let k = 0; k < 16; k++) ring.push(fnN(sa.x + dmath.cos((k / 16) * TAU) * (sa.r + 4), sa.z + dmath.sin((k / 16) * TAU) * (sa.r + 4)));
     ring.sort((a, b) => a - b);
     const level = Math.max(0.9, ring[8] - SWAMP_ARENA.sink);
     const r = sa.r - 3;
@@ -1803,15 +1806,15 @@ function planBogs(plan, taken, rng, fnN) {
     const r = i < 3000 ? rng.range(22, 38) : rng.range(9, 22);   // big lagoons first (the crocodiles' home), then smaller bogs between
     const reach = r * 1.15 * 1.3;
     // the whole shoreline (up to ~1.4 r out) clear of the hut, boat, sites and plots; meadows may get wet edges
-    if (taken.some((t) => !t.hill && Math.hypot(t.x - x, t.z - z) < (t.meadow ? t.r * 0.5 + r : t.r * 0.85 + r * 1.3))) continue;
+    if (taken.some((t) => !t.hill && dmath.hypot(t.x - x, t.z - z) < (t.meadow ? t.r * 0.5 + r : t.r * 0.85 + r * 1.3))) continue;
     // a bog either joins the field it overlaps (deep enough into it) or keeps clear of all others
-    const near = plan.bogs.filter((b) => Math.hypot(b.x - x, b.z - z) < (b.r + r) * 1.35 + 2);
-    if (near.some((b) => b.arena || Math.hypot(b.x - x, b.z - z) > (b.r + r) * 1.15)) continue;
+    const near = plan.bogs.filter((b) => dmath.hypot(b.x - x, b.z - z) < (b.r + r) * 1.35 + 2);
+    if (near.some((b) => b.arena || dmath.hypot(b.x - x, b.z - z) > (b.r + r) * 1.15)) continue;
     const field = new Set(near.map((b) => b.field));
     if (field.size > 1 || (near.length && plan.bogs.filter((b) => b.field === near[0].field).length >= 14)) continue;
-    if (plan.sites.peak && Math.hypot(plan.sites.peak.x - x, plan.sites.peak.z - z) < r * 1.3 + 14) continue;
+    if (plan.sites.peak && dmath.hypot(plan.sites.peak.x - x, plan.sites.peak.z - z) < r * 1.3 + 14) continue;
     if (flowDist(plan, x, z) < reach + 6) continue;
-    if (plan.pools.some((p) => Math.hypot(p.x - x, p.z - z) < p.r * 2.6 + reach)) continue;
+    if (plan.pools.some((p) => dmath.hypot(p.x - x, p.z - z) < p.r * 2.6 + reach)) continue;
     const h = fnN(x, z);
     if (h < 0.9 || h > 4.5) continue;
     // the water stands a little below the lowest point of the shore
@@ -1830,7 +1833,7 @@ function planBogs(plan, taken, rng, fnN) {
 export function poolAt(plan, x, z, kind) {
   for (const p of plan.pools) {
     if (p.kind !== kind) continue;
-    if (Math.hypot(x - p.x, z - p.z) < (p.reach ?? p.r * 1.35)) return p;
+    if (dmath.hypot(x - p.x, z - p.z) < (p.reach ?? p.r * 1.35)) return p;
   }
   return null;
 }

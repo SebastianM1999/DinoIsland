@@ -14,6 +14,7 @@
 // The mesh ends open at the region's edge (the terrain draws on beyond it, under water), everywhere else it is closed.
 
 import { volumeLatticeSteps, VOXEL } from '../../shared/caveVolume.js';
+import * as dmath from '../../shared/dmath.js';
 
 export { VOXEL };
 /** cells per chunk side (x and z): 26 * 1.25 = 32.5 m */
@@ -98,7 +99,7 @@ export function* meshCaveVolumeSteps(plan, { half, voxel = VOXEL, chunk = CHUNK 
         const gx = bl(cv[1] - cv[0], cv[3] - cv[2], cv[5] - cv[4], cv[7] - cv[6], fy, fz);
         const gy = bl(cv[2] - cv[0], cv[3] - cv[1], cv[6] - cv[4], cv[7] - cv[5], fx, fz);
         const gz = bl(cv[4] - cv[0], cv[5] - cv[1], cv[6] - cv[2], cv[7] - cv[3], fx, fy);
-        const gl = Math.hypot(gx, gy, gz) || 1;
+        const gl = dmath.hypot(gx, gy, gz) || 1;
         cell[cid(a, j, b)] = pos.length / 3;
         pos.push(X(a) + fx * V, Y0 + (j + fy) * V, Z(b) + fz * V);
         nor.push(gx / gl, gy / gl, gz / gl);
