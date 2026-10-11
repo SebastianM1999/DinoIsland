@@ -87,3 +87,34 @@ Remaining runtime checks: the user's Chrome/profile/display, complete combat
 routes, cave FPS, real Steam/Electron packaging, and repeated expedition changes.
 No consistent 120 FPS acceptance claim is made. The user's shared checkout at
 localhost:8080 has not been changed by this isolated branch.
+
+## Follow-up: reported drops to 30 FPS
+
+The selected client world does not construct cave geometry on Jungle, and the
+menu renderer's diagnostics show zero retained islands after solo launch.
+However, `src/sim/worker.js` still prefetches the entire 8,888,900-byte cave bake
+on every solo start, inflating just its walk section. This background prefetch
+was missed in the first review; it is startup work, not evidence that cave
+geometry renders continuously on Jungle. Loading all dinosaur catalog GLBs is
+another cross-island preload.
+
+At normal Jungle landing spawn, frame counters recorded approximately 754 draw
+calls and 5.48 million triangles across render passes at Medium, DPR 1. That
+is substantially heavier than the benchmark's herbivore-observation camera.
+The automatic graphics budget is 11 ms GPU time and 22 ms frame time, targeting
+roughly 60 FPS; it does not enforce the requested 120 FPS reference target.
+Its completed-calibration watchdog requires consecutive slow frames, so
+intermittent spikes can escape recovery.
+
+The pause overlay keeps world simulation/rendering active and rebuilds its DOM
+lists once per second. Its final CSS disables backdrop blur and it does not use
+the brush SVG filter. Hidden HUD/minimap updates continue, which is avoidable
+work, but no measured evidence yet attributes sustained 30 FPS to the pause
+menu. Settings still uses backdrop blur and brush filtering.
+
+A controlled menu/render comparison was stopped after another Claude-controlled
+Playwright game benchmark was detected running concurrently. Its timing results
+are excluded. Multiple game instances compete for the same GPU and can affect
+both lab measurements and the user's live game. Future attribution runs must
+have exclusive hardware access; source findings and scene counters alone do
+not establish the precise cause of the user's frame drops.
