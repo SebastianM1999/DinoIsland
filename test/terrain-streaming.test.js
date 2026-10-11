@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { TerrainChunks, splitTerrainGeometry } from '../src/client/world/terrainChunks.js';
 import { disposeIslandScenes } from '../src/client/core/resources.js';
-import { runBuildSteps } from '../src/client/core/buildSteps.js';
+import { runBuildSteps, warmSceneBatches } from '../src/client/core/buildSteps.js';
 
 function grid(n = 4) {
   const geo = new THREE.BufferGeometry();
@@ -107,4 +107,42 @@ test('cancelling staged construction closes the builder and prevents later world
   function* build() { try { events.push('first'); yield; events.push('obsolete'); } finally { events.push('released'); } }
   await assert.rejects(runBuildSteps(build(), { signal: controller.signal, budgetMs: 0, pause: async () => controller.abort() }), { name: 'AbortError' });
   assert.deepEqual(events, ['first', 'released']);
+});
+
+test('warm-up batches upload hidden meshes while preserving lights and restoring visibility after failure', async () => {
+  const scene = new THREE.Scene(), hidden = new THREE.Group(); hidden.visible = false; scene.add(hidden);
+  const light = new THREE.DirectionalLight(); scene.add(light);
+  const geometry = new THREE.BoxGeometry(), material = new THREE.MeshBasicMaterial();
+  const meshes = Array.from({ length: 5 }, () => new THREE.Mesh(geometry, material));
+  hidden.add(...meshes); meshes[0].visible = false;
+  const draws = [], seen = new Set();
+  await warmSceneBatches([scene], () => {
+    const shown = meshes.filter(mesh => mesh.visible);
+    draws.push(shown.length); shown.forEach(mesh => seen.add(mesh));
+    assert.equal(light.visible, true);
+    assert.equal(hidden.visible, true);
+  }, { batchSize: 2, pause: async () => {} });
+  assert.deepEqual(draws, [2, 2, 1]);
+  assert.equal(seen.size, 5);
+  assert.equal(hidden.visible, false);
+  assert.equal(meshes[0].visible, false);
+  assert(meshes.every(mesh => mesh.frustumCulled));
+  await assert.rejects(warmSceneBatches([scene], () => { throw new Error('GPU failure'); }, { batchSize: 2 }), /GPU failure/);
+  assert.equal(hidden.visible, false);
+  assert.equal(meshes[0].visible, false);
+  assert.equal(light.visible, true);
+  geometry.dispose(); material.dispose();
+});
+
+test('warm-up reaches accessory meshes nested beneath a mesh from an earlier batch', async () => {
+  const scene = new THREE.Scene();
+  const geometry = new THREE.BoxGeometry(), material = new THREE.MeshBasicMaterial();
+  const parent = new THREE.Mesh(geometry, material), child = new THREE.Mesh(geometry, material);
+  parent.visible = child.visible = false;
+  scene.add(parent); parent.add(child);
+  const seen = new Set();
+  await warmSceneBatches([scene], () => scene.traverseVisible(object => { if (object.isMesh) seen.add(object); }), { batchSize: 1, pause: async () => {} });
+  assert(seen.has(parent) && seen.has(child), 'both buffers actually reach the renderer');
+  assert.equal(parent.visible, false); assert.equal(child.visible, false);
+  geometry.dispose(); material.dispose();
 });

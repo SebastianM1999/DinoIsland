@@ -9,6 +9,7 @@ import { WorldPost, usesPost } from './worldPost.js';
 import { requestPrograms } from './programs.js';
 import { LightPool } from './lightPool.js';
 import { TIERS, GraphicsAutoTune, gpuName } from './graphicsTier.js';
+import { warmSceneBatches } from './buildSteps.js';
 
 const R = CONFIG.render;
 const _tmpColor = new THREE.Color();
@@ -318,27 +319,19 @@ export class Renderer {
       if (post) await this.post.compile(this.camera);
     } finally { r.setRenderTarget(null); }
     this.compiledPaths.add(!!post);
-    this.#warmRender();
+    await this.#warmRender();
     this.prepared = true;
   }
 
   /**
-   * One real frame with culling off: shadow-depth programs, texture uploads and
-   * every geometry buffer are created now instead of when it first comes into view.
+   * Hidden frames with culling off: bound geometry uploads per draw and yield
+   * between batches so the loading screen continues to respond.
    */
-  #warmRender() {
+  async #warmRender() {
     // Also shows what is hidden at this moment (LOD levels, effects that only appear
     // later): shadow-depth programs exist per drawn object and are not part of
     // compile(). Lights stay as they are: their count is part of every program.
-    const culled = [], hidden = [];
-    for (const sc of [this.scene, this.viewScene]) sc.traverse((o) => {
-      if (o.frustumCulled) { o.frustumCulled = false; culled.push(o); }
-      if (!o.visible && !o.isLight) { o.visible = true; hidden.push(o); }
-    });
-    try { this.render(0); } finally {
-      for (const o of culled) o.frustumCulled = true;
-      for (const o of hidden) o.visible = false;
-    }
+    await warmSceneBatches([this.scene, this.viewScene], () => this.render(0));
     this.metrics.cpuRenderMs = 0;
   }
 

@@ -38,7 +38,8 @@ node scripts/performance/browser.mjs --channel=chrome --headed --output=output/p
 
 The default target is **120 FPS, Medium, 1920 × 1080, device pixel ratio 1**.
 Medium means the game's actual internal `TIERS[1]`: shadows enabled, 1024 shadow
-map, 0.65 grass density, vegetation LOD distance 80. The benchmark freezes that
+map, 0.65 grass density, vegetation LOD distance 80, DPR cap 1, two world-target
+MSAA samples and no tree-foliage shadow casters (other shadows remain enabled). The benchmark freezes that
 tier instead of permitting auto-tuning to reduce quality during a slow run.
 Production auto-tuning is unchanged. Render scale/contact shading use fresh
 context defaults (100%/30%), and their applied values are recorded.
@@ -83,6 +84,24 @@ they cannot establish 120 FPS performance on players' hardware. The report
 labels headless mode, requested software mode and detected renderer string.
 
 ## Interpreting the target and optional gates
+
+The actual menu-to-solo landing spawn has a separate opt-in hardware scenario:
+
+```powershell
+node scripts/performance/startup.mjs --channel=chrome --runs=3 --seconds=30 --output=output/performance/startup.json
+```
+
+It opens the real entry document in fresh 1920×1080/DPR-1 contexts, measures
+selected-photo/menu readiness and solo launch, then samples the real first-island
+landing camera using Worker hosting and live dinosaurs. Run one starts while the
+live tour is pending to exercise cancellation; later runs wait for that tour.
+The menu must retain one island and request no other islands' photographs/cave
+bake. The report records asset errors, long tasks, frame/GPU/render CPU percentiles,
+draw calls and triangles. Medium is frozen during gameplay. The stationary landing
+route has one player; it complements the four-player observation workload. Headless
+pointer-lock status is recorded. No combat, co-op or cave FPS claim follows from it.
+Declare changed quality presets when comparing old and new Medium and avoid
+concurrent tests/coverage while measuring.
 
 120 FPS allows **8.333 ms per frame**. For a calibrated hardware run, the strict target gate is p95 ≤ 8.333 ms and p99 ≤ 16.667 ms:
 

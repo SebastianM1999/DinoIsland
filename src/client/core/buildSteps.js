@@ -23,3 +23,34 @@ export async function runBuildSteps(steps, { signal, budgetMs = 4, now = () => p
     throw error;
   }
 }
+
+/** Upload a bounded set of meshes per hidden draw, keeping the light set fixed. */
+export async function warmSceneBatches(scenes, draw, { batchSize = 64, pause = nextBuildTask, signal } = {}) {
+  const saved = [], meshes = [];
+  for (const scene of scenes) scene.traverse(object => {
+    if (object.isLight) return;
+    saved.push({ object, visible: object.visible, culled: object.frustumCulled });
+    object.visible = !object.isMesh;
+    if (object.isMesh) { object.frustumCulled = false; meshes.push(object); }
+  });
+  try {
+    for (let start = 0; start < meshes.length; start += batchSize) {
+      checkBuildSignal(signal);
+      const end = Math.min(meshes.length, start + batchSize);
+      const shown = new Set();
+      for (let i = start; i < end; i++) {
+        // Meshes can own other meshes (weapons and creature accessories).
+        // Three skips descendants of an invisible parent, so warm their small
+        // ancestor chain too even when that parent was in an earlier batch.
+        for (let object = meshes[i]; object; object = object.parent) if (object.isMesh) {
+          object.visible = true; shown.add(object);
+        }
+      }
+      try { draw(); } finally { for (const object of shown) object.visible = false; }
+      await pause();
+    }
+    checkBuildSignal(signal);
+  } finally {
+    for (const { object, visible, culled } of saved) { object.visible = visible; object.frustumCulled = culled; }
+  }
+}
