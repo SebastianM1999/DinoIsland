@@ -18,9 +18,9 @@ import { caveFloorBase } from '../../shared/caveField.js';
 import { withSurfaceDetail, setSurfaceBiome, CAVE_GLOW } from './surfaceDetail.js';
 import { buildGlowField } from './caveStyle.js';
 import { buildSkyField, withCaveSky, CAVE_SKY } from './caveSky.js';
-import { meshCaveVolume } from './caveVolumeMesh.js';
+import { meshCaveVolumeSteps } from './caveVolumeMesh.js';
 import { caveRock, releaseVolumeLattice, volumeLattice } from '../../shared/caveVolume.js';
-import { bakeCaveLight, sourceProbe } from './caveLight.js';
+import { bakeCaveLightSteps, sourceProbe } from './caveLight.js';
 import { caveBakeFor, meshKey, decodeMesh } from '../../shared/caveBake.js';
 
 /** Bump when the vertex paint below changes in a way the probe (paintProbe) cannot see; the probe catches most. */
@@ -31,6 +31,14 @@ const C = (hex) => new THREE.Color(hex);
 const WET_MAX = 8;
 
 export function buildCaveTerrainMesh(terrain, layout) {
+  const steps = buildCaveTerrainMeshSteps(terrain, layout);
+  let step;
+  while (!(step = steps.next()).done);
+  return step.value;
+}
+
+/** The same mesh, yielding between rows and chunks (the client's loading steps); returns the terrain mesh. */
+export function* buildCaveTerrainMeshSteps(terrain, layout) {
   const n = terrain.n, cell = terrain.cell, half = terrain.half, stride = n + 1;
   const plan = layout.plan, S = plan.seed;
   const depthAt = plan.cave.depthAt;
@@ -195,12 +203,16 @@ export function buildCaveTerrainMesh(terrain, layout) {
       const dz = (terrain.h(i, j + 1) - terrain.h(i, j - 1)) / (2 * cell);
       fillVertex(T, j * stride + i, x, terrain.h(i, j), z, Math.hypot(dx, dz));
     }
+    yield;
   }
 
   // the volume draws everything in its region (a ring of ~6 m of it lies under the terrain's own cells beside it)
   const inside = caveRock(plan).region(0);
   const covered = new Uint8Array(stride * stride);
-  for (let j = 0; j <= n; j++) for (let i = 0; i <= n; i++) covered[j * stride + i] = inside(-half + i * cell, -half + j * cell) ? 1 : 0;
+  for (let j = 0; j <= n; j++) {
+    for (let i = 0; i <= n; i++) covered[j * stride + i] = inside(-half + i * cell, -half + j * cell) ? 1 : 0;
+    if (j % 16 === 15) yield;
+  }
   const idx = [];
   for (let j = 0; j < n; j++) {
     for (let i = 0; i < n; i++) {
@@ -240,7 +252,7 @@ export function buildCaveTerrainMesh(terrain, layout) {
     chunks = decodeMesh(baked.mesh);
     volumeStats = { ...baked.header.stats, baked: true };
   } else {
-    chunks = paintLive();
+    chunks = yield* paintLive();
   }
   mesh.userData.volumeStats = volumeStats;
   mesh.userData.bakeKey = key;
@@ -266,17 +278,18 @@ export function buildCaveTerrainMesh(terrain, layout) {
   mesh.add(group);
 
   // the live path: mesh the volume and paint every vertex from its position and normal (a roof faces down: wet dark stone)
-  function paintLive() {
-    const vol = meshCaveVolume(plan, { half });
+  function* paintLive() {
+    const vol = yield* meshCaveVolumeSteps(plan, { half });
     volumeStats = vol.stats;
     // the light of every vertex from the same SDF (before the lattice is let go)
-    volumeStats.light = bakeCaveLight(volumeLattice(plan, half), vol.chunks, { sources: glow.sources, visAt: sky.visAt, waterAt: (x, z) => terrain.waterLevelAt(x, z) });
+    volumeStats.light = yield* bakeCaveLightSteps(volumeLattice(plan, half), vol.chunks, { sources: glow.sources, visAt: sky.visAt, waterAt: (x, z) => terrain.waterLevelAt(x, z) });
     releaseVolumeLattice(plan);   // (the mesh is cut, the walk grid built: the ~25 MB of samples can go)
     const out = [];
     for (const ch of vol.chunks) {
     const m = ch.pos.length / 3;
     const A = { pos: new Float32Array(m * 3), col: new Float32Array(m * 3), sf: new Float32Array(m * 4), sf2: new Float32Array(m * 2) };
     for (let v = 0; v < m; v++) {
+      if ((v & 1023) === 1023) yield;
       const x = ch.pos[v * 3], y = ch.pos[v * 3 + 1], z = ch.pos[v * 3 + 2], ny = ch.nor[v * 3 + 1];
       // (the heightfield's slope: rise over run, capped; downward faces count as walls)
       const slope = Math.min(2.5, Math.hypot(ch.nor[v * 3], ch.nor[v * 3 + 2]) / Math.max(Math.abs(ny), 0.04));

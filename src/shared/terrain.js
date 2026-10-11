@@ -7,7 +7,7 @@ import { CONFIG } from './config.js';
 import { WORLD, HUT_GROUND, planIsland, islandHeight, riverQuery, poolAt, bogSample, bridgeAt } from './island.js';
 import { smoothstep } from './rng.js';
 import { caveCeiling, CAVE_SKY } from './caveField.js';
-import { buildCaveWalk } from './caveWalk.js';
+import { buildCaveWalkSteps } from './caveWalk.js';
 import { caveBakeFor, decodeWalk } from './caveBake.js';
 
 /**
@@ -66,7 +66,7 @@ export class Terrain {
     if (plan.cave) {
       // (a baked fixed map brings the very same grid, see caveBake.js; any other island builds it from the volume)
       const baked = caveBakeFor(plan, 'walk');
-      this.walk = baked ? decodeWalk(baked.walk) : buildCaveWalk(plan, { half: this.half, coarseHeight: (x, z) => this.#coarseHeight(x, z), coarseCeiling: (x, z) => this.#coarseCeiling(x, z) });
+      this.walk = baked ? decodeWalk(baked.walk) : yield* buildCaveWalkSteps(plan, { half: this.half, coarseHeight: (x, z) => this.#coarseHeight(x, z), coarseCeiling: (x, z) => this.#coarseCeiling(x, z) });
       // (the coarse grid follows it where it is covered: flood fills, the water shader and the sea floor mesh read it)
       const W = this.walk;
       for (let j = 0; j <= segments; j++) {

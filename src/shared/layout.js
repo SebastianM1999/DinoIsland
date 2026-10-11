@@ -824,6 +824,7 @@ export function* buildLayoutSteps(terrain) {
         if (t.kind === 'falseExit') continue;
         let run = WALL_TORCH.spacing * (0.3 + 0.5 * wr());   // (the first one comes early in every tunnel)
         for (let i = 1; i < t.pts.length; i++) {
+          yield;   // (a wall search is a few hundred field samples: let the client paint between points)
           const a = t.pts[i - 1], b = t.pts[i];
           const seg = Math.hypot(b.x - a.x, b.z - a.z);
           run -= seg;

@@ -28,7 +28,7 @@ import { setSurfaceQuality } from '../world/surfaceDetail.js';
 import { buildFruitPlants } from '../world/fruitPlants.js';
 import { buildResourceNodes } from '../world/resourceNodes.js';
 import { buildBowCamp } from '../world/bowCamp.js';
-import { buildHut } from '../world/hut.js';
+import { buildHutSteps } from '../world/hut.js';
 import { buildBaseView } from '../world/base.js';
 import { BasePanel } from '../ui/basePanel.js';
 import { campStations, safeZone, applyBaseColliders, hasBasePlots, freshBase } from '../../shared/base.js';
@@ -178,7 +178,7 @@ export class Game {
     this.woodSupports = woodSupports(this.layout);
     this.stepCadence = new StepCadence();
     this.hud = new Hud(document.getElementById('hud'));
-    this.hud.initMinimap(this.terrain, this.layout);
+    yield* this.hud.initMinimapSteps(this.terrain, this.layout);
     this.hud.setXp(this.profile);
     try { this.hud.trackedContract = localStorage.getItem(storageKey('tracked')) || null; } catch { /* storage blocked */ }
     this.hud.onTrackContract = (id) => {
@@ -254,7 +254,8 @@ export class Game {
     // update(dt, renderTime), minimapMarkers(out), compassMarkers(bearing, out).
     this.dinos = new DinoViews(this);
     this.tracks = new Tracks(this);
-    this.items = new Items(this);
+    this.items = new Items(this, { deferWarmUp: true });
+    yield* this.items.warmUpSteps();
     this.projectiles = new Projectiles(this);
     this.actions = new PlayerActions(this);
     this.relics = new Relics(this);
@@ -355,7 +356,7 @@ export class Game {
     scene.add(this.bowCamp.group);
     yield;
     // islands with building plots start at a small landing camp; the team builds its own base
-    this.hut = buildHut(this.terrain, this.layout, { landing: hasBasePlots(this.layout) });
+    this.hut = yield* buildHutSteps(this.terrain, this.layout, { landing: hasBasePlots(this.layout) });
     scene.add(this.hut.group);
     yield;
     this.baseView = buildBaseView(this.terrain, this.layout);

@@ -13,7 +13,7 @@
 // normals are the field gradient (trilinear, from the same eight samples: continuous across chunk borders).
 // The mesh ends open at the region's edge (the terrain draws on beyond it, under water), everywhere else it is closed.
 
-import { volumeLattice, VOXEL } from '../../shared/caveVolume.js';
+import { volumeLatticeSteps, VOXEL } from '../../shared/caveVolume.js';
 
 export { VOXEL };
 /** cells per chunk side (x and z): 26 * 1.25 = 32.5 m */
@@ -24,10 +24,18 @@ export const CHUNK = 26;
  * @param {{half:number, voxel?:number, chunk?:number}} opts `half`: the terrain's half extent (search range)
  * @returns {{chunks:{pos:Float32Array, nor:Float32Array, idx:Uint32Array, ci:number, ck:number}[], voxel:number, stats:object, region:Function, rock:object}}
  */
-export function meshCaveVolume(plan, { half, voxel = VOXEL, chunk = CHUNK }) {
+export function meshCaveVolume(plan, options) {
+  const steps = meshCaveVolumeSteps(plan, options);
+  let step;
+  while (!(step = steps.next()).done);
+  return step.value;
+}
+
+/** The same mesh, yielding after the lattice rows and every chunk so a client can paint between them. */
+export function* meshCaveVolumeSteps(plan, { half, voxel = VOXEL, chunk = CHUNK }) {
   const t0 = performance.now();
   // --- 1. the columns (shared with the sim's walk grid: shared/caveVolume.js volumeLattice)
-  const lat = volumeLattice(plan, half, voxel);
+  const lat = yield* volumeLatticeSteps(plan, half, voxel);
   const { rock, V, x0, z0, NI, NK, avail } = lat;
   const inRegion = lat.region;
   const X = (i) => x0 + i * V, Z = (k) => z0 + k * V;
@@ -44,6 +52,7 @@ export function meshCaveVolume(plan, { half, voxel = VOXEL, chunk = CHUNK }) {
   let tris = 0, verts = 0;
   const nci = Math.ceil((NI - 1) / chunk), nck = Math.ceil((NK - 1) / chunk);
   for (let ck = 0; ck < nck; ck++) for (let ci = 0; ci < nci; ci++) {
+    yield;
     const i0 = ci * chunk, i1 = Math.min(NI - 1, i0 + chunk), k0 = ck * chunk, k1 = Math.min(NK - 1, k0 + chunk);
     // cells (a, b) with a in [i0 - 1, i1), b in [k0 - 1, k1): the layer before the chunk is recomputed
     const ai0 = Math.max(0, i0 - 1), bk0 = Math.max(0, k0 - 1);

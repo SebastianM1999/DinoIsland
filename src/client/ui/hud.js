@@ -8,7 +8,7 @@
 import { EQUIP } from '../../shared/protocol.js';
 import { CONFIG } from '../../shared/config.js';
 import { icon, portraitSvg } from './icons.js';
-import { buildMapBase, drawMap } from './minimap.js';
+import { buildMapBase, buildMapBaseSteps, drawMap } from './minimap.js';
 import { revealMap } from './caveMap.js';
 import { ITEM_INFO } from './itemInfo.js';
 import { CONTRACTS as BOARD_CONTRACTS } from '../../shared/missions.js';
@@ -412,6 +412,13 @@ export class Hud {
   /** Draw the minimap base once. */
   initMinimap(terrain, layout) {
     this._mapBase = buildMapBase(terrain, layout);
+    this._drawMinimap();
+    if (this._mapOpen) this._drawBigMap();
+  }
+
+  /** The same, painted in steps (the game's loading sequence: yields between bands of rows). */
+  *initMinimapSteps(terrain, layout) {
+    this._mapBase = yield* buildMapBaseSteps(terrain, layout);
     this._drawMinimap();
     if (this._mapOpen) this._drawBigMap();
   }

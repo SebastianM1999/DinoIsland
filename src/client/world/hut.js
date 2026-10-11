@@ -18,7 +18,15 @@ const ANIM_RANGE = 220; // skip animation when the camera is farther than this
  * supply bench, flag and a cold fire pit; no cabin, wardrobe or mission board.
  * @returns {{ group: THREE.Group, update(dt:number, time:number, camPos?:THREE.Vector3):void, setArrowStock(n:number):void, arrowSlots:number }}
  */
-export function buildHut(terrain, layout, { landing = false } = {}) {
+export function buildHut(terrain, layout, options) {
+  const steps = buildHutSteps(terrain, layout, options);
+  let step;
+  while (!(step = steps.next()).done);
+  return step.value;
+}
+
+/** The same camp, yielding between its heavy parts (cabin, props, ground, merged meshes) for the client's loading steps. */
+export function* buildHutSteps(terrain, layout, { landing = false } = {}) {
   const hut = layout.hut;
   const group = new THREE.Group();
   group.name = 'hut';
@@ -28,6 +36,7 @@ export function buildHut(terrain, layout, { landing = false } = {}) {
   const local = (p) => [p.x - hut.x, terrain.heightAt(p.x, p.z) - hut.y, p.z - hut.z];
 
   const cabin = landing ? { std: [], glossy: [], glow: [] } : buildCabin();
+  yield;
   const propsStd = [];
   const glossy = [...cabin.glossy];
   const glow = [...cabin.glow];
@@ -53,6 +62,7 @@ export function buildHut(terrain, layout, { landing = false } = {}) {
   }
   add(buildFlagpole(), flagPos);
   add(buildCampfire(), firePos);
+  yield;
 
   // camp ground: flagstones round the fire, stepping stones, stones and firewood
   const xz = (p) => [p[0], p[2]];
@@ -64,9 +74,11 @@ export function buildHut(terrain, layout, { landing = false } = {}) {
   }, layout.biome?.id, (lx, lz) => terrain.heightAt(hut.x + lx, hut.z + lz) - hut.y);
   const floorStone = [];
   for (const g of floor) (g.userData.stone ? floorStone : propsStd).push(g);
+  yield;
 
   const cabinMesh = landing ? null : mesh(merge(cabin.std));
   if (cabinMesh) cabinMesh.name = 'hut-cabin';
+  yield;
   const propsMesh = mesh(merge(propsStd));
   propsMesh.name = 'hut-props';
   const glossyMesh = mesh(merge(glossy), MAT.glossy);

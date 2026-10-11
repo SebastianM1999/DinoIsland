@@ -8,7 +8,7 @@ import { fbm, smoothstep } from '../../shared/rng.js';
 import { BIOMES } from '../../shared/levels.js';
 import { causewayQuery } from '../../shared/bossArena.js';
 import { withSurfaceDetail, setSurfaceBiome } from './surfaceDetail.js';
-import { buildCaveTerrainMesh } from './caveTerrain.js';
+import { buildCaveTerrainMesh, buildCaveTerrainMeshSteps } from './caveTerrain.js';
 import { TerrainChunks, splitTerrainGeometry } from './terrainChunks.js';
 import { runBuildSteps } from '../core/buildSteps.js';
 
@@ -63,7 +63,7 @@ export async function buildTerrainMeshAsync(terrain, layout, { signal, position 
 }
 
 export function* buildTerrainMeshSteps(terrain, layout) {
-  if (layout.plan.cave) return buildCaveTerrainMesh(terrain, layout);   // the Hollow Mountain: caveTerrain.js
+  if (layout.plan.cave) return yield* buildCaveTerrainMeshSteps(terrain, layout);   // the Hollow Mountain: caveTerrain.js
   const n = terrain.n, cell = terrain.cell, half = terrain.half;
   const stride = n + 1;
   const plan = layout.plan;

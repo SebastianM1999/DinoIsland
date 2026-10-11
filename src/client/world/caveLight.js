@@ -62,7 +62,15 @@ const AO_W = [1, 0.75, 0.5];
  * @param {{pos:Float32Array, nor:Float32Array}[]} chunks from meshCaveVolume; each gets `lt` (Float32 x3) and `gl` (Float32 x3)
  * @param {{sources:{x:number,y:number,z:number,r:number,k:number,c:{r:number,g:number,b:number}}[], visAt:(x:number,y:number,z:number)=>number, waterAt:(x:number,z:number)=>number|null}} src
  */
-export function bakeCaveLight(lat, chunks, { sources, visAt, waterAt }) {
+export function bakeCaveLight(lat, chunks, source) {
+  const steps = bakeCaveLightSteps(lat, chunks, source);
+  let step;
+  while (!(step = steps.next()).done);
+  return step.value;
+}
+
+/** The same bake, yielding every 256 vertices so a client can paint between them. */
+export function* bakeCaveLightSteps(lat, chunks, { sources, visAt, waterAt }) {
   const t0 = performance.now();
   const field = latticeSampler(lat);
   // sources in a coarse grid
@@ -85,6 +93,7 @@ export function bakeCaveLight(lat, chunks, { sources, visAt, waterAt }) {
     const m = ch.pos.length / 3;
     const lt = new Float32Array(m * 3), gl = new Float32Array(m * 3);
     for (let v = 0; v < m; v++) {
+      if ((v & 255) === 255) yield;
       const x = ch.pos[v * 3], y = ch.pos[v * 3 + 1], z = ch.pos[v * 3 + 2];
       const nx = ch.nor[v * 3], ny = ch.nor[v * 3 + 1], nz = ch.nor[v * 3 + 2];
       // --- ambient occlusion
