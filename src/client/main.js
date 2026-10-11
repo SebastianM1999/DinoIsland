@@ -38,6 +38,8 @@ function applyDemoMenu() {
   document.body.classList.add('is-demo');
   $('play-island').value = '0';
   for (const id of ['btn-home-skills', 'tour-next']) { const b = $(id); if (b) b.hidden = true; }
+  const kicker = document.querySelector('.menu-kicker');
+  if (kicker) kicker.textContent = `Co-op dinosaur survival · demo · 1–${CONFIG.demo.maxPlayers} explorers`;
 }
 document.title = BRAND.name;
 
