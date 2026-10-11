@@ -92,8 +92,8 @@ export const ICONS = {
   herb: svg(`<path d="M16 28V13" stroke="#5aa63a" stroke-width="2" stroke-linecap="round"/>
     <path d="M16 24c-6 1-10-2-11-7 5-1 9 1 11 7zM16 21c5.5 1 9.5-1.5 11-6.5-5-1-9 1-11 6.5z" fill="#a6e46e" stroke="${OUT}" stroke-width="1" stroke-linejoin="round"/>
     <path d="M7.5 18c3 .8 5.6 2.6 8 5.5M24.5 15c-3 .8-5.6 2.4-8.2 5.3" stroke="#5aa63a" stroke-width="0.9" fill="none"/>
-    <g fill="#ffffff" stroke="${OUT}" stroke-width="0.8"><circle cx="16" cy="6" r="2.4"/><circle cx="12.2" cy="8.8" r="2.4"/><circle cx="19.8" cy="8.8" r="2.4"/><circle cx="13.6" cy="12.6" r="2.4"/><circle cx="18.4" cy="12.6" r="2.4"/></g>
-    <circle cx="16" cy="9.6" r="2" fill="#ffd84a" stroke="${OUT}" stroke-width="0.8"/>`),
+    <g fill="#c9b2ff" stroke="${OUT}" stroke-width="0.8"><circle cx="16" cy="6" r="2.4"/><circle cx="12.2" cy="8.8" r="2.4"/><circle cx="19.8" cy="8.8" r="2.4"/><circle cx="13.6" cy="12.6" r="2.4"/><circle cx="18.4" cy="12.6" r="2.4"/></g>
+    <circle cx="16" cy="9.6" r="2" fill="#ffffff" stroke="${OUT}" stroke-width="0.8"/>`),
 
   plates: svg(`<path d="M3 26 9 8l6 18z" fill="#f08a3a" stroke="${OUT}" stroke-width="1" stroke-linejoin="round"/>
     <path d="M13 26 20 4l7.5 22z" fill="#6fb541" stroke="${OUT}" stroke-width="1" stroke-linejoin="round"/>
