@@ -4,7 +4,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Net } from '../src/client/net/net.js';
 import { ServerWorld } from '../src/sim/world.js';
-import { MSG, ACT, EQUIP } from '../src/shared/protocol.js';
+import { MSG, ACT, EQUIP, EV } from '../src/shared/protocol.js';
 import { CONFIG } from '../src/shared/config.js';
 import { PerfStats } from '../src/client/ui/perfStats.js';
 
@@ -51,6 +51,120 @@ test('the heartbeat starts on welcome (covers loading) and survives a synchronou
   assert.ok(net.heartbeat);
   assert.ok(transport.sent.some((m) => m.t === MSG.PING));
   net.close();
+});
+
+test('world changes during loading replay in order before only the latest snapshot', () => {
+  const { net, deliver } = client();
+  try {
+    net.clearHandlers();
+    net.beginLoading();
+    deliver({ t: MSG.EV, e: EV.BASE, base: { stage: 2 }, r: 2, w: 1 });
+    deliver({ t: MSG.SNAP, now: 2, n: 1, r: 2, w: 1, p: [] });
+    deliver({ t: MSG.EV, e: EV.WALL_TORCH, torch: 3, r: 3, w: 1 });
+    deliver({ t: MSG.SNAP, now: 3, n: 2, r: 3, w: 1, p: [] });
+    deliver({ t: MSG.SNAP, now: 2.5, n: 1, r: 3, w: 1, p: [] });
+    const state = { base: 0, torches: new Set(), frame: null }, order = [];
+    net.on(`ev:${EV.BASE}`, message => { state.base = message.base.stage; order.push('base'); });
+    net.on(`ev:${EV.WALL_TORCH}`, message => { state.torches.add(message.torch); order.push('torch'); });
+    net.on(MSG.SNAP, message => { state.frame = message.now; order.push('snap'); });
+    assert.equal(state.base, 0);
+    net.endLoading();
+    assert.equal(state.base, 2);
+    assert(state.torches.has(3));
+    assert.equal(state.frame, 3);
+    assert.deepEqual(order, ['base', 'torch', 'snap']);
+    assert.equal(net.reliableSeq, 3);
+    assert.equal(net.telemetry.snapshots, 2, 'replay does not accept or count snapshots twice');
+    net.endLoading();
+    assert.equal(order.length, 3);
+  } finally { net.close(); }
+});
+
+test('a loading snapshot that overtakes its prerequisite waits for the buffered reliable change', () => {
+  const { net, deliver } = client(), order = [];
+  try {
+    net.clearHandlers(); net.beginLoading();
+    deliver({ t: MSG.SNAP, now: 2, n: 1, r: 2, w: 1, p: [] });
+    deliver({ t: MSG.INV, inv: { fruit: ['berry'] }, r: 2, w: 1 });
+    net.on(MSG.INV, message => order.push(message.inv.fruit[0]));
+    net.on(MSG.SNAP, () => order.push('snap'));
+    net.endLoading();
+    assert.deepEqual(order, ['berry', 'snap']);
+  } finally { net.close(); }
+});
+
+test('loading coalesces hundreds of snapshots without exhausting its bounded event queue', () => {
+  const { net, deliver } = client(), frames = [];
+  try {
+    net.clearHandlers(); net.beginLoading({ maxMessages: 1, maxBytes: 512 });
+    for (let i = 0; i < 500; i++) deliver({ t: MSG.SNAP, now: i + 2, n: i + 1, r: 1, w: 1, p: [] });
+    net.on(MSG.SNAP, message => frames.push(message.now));
+    net.endLoading();
+    assert.equal(net.closed, false);
+    assert.deepEqual(frames, [501]);
+  } finally { net.close(); }
+});
+
+test('synchronous messages triggered by a replay handler cannot overtake queued changes', () => {
+  const { net, deliver } = client(), order = [];
+  try {
+    net.clearHandlers(); net.beginLoading();
+    deliver({ t: MSG.EV, e: EV.BASE, base: {}, r: 2, w: 1 });
+    deliver({ t: MSG.EV, e: EV.WALL_TORCH, torch: 1, r: 3, w: 1 });
+    net.on(`ev:${EV.BASE}`, () => {
+      order.push('base');
+      deliver({ t: MSG.INV, inv: {}, r: 4, w: 1 });
+    });
+    net.on(`ev:${EV.WALL_TORCH}`, () => order.push('torch'));
+    net.on(MSG.INV, () => order.push('response'));
+    net.endLoading();
+    assert.deepEqual(order, ['base', 'torch', 'response']);
+  } finally { net.close(); }
+});
+
+test('a newer reliable loading change prevents replaying a snapshot that could undo it', () => {
+  const { net, deliver } = client(), order = [];
+  try {
+    net.clearHandlers(); net.beginLoading();
+    deliver({ t: MSG.SNAP, now: 2, n: 1, r: 1, w: 1, p: [] });
+    deliver({ t: MSG.CORRECT, x: 20, y: 4, z: 2, k: 5, r: 2, w: 1 });
+    assert.equal(net.epoch, 5, 'metadata remains current during construction');
+    net.on(MSG.CORRECT, message => order.push(message.x));
+    net.on(MSG.SNAP, () => order.push('old snap'));
+    net.endLoading();
+    assert.deepEqual(order, [20]);
+    deliver({ t: MSG.SNAP, now: 3, n: 2, r: 2, w: 1, p: [] });
+    assert.deepEqual(order, [20, 'old snap']);
+  } finally { net.close(); }
+});
+
+test('loading reliable and byte limits disconnect explicitly rather than dropping world changes', () => {
+  for (const limit of [{ maxMessages: 1 }, { maxBytes: 10 }]) {
+    const { net, deliver } = client();
+    let reason;
+    net.onClose = text => { reason = text; };
+    net.beginLoading(limit);
+    deliver({ t: MSG.INV, inv: { fruit: ['berry'] }, r: 2, w: 1 });
+    deliver({ t: MSG.INV, inv: { fruit: ['berry', 'plum'] }, r: 3, w: 1 });
+    assert.equal(net.closed, true);
+    assert.match(reason, /Too many world changes while loading/);
+    assert.equal(net.loading, null);
+    net.endLoading();
+  }
+});
+
+test('a replacement welcome during loading cannot replay events into the wrong island', () => {
+  const { net, deliver } = client();
+  let reason, applied = 0;
+  net.onClose = text => { reason = text; };
+  net.beginLoading();
+  deliver({ t: MSG.EV, e: EV.WALL_TORCH, torch: 2, r: 2, w: 1 });
+  net.on(`ev:${EV.WALL_TORCH}`, () => applied++);
+  deliver({ t: MSG.WELCOME, id: 1, k: 0, now: 3, r: 3, w: 2 });
+  net.endLoading();
+  assert.equal(net.closed, true);
+  assert.match(reason, /island changed while loading/);
+  assert.equal(applied, 0);
 });
 
 test('actions carry their own movement state, so a lost movement packet cannot reject a shot', () => {

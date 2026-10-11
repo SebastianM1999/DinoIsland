@@ -92,7 +92,7 @@ Grouped by the module area they mainly cover. Many simulation tests also check t
 - `graphics-tier.test.js` — conservative graphics startup, measured promotion, sustained three-FPS recovery, hidden-tab exclusion, isolated hitch rejection, frame-cap handling, versioned saved calibration and workload rechecks.
 - `frame-hitches.test.js` — frame-freeze guards: `requestPrograms` waits for linked programs, `WorldPost.compile` targets, `usesPost`, and no client code toggles a light's `visible`.
 - `input-panels.test.js` — Escape/E panel handling, raw pointer-lock fallback/retry, focus/lock resets and cursor-warp rejection; permanent input disposal removes listeners, cancels retries and releases late browser lock grants (`src/client/input/input.js`).
-- `ordering.test.js` — packet ordering and action/state dependencies under unreliable transport (client `Net` + `ServerWorld`).
+- `ordering.test.js` — packet ordering and action/state dependencies under unreliable transport; bounded launch buffering replays reliable world changes before the latest snapshot, preserves correction metadata and fails closed on overflow or world replacement (client `Net` + `ServerWorld`).
 
 ### Hosting and networking (server/, desktop/)
 - `http-host.test.js` — real HTTP/WebSocket host with two co-op players routing firearm shots and reloads.
