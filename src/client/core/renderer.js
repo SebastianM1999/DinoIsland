@@ -13,8 +13,7 @@ import { TIERS, GraphicsAutoTune, gpuName } from './graphicsTier.js';
 const R = CONFIG.render;
 const _tmpColor = new THREE.Color();
 
-/** World antialiasing (MSAA samples) and upscaling sharpness, both fixed. */
-const MSAA_SAMPLES = 4;
+/** Upscaling sharpness; world MSAA is selected by the measured graphics tier. */
 const SHARPNESS = 0.35;
 
 export class Renderer {
@@ -37,7 +36,7 @@ export class Renderer {
     this.metrics = { cpuRenderMs: 0, gpuMs: null, worldScale: 1, tier: '' };
     this.lastPostSize = '';
     // Graphics level: chosen per PC by GraphicsAutoTune (see graphicsTier.js).
-    this.graphics = TIERS[TIERS.length - 1];
+    this.graphics = TIERS[1];
     this.graphicsListeners = new Set();
 
     this.camera = new THREE.PerspectiveCamera(CONFIG.player.fov, 1, 0.1, R.viewDistance);
@@ -350,7 +349,7 @@ export class Renderer {
     this.post ??= new WorldPost(r);
     const size = r.getDrawingBufferSize(_bufferSize);
     const w = Math.max(1, Math.round(size.x * scale)), h = Math.max(1, Math.round(size.y * scale));
-    const samples = Math.min(MSAA_SAMPLES, r.capabilities.maxSamples);
+    const samples = Math.min(this.graphics.msaaSamples, r.capabilities.maxSamples);
     const key = `${w}:${h}:${samples}:${ao > 0}`;
     if (key !== this.lastPostSize) {
       this.post.resize(w, h, samples, ao > 0);
@@ -364,7 +363,7 @@ export class Renderer {
     const started = performance.now();
     const gpu = this.gpuTimer.poll();
     const cap = FPS_LIMITS[settings.fpsLimit] ?? 0;
-    this.autoTune.frame(rawDt, gpu, cap > 0 && cap < 60);
+    this.autoTune.frame(rawDt, gpu, cap > 0 && cap < 60, !globalThis.document?.hidden);
     this.gpuTimer.begin();
     r.info.reset();
     r.shadowMap.needsUpdate = true;
