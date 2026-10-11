@@ -1,6 +1,8 @@
 // Simple 2D collision against static world colliders (circles + oriented boxes).
 // Used by the local player controller and by server-side dinosaur movement.
 
+import * as dmath from './dmath.js';
+
 const CELL = 8;
 const REACH = 2; // largest mover radius the grid lookup covers
 
@@ -29,7 +31,7 @@ function boxesNear(colliders, x, z) {
   if (!grid || grid.n !== colliders.boxes.length) {
     grid = colliders._boxGrid = { n: colliders.boxes.length, cells: new Map() };
     for (const b of colliders.boxes) {
-      const e = Math.hypot(b.hw, b.hd) + REACH;
+      const e = dmath.hypot(b.hw, b.hd) + REACH;
       for (let ix = Math.floor((b.x - e) / CELL); ix <= Math.floor((b.x + e) / CELL); ix++) {
         for (let iz = Math.floor((b.z - e) / CELL); iz <= Math.floor((b.z + e) / CELL); iz++) {
           const key = ix * 4096 + iz;
@@ -56,12 +58,12 @@ function circleDepth(c, x, z, r) {
 
 /** Overlap depth of circle (x, z, r) with one oriented box (<= 0: apart). */
 function boxDepth(b, x, z, r) {
-  const cos = Math.cos(b.rot), sin = Math.sin(b.rot);
+  const cos = dmath.cos(b.rot), sin = dmath.sin(b.rot);
   const dx = x - b.x, dz = z - b.z;
   const lx = dx * cos + dz * sin, lz = -dx * sin + dz * cos;
   const ex = Math.abs(lx) - b.hw, ez = Math.abs(lz) - b.hd;
   if (ex <= 0 && ez <= 0) return r - Math.max(ex, ez);          // centre inside
-  return r - Math.hypot(Math.max(ex, 0), Math.max(ez, 0));
+  return r - dmath.hypot(Math.max(ex, 0), Math.max(ez, 0));
 }
 
 /**
@@ -86,7 +88,7 @@ export function standTop(colliders, x, z, margin = 0, maxTop = Infinity) {
   }
   for (const b of boxesNear(colliders, x, z)) {
     if (!b.stand || b.top > maxTop || b.top <= best) continue;
-    const cos = Math.cos(b.rot), sin = Math.sin(b.rot);
+    const cos = dmath.cos(b.rot), sin = dmath.sin(b.rot);
     const dx = x - b.x, dz = z - b.z;
     if (Math.abs(dx * cos + dz * sin) <= b.hw + margin && Math.abs(-dx * sin + dz * cos) <= b.hd + margin) best = b.top;
   }
@@ -150,7 +152,7 @@ export function resolveCircle(x, z, r, colliders, out = { x: 0, z: 0, hit: false
     }
     for (const b of r <= REACH ? boxesNear(colliders, x, z) : colliders.boxes) {
       if (!inSpan(b, y0, y1, climb)) continue;
-      const cos = Math.cos(b.rot), sin = Math.sin(b.rot);
+      const cos = dmath.cos(b.rot), sin = dmath.sin(b.rot);
       const dx = x - b.x, dz = z - b.z;
       // into box space
       const lx = dx * cos + dz * sin;
@@ -201,7 +203,7 @@ function wedgePoint(x, z, r, colliders, y0, y1, climb) {
     for (let j = i + 1; j < near.length; j++) {
       const a = near[i], b = near[j];
       const ra = a.r + r + SKIN * 0.25, rb = b.r + r + SKIN * 0.25;
-      const dx = b.x - a.x, dz = b.z - a.z, d = Math.hypot(dx, dz);
+      const dx = b.x - a.x, dz = b.z - a.z, d = dmath.hypot(dx, dz);
       if (d < 1e-6 || d > ra + rb || d < Math.abs(ra - rb)) continue;
       const u = (ra * ra - rb * rb + d * d) / (2 * d);
       const h = Math.sqrt(Math.max(0, ra * ra - u * u));
@@ -255,7 +257,7 @@ export function segmentColliders(ax, ay, az, bx, by, bz, colliders, groundAt) {
     consider((-b - sq) / a, (-b + sq) / a, c.x, c.z, c.top, c.bottom);
   }
   for (const bx2 of colliders.boxes) {
-    const cos = Math.cos(bx2.rot), sin = Math.sin(bx2.rot);
+    const cos = dmath.cos(bx2.rot), sin = dmath.sin(bx2.rot);
     const lx = (ax - bx2.x) * cos + (az - bx2.z) * sin, lz = -(ax - bx2.x) * sin + (az - bx2.z) * cos;
     const ux = dx * cos + dz * sin, uz = -dx * sin + dz * cos;
     let t0 = 0, t1 = 1;
@@ -286,7 +288,7 @@ export function raySphere(ox, oy, oz, dx, dy, dz, cx, cy, cz, r) {
 /** Segment [a,b] vs sphere: returns fraction t in [0,1] of first contact or -1. */
 export function segmentSphere(ax, ay, az, bx, by, bz, cx, cy, cz, r) {
   const dx = bx - ax, dy = by - ay, dz = bz - az;
-  const len = Math.hypot(dx, dy, dz);
+  const len = dmath.hypot(dx, dy, dz);
   if (len < 1e-6) return -1;
   const t = raySphere(ax, ay, az, dx / len, dy / len, dz / len, cx, cy, cz, r);
   if (t < 0 || t > len) return -1;

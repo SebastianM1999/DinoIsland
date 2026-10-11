@@ -22,6 +22,7 @@ import { SUMP } from './caveMaze.js';
 import { WALL_TORCH, wallMount } from './torch.js';
 import { caveRock } from './caveVolume.js';
 import { SPRING_LIP_OFFSET, SPRING_FLOOR, springColliders } from './springShape.js';
+import * as dmath from './dmath.js';
 
 const TAU = Math.PI * 2;
 
@@ -128,7 +129,7 @@ export function* buildLayoutSteps(terrain) {
     return {
       kind: p.kind === 'highland' && y < 8 ? 'inland' : p.kind,   // the best "high" ground may still be low
       x: p.x, z: p.z, r: p.r, y,
-      rot: Math.atan2(-(hf.x - p.x), -(hf.z - p.z)),
+      rot: dmath.atan2(-(hf.x - p.x), -(hf.z - p.z)),
     };
   });
   // islands with base plots start at a small landing camp: no cabin, wardrobe or mission board
@@ -142,7 +143,7 @@ export function* buildLayoutSteps(terrain) {
   for (let i = 0; i < 4; i++) {
     const a = -Math.PI / 2 + (i - 1.5) * 0.45;
     // face east, toward the island and the boat
-    layout.spawnPoints.push({ x: hf.x + Math.cos(a) * 4.5 - 1, z: hf.z - 2 + Math.sin(a) * 4.5 - 1.5, yaw: -Math.PI / 2 });
+    layout.spawnPoints.push({ x: hf.x + dmath.cos(a) * 4.5 - 1, z: hf.z - 2 + dmath.sin(a) * 4.5 - 1.5, yaw: -Math.PI / 2 });
   }
 
   // ---------------------------------------------------------------- boat
@@ -158,7 +159,7 @@ export function* buildLayoutSteps(terrain) {
   if (plan.waterfall) {
     const { x, z, width, dir, pool } = plan.waterfall;
     const behind = terrain.heightAt(x + dir.x * 6, z + dir.z * 6);
-    const source = { x, z, y: Math.max(pool.level + 3, Math.min(pool.level + 10, behind - 2)), rot: Math.atan2(dir.x, dir.z), width };
+    const source = { x, z, y: Math.max(pool.level + 3, Math.min(pool.level + 10, behind - 2)), rot: dmath.atan2(dir.x, dir.z), width };
     boxes.push(...springColliders(source));
     const lip = { x: x - dir.x * SPRING_LIP_OFFSET, y: source.y + SPRING_FLOOR, z: z - dir.z * SPRING_LIP_OFFSET };
     // A single vertical curtain: its footprint is entirely over the basin.
@@ -170,10 +171,10 @@ export function* buildLayoutSteps(terrain) {
   }
   if (plan.volcano) {
     const v = plan.volcano;
-    const crater = plan.pools.find((p) => p.kind === 'lava' && Math.hypot(p.x - v.x, p.z - v.z) < 1);
+    const crater = plan.pools.find((p) => p.kind === 'lava' && dmath.hypot(p.x - v.x, p.z - v.z) < 1);
     // (the caldera: its smoke rises from a vent on the rim across from the notch – the crater floor is the arena)
     layout.volcano = v.rimH != null
-      ? { x: v.x - Math.cos(v.notchAngle) * v.craterR, z: v.z - Math.sin(v.notchAngle) * v.craterR, craterY: v.rimY + 1, craterR: 6 }
+      ? { x: v.x - dmath.cos(v.notchAngle) * v.craterR, z: v.z - dmath.sin(v.notchAngle) * v.craterR, craterY: v.rimY + 1, craterR: 6 }
       : { x: v.x, z: v.z, craterY: crater ? crater.level : v.height * 0.7, craterR: v.craterR };
   }
 
@@ -188,7 +189,7 @@ export function* buildLayoutSteps(terrain) {
         const [ax, az] = line[i], [bx, bz] = line[i + 1];
         const vx = bx - ax, vz = bz - az;
         const t = Math.max(0, Math.min(1, ((x - ax) * vx + (z - az) * vz) / (vx * vx + vz * vz)));
-        best = Math.min(best, Math.hypot(ax + vx * t - x, az + vz * t - z));
+        best = Math.min(best, dmath.hypot(ax + vx * t - x, az + vz * t - z));
       }
     }
     return best;
@@ -203,9 +204,9 @@ export function* buildLayoutSteps(terrain) {
   };
   const reserve = (x, z, r) => occupied.push({ x, z, r });
   // the hut clearing – and the base plots, which stay just as clear of trees, rocks and dinosaur homes
-  const nearHut = (x, z, pad = 0) => Math.hypot(x - hf.x, z - (hf.z + 2)) < hf.radius + pad
-    || layout.basePlots.some((p) => Math.hypot(x - p.x, z - p.z) < p.r + 2 + Math.min(pad, 12));
-  const nearBoat = (x, z, pad = 0) => Math.hypot(x - plan.boat.x, z - plan.boat.z) < 10 + pad;
+  const nearHut = (x, z, pad = 0) => dmath.hypot(x - hf.x, z - (hf.z + 2)) < hf.radius + pad
+    || layout.basePlots.some((p) => dmath.hypot(x - p.x, z - p.z) < p.r + 2 + Math.min(pad, 12));
+  const nearBoat = (x, z, pad = 0) => dmath.hypot(x - plan.boat.x, z - plan.boat.z) < 10 + pad;
   const dry = (x, z, min = 0.4) => terrain.waterLevelAt(x, z) === null && terrain.lavaLevelAt(x, z) === null && terrain.heightAt(x, z) > min;
   // (the cave level has plants and loose rocks in its two coves only)
   const inside = caveLevel
@@ -219,15 +220,15 @@ export function* buildLayoutSteps(terrain) {
         const a = rv.pts[i], b = rv.pts[i + 1];
         const vx = b.x - a.x, vz = b.z - a.z;
         const t = Math.max(0, Math.min(1, ((x - a.x) * vx + (z - a.z) * vz) / (vx * vx + vz * vz || 1)));
-        best = Math.min(best, Math.hypot(a.x + vx * t - x, a.z + vz * t - z) - (a.w + b.w) / 4);
+        best = Math.min(best, dmath.hypot(a.x + vx * t - x, a.z + vz * t - z) - (a.w + b.w) / 4);
       }
     }
     return best;
   };
-  const poolDist = (x, z) => Math.min(Infinity, ...plan.pools.map((p) => Math.hypot(x - p.x, z - p.z) - p.r));
+  const poolDist = (x, z) => Math.min(Infinity, ...plan.pools.map((p) => dmath.hypot(x - p.x, z - p.z) - p.r));
   // the falling water's way down the cliff stays clear of trees and rocks
   for (const wf of layout.waterfalls) {
-    const run = Math.hypot(wf.impact.x - wf.top.x, wf.impact.z - wf.top.z);
+    const run = dmath.hypot(wf.impact.x - wf.top.x, wf.impact.z - wf.top.z);
     for (let d = 0; d <= run; d += 1.5) reserve(wf.top.x + wf.dirX * d, wf.top.z + wf.dirZ * d, wf.width / 2 + 1.2);
   }
 
@@ -238,10 +239,10 @@ export function* buildLayoutSteps(terrain) {
     if (c.host == null) {
       let best = null, bd = Infinity;
       for (const [px, pz] of layout.path[0]) {
-        const d = Math.hypot(px - c.x, pz - c.z);
+        const d = dmath.hypot(px - c.x, pz - c.z);
         if (d < bd) { bd = d; best = [px, pz]; }
       }
-      if (best) cave.rot = Math.atan2(-(best[0] - c.x), -(best[1] - c.z));
+      if (best) cave.rot = dmath.atan2(-(best[0] - c.x), -(best[1] - c.z));
     }
     cave.mouth = caveMouth(cave);
     cave.inner = caveInterior(cave);
@@ -291,7 +292,7 @@ export function* buildLayoutSteps(terrain) {
     let wallY = Infinity;
     for (let k = 0; k < 24; k++) {
       const a = (k / 24) * TAU;
-      wallY = Math.min(wallY, groundAt(sa.x + Math.cos(a) * sa.r, sa.z + Math.sin(a) * sa.r));
+      wallY = Math.min(wallY, groundAt(sa.x + dmath.cos(a) * sa.r, sa.z + dmath.sin(a) * sa.r));
     }
     const arena = {
       ...sa,
@@ -309,7 +310,7 @@ export function* buildLayoutSteps(terrain) {
     // warning sign beside the entrance (west gate)
     {
       const a = sa.gates[0].angle + 0.3, rr = sa.r + 3.2;
-      const sx = sa.x + Math.cos(a) * rr, sz = sa.z + Math.sin(a) * rr;
+      const sx = sa.x + dmath.cos(a) * rr, sz = sa.z + dmath.sin(a) * rr;
       arena.sign = { x: sx, z: sz, y: groundAt(sx, sz), angle: sa.gates[0].angle };
       circles.push({ x: sx, z: sz, r: 0.35, top: arena.sign.y + 2.4, kind: 'arena' });
     }
@@ -317,7 +318,7 @@ export function* buildLayoutSteps(terrain) {
     const n = 26;
     for (let k = 0; k < n; k++) {
       const a = (k / n) * TAU + ra.range(-0.04, 0.04);
-      const x = sa.x + Math.cos(a) * sa.r, z = sa.z + Math.sin(a) * sa.r;
+      const x = sa.x + dmath.cos(a) * sa.r, z = sa.z + dmath.sin(a) * sa.r;
       if (gateOffset(sa, x, z) < SWAMP_ARENA.gateW / 2 + 1.2) continue;
       arena.roots.push({ x, z, y: groundAt(x, z), rot: a + ra.range(-0.3, 0.3), scale: ra.range(1.25, 1.7), tall: ra() < 0.4, seed: ra.int(1, 999) });
     }
@@ -332,7 +333,7 @@ export function* buildLayoutSteps(terrain) {
     // bones in the mud (visual only)
     for (let i = 0; i < 18; i++) {
       const a = ra() * TAU, rr = ra.range(3, sa.r - 5);
-      const x = sa.x + Math.cos(a) * rr, z = sa.z + Math.sin(a) * rr;
+      const x = sa.x + dmath.cos(a) * rr, z = sa.z + dmath.sin(a) * rr;
       arena.bones.push({ x, z, y: groundAt(x, z), rot: ra() * TAU, kind: ra() < 0.3 ? 'skull' : 'rib', s: ra.range(0.9, 1.6) });
     }
   }
@@ -359,13 +360,13 @@ export function* buildLayoutSteps(terrain) {
     for (let k = 0; k < n; k++) {
       const a = va.gates[0].angle + ((k + 0.5) / n) * TAU + ra.range(-0.15, 0.15);
       const rr = va.r * ra.range(0.42, 0.72);
-      const cx = va.x + Math.cos(a) * rr, cz = va.z + Math.sin(a) * rr;
-      if (distToPath(cx, cz) < 5.5 || Math.hypot(cx - va.spawn.x, cz - va.spawn.z) < 7) continue;
+      const cx = va.x + dmath.cos(a) * rr, cz = va.z + dmath.sin(a) * rr;
+      if (distToPath(cx, cz) < 5.5 || dmath.hypot(cx - va.spawn.x, cz - va.spawn.z) < 7) continue;
       const cluster = { x: cx, z: cz, y: groundAt(cx, cz), parts: [] };
       for (let i = 0, m = ra.int(3, 5); i < m; i++) {
         const pa = ra() * TAU, pr = i ? ra.range(1.0, 1.7) : 0;
-        const x = cx + Math.cos(pa) * pr, z = cz + Math.sin(pa) * pr;
-        if (cluster.parts.some((p) => Math.hypot(p.x - x, p.z - z) < 1.1)) continue;
+        const x = cx + dmath.cos(pa) * pr, z = cz + dmath.sin(pa) * pr;
+        if (cluster.parts.some((p) => dmath.hypot(p.x - x, p.z - z) < 1.1)) continue;
         const r = ra.range(0.55, 0.85), h = ra.range(3.4, 6.5) * (i ? ra.range(0.5, 0.85) : 1);
         const y = groundAt(x, z);
         cluster.parts.push({ x, z, y, r, h, rot: ra() * TAU, tilt: ra.range(-0.06, 0.06) });
@@ -376,14 +377,14 @@ export function* buildLayoutSteps(terrain) {
     // warning sign beside the path at the notch
     {
       const a = va.gates[0].angle + 0.13, rr = va.craterR + 8;
-      const sx = va.x + Math.cos(a) * rr, sz = va.z + Math.sin(a) * rr;
+      const sx = va.x + dmath.cos(a) * rr, sz = va.z + dmath.sin(a) * rr;
       arena.sign = { x: sx, z: sz, y: groundAt(sx, sz), angle: va.gates[0].angle };
       circles.push({ x: sx, z: sz, r: 0.35, top: arena.sign.y + 2.4, kind: 'arena' });
     }
     // bones and skulls on the floor (visual only)
     for (let i = 0; i < 16; i++) {
       const a = ra() * TAU, rr = ra.range(3, va.r - 3);
-      const x = va.x + Math.cos(a) * rr, z = va.z + Math.sin(a) * rr;
+      const x = va.x + dmath.cos(a) * rr, z = va.z + dmath.sin(a) * rr;
       arena.bones.push({ x, z, y: groundAt(x, z), rot: ra() * TAU, kind: ra() < 0.3 ? 'skull' : 'rib', s: ra.range(0.9, 1.6) });
     }
   }
@@ -444,10 +445,10 @@ export function* buildLayoutSteps(terrain) {
     // the gate: two rough pillars either side of the causeway start, a cracked lintel over them
     {
       const g0 = pa.path[0], g1 = pa.path[1];
-      const dx = g1.x - g0.x, dz = g1.z - g0.z, dl = Math.hypot(dx, dz);
+      const dx = g1.x - g0.x, dz = g1.z - g0.z, dl = dmath.hypot(dx, dz);
       const gx = g0.x + dx / dl * 3, gz = g0.z + dz / dl * 3;
       const span = pa.causewayW + 2.2;
-      arena.gate = { x: gx, z: gz, y: groundAt(gx, gz), rot: Math.atan2(dx, dz), span, h: 5.6 };
+      arena.gate = { x: gx, z: gz, y: groundAt(gx, gz), rot: dmath.atan2(dx, dz), span, h: 5.6 };
       for (const s of [-1, 1]) {
         const px = gx + (-dz / dl) * s * span / 2, pz = gz + (dx / dl) * s * span / 2;
         circles.push({ x: px, z: pz, r: 0.95, top: arena.gate.y + arena.gate.h + 0.8, kind: 'boss' });
@@ -456,9 +457,9 @@ export function* buildLayoutSteps(terrain) {
     // obsidian spires on the rim (never on the causeway's pass)
     for (let i = 0; i < 900 && arena.spires.length < 48; i++) {
       const a = ra() * TAU, rr = ra.range(pa.lakeR + 4, pa.outerR - 5);
-      const x = pa.center.x + Math.cos(a) * rr, z = pa.center.z + Math.sin(a) * rr;
+      const x = pa.center.x + dmath.cos(a) * rr, z = pa.center.z + dmath.sin(a) * rr;
       if (!offCauseway(x, z, 5) || terrain.heightAt(x, z) < pa.lava.level + 0.6) continue;
-      if (arena.spires.some((s) => Math.hypot(s.x - x, s.z - z) < s.r + 2.6)) continue;
+      if (arena.spires.some((s) => dmath.hypot(s.x - x, s.z - z) < s.r + 2.6)) continue;
       const r = ra.range(0.7, 1.5), h = ra.range(3, 9) * (ra() < 0.2 ? 1.5 : 1);
       arena.spires.push({ x, z, y: groundAt(x, z), r, h, rot: ra() * TAU, tiltX: ra.range(-0.18, 0.18), tiltZ: ra.range(-0.18, 0.18) });
       circles.push({ x, z, r: r * 0.85, top: groundAt(x, z) + h, kind: 'boss' });
@@ -466,8 +467,8 @@ export function* buildLayoutSteps(terrain) {
     // charred dead trees between them
     for (let i = 0; i < 400 && arena.deadTrees.length < 12; i++) {
       const a = ra() * TAU, rr = ra.range(pa.lakeR + 5, pa.outerR - 7);
-      const x = pa.center.x + Math.cos(a) * rr, z = pa.center.z + Math.sin(a) * rr;
-      if (!offCauseway(x, z, 5) || [...arena.spires, ...arena.deadTrees].some((s) => Math.hypot(s.x - x, s.z - z) < 3)) continue;
+      const x = pa.center.x + dmath.cos(a) * rr, z = pa.center.z + dmath.sin(a) * rr;
+      if (!offCauseway(x, z, 5) || [...arena.spires, ...arena.deadTrees].some((s) => dmath.hypot(s.x - x, s.z - z) < 3)) continue;
       arena.deadTrees.push({ x, z, y: groundAt(x, z), h: ra.range(4, 7), rot: ra() * TAU, lean: ra.range(-0.15, 0.15), seed: ra.int(1, 999) });
       circles.push({ x, z, r: 0.35, top: groundAt(x, z) + 5, kind: 'boss' });
     }
@@ -478,7 +479,7 @@ export function* buildLayoutSteps(terrain) {
       for (let k = 0; k < n; k++) {
         const a = (k / n) * TAU + ra.range(-0.05, 0.05);
         const rr = pa.plateauR + ra.range(0.7, 1.4);
-        const x = pa.plateau.x + Math.cos(a) * rr, z = pa.plateau.z + Math.sin(a) * rr;
+        const x = pa.plateau.x + dmath.cos(a) * rr, z = pa.plateau.z + dmath.sin(a) * rr;
         if (!offCauseway(x, z, 2.5)) continue;
         if (ra() < 0.25) continue;                            // gaps to look through
         const r = ra.range(0.55, 0.9), h = ra() < 0.6 ? ra.range(0.4, 1.1) : ra.range(1.8, 3.4);
@@ -493,7 +494,7 @@ export function* buildLayoutSteps(terrain) {
       const a = ra() * TAU;
       const c = onPlateau ? pa.plateau : pa.center;
       const rr = onPlateau ? ra.range(3, pa.plateauR - 1) : ra.range(pa.lakeR + 4, pa.outerR - 6);
-      const x = c.x + Math.cos(a) * rr, z = c.z + Math.sin(a) * rr;
+      const x = c.x + dmath.cos(a) * rr, z = c.z + dmath.sin(a) * rr;
       if (!offCauseway(x, z, 0.5) || terrain.lavaLevelAt(x, z) !== null) continue;
       arena.bones.push({ x, z, y: groundAt(x, z), rot: ra() * TAU, kind: ra() < 0.35 ? 'skull' : 'rib', s: ra.range(0.8, 1.5) });
     }
@@ -507,7 +508,7 @@ export function* buildLayoutSteps(terrain) {
     for (const [slope, usePred, R2] of [[0.6, true, maxR], [1.0, true, maxR * 2], [1.2, false, maxR * 3]]) {
       for (let k = 0; k < 600; k++) {
         const a = rng() * TAU, r = (k / 600) * R2;
-        const x = cx + Math.cos(a) * r, z = cz + Math.sin(a) * r;
+        const x = cx + dmath.cos(a) * r, z = cz + dmath.sin(a) * r;
         if (dry(x, z, 0.8) && terrain.slopeAt(x, z) < slope && outsideGrove(x, z, 4) && (!usePred || pred(x, z))) return { x, z };
       }
     }
@@ -598,8 +599,8 @@ export function* buildLayoutSteps(terrain) {
         let n = 0;
         for (let k = 0; k < 400 && n < an.n; k++) {
           const ang = rc() * TAU, rr = rc.range(an.r0, an.r1);
-          const x = an.x + Math.cos(ang) * rr, z = an.z + Math.sin(ang) * rr;
-          if (!flat(x, z, 0.25) || !free(x, z, 2.2) || !clearOfColliders(x, z, 1.2) || layout.torchSpots.some((t) => Math.hypot(t.x - x, t.z - z) < 5)) continue;
+          const x = an.x + dmath.cos(ang) * rr, z = an.z + dmath.sin(ang) * rr;
+          if (!flat(x, z, 0.25) || !free(x, z, 2.2) || !clearOfColliders(x, z, 1.2) || layout.torchSpots.some((t) => dmath.hypot(t.x - x, t.z - z) < 5)) continue;
           layout.torchSpots.push({ x, z, y: floorY(x, z) });
           reserve(x, z, 2);
           n++;
@@ -612,8 +613,8 @@ export function* buildLayoutSteps(terrain) {
       const spawns = [];
       for (let k = 0; k < 300 && spawns.length < 8; k++) {
         const ang = rc() * TAU, rr = Math.sqrt(rc()) * n.r * 0.7;
-        const x = n.x + Math.cos(ang) * rr, z = n.z + Math.sin(ang) * rr;
-        if (flat(x, z) && terrain.clearanceAt(x, z) > 5 && -openS(x, z) > 3 && clearOfColliders(x, z, 1) && !layout.relics.some((r) => Math.hypot(r.x - x, r.z - z) < 4)) spawns.push({ x, z });
+        const x = n.x + dmath.cos(ang) * rr, z = n.z + dmath.sin(ang) * rr;
+        if (flat(x, z) && terrain.clearanceAt(x, z) > 5 && -openS(x, z) > 3 && clearOfColliders(x, z, 1) && !layout.relics.some((r) => dmath.hypot(r.x - x, r.z - z) < 4)) spawns.push({ x, z });
       }
       layout.caveDinoSpots.push({
         id: n.id, x: n.x, z: n.z, y: floorY(n.x, n.z), radius: n.r, ceiling: terrain.ceilingAt(n.x, n.z),
@@ -633,7 +634,7 @@ export function* buildLayoutSteps(terrain) {
     // a point on a tunnel's centre line at arc fraction u
     const tunnelAt = (t, u) => {
       const cum = [0];
-      for (let i = 1; i < t.pts.length; i++) cum.push(cum[i - 1] + Math.hypot(t.pts[i].x - t.pts[i - 1].x, t.pts[i].z - t.pts[i - 1].z));
+      for (let i = 1; i < t.pts.length; i++) cum.push(cum[i - 1] + dmath.hypot(t.pts[i].x - t.pts[i - 1].x, t.pts[i].z - t.pts[i - 1].z));
       const d = u * cum[cum.length - 1];
       let i = 1;
       while (i < cum.length - 1 && cum[i] < d) i++;
@@ -699,7 +700,7 @@ export function* buildLayoutSteps(terrain) {
     const sample = (pred, tries = 40) => {
       for (let k = 0; k < tries; k++) {
         const an = pickAnchor(), ang = rc() * TAU, rr = Math.sqrt(rc()) * an.rad;
-        const x = an.x + Math.cos(ang) * rr, z = an.z + Math.sin(ang) * rr;
+        const x = an.x + dmath.cos(ang) * rr, z = an.z + dmath.sin(ang) * rr;
         const s = openS(x, z);
         if (s < -0.3 && underRoof(x, z) && dry(x, z, 0.5) && pred(x, z, -s)) return { x, z, s: -s, an };
       }
@@ -722,7 +723,7 @@ export function* buildLayoutSteps(terrain) {
       for (const t of mz.tunnels) for (let i = 0; i < t.pts.length - 1; i++) {
         const a = t.pts[i], b = t.pts[i + 1], vx = b.x - a.x, vz = b.z - a.z;
         const u = Math.max(0, Math.min(1, ((x - a.x) * vx + (z - a.z) * vz) / (vx * vx + vz * vz || 1)));
-        best = Math.min(best, Math.hypot(a.x + vx * u - x, a.z + vz * u - z) / (a.w / 2));
+        best = Math.min(best, dmath.hypot(a.x + vx * u - x, a.z + vz * u - z) / (a.w / 2));
       }
       return best;
     };
@@ -741,12 +742,12 @@ export function* buildLayoutSteps(terrain) {
       let placed = 0;
       for (let k = 0; k < 120 && placed < (n.r > 20 ? 4 : 2); k++) {
         const ang = rc() * TAU, rr = rc.range(0.25, 0.7) * n.r;
-        const x = n.x + Math.cos(ang) * rr, z = n.z + Math.sin(ang) * rr;
+        const x = n.x + dmath.cos(ang) * rr, z = n.z + dmath.sin(ang) * rr;
         const column = placed === 0 && n.r > 18 && !n.tags.includes('entrance') && !n.tags.includes('exit');
         const r = column ? rc.range(1.3, 2.0) : rc.range(0.7, 1.3);
         if (-openS(x, z) < r + 4.5 || !flat(x, z, 0.35) || !free(x, z, r + 2.2) || !clearOfColliders(x, z, r + 1.5)) continue;
         // chamber entrances stay open: nothing in a tunnel's way
-        if (centerDist(x, z) < 1.1 + r / 4.5 && Math.hypot(x - n.x, z - n.z) > n.r * 0.55) continue;
+        if (centerDist(x, z) < 1.1 + r / 4.5 && dmath.hypot(x - n.x, z - n.z) > n.r * 0.55) continue;
         const y = floorY(x, z), ceil = terrain.ceilingAt(x, z);
         if (!Number.isFinite(ceil)) continue;
         const h = column ? ceil - y + 0.5 : rc.range(2.2, 5.2);
@@ -759,7 +760,7 @@ export function* buildLayoutSteps(terrain) {
     }
     // crystals: halls glow in their own hue, a few more are sprinkled along other walls
     const gradient = (x, z) => {
-      const e = 0.8, gx = openS(x + e, z) - openS(x - e, z), gz = openS(x, z + e) - openS(x, z - e), l = Math.hypot(gx, gz) || 1;
+      const e = 0.8, gx = openS(x + e, z) - openS(x - e, z), gz = openS(x, z + e) - openS(x, z - e), l = dmath.hypot(gx, gz) || 1;
       return { x: -gx / l, z: -gz / l };     // points into the cave
     };
     const addCrystals = (hall, hue, want, band) => {
@@ -767,10 +768,10 @@ export function* buildLayoutSteps(terrain) {
         let x, z;
         if (hall) {
           const ang = rc() * TAU, rr = rc.range(0.45, 1.0) * hall.r;
-          x = hall.x + Math.cos(ang) * rr; z = hall.z + Math.sin(ang) * rr;
+          x = hall.x + dmath.cos(ang) * rr; z = hall.z + dmath.sin(ang) * rr;
         } else {
           const an = pickAnchor(), ang = rc() * TAU, rr = Math.sqrt(rc()) * an.rad;
-          x = an.x + Math.cos(ang) * rr; z = an.z + Math.sin(ang) * rr;
+          x = an.x + dmath.cos(ang) * rr; z = an.z + dmath.sin(ang) * rr;
         }
         const d = -openS(x, z);
         if (d < band[0] || d > band[1] || !underRoof(x, z) || !dry(x, z, 0.5) || !free(x, z, 0.9) || terrain.slopeAt(x, z) > 1.0) continue;
@@ -818,7 +819,7 @@ export function* buildLayoutSteps(terrain) {
       const wr = makeRng((plan.seed ^ 0x70c4) >>> 0);
       const W = layout.wallTorches;
       const rock = caveRock(plan);
-      const spaced = (x, z, d) => W.every((w) => Math.hypot(w.x - x, w.z - z) >= d);
+      const spaced = (x, z, d) => W.every((w) => dmath.hypot(w.x - x, w.z - z) >= d);
       let side = wr() < 0.5 ? -1 : 1;
       for (const t of mz.tunnels) {
         if (t.kind === 'falseExit') continue;
@@ -826,7 +827,7 @@ export function* buildLayoutSteps(terrain) {
         for (let i = 1; i < t.pts.length; i++) {
           yield;   // (a wall search is a few hundred field samples: let the client paint between points)
           const a = t.pts[i - 1], b = t.pts[i];
-          const seg = Math.hypot(b.x - a.x, b.z - a.z);
+          const seg = dmath.hypot(b.x - a.x, b.z - a.z);
           run -= seg;
           if (run > 0) continue;
           const u = i / (t.pts.length - 1);
@@ -835,7 +836,7 @@ export function* buildLayoutSteps(terrain) {
           // (no good wall here: `run` stays used up, the next point of the tunnel tries again)
           const w = wallMount(rock, floorY(b.x, b.z), b, { x: (b.x - a.x) / seg, z: (b.z - a.z) / seg }, side);
           if (!w || !(terrain.ceilingAt(w.x, w.z) > w.y + 1.2) || !spaced(w.x, w.z, WALL_TORCH.spacing * 0.5)) continue;
-          if (layout.relics.some((r) => Math.hypot(r.x - w.x, r.z - w.z) < 6)) continue;
+          if (layout.relics.some((r) => dmath.hypot(r.x - w.x, r.z - w.z) < 6)) continue;
           if (terrain.waterDepthAt(w.x + w.nx * 2.5, w.z + w.nz * 2.5) > 0) continue;
           W.push({ id: W.length, x: w.x, y: w.y, z: w.z, nx: w.nx, nz: w.nz, tunnel: t.id });
           run = WALL_TORCH.spacing * (0.75 + 0.5 * wr());
@@ -848,7 +849,7 @@ export function* buildLayoutSteps(terrain) {
   // ---------------------------------------------------- jungle density
   const meadowCut = (x, z) => {
     let d = 0;
-    for (const m of plan.meadows) d = Math.max(d, 1 - smoothstep(m.r * 0.5, m.r * 1.1, Math.hypot(x - m.x, z - m.z)));
+    for (const m of plan.meadows) d = Math.max(d, 1 - smoothstep(m.r * 0.5, m.r * 1.1, dmath.hypot(x - m.x, z - m.z)));
     return d;
   };
   // volcano: the few green pockets (cool ground away from the lava, 0..1)
@@ -859,7 +860,7 @@ export function* buildLayoutSteps(terrain) {
     const n = fbm(x * 0.012 + 5, z * 0.012 - 3, 3, S + 40) * 0.5 + 0.5;
     let d = (n * 0.9 + 0.25) * veg.treeDensity;
     d -= 0.8 * meadowCut(x, z);
-    if (plan.volcano) d -= 0.9 * (1 - smoothstep(plan.volcano.radius * 0.35, plan.volcano.radius * 0.7, Math.hypot(x - plan.volcano.x, z - plan.volcano.z)));
+    if (plan.volcano) d -= 0.9 * (1 - smoothstep(plan.volcano.radius * 0.35, plan.volcano.radius * 0.7, dmath.hypot(x - plan.volcano.x, z - plan.volcano.z)));
     // nothing green grows on hot ground; the cooler green pockets are thick with pines
     if (volcanic) d += 0.45 * greenPocket(x, z) - 1.2 * terrain.heatAt(x, z);
     return d;
@@ -882,7 +883,7 @@ export function* buildLayoutSteps(terrain) {
     for (const rr of [footR, shape.r(0) * scale, footR * 0.5]) {
       for (let k = 0; k < 8; k++) {
         const a = (k / 8) * TAU;
-        lo = Math.min(lo, terrain.heightAt(x + Math.cos(a) * rr, z + Math.sin(a) * rr));
+        lo = Math.min(lo, terrain.heightAt(x + dmath.cos(a) * rr, z + dmath.sin(a) * rr));
       }
     }
     t.sink = TREE_SINK + Math.max(0, y - lo) + 0.05;
@@ -898,7 +899,7 @@ export function* buildLayoutSteps(terrain) {
     for (let i = 0; i < 2600 && layout.trees.length < (volcanic ? 50 : 120); i++) {
       if (i % 64 === 0) yield;
       const a = rng() * TAU, k = rng.range(0.82, 1.0);
-      const x = Math.cos(a) * plan.A * k, z = Math.sin(a) * halfWidthAt(plan, x) * k;
+      const x = dmath.cos(a) * plan.A * k, z = dmath.sin(a) * halfWidthAt(plan, x) * k;
       const h = terrain.heightAt(x, z);
       if (h < 0.7 || h > 3.2 || !dry(x, z) || nearHut(x, z, 6) || nearBoat(x, z, 10) || terrain.slopeAt(x, z) > 0.5 || distToPath(x, z) < 3) continue;
       if (!free(x, z, 2.5)) continue;
@@ -917,9 +918,9 @@ export function* buildLayoutSteps(terrain) {
     if (sa) {
       for (const [deg, k] of [[35, 0.55], [145, 0.55], [215, 0.58], [325, 0.58], [270, 0.5], [90, 0.75], [180, 0.3], [0, 0.3]]) {
         const a = (deg + rm.range(-10, 10)) * Math.PI / 180, rr = sa.r * k;
-        const x = sa.x + Math.cos(a) * rr, z = sa.z + Math.sin(a) * rr;
+        const x = sa.x + dmath.cos(a) * rr, z = sa.z + dmath.sin(a) * rr;
         if (Math.abs(z - sa.z) < 6 && Math.abs(deg % 180) < 1) continue;   // the causeway runs along z = sa.z
-        if (Math.hypot(x - sa.spawn.x, z - sa.spawn.z) < 7 || distToPath(x, z) < 4.5) continue;
+        if (dmath.hypot(x - sa.spawn.x, z - sa.spawn.z) < 7 || distToPath(x, z) < 4.5) continue;
         // Arena obstacles belong on shallow banks, outside the boss's deep ambush hollows.
         if (terrain.waterDepthAt(x, z) > 0.3) continue;
         addTree('mangrove', x, z, rm.range(1.35, 1.7), 0.6);
@@ -977,7 +978,7 @@ export function* buildLayoutSteps(terrain) {
       const x = rl.range(-plan.A * 0.9, plan.A * 0.9), z = rl.range(-plan.B * 0.9, plan.B * 0.9);
       if (!inside(x, z, 0.9) || nearHut(x, z, 10) || nearBoat(x, z, 6) || !outsideGrove(x, z, 12)) continue;
       const len = rl.range(5, 11), r = rl.range(0.3, 0.52), rot = rl() * TAU;
-      const dx = Math.cos(rot), dz = Math.sin(rot);
+      const dx = dmath.cos(rot), dz = dmath.sin(rot);
       // the whole trunk: dry, fairly flat, clear of paths, water and anything standing
       const pts = [];
       let ok = true;
@@ -1050,15 +1051,15 @@ export function* buildLayoutSteps(terrain) {
   // Hut clearing decoration rocks.
   for (let i = 0; i < 6; i++) {
     const a = rng() * TAU, r = rng.range(15, 20);
-    const x = hf.x + Math.cos(a) * r, z = hf.z + Math.sin(a) * r;
+    const x = hf.x + dmath.cos(a) * r, z = hf.z + dmath.sin(a) * r;
     if (free(x, z, 1.5) && distToPath(x, z) > 2.5 && dry(x, z, 0.3)) addRock(x, z, rng.range(0.6, 1.2));
   }
   // Sea stacks (tall rocks in the water) – landmarks and Pteranodon perches.
   for (let k = 0; k < (caveLevel ? 0 : 7); k++) {
     const a = (k / 7) * TAU + rng.range(-0.25, 0.25);
-    if (Math.abs(Math.cos(a)) > 0.92) continue;           // keep the hut and boat views open
+    if (Math.abs(dmath.cos(a)) > 0.92) continue;           // keep the hut and boat views open
     const f = rng.range(1.12, 1.26);
-    const x = Math.cos(a) * (plan.A * f), z = Math.sin(a) * (plan.B * f + 20);
+    const x = dmath.cos(a) * (plan.A * f), z = dmath.sin(a) * (plan.B * f + 20);
     const stack = { x, z, y: terrain.heightAt(x, z), height: rng.range(12, 26), radius: rng.range(5, 9), rot: rng() * TAU };
     if (!insideBossArena(layout, x, z, stack.radius + 6)) layout.seaStacks.push(stack);
   }
@@ -1142,7 +1143,7 @@ export function* buildLayoutSteps(terrain) {
       // search a dry flat spot near the candidate
       for (let k = 0; k < 200; k++) {
         const a = rng() * TAU, r = k * 0.12;
-        const x = cx + Math.cos(a) * r, z = cz + Math.sin(a) * r;
+        const x = cx + dmath.cos(a) * r, z = cz + dmath.sin(a) * r;
         if (dry(x, z, 1) && terrain.slopeAt(x, z) < 0.5 && free(x, z, 1.2) && (!lowGround || outsideGrove(x, z, 2)) && (!volcanic || (terrain.heatAt(x, z) < 0.4 && outsideGrove(x, z, 2)))) {
           reserve(x, z, 1.2);
           addFruit(FRUIT.plant, x, z, 'plant');
@@ -1157,7 +1158,7 @@ export function* buildLayoutSteps(terrain) {
     const pts = [];
     for (let k = 0; k < 500 && pts.length < n; k++) {
       const a = rng() * TAU, r = Math.sqrt(rng()) * radius;
-      const x = cx + Math.cos(a) * r, z = cz + Math.sin(a) * r;
+      const x = cx + dmath.cos(a) * r, z = cz + dmath.sin(a) * r;
       if (dry(x, z, 1.2) && terrain.slopeAt(x, z) < 0.5 && !nearHut(x, z, 40) && outsideGrove(x, z, 6) && terrain.heatAt(x, z) < 0.3) pts.push({ x, z });
     }
     return pts;
@@ -1166,7 +1167,7 @@ export function* buildLayoutSteps(terrain) {
     for (let i = 0; i < 800; i++) {
       const x = rng.range(-plan.A * 0.75, plan.A * 0.75), z = rng.range(-plan.B * 0.7, plan.B * 0.7);
       if (!inside(x, z, 0.8) || !dry(x, z, lowGround ? 1.2 : 2) || terrain.slopeAt(x, z) > 0.45 || terrain.heatAt(x, z) > 0.2) continue;
-      if (Math.hypot(x - hf.x, z - hf.z) < minHut || nearBoat(x, z, 25) || !outsideGrove(x, z, 25) || !pred(x, z)) continue;
+      if (dmath.hypot(x - hf.x, z - hf.z) < minHut || nearBoat(x, z, 25) || !outsideGrove(x, z, 25) || !pred(x, z)) continue;
       return { x, z };
     }
     return { x: 0, z: 0 };
@@ -1183,7 +1184,7 @@ export function* buildLayoutSteps(terrain) {
   }
   for (let i = 0; i < (caveLevel ? 0 : D.raptor); i++) {
     // the first pack guards the nest
-    const separated = (x, z) => layout.dinoZones.raptor.every((zone) => Math.hypot(x - zone.x, z - zone.z) >= 48);
+    const separated = (x, z) => layout.dinoZones.raptor.every((zone) => dmath.hypot(x - zone.x, z - zone.z) >= 48);
     const c = i === 0 && layout.nest && !volcanic ? { x: layout.nest.x, z: layout.nest.z }
       : plan.level.index === 0 ? randomZoneCenter(90, separated) : randomZoneCenter(100 + i * 10);
     layout.dinoZones.raptor.push({ x: c.x, z: c.z, radius: 34, spawns: pickDry(c.x, c.z, 14, 5), size: i === 0 ? 3 : 2 + (i % 2) });
@@ -1195,7 +1196,7 @@ export function* buildLayoutSteps(terrain) {
     let best = null;
     for (let k = 0; k < 200; k++) {
       const a = rng() * TAU, r = Math.sqrt(rng()) * h.radius * 0.35;
-      const x = h.x + Math.cos(a) * r, z = h.z + Math.sin(a) * r;
+      const x = h.x + dmath.cos(a) * r, z = h.z + dmath.sin(a) * r;
       const y = terrain.heightAt(x, z);
       if (terrain.slopeAt(x, z) < 0.35 && (!best || y > best.y)) best = { x, z, y };
     }
@@ -1213,11 +1214,11 @@ export function* buildLayoutSteps(terrain) {
     for (let k = 0; k < 9; k++) {
       const a = (k / 9) * TAU;
       const [sx, sz] = plan.shape === 'round' ? [1.1, 1.1] : [1.4, 0.75];
-      let x = cx + Math.cos(a) * rr * sx, z = cz + Math.sin(a) * rr * sz;
+      let x = cx + dmath.cos(a) * rr * sx, z = cz + dmath.sin(a) * rr * sz;
       for (let n = 0; n < 60 && !(dry(x, z, 1) && terrain.slopeAt(x, z) < 0.6 && inside(x, z, 0.85)); n++) {
         x = cx + (x - cx) * 0.97; z = cz + (z - cz) * 0.97;
       }
-      if (Math.hypot(x - hf.x, z - hf.z) < 70) continue;
+      if (dmath.hypot(x - hf.x, z - hf.z) < 70) continue;
       layout.trexPatrol.push({ x, z });
     }
     if (layout.nest && volcanic) layout.trexPatrol.splice(1, 0, { x: layout.nest.x + 8, z: layout.nest.z + 8 });
@@ -1235,8 +1236,8 @@ export function* buildLayoutSteps(terrain) {
       ...layout.spawnPoints.map((p) => ({ ...p, r: 4 })),
       ...layout.relics.map((p) => ({ ...p, r: 4 })),
     ];
-    const clear = (x, z, r) => keepClear.every((p) => Math.hypot(p.x - x, p.z - z) > p.r + r);
-    const meadow = (x, z, pad) => plan.meadows.some((f) => Math.hypot(x - f.x, z - f.z) < f.r * 0.6 + pad);
+    const clear = (x, z, r) => keepClear.every((p) => dmath.hypot(p.x - x, p.z - z) > p.r + r);
+    const meadow = (x, z, pad) => plan.meadows.some((f) => dmath.hypot(x - f.x, z - f.z) < f.r * 0.6 + pad);
 
     // Big boulders: landmarks on hillsides, meadow edges and cliff bases.
     let big = 0;
@@ -1253,7 +1254,7 @@ export function* buildLayoutSteps(terrain) {
       big++;
       for (let k = rr.int(1, 3); k > 0; k--) {
         const a = rr() * TAU, d = s * rr.range(1.5, 2.3);
-        const cx = x + Math.cos(a) * d, cz = z + Math.sin(a) * d, cs = rr.range(0.7, 1.4);
+        const cx = x + dmath.cos(a) * d, cz = z + dmath.sin(a) * d, cs = rr.range(0.7, 1.4);
         if (dry(cx, cz, 1) && distToPath(cx, cz) > 2.5 && free(cx, cz, cs * 1.1) && clear(cx, cz, cs)) addRock(cx, cz, cs, {}, rr);
       }
     }
@@ -1265,7 +1266,7 @@ export function* buildLayoutSteps(terrain) {
         const a = P[i], b = P[(i + 1) % P.length];
         const vx = b.x - a.x, vz = b.z - a.z;
         const t = Math.max(0, Math.min(1, ((x - a.x) * vx + (z - a.z) * vz) / (vx * vx + vz * vz || 1)));
-        best = Math.min(best, Math.hypot(a.x + vx * t - x, a.z + vz * t - z));
+        best = Math.min(best, dmath.hypot(a.x + vx * t - x, a.z + vz * t - z));
       }
       return best;
     };
@@ -1275,7 +1276,7 @@ export function* buildLayoutSteps(terrain) {
       for (let k = 0; k < 12; k++) {
         const a = (k / 12) * TAU;
         for (const f of [0.5, 1]) {
-          const h = terrain.heightAt(x + Math.cos(a) * Rr * f, z + Math.sin(a) * Rr * f);
+          const h = terrain.heightAt(x + dmath.cos(a) * Rr * f, z + dmath.sin(a) * Rr * f);
           lo = Math.min(lo, h); hi = Math.max(hi, h);
         }
       }
@@ -1296,7 +1297,7 @@ export function* buildLayoutSteps(terrain) {
       formations++;
       for (let k = rf.int(2, 4); k > 0; k--) {
         const a = rf() * TAU, d = Rr * rf.range(1.05, 1.35);
-        const cx = x + Math.cos(a) * d, cz = z + Math.sin(a) * d, cs = rf.range(0.6, 1.5);
+        const cx = x + dmath.cos(a) * d, cz = z + dmath.sin(a) * d, cs = rf.range(0.6, 1.5);
         if (dry(cx, cz, 1) && distToPath(cx, cz) > 2.5 && free(cx, cz, cs * 1.1) && clear(cx, cz, cs)) addRock(cx, cz, cs, {}, rf);
       }
     }
@@ -1357,18 +1358,18 @@ export function* buildLayoutSteps(terrain) {
       reserve(x, z, 0.9);
     };
     const count = (type) => layout.resourceSpots.filter((s) => s.type === type).length;
-    const apart = (type, x, z) => layout.resourceSpots.every((s) => s.type !== type || Math.hypot(s.x - x, s.z - z) >= spread);
+    const apart = (type, x, z) => layout.resourceSpots.every((s) => s.type !== type || dmath.hypot(s.x - x, s.z - z) >= spread);
     const open = (x, z) => inside(x, z, 0.92) && dry(x, z, 0.8) && !nearHut(x, z, 4) && !nearBoat(x, z, 4) &&
       distToPath(x, z) > 2.5 && outsideGrove(x, z, 4) && terrain.heatAt(x, z) < 0.1;
-    const meadowAt = (x, z) => plan.meadows.some((m) => Math.hypot(x - m.x, z - m.z) < m.r * 0.9);
-    const byRock = (x, z) => layout.rocks.some((r) => r.scale > PEBBLE_SCALE && Math.hypot(r.x - x, r.z - z) < r.R + 6);
+    const meadowAt = (x, z) => plan.meadows.some((m) => dmath.hypot(x - m.x, z - m.z) < m.r * 0.9);
+    const byRock = (x, z) => layout.rocks.some((r) => r.scale > PEBBLE_SCALE && dmath.hypot(r.x - x, r.z - z) < r.R + 6);
     // resin: a drop of amber on the bark of a round or tall tree, at hip height (the
     // client puts it on the visible trunk); the spot lies just in front of the bark
     const hosts = layout.trees.filter((t) => t.type === 'round' || t.type === 'tall');
     for (let i = 0; i < 6000 && hosts.length && count('resin') < (want.resin || 0); i++) {
       const t = hosts[rr.int(0, hosts.length - 1)];
       const side = rr() * TAU, r = TRUNKS[t.type][treeVariant(t)].r(0.12) * t.scale + 0.35;
-      const x = t.x + Math.cos(side) * r, z = t.z + Math.sin(side) * r;
+      const x = t.x + dmath.cos(side) * r, z = t.z + dmath.sin(side) * r;
       if (!open(x, z) || terrain.slopeAt(x, z) > 0.6 || !apart('resin', x, z)) continue;
       add('resin', x, z, { host: 'tree:' + t.id, side });
     }
@@ -1399,18 +1400,18 @@ export function* buildLayoutSteps(terrain) {
     const rb = makeRng(S ^ 0xb0c4);
     const pk = plan.mainPeak, tr = plan.trail;
     const len = [0];
-    for (let i = 1; i < tr.length; i++) len.push(len[i - 1] + Math.hypot(tr[i].x - tr[i - 1].x, tr[i].z - tr[i - 1].z));
+    for (let i = 1; i < tr.length; i++) len.push(len[i - 1] + dmath.hypot(tr[i].x - tr[i - 1].x, tr[i].z - tr[i - 1].z));
     const total = len[len.length - 1];
     // (trees reserve wide room for their crowns: check the solid things themselves)
-    const clear = (x, z) => layout.trees.every((t) => Math.hypot(t.x - x, t.z - z) > 2.2 * t.scale) &&
-      layout.rocks.every((r) => Math.hypot(r.x - x, r.z - z) > r.R + 1.5) &&
-      layout.logs.every((l) => Math.hypot(l.x - x, l.z - z) > l.len / 2 + 1.5) &&
-      [...layout.fruitSpots, ...layout.relics].every((o) => Math.hypot(o.x - x, o.z - z) > 4) &&
-      layout.nests.every((n) => Math.hypot(n.x - x, n.z - z) > 8);
+    const clear = (x, z) => layout.trees.every((t) => dmath.hypot(t.x - x, t.z - z) > 2.2 * t.scale) &&
+      layout.rocks.every((r) => dmath.hypot(r.x - x, r.z - z) > r.R + 1.5) &&
+      layout.logs.every((l) => dmath.hypot(l.x - x, l.z - z) > l.len / 2 + 1.5) &&
+      [...layout.fruitSpots, ...layout.relics].every((o) => dmath.hypot(o.x - x, o.z - z) > 4) &&
+      layout.nests.every((n) => dmath.hypot(n.x - x, n.z - z) > 8);
     // candidates every 2 m along that stretch, 6-12 m to either side; the nearest to the mountain's foot wins
     const cands = [];
     for (let i = 1; i < tr.length; i++) {
-      const q = tr[i - 1], p = tr[i], l = Math.hypot(p.x - q.x, p.z - q.z) || 1;
+      const q = tr[i - 1], p = tr[i], l = dmath.hypot(p.x - q.x, p.z - q.z) || 1;
       const nx = -(p.z - q.z) / l, nz = (p.x - q.x) / l;
       for (let k = 0; k < l; k += 2) {
         if (len[i - 1] + k < total * 0.35 || len[i - 1] + k > total * 0.5) continue;
@@ -1418,7 +1419,7 @@ export function* buildLayoutSteps(terrain) {
         for (const side of [1, -1]) {
           for (let d = 6; d <= 12; d += 1.5) {
             const x = cx + nx * side * d, z = cz + nz * side * d;
-            cands.push({ x, z, nx: nx * side, nz: nz * side, foot: Math.abs(Math.hypot(x - pk.x, z - pk.z) - pk.radius) + d * 0.5 + rb() });
+            cands.push({ x, z, nx: nx * side, nz: nz * side, foot: Math.abs(dmath.hypot(x - pk.x, z - pk.z) - pk.radius) + d * 0.5 + rb() });
           }
         }
       }
@@ -1428,9 +1429,9 @@ export function* buildLayoutSteps(terrain) {
       outsideGrove(x, z, 4) && !nearHut(x, z, 6) && clear(x, z));
     if (c) {
       // (the stump faces the trail)
-      layout.bowCamp = { x: c.x, z: c.z, y: terrain.heightAt(c.x, c.z), rot: Math.atan2(-c.nx, -c.nz) };
+      layout.bowCamp = { x: c.x, z: c.z, y: terrain.heightAt(c.x, c.z), rot: dmath.atan2(-c.nx, -c.nz) };
       reserve(c.x, c.z, 3);
-      layout.bushes = layout.bushes.filter((bu) => Math.hypot(bu.x - c.x, bu.z - c.z) > 2.6);
+      layout.bushes = layout.bushes.filter((bu) => dmath.hypot(bu.x - c.x, bu.z - c.z) > 2.6);
       circles.push({ x: c.x, z: c.z, r: 0.55, top: layout.bowCamp.y + 0.68, stand: true, kind: 'stump' });   // (client/world/bowCamp.js draws it 1.25 x life size)
     }
   }

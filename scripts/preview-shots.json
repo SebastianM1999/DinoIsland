@@ -21,8 +21,8 @@
 ],
   "4": [
   { "name": "hut-cove", "from": [-250, 30, 4], "to": [-227, 12, 4] },
-  { "name": "crystals-a", "from": [-30, -108, 2.5], "to": [-47, -117, 3], "dinos": false },
+  { "name": "crystals-a", "from": [-102, -140, 2.5], "to": [-132, -142, 3], "dinos": false },
   { "name": "east-cove", "from": [268, 4, 6], "to": [190, 12, 28], "fov": 60 },
-  { "name": "crystals-b", "from": [-30, -108, 2.5], "to": [-10, -100, 8], "dinos": false },
+  { "name": "crystals-b", "from": [-34, -128, 2.5], "to": [-26, -92, 3], "dinos": false },
   { "name": "east-boat", "from": [212, 10, 4], "to": [240, -2, 3] }
 ] }

@@ -10,6 +10,7 @@
 // minimap) and server (terrain, colliders, AI).
 
 import { CONFIG } from './config.js';
+import * as dmath from './dmath.js';
 
 export const VOLCANO_ARENA = {
   name: 'Ember Crown',
@@ -40,7 +41,7 @@ export const VOLCANO_ARENA = {
 export function planVolcanoArena(plan) {
   const v = plan.volcano;
   const V = VOLCANO_ARENA;
-  const a = v.notchAngle, c = Math.cos(a), s = Math.sin(a);
+  const a = v.notchAngle, c = dmath.cos(a), s = dmath.sin(a);
   return {
     x: v.x, z: v.z, r: V.r, y: v.floorY,
     craterR: V.craterR, moatR: V.moatR, moatW: V.moatW, moatLevel: v.floorY - V.sink,
@@ -89,15 +90,15 @@ export function columnCycle(st, C = CONFIG.volcano.column) {
  */
 export function ashShelter(layout, x, z) {
   const hut = layout.plan.hut;
-  if (Math.hypot(x - hut.x, z - (hut.z + 2)) < hut.radius) return true;
-  return (layout.basePlots || []).some((p) => Math.hypot(x - p.x, z - p.z) < p.r);
+  if (dmath.hypot(x - hut.x, z - (hut.z + 2)) < hut.radius) return true;
+  return (layout.basePlots || []).some((p) => dmath.hypot(x - p.x, z - p.z) < p.r);
 }
 
 /** Distance (m, along the moat) from (x, z)'s bearing to the entrance's middle. */
 export function entranceOffset(a, x, z) {
-  const ang = Math.atan2(z - a.z, x - a.x);
+  const ang = dmath.atan2(z - a.z, x - a.x);
   const g = a.gates[0].angle;
-  return Math.abs(Math.atan2(Math.sin(ang - g), Math.cos(ang - g))) * a.moatR;
+  return Math.abs(dmath.atan2(dmath.sin(ang - g), dmath.cos(ang - g))) * a.moatR;
 }
 
 /** The moat as a lava flow polyline: round the floor, open at the entrance. */
@@ -109,7 +110,7 @@ export function moatFlow(a) {
   const pts = [];
   for (let k = 0; k <= n; k++) {
     const ang = g + gap + (k / n) * (Math.PI * 2 - 2 * gap);
-    pts.push({ x: a.x + Math.cos(ang) * a.moatR, z: a.z + Math.sin(ang) * a.moatR, y: a.moatLevel, w: a.moatW });
+    pts.push({ x: a.x + dmath.cos(ang) * a.moatR, z: a.z + dmath.sin(ang) * a.moatR, y: a.moatLevel, w: a.moatW });
   }
   return { kind: 'lava', ring: true, pts };
 }

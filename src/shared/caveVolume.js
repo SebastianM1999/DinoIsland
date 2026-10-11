@@ -19,6 +19,7 @@ import { smoothstep } from './rng.js';
 import { fbm3 } from './springShape.js';
 import { caveColumn, caveDepth } from './caveField.js';
 import { CAVE_GEOM as G } from './caveMaze.js';
+import * as dmath from './dmath.js';
 
 /** Roundness of the cave's cross-section (floor into wall, wall into vault) and of the union with the outside (metres). */
 export const KC = 2.4, KU = 1.6;
@@ -53,7 +54,7 @@ export function volumeField(c, x, y, z, seed = 0) {
 
 /** Slope data of a column from the gradient of its `top` (rise per metre in x and z). */
 export function slopeOf(gx, gz) {
-  const g = Math.hypot(gx, gz);
+  const g = dmath.hypot(gx, gz);
   return { g, inv: 1 / Math.sqrt(1 + g * g) };
 }
 

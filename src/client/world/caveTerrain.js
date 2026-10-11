@@ -22,6 +22,7 @@ import { meshCaveVolumeSteps } from './caveVolumeMesh.js';
 import { caveRock, releaseVolumeLattice, volumeLattice } from '../../shared/caveVolume.js';
 import { bakeCaveLightSteps, sourceProbe } from './caveLight.js';
 import { caveBakeFor, meshKey, decodeMesh } from '../../shared/caveBake.js';
+import * as dmath from '../../shared/dmath.js';
 
 /** Bump when the vertex paint below changes in a way the probe (paintProbe) cannot see; the probe catches most. */
 export const PAINT_VERSION = 2;
@@ -68,8 +69,8 @@ export function* buildCaveTerrainMeshSteps(terrain, layout) {
     const warp = fbm(x * 0.05, z * 0.05, 2, S + 195) * 2;
 
     // ---- wet stone and strata, shared by cliffs and walls
-    const strata = Math.sin(y * 1.9 + warp);
-    const band = Math.sin(y * 0.65 + warp * 0.6 + fbm(x * 0.02, z * 0.02, 2, S + 194) * 3);
+    const strata = dmath.sin(y * 1.9 + warp);
+    const band = dmath.sin(y * 0.65 + warp * 0.6 + fbm(x * 0.02, z * 0.02, 2, S + 194) * 3);
     rock.copy(P.rock).lerp(P.rockWarm, smoothstep(0.1, 0.9, strata) * 0.6);
     rock.lerp(P.rockDark, smoothstep(0.3, -0.8, strata) * 0.5);
     rock.offsetHSL(band * 0.03, band * 0.05, band * 0.035);
@@ -201,7 +202,7 @@ export function* buildCaveTerrainMeshSteps(terrain, layout) {
       const x = -half + i * cell, z = -half + j * cell;
       const dx = (terrain.h(i + 1, j) - terrain.h(i - 1, j)) / (2 * cell);
       const dz = (terrain.h(i, j + 1) - terrain.h(i, j - 1)) / (2 * cell);
-      fillVertex(T, j * stride + i, x, terrain.h(i, j), z, Math.hypot(dx, dz));
+      fillVertex(T, j * stride + i, x, terrain.h(i, j), z, dmath.hypot(dx, dz));
     }
     yield;
   }
@@ -292,7 +293,7 @@ export function* buildCaveTerrainMeshSteps(terrain, layout) {
       if ((v & 1023) === 1023) yield;
       const x = ch.pos[v * 3], y = ch.pos[v * 3 + 1], z = ch.pos[v * 3 + 2], ny = ch.nor[v * 3 + 1];
       // (the heightfield's slope: rise over run, capped; downward faces count as walls)
-      const slope = Math.min(2.5, Math.hypot(ch.nor[v * 3], ch.nor[v * 3 + 2]) / Math.max(Math.abs(ny), 0.04));
+      const slope = Math.min(2.5, dmath.hypot(ch.nor[v * 3], ch.nor[v * 3 + 2]) / Math.max(Math.abs(ny), 0.04));
       fillVertex(A, v, x, y, z, ny < 0 ? Math.max(slope, 1) : slope);
       const rk = smoothstep(-0.1, -0.55, ny);
       if (rk > 0) {
@@ -322,7 +323,7 @@ const _tint = new THREE.Color();
 function roofLook(out, S, P, x, y, z, gap) {
   const noise = fbm(x * 0.05, z * 0.05, 3, S + 311) * 0.5 + 0.5;
   const warp = fbm(x * 0.06, z * 0.06, 2, S + 312) * 2;
-  const band = Math.sin(x * 0.11 + z * 0.07 + warp * 2.2);
+  const band = dmath.sin(x * 0.11 + z * 0.07 + warp * 2.2);
   out.copy(P.rockDark).lerp(P.rock, 0.25 + 0.4 * noise);
   out.lerp(P.rockWarm, smoothstep(0.2, 0.9, band) * 0.35);
   out.offsetHSL(band * 0.02, 0, band * 0.025);

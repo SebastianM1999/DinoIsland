@@ -11,6 +11,7 @@
 
 import { makeRng } from './rng.js';
 import { toWorld } from './siteFrame.js';
+import * as dmath from './dmath.js';
 
 export const CAVE = {
   radius: 7.2,       // outer footprint radius of the rock dome at ground level
@@ -81,7 +82,7 @@ export function caveColliders(c) {
   };
   for (let i = 0; i < n; i++) {
     const a = (i / n) * Math.PI * 2;             // 0 = entrance center (local -z)
-    const lx = Math.sin(a) * R, lz = -Math.cos(a) * R;
+    const lx = dmath.sin(a) * R, lz = -dmath.cos(a) * R;
     if (lz < 0 && Math.abs(lx) < CAVE.mouth + CAVE.wallR) continue;
     push(lx, lz);
   }
@@ -96,7 +97,7 @@ export function caveColliders(c) {
   // shrunk to the part outside the wall ring)
   for (const m of caveMasses(c.seed)) {
     for (const f of massFootprint(m)) {
-      const d = Math.hypot(f.x, f.z);
+      const d = dmath.hypot(f.x, f.z);
       if (d + f.r <= R + CAVE.wallR) continue;
       let { x, z, r } = f;
       if (d - r < R) {
@@ -120,12 +121,12 @@ export function caveRockPilesLocal(seed = 1) {
   const walls = caveColliders({ x: 0, z: 0, y: 0, rot: 0, seed });   // local frame
   // either overlap a neighbour clearly or leave a gap a mover fits through
   const spaced = (x, z, r, o, overlap) => {
-    const g = Math.hypot(o.x - x, o.z - z) - o.r - r;
+    const g = dmath.hypot(o.x - x, o.z - z) - o.r - r;
     return g >= 1.1 || g <= -overlap * Math.min(r, o.r);
   };
   const fits = (x, z, r) => {
     if (z < -4 && Math.abs(x) - r < CAVE_WALKWAY) return false;
-    for (const o of out) if (!spaced(x, z, r, o, 0.2) || Math.hypot(o.x - x, o.z - z) < (o.r + r) * 0.8) return false;
+    for (const o of out) if (!spaced(x, z, r, o, 0.2) || dmath.hypot(o.x - x, o.z - z) < (o.r + r) * 0.8) return false;
     for (const o of walls) if (!spaced(x, z, r, o, 0.3)) return false;
     return true;
   };
@@ -138,7 +139,7 @@ export function caveRockPilesLocal(seed = 1) {
   for (const p of plan) {
     for (let k = 0, tries = 0; k < p.n && tries < 80; tries++) {
       side = -side;
-      const r = p.rMin + (p.rMax - p.rMin) * rng() ** 1.4;
+      const r = p.rMin + (p.rMax - p.rMin) * dmath.pow(rng(), 1.4);
       const x = side * (p.xMin + (p.xMax - p.xMin) * rng());
       const z = p.zMin + (p.zMax - p.zMin) * rng();
       if (!fits(x, z, r)) continue;

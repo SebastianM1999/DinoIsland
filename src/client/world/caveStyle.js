@@ -6,6 +6,7 @@
 
 import * as THREE from 'three';
 import { smoothstep } from '../../shared/rng.js';
+import * as dmath from '../../shared/dmath.js';
 
 // ------------------------------------------------------------------ colours
 const AMBER = new THREE.Color('#ffa63d');
@@ -65,7 +66,7 @@ export function buildGlowField(layout) {
         const z = -half + (j + 0.5) * step;
         for (let i = i0; i <= i1; i++) {
           const x = -half + (i + 0.5) * step;
-          const d = Math.hypot(x - s.x, z - s.z);
+          const d = dmath.hypot(x - s.x, z - s.z);
           if (d >= s.r) continue;
           const f = 1 - d / s.r, w = f * f * s.k;
           const o = (j * size + i) * 3;
@@ -75,7 +76,7 @@ export function buildGlowField(layout) {
     }
     // many overlapping crystals must add up to a brighter glow, never to a white one: compress the strongest
     // channel softly (hue kept) instead of clipping each channel on its own
-    const soft = (m) => (m <= 0.55 ? m : 0.55 + 0.5 * (1 - Math.exp(-(m - 0.55) / 0.5)));
+    const soft = (m) => (m <= 0.55 ? m : 0.55 + 0.5 * (1 - dmath.exp(-(m - 0.55) / 0.5)));
     for (let k = 0; k < size * size; k++) {
       const m = Math.max(acc[k * 3], acc[k * 3 + 1], acc[k * 3 + 2]);
       const g = m > 0 ? soft(m) / m / GLOW_RANGE * 255 : 0;

@@ -12,6 +12,7 @@
 
 import { fbm, clamp, lerp, smoothstep } from './rng.js';
 import { CAVE_GEOM as G, SUMP } from './caveMaze.js';
+import * as dmath from './dmath.js';
 
 /** Roof values at or above this are "open sky" (Terrain.ceilingAt returns Infinity). */
 export const CAVE_SKY = 100;
@@ -45,7 +46,7 @@ function coveOf(seed, s) {
   const k = s < 0 ? 0 : 1;
   const ph = ((seed >>> (k * 5)) % 628) / 100;
   const face = (z) => G.face + 11 * fbm(z * 0.022 + 9 + k * 7, 3.1, 3, seed + 71 + k);
-  const half = (u) => G.coveHalf * (0.82 + 0.2 * smoothstep(0, 70, u)) + 8 * fbm(u * 0.035 + 2, 5 + k * 3, 3, seed + 72 + k) + 4 * Math.sin(u * 0.06 + ph);
+  const half = (u) => G.coveHalf * (0.82 + 0.2 * smoothstep(0, 70, u)) + 8 * fbm(u * 0.035 + 2, 5 + k * 3, 3, seed + 72 + k) + 4 * dmath.sin(u * 0.06 + ph);
   // nooks: small round inlets just outside the side walls
   const nooks = [0, 1].map((i) => {
     const r = 9 + 7 * (((seed >>> (3 + i * 4 + k)) % 97) / 97);
@@ -61,7 +62,7 @@ function coveOf(seed, s) {
     sdf(x, z) {
       let d = base(x, z);
       const u = s * x - face(z);
-      for (const n of nooks) d = smin(d, Math.hypot(u - n.u, z - n.z) - n.r, 7);
+      for (const n of nooks) d = smin(d, dmath.hypot(u - n.u, z - n.z) - n.r, 7);
       return d;
     },
     side(x, z) { const u = s * x - face(z); return half(Math.max(u, 0)) - Math.abs(z); },
@@ -74,9 +75,9 @@ export function mountainDepth(seed) {
   const [ax, az] = G.radius;
   const west = coveOf(seed, -1), east = coveOf(seed, 1);
   const f = (x, z) => {
-    const ang = Math.atan2(z / az, x / ax);
-    const warp = 1 + 0.05 * Math.sin(3 * ang + p1) + 0.034 * Math.sin(5 * ang + p2) + 0.026 * Math.sin(2 * ang + p3) + 0.018 * Math.sin(8 * ang + p4);
-    const dEll = (warp - Math.hypot(x / ax, z / az)) * Math.min(ax, az);
+    const ang = dmath.atan2(z / az, x / ax);
+    const warp = 1 + 0.05 * dmath.sin(3 * ang + p1) + 0.034 * dmath.sin(5 * ang + p2) + 0.026 * dmath.sin(2 * ang + p3) + 0.018 * dmath.sin(8 * ang + p4);
+    const dEll = (warp - dmath.hypot(x / ax, z / az)) * Math.min(ax, az);
     // headlands and bays along the shore, small rocky points on top
     const rag = 17 * fbm(x * 0.011 + 3, z * 0.011 - 5, 3, seed + 61) + 5 * fbm(x * 0.04 + 8, z * 0.04, 2, seed + 62);
     return Math.min(dEll + rag, west.sdf(x, z), east.sdf(x, z));
@@ -114,7 +115,7 @@ function buildField(plan) {
   for (const t of cave.maze.tunnels) {
     let acc = 0;
     const cum = [0];
-    for (let i = 1; i < t.pts.length; i++) { acc += Math.hypot(t.pts[i].x - t.pts[i - 1].x, t.pts[i].z - t.pts[i - 1].z); cum.push(acc); }
+    for (let i = 1; i < t.pts.length; i++) { acc += dmath.hypot(t.pts[i].x - t.pts[i - 1].x, t.pts[i].z - t.pts[i - 1].z); cum.push(acc); }
     for (let i = 0; i < t.pts.length - 1; i++) {
       const a = t.pts[i], b = t.pts[i + 1];
       const pr = { type: 0, ax: a.x, az: a.z, bx: b.x, bz: b.z, w0: a.w, w1: b.w, r0: a.roof, r1: b.roof, u0: cum[i] / acc, u1: cum[i + 1] / acc, len: acc, t };
@@ -125,7 +126,7 @@ function buildField(plan) {
   for (const n of cave.maze.nodes) {
     if (n.outside) continue;
     const ra = n.r * Math.sqrt(n.aspect), rb = n.r / Math.sqrt(n.aspect);
-    const pr = { type: 1, n, ra, rb, c: Math.cos(n.rot), s: Math.sin(n.rot), roof: n.roof };
+    const pr = { type: 1, n, ra, rb, c: dmath.cos(n.rot), s: dmath.sin(n.rot), roof: n.roof };
     prims.push(pr);
     const R = Math.max(ra, rb) * 1.2;
     put(pr, n.x - R, n.z - R, n.x + R, n.z + R);
@@ -145,7 +146,7 @@ function buildField(plan) {
           const vx = pr.bx - pr.ax, vz = pr.bz - pr.az;
           const raw = ((x - pr.ax) * vx + (z - pr.az) * vz) / (vx * vx + vz * vz || 1);
           const u = clamp(raw, 0, 1);
-          const dc = Math.hypot(pr.ax + vx * u - x, pr.az + vz * u - z);
+          const dc = dmath.hypot(pr.ax + vx * u - x, pr.az + vz * u - z);
           const half = lerp(pr.w0, pr.w1, u) / 2;
           d = dc - half;
           roof = lerp(pr.r0, pr.r1, u);
@@ -174,20 +175,20 @@ function buildField(plan) {
         } else {
           const dx = x - pr.n.x, dz = z - pr.n.z;
           const lx = dx * pr.c + dz * pr.s, lz = -dx * pr.s + dz * pr.c;
-          const th = Math.atan2(lz, lx);
-          const wf = 1 + 0.09 * Math.sin(2 * th + pr.n.wob[0]) + 0.06 * Math.sin(3 * th + pr.n.wob[1]);
-          d = (Math.hypot(lx / pr.ra, lz / pr.rb) - wf) * Math.min(pr.ra, pr.rb);
-          roof = pr.roof + 1.2 * Math.sin(th * 2 + pr.n.wob[1]) * 0.5;
+          const th = dmath.atan2(lz, lx);
+          const wf = 1 + 0.09 * dmath.sin(2 * th + pr.n.wob[0]) + 0.06 * dmath.sin(3 * th + pr.n.wob[1]);
+          d = (dmath.hypot(lx / pr.ra, lz / pr.rb) - wf) * Math.min(pr.ra, pr.rb);
+          roof = pr.roof + 1.2 * dmath.sin(th * 2 + pr.n.wob[1]) * 0.5;
         }
         if (d < best) best = d;
         if (d < 28) {
-          sum += Math.exp(-d / SMIN);
-          const w = Math.exp(-Math.max(d, -12) / 5);
+          sum += dmath.exp(-d / SMIN);
+          const w = dmath.exp(-Math.max(d, -12) / 5);
           rw += w; rs += w * roof;
         }
       }
     }
-    const s = sum > 0 ? Math.min(best + 1e-6, -SMIN * Math.log(sum)) : best;
+    const s = sum > 0 ? Math.min(best + 1e-6, -SMIN * dmath.log(sum)) : best;
     memo = { s: Math.min(s, 80), roof: rw > 0 ? rs / rw : 8, dep, fw, y0, sw, sy, sl, fx };
     return memo;
   };
@@ -216,13 +217,13 @@ function buildField(plan) {
   const pk = ((seed >>> 3) % 97) / 97, pq = ((seed >>> 11) % 89) / 89, pr = ((seed >>> 17) % 83) / 83;
   const peakA = { x: (pk - 0.5) * 120, z: (pq - 0.5) * 200, h: 52 + 12 * pr, r: 85 };
   const aAng = 0.9 + 4.4 * pr + pk;
-  const peakB = { x: -peakA.x * 0.6 + Math.cos(aAng) * 135, z: peakA.z * 0.5 + Math.sin(aAng) * 150, h: 30 + 10 * pk, r: 62 };
+  const peakB = { x: -peakA.x * 0.6 + dmath.cos(aAng) * 135, z: peakA.z * 0.5 + dmath.sin(aAng) * 150, h: 30 + 10 * pk, r: 62 };
   for (const p of [peakA, peakB]) {   // (a summit sits in the core, well away from the rim)
     for (let i = 0; i < 12 && depth(p.x, p.z) < 95; i++) { p.x *= 0.85; p.z *= 0.85; }
   }
   /** rise (m) at depth d: 2.4 m per m over the first 6 m (67 deg: nobody climbs), easing to 0.5 by 22 m, then 0.4 */
   const belt = (d) => {
-    const foot = 4 * (1 - Math.exp(-d / 1.8));   // (a sea cliff's first steps: 75 deg right at the water)
+    const foot = 4 * (1 - dmath.exp(-d / 1.8));   // (a sea cliff's first steps: 75 deg right at the water)
     const u = clamp((d - 6) / 16, 0, 1);
     const K = Math.min(d, 6) + 16 * (u - (u * u * u - u * u * u * u / 2));
     return 0.5 * Math.min(d, 22) + 1.9 * K + 0.4 * Math.max(0, d - 22) + foot;
@@ -230,8 +231,8 @@ function buildField(plan) {
   const summit = (x, z) => {
     let h = 0;
     for (const p of [peakA, peakB]) {
-      const r = Math.hypot(x - p.x, z - p.z) / p.r;
-      h += p.h * (0.55 * Math.exp(-r * r * 1.1) + 0.45 * Math.exp(-r * 1.9));
+      const r = dmath.hypot(x - p.x, z - p.z) / p.r;
+      h += p.h * (0.55 * dmath.exp(-r * r * 1.1) + 0.45 * dmath.exp(-r * 1.9));
     }
     return h;
   };
@@ -239,8 +240,8 @@ function buildField(plan) {
     // buttresses and gullies: the flank climbs sooner or later along the shore
     const bw = fbm(x * 0.018 + 13, z * 0.018 - 4, 3, seed + 31);
     // radial ribs running down from the summit
-    const ang = Math.atan2(z - peakA.z, x - peakA.x);
-    const rib = 1 - Math.abs(fbm(ang * 11 + 5, Math.hypot(x - peakA.x, z - peakA.z) * 0.012, 3, seed + 32));
+    const ang = dmath.atan2(z - peakA.z, x - peakA.x);
+    const rib = 1 - Math.abs(fbm(ang * 11 + 5, dmath.hypot(x - peakA.x, z - peakA.z) * 0.012, 3, seed + 32));
     const de = d * (1 + 0.12 * bw * smoothstep(0, 14, d));
     const deep = smoothstep(7, 45, d);
     let y = belt(Math.max(de, 0));
@@ -252,7 +253,7 @@ function buildField(plan) {
     // strata ledges: flat shelves with short drops, wandering with the rock's own layers (high up only)
     const T = 8 + 4 * fbm(x * 0.012 + 1, z * 0.012 + 9, 2, seed + 35), ph = 3 * fbm(x * 0.02 + 5, z * 0.02 + 1, 2, seed + 34);
     const patch = smoothstep(0.0, 0.45, fbm(x * 0.014 + 3, z * 0.014 - 8, 2, seed + 36));
-    y += 1.2 * patch * smoothstep(38, 52, y) * Math.sin(y * (Math.PI * 2 / T) + ph);
+    y += 1.2 * patch * smoothstep(38, 52, y) * dmath.sin(y * (Math.PI * 2 / T) + ph);
     return y;
   };
 
@@ -302,7 +303,7 @@ function buildField(plan) {
         h = lerp(floor, top, smoothstep(0, WALL, s));
       }
       for (const p of pads) {
-        const dd = Math.hypot(x - p.x, z - p.z);
+        const dd = dmath.hypot(x - p.x, z - p.z);
         if (dd < p.r) h = lerp(h, p.h, 1 - smoothstep(p.r * 0.65, p.r, dd));
       }
       return h;
@@ -328,7 +329,7 @@ function buildField(plan) {
         o.s = q.s;
       } else { o.roof = 1e4; o.s = query(x, z).s; }
       for (const p of pads) {
-        const dd = Math.hypot(x - p.x, z - p.z);
+        const dd = dmath.hypot(x - p.x, z - p.z);
         if (dd < p.r) { const t = 1 - smoothstep(p.r * 0.65, p.r, dd); floor = lerp(floor, p.h, t); top = lerp(top, p.h, t); }
       }
       o.floor = floor; o.top = top;
@@ -338,8 +339,8 @@ function buildField(plan) {
       const d = depth(x, z);
       if (d <= 0) return 1e4;
       const roof = roofOf(x, z, d, query(x, z));
-      const s = smoothstep(2, 24, d);
-      return roof + 4000 * (1 - s) ** 3;
+      const t = 1 - smoothstep(2, 24, d);
+      return roof + 4000 * t * t * t;
     },
   };
   return field;

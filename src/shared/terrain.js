@@ -9,6 +9,7 @@ import { smoothstep } from './rng.js';
 import { caveCeiling, CAVE_SKY } from './caveField.js';
 import { buildCaveWalkSteps } from './caveWalk.js';
 import { caveBakeFor, decodeWalk } from './caveBake.js';
+import * as dmath from './dmath.js';
 
 /**
  * Heat (volcano): the ground near lava and fumaroles is hot – 1 right at the
@@ -128,7 +129,7 @@ export class Terrain {
         for (let i = 0; i <= segments; i++) {
           const x = -this.half + i * this.cell, z = -this.half + j * this.cell;
           let h = 1 - smoothstep(0, HEAT.reach, dist[j * n1 + i]);
-          for (const f of plan.fumaroles || []) h = Math.max(h, 0.85 * (1 - smoothstep(0.5, HEAT.fumarole, Math.hypot(x - f.x, z - f.z))));
+          for (const f of plan.fumaroles || []) h = Math.max(h, 0.85 * (1 - smoothstep(0.5, HEAT.fumarole, dmath.hypot(x - f.x, z - f.z))));
           this.heatMask[j * n1 + i] = h;
         }
         yield;
@@ -248,7 +249,7 @@ export class Terrain {
 
   slopeAt(x, z) {
     const g = this.gradientAt(x, z);
-    return Math.hypot(g.x, g.z);
+    return dmath.hypot(g.x, g.z);
   }
 
   /** Surface of a river/pool of `kind` above the ground at (x, z), or null. */

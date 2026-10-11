@@ -11,6 +11,7 @@
 // (look, minimap) and server (terrain, colliders, AI).
 
 import { smoothstep } from './rng.js';
+import * as dmath from './dmath.js';
 
 export const SWAMP_ARENA = {
   name: 'Drowned Hollow',
@@ -34,7 +35,7 @@ export const SWAMP_ARENA = {
 export function planSwampArena(plan) {
   const r = SWAMP_ARENA.r;
   const x = 0, z = 0;
-  const gate = (angle, kind) => ({ angle, kind, locked: false, x: x + Math.cos(angle) * (r + 3), z: z + Math.sin(angle) * (r + 3) });
+  const gate = (angle, kind) => ({ angle, kind, locked: false, x: x + dmath.cos(angle) * (r + 3), z: z + dmath.sin(angle) * (r + 3) });
   return {
     x, z, r,
     gates: [gate(Math.PI, 'entrance'), gate(0, 'exit')],
@@ -53,15 +54,15 @@ export function insideSwampArena(layout, x, z, pad = 0) {
 
 /** Distance along the ring (m) from (x, z) to the nearest gate's middle. */
 export function gateOffset(a, x, z) {
-  const ang = Math.atan2(z - a.z, x - a.x);
+  const ang = dmath.atan2(z - a.z, x - a.x);
   let best = Infinity;
-  for (const g of a.gates) best = Math.min(best, Math.abs(Math.atan2(Math.sin(ang - g.angle), Math.cos(ang - g.angle))) * a.r);
+  for (const g of a.gates) best = Math.min(best, Math.abs(dmath.atan2(dmath.sin(ang - g.angle), dmath.cos(ang - g.angle))) * a.r);
   return best;
 }
 
 /** True where the ring wall stands (not in a gate's opening). */
 export function onArenaWall(a, x, z) {
-  const d = Math.hypot(x - a.x, z - a.z);
+  const d = dmath.hypot(x - a.x, z - a.z);
   if (Math.abs(d - a.r) > SWAMP_ARENA.wallW / 2) return false;
   return gateOffset(a, x, z) > SWAMP_ARENA.gateW / 2;
 }
@@ -77,7 +78,7 @@ export function arenaWallColliders(a, groundY) {
   const seg = (2 * Math.PI * a.r) / n;
   for (let k = 0; k < n; k++) {
     const ang = (k / n) * Math.PI * 2;
-    const x = a.x + Math.cos(ang) * a.r, z = a.z + Math.sin(ang) * a.r;
+    const x = a.x + dmath.cos(ang) * a.r, z = a.z + dmath.sin(ang) * a.r;
     if (gateOffset(a, x, z) < SWAMP_ARENA.gateW / 2 + seg / 2) continue;
     // box: long side along the ring tangent; collider rot is the negated yaw
     out.push({ x, z, hw: seg / 2 + 0.15, hd: SWAMP_ARENA.wallW / 2, rot: ang + Math.PI / 2, top: groundY + SWAMP_ARENA.wallH, kind: 'arena' });
@@ -124,7 +125,7 @@ export function waistWallColliders(a, walls, groundAt) {
 
 /** How much of the basin floor shaping applies at (x, z): 1 inside, 0 beyond the wall. */
 export function arenaBasin(a, x, z) {
-  const d = Math.hypot(x - a.x, z - a.z);
+  const d = dmath.hypot(x - a.x, z - a.z);
   return 1 - smoothstep(a.r - 7, a.r - 2, d);
 }
 
@@ -133,7 +134,7 @@ export function ambushPocket(a, x, z) {
   if (!a) return 0;
   let depth = 0;
   for (const side of [-1, 1]) {
-    const d = Math.hypot((x - a.x) / 1.4, z - a.z - side * a.r * .45);
+    const d = dmath.hypot((x - a.x) / 1.4, z - a.z - side * a.r * .45);
     depth = Math.max(depth, 1 - smoothstep(6, 10, d));
   }
   return depth;

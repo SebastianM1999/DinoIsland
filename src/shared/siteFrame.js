@@ -3,9 +3,11 @@
 // world (cos rot, -sin rot), local -z to (-sin rot, -cos rot).
 // Shared by server (colliders, pickup spots) and client (models).
 
+import * as dmath from './dmath.js';
+
 /** Local (lx, lz) -> world { x, z }. */
 export function toWorld(o, lx, lz) {
-  const c = Math.cos(o.rot || 0), s = Math.sin(o.rot || 0);
+  const c = dmath.cos(o.rot || 0), s = dmath.sin(o.rot || 0);
   return { x: o.x + lx * c + lz * s, z: o.z - lx * s + lz * c };
 }
 

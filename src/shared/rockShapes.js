@@ -4,6 +4,7 @@
 // exactly these vertices and the collision reads the same table, so the hitbox
 // is the visible rock – including the vertical walls of stepped rocks.
 
+import * as dmath from './dmath.js';
 
 /** Angles per ring (enough for a smooth outline; collision uses the same table). */
 const SIDES = 24;
@@ -69,7 +70,7 @@ export function rockTable(variant) {
   for (let j = 0; j < SIDES; j++) {
     const a = (j / SIDES) * TAU;
     // smooth lobes only (no per-vertex noise) so the outline reads as a rounded stone
-    outline.push(1 + v.wob * (Math.sin(2 * a + variant) * 0.6 + Math.sin(3 * a + variant * 2) * 0.4 + Math.sin(5 * a + seed) * 0.22));
+    outline.push(1 + v.wob * (dmath.sin(2 * a + variant) * 0.6 + dmath.sin(3 * a + variant * 2) * 0.4 + dmath.sin(5 * a + seed) * 0.22));
   }
   const rad = [], h = [], wall = [];
   v.rings.forEach(([r, y, isWall], k) => {
@@ -78,9 +79,9 @@ export function rockTable(variant) {
       // walls keep the radius of the ledge above them so they stay vertical
       const key = isWall ? k - 1 : k;
       const a = (j / SIDES) * TAU;
-      const wobble = r === 0 ? 0 : (Math.sin(a * 3 + key * 1.7 + seed) * 0.6 + Math.sin(a * 5 - key * 2.3) * 0.4) * v.tierWob;
+      const wobble = r === 0 ? 0 : (dmath.sin(a * 3 + key * 1.7 + seed) * 0.6 + dmath.sin(a * 5 - key * 2.3) * 0.4) * v.tierWob;
       rr.push(r * outline[j] * (1 + wobble));
-      hh.push(y + (r === 0 ? 0 : Math.sin(a * 2 + k * 1.3 + seed) * 0.015));
+      hh.push(y + (r === 0 ? 0 : dmath.sin(a * 2 + k * 1.3 + seed) * 0.015));
     }
     if (isWall) for (let j = 0; j < SIDES; j++) rr[j] = Math.max(rr[j], rad[k - 1][j] + 0.004);
     else if (k > 0) for (let j = 0; j < SIDES; j++) rr[j] = Math.max(rr[j], rad[k - 1][j] + 0.02);
@@ -114,7 +115,7 @@ export function placeRock(r, terrain) {
   let lo = Infinity;
   for (let k = 0; k < 12; k++) {
     const a = (k / 12) * TAU;
-    lo = Math.min(lo, terrain.heightAt(r.x + Math.cos(a) * r.R * 0.85, r.z + Math.sin(a) * r.R * 0.85));
+    lo = Math.min(lo, terrain.heightAt(r.x + dmath.cos(a) * r.R * 0.85, r.z + dmath.sin(a) * r.R * 0.85));
   }
   r.by = Math.min(r.by, lo - 0.05);
   r.top = r.by + t.top * r.fy;
@@ -132,17 +133,17 @@ export function rockSurfaceAt(r, x, z) {
   out.h = -Infinity; out.slope = 0; out.ledge = -Infinity;
   const dx = x - r.x, dz = z - r.z;
   if (dx * dx + dz * dz > r.R * r.R) return out;
-  const c = Math.cos(r.rot), s = Math.sin(r.rot);
+  const c = dmath.cos(r.rot), s = dmath.sin(r.rot);
   // world -> rock local (inverse yaw, then inverse scale); the mesh uses the same axes
   const lx = (dx * c - dz * s) / r.fx, lz = (dx * s + dz * c) / r.fz;
   const t = rockTable(r.variant);
-  let a = Math.atan2(lz, lx);
+  let a = dmath.atan2(lz, lx);
   if (a < 0) a += TAU;
   const j0 = Math.floor((a / TAU) * t.sides) % t.sides, j1 = (j0 + 1) % t.sides;
-  const d = Math.hypot(lx, lz);
+  const d = dmath.hypot(lx, lz);
   const ux = d > 1e-9 ? lx / d : 1, uz = d > 1e-9 ? lz / d : 0;
   const a0 = (j0 / t.sides) * TAU, a1 = (j1 / t.sides) * TAU;
-  const c0 = Math.cos(a0), s0 = Math.sin(a0), c1 = Math.cos(a1), s1 = Math.sin(a1);
+  const c0 = dmath.cos(a0), s0 = dmath.sin(a0), c1 = dmath.cos(a1), s1 = dmath.sin(a1);
   // Where the ray from the centre crosses ring k's straight mesh edge: radius + height there.
   let ringR = 0, ringH = 0;
   const ring = (k) => {
@@ -150,7 +151,7 @@ export function rockSurfaceAt(r, x, z) {
     const ex = p1x - p0x, ez = p1z - p0z;
     const den = ux * ez - uz * ex;
     const f = Math.abs(den) > 1e-9 ? Math.min(1, Math.max(0, -(ux * p0z - uz * p0x) / den)) : 0;
-    ringR = Math.hypot(p0x + ex * f, p0z + ez * f);
+    ringR = dmath.hypot(p0x + ex * f, p0z + ez * f);
     ringH = t.h[k][j0] + (t.h[k][j1] - t.h[k][j0]) * f;
   };
   const rings = t.rad.length - 1; // the skirt is not walkable

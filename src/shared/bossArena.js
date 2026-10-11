@@ -14,6 +14,7 @@
 
 import { valueNoise, smoothstep, lerp, clamp } from './rng.js';
 import { GROVE } from './grove.js';
+import * as dmath from './dmath.js';
 
 export const BOSS_ARENA = {
   name: GROVE.name,
@@ -54,11 +55,11 @@ export function planBossArena(plan, heightAt = null) {
   const b = plan.boat;
   const candidates = [-1, 1].map((side) => {
     const start = { x: b.x - 10, z: b.z + side * A.besideBoat };
-    const ul = Math.hypot(0.55, 0.83);
+    const ul = dmath.hypot(0.55, 0.83);
     const u = { x: 0.55 / ul, z: (0.83 / ul) * side };
     const center = { x: start.x + u.x * A.offshore, z: start.z + u.z * A.offshore };
     let riverGap = Infinity;
-    for (const p of plan.river?.pts || []) riverGap = Math.min(riverGap, Math.hypot(p.x - center.x, p.z - center.z) - p.w / 2);
+    for (const p of plan.river?.pts || []) riverGap = Math.min(riverGap, dmath.hypot(p.x - center.x, p.z - center.z) - p.w / 2);
     // Prefer the shore that reaches open sea sooner when both sides keep the
     // islet clear of the river. Coastal noise can extend one beach farther.
     let shoreLand = 0;
@@ -80,13 +81,13 @@ export function planBossArena(plan, heightAt = null) {
   const plateau = { x: center.x + u.x * A.plateauShift, z: center.z + u.z * A.plateauShift };
   // the boss (the giant Brachiosaurus) spawns in the middle of the plateau,
   // looking down the causeway (yaw like the player's: facing (-sin yaw, -cos yaw) = -u)
-  const spawn = { x: plateau.x, z: plateau.z, yaw: Math.atan2(u.x, u.z) };
+  const spawn = { x: plateau.x, z: plateau.z, yaw: dmath.atan2(u.x, u.z) };
   // the causeway: over the sea, through the rim and across the lava onto the
   // plateau, a gentle S-bend
   const end = { x: plateau.x - u.x * A.plateauR * 0.8, z: plateau.z - u.z * A.plateauR * 0.8 };
   const path = [];
   for (let i = 0; i <= 12; i++) {
-    const t = i / 12, bend = Math.sin(t * Math.PI * 2) * 5 * Math.sin(t * Math.PI);
+    const t = i / 12, bend = dmath.sin(t * Math.PI * 2) * 5 * dmath.sin(t * Math.PI);
     path.push({ x: lerp(start.x, end.x, t) + v.x * bend, z: lerp(start.z, end.z, t) + v.z * bend });
   }
   const top = A.lavaLevel + A.causewayRise;
@@ -110,7 +111,7 @@ export function causewayQuery(a, x, z) {
     const vx = q.x - p.x, vz = q.z - p.z;
     const L2 = vx * vx + vz * vz || 1;
     const s = clamp(((x - p.x) * vx + (z - p.z) * vz) / L2, 0, 1);
-    const d = Math.hypot(p.x + vx * s - x, p.z + vz * s - z);
+    const d = dmath.hypot(p.x + vx * s - x, p.z + vz * s - z);
     if (d < bd) { bd = d; bt = (i + s) / (pts.length - 1); }
   }
   return { d: bd, t: bt };
@@ -121,7 +122,7 @@ export function causewayQuery(a, x, z) {
  * lake bed, plateau and causeway. Far away it returns h unchanged.
  */
 export function bossArenaHeight(a, x, z, h, seed = 0) {
-  const dc = Math.hypot(x - a.center.x, z - a.center.z);
+  const dc = dmath.hypot(x - a.center.x, z - a.center.z);
   const q = causewayQuery(a, x, z);
   const half = a.causewayW / 2;
   if (dc > a.outerR + 12) {
@@ -132,8 +133,8 @@ export function bossArenaHeight(a, x, z, h, seed = 0) {
   }
   const L = A.lavaLevel, bed = L - A.lakeDepth;
   // rocky rim: jagged crest all round, softly into the sea (or the island) outside
-  const ang = Math.atan2(z - a.center.z, x - a.center.x);
-  const crest = L + 1.4 + 2.4 * (0.5 + 0.5 * valueNoise(Math.cos(ang) * 3.1 + 7, Math.sin(ang) * 3.1, seed + 301))
+  const ang = dmath.atan2(z - a.center.z, x - a.center.x);
+  const crest = L + 1.4 + 2.4 * (0.5 + 0.5 * valueNoise(dmath.cos(ang) * 3.1 + 7, dmath.sin(ang) * 3.1, seed + 301))
     + 0.6 * valueNoise(x * 0.18, z * 0.18, seed + 302);
   let g;
   if (dc < a.lakeR - 1.5) g = bed;
@@ -142,7 +143,7 @@ export function bossArenaHeight(a, x, z, h, seed = 0) {
   const out = smoothstep(a.outerR - 5, a.outerR + 6, dc);
   g = lerp(Math.max(g, dc > a.lakeR + 3 ? h : g), h, out);
   // the plateau rises out of the lava
-  const dp = Math.hypot(x - a.plateau.x, z - a.plateau.z);
+  const dp = dmath.hypot(x - a.plateau.x, z - a.plateau.z);
   if (dp < a.plateauR + 4) {
     const k = 1 - smoothstep(a.plateauR, a.plateauR + 4, dp);
     g = Math.max(g, lerp(bed, a.plateauY + 0.15 * valueNoise(x * 0.3, z * 0.3, seed + 303), k));
