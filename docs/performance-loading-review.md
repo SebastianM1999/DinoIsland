@@ -71,6 +71,12 @@ fixture's 20 ms sleep was replaced with bounded response-completion waiting
 after the full run exposed its timing race; production endpoint behavior was
 unchanged.
 
+Final Chrome smoke checks launched solo both during pending preview construction
+and after the live preview completed, including a wider viewport resize. Both
+retained active dinosaurs, released the network loading queue, and reported zero
+JavaScript errors or failed requests. Screenshots confirmed the live menu and
+landing scenery rendered. This functional check did not measure FPS.
+
 Regression tests protect full terrain-cell coverage, streaming eviction,
 nested mesh warm-up, cancellation cleanup, seeded synchronous/staged world
 and vegetation parity, spatial detail selection, stale postcards, slow-frame
