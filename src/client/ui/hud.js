@@ -754,7 +754,7 @@ export class Hud {
     const loot = inv.loot || {}, store = inv.store || {};
     const gear = [
       cell('spear', inv.spear ? `${inv.spearHealth ?? 100}%` : 0, 'Spear health', 'spear', inv.spear ? 'spear' : null),
-      ...['pistol', 'rifle'].map(k => cell(k, inv.guns?.[k]?.owned === false ? 0 : `${inv.guns?.[k]?.loaded ?? 0}/${inv.guns?.[k]?.reserve ?? 0}`, k === 'pistol' ? 'Pistol' : 'Assault rifle', k, inv.guns?.[k] && inv.guns[k].owned !== false ? k : null)),
+      ...['pistol', 'rifle'].filter(k => inv.guns?.[k]).map(k => cell(k, inv.guns?.[k]?.owned === false ? 0 : `${inv.guns?.[k]?.loaded ?? 0}/${inv.guns?.[k]?.reserve ?? 0}`, k === 'pistol' ? 'Pistol' : 'Assault rifle', k, inv.guns?.[k] && inv.guns[k].owned !== false ? k : null)),
       cell('arrow', `${inv.arrows ?? 0}/${inv.maxArrows ?? CONFIG.weapons.bow.maxArrows}`, 'Arrows', 'arrow', inv.arrows > 0 ? 'arrow' : null),
       cell('trap', inv.traps ?? 0, 'Traps', 'trap', inv.traps > 0 ? 'trap' : null),
     ].join('');
@@ -1078,7 +1078,15 @@ export class Hud {
     const sig = JSON.stringify(info || {});
     if (this._c.win === sig && !this.$win.hidden) return;
     this._c.win = sig;
-    this.$win.innerHTML = info.won
+    this.$win.innerHTML = info.won && info.demo
+      ? `<div class="hud-win-card brush">
+      <span class="hud-win-ic">${icon('trophy')}</span>
+      <h2>That was the demo!</h2>
+      <p>The boat is repaired and the whole team is aboard. Thanks for playing ${esc(BRAND.name)}!</p>
+      ${info.completedIn != null ? `<p class="hud-win-time">${icon('clock')} ${fmtTime(info.completedIn)}</p>` : ''}
+      <p>The island starts over in a moment…</p>
+    </div>`
+      : info.won
       ? `<div class="hud-win-card brush">
       <span class="hud-win-ic">${icon('trophy')}</span>
       <h2>You escaped ${esc(BRAND.name)}!</h2>

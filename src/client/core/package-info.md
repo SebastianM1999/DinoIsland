@@ -17,6 +17,7 @@
 ### Areas inside `game.js` (~1000 lines)
 - constructor: terrain/layout from `welcome.world.level`, reuse of `gfx`/`audio`/`input`, `PlayerController`, skill mods, grove barrier, `StuckDetector`, HUD + minimap, `input.onPanelToggle` (which panel E/Tab/M/K/Esc opens or closes), systems list `[DinoViews, Tracks, Items, PlayerActions, Projectiles, Relics]`, panels (wardrobe, boat, crafting, base, skills, grove prompt) whose callbacks send `ACT.*`.
 - `#buildWorld`: cooperatively builds terrain and vegetation, adds each completed `world/` builder to the scene, `worldUpdaters`, F3 collider debug view. `Game.create` also schedules deterministic terrain rows and layout placement searches; cancelling construction releases partial scenes.
+- the demo: `game.demo` from the welcome (`world.demo`): no skill panel (K), `body.is-demo` hides the XP ring and level.
 - network (`#applyWelcome`, `#bindNet`): handlers for `WELCOME` (new island), `SNAP` (own HP/max HP/downed, remote rows, then `sys.onSnapshot`), `INV`, `PROF`, `CORRECT` (snap body, glide camera via `corrOffset`), and events: relic, boat, XP, join/leave, outfit, fruit, map resource, bow found, toast, full, item remove, trap snap, mission, store, base, raid, tower shot, hurt, death, down, revive, revived, respawn; disconnect -> `onLeave`.
 - mission / base / crafting sync: `#showMission`, `setBase`, `#syncBase`, `#syncCrafting`, `stations`, `open*` helpers.
 - skills / downed: `#setProfile`, `mods`, `maxHp`, `#setDowned`, `#syncDowned`, `setCreative`.

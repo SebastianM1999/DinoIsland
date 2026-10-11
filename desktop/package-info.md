@@ -2,7 +2,7 @@
 > Electron wrapper: starts the game server in-process, opens a locked-down game window on it, and bridges optional Steam co-op (lobbies, invites, P2P transport) to the renderer.
 
 ## Files
-- `main.cjs` — Electron main process: imports `createGameServer()` from `server/index.js`, listens on `0.0.0.0` (port from `DINO_DESKTOP_PORT`, else random), opens a sandboxed `BrowserWindow` on `http://127.0.0.1:<port>/`, installs Steam, and stops everything on quit.
+- `main.cjs` — Electron main process: imports `createGameServer()` from `server/index.js`, listens on `0.0.0.0` (port from `DINO_DESKTOP_PORT`, else random), opens a sandboxed `BrowserWindow` on `http://127.0.0.1:<port>/` (`--demo` / `DINO_DEMO=1`: hosts the demo and opens `?demo=1`), installs Steam, and stops everything on quit.
 - `preload.cjs` — exposes `window.dinoSteam` (status, friends, lobbies, host, join, leave, invite, dismissInvite, send, onEvent) via `contextBridge`, forwarding to `dino:steam:*` IPC channels.
 - `steam.cjs` — `installSteam(app, win, localUrl)`: loads the Steamworks SDK (`steamworks-ffi-node`) if an App ID and the runtime DLL are present, creates a `SteamSession`, pumps it every 4 ms, and registers the IPC handlers with a trusted-sender check. Returns a cleanup function.
 - `steam-session.js` — `SteamSession` (ES module): hosts or joins a Steam lobby, wraps Steam P2P connections as WebSocket-like `Peer`s and attaches them to a `startGameHost()` game host (no HTTP server). Also exports `STEAM_PROTOCOL` and `validSteamId()`.

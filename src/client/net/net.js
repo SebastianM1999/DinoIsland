@@ -101,7 +101,7 @@ export class Net {
    * Start an authoritative world for solo play. It runs in a Web Worker
    * (src/sim/worker.js), so its ticks never stall a rendered frame.
    * Resolves after the welcome. Testing aids in `opts`: level (0-based start island),
-   * baseStage (base already standing), raidIn (seconds until the first raid).
+   * baseStage (base already standing), raidIn (seconds until the first raid); demo (CONFIG.demo).
    */
   static local(name, outfit, opts = {}, profile) {
     return new Promise((resolve, reject) => {

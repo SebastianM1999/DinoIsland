@@ -63,7 +63,8 @@ function resolvePath(urlPath) {
   return relative.startsWith('..') || path.isAbsolute(relative) ? null : file;
 }
 
-export function createGameServer() {
+/** demo: host the demo (CONFIG.demo) – `npm start -- --demo` or DINO_DEMO=1. */
+export function createGameServer({ demo = false } = {}) {
   let host;
   let internet;
   const httpServer = http.createServer((req, res) => {
@@ -108,7 +109,7 @@ export function createGameServer() {
     resolveUrl: resolvePath,
   });
   });
-  host = startGameHost(httpServer, { onConnection: (ws, req) => internet?.trackHost(ws, req) });
+  host = startGameHost(httpServer, { onConnection: (ws, req) => internet?.trackHost(ws, req), demo });
   internet = new InternetHost(httpServer);
   httpServer.on('close', () => internet.stop());
   return { httpServer, host, internet };
@@ -117,9 +118,10 @@ export function createGameServer() {
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const argPort = process.argv.indexOf('--port');
   const port = Number(process.env.PORT || (argPort > 0 ? process.argv[argPort + 1] : CONFIG.net.port));
-  const { httpServer, host, internet } = createGameServer();
+  const demo = process.argv.includes('--demo') || process.env.DINO_DEMO === '1';
+  const { httpServer, host, internet } = createGameServer({ demo });
   for (const signal of ['SIGINT', 'SIGTERM']) process.once(signal, () => { internet.stop(); host.stop(); httpServer.close(); });
   httpServer.listen(port, () => {
-    console.log(`${BRAND.name} server running at http://localhost:${port}`);
+    console.log(`${BRAND.name} ${demo ? 'demo ' : ''}server running at http://localhost:${port}`);
   });
 }

@@ -72,6 +72,7 @@ Grouped by the module area they mainly cover. Many simulation tests also check t
 - `inventory-drop.test.js` — dropping, picking up and depositing inventory stacks without duplication.
 - `resources.test.js` — map resources: island 1's spots (count, spread, dry, off the path, resin on its tree, deterministic; none elsewhere), gathering, refusals, regrowth, late join, depositing and paying for an upgrade, the client nodes.
 - `bow-find.test.js` — the hunter's camp on island 1 (placement over variants, none elsewhere), starting without a bow, taking it per explorer, keeping it through death and the voyage, refills/respawns, later islands and creative, the client camp.
+- `demo.test.js` — the demo (`opts.demo`): island 1 only, two explorers, no firearms (and no crash on gun actions), no XP/skills and the saved profile untouched, the win after island 1 and the restart, a demo server's status.
 - `discovery-fruit.test.js` — fruit plant harvests/regrowth, shared dinosaur sightings, fruit plant visuals.
 - `outfits.test.js` — outfit sanitizing, server outfit changes, player model outfits.
 

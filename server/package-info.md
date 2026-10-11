@@ -3,7 +3,7 @@
 
 ## Files
 - `staticFiles.js` — `serveStatic()`: ETag/304, brotli/gzip for text files (compressed once per file version and kept in memory), one-day caching for `/vendor/three/` and the font, and the `<link rel="modulepreload">` hints injected into `index.html` from the static import graph of its module entry (`staticImportGraph()` follows the import map for `three`).
-- `index.js` — HTTP static file server plus local control endpoints (`/connection`, `/status`, `/internet*`); `createGameServer()` wires the game host and the internet relay onto one `http.Server`. Also runnable as a CLI (`node server/index.js [--port N]`).
+- `index.js` — HTTP static file server plus local control endpoints (`/connection`, `/status`, `/internet*`); `createGameServer()` wires the game host and the internet relay onto one `http.Server`. Also runnable as a CLI (`node server/index.js [--port N] [--demo]`; `DINO_DEMO=1` too): `createGameServer({ demo })` hosts the demo (CONFIG.demo).
 - `devPins.js` — `handleDevPins(req, res, root)`: the dev pin tool's endpoint (`POST /__dev/pin`, `GET /__dev/pins`); writes `dev-pins/<id>.json` + `.png` (gitignored) with the git commit/branch. Answers only in a source checkout (a `.git` in the root) and only to this machine; 404 otherwise.
 - `caveBake.js` — Node reader of the Hollow Mountain bakes (`assets/cave/*.bin`, `src/shared/caveBake.js`): `readCaveBake`, `bakePath`, `installCaveBakes()` (the synchronous provider `Terrain` asks; `startGameHost` installs it so the host builds a baked fixed map's walk grid in ~0.1 s instead of ~2 s).
 - `gameHost.js` — `startGameHost()`: WebSocket connection handling, `hello` join/reject, message routing into `ServerWorld`, fixed-rate tick loop, snapshot broadcast and silent-client timeout.
@@ -12,7 +12,7 @@
 
 ## Entry points
 - `createGameServer()` (index.js) — called by `desktop/main.cjs` (Electron launcher) and by tests (`test/http-host.test.js`, `test/internet-host.test.js`, `test/lan-address.test.js`, `test/audio.test.js`). Returns `{ httpServer, host, internet }`; the caller decides the port and calls `listen`.
-- `startGameHost(httpServer?, { onConnection })` (gameHost.js) — called by `index.js` and by `desktop/steam-session.js`, which passes no HTTP server and feeds Steam peers through the returned `attachConnection(ws, addr)`. The returned object also has `world`, `stop()` and `status()`.
+- `startGameHost(httpServer?, { onConnection, demo })` (gameHost.js; `status()` reports `demo` and its `maxPlayers`) — called by `index.js` and by `desktop/steam-session.js`, which passes no HTTP server and feeds Steam peers through the returned `attachConnection(ws, addr)`. The returned object also has `world`, `stop()` and `status()`.
 - `InternetHost` — constructed in `index.js`; its constructor takes injectable `getHelper`/`spawnProcess`/`resolveAddress` (used by `test/internet-host.test.js`).
 - `npm start` / `npm run dev` run `server/index.js` directly.
 

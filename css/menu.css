@@ -14,6 +14,9 @@
 .explorer-card label { display: block; color: #cad6c7; font-size: .8rem; }
 #player-name { font: inherit; font-weight: 700; color: #fff1d0; width: 100%; min-width: 0; border: 0; border-bottom: 1px solid #97aa9266; background: transparent; border-radius: 0; padding: 2px 0; }
 #home-progress { display: block; font-size: .8rem; color: #b9c8b4; margin-top: 4px; }
+/* the demo (CONFIG.demo, src/client/main.js applyDemoMenu): no levels, XP or skill tree */
+body.is-demo #home-progress, body.is-demo .home-explorer-stats, body.is-demo .home-explorer-progress,
+body.is-demo [data-explorer-skills], body.is-demo .home-explorer-skills, body.is-demo #home-skills { display: none; }
 #menu .menu-buttons { gap: 10px; margin: 16px 0 14px; }
 #menu .btn, .home-dialog .btn { min-height: 48px; padding: 12px 16px; background: #192e2de0; border: 1px solid #75867b; border-radius: 6px; box-shadow: none; color: #fff1d0; }
 #menu .btn:hover, .home-dialog .btn:hover { background: #3b5548; }

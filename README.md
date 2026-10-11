@@ -19,6 +19,8 @@ npm run desktop
 npm run build:win
 ```
 
+**Demo:** `npm start -- --demo` (or `DINO_DEMO=1`, also for `npm run desktop`) hosts the demo from the game design: island 1 only, 1–2 explorers, spear and bow (no firearms), no XP or skill tree; after the boat the island starts over. For a solo demo open `http://localhost:8080/?demo=1`.
+
 The Windows build is in `dist/win-unpacked/`. Keep the entire folder together when running or distributing it. The desktop app chooses an available LAN port; expand **LAN / direct connection** to see it in the server address. Set `DINO_DESKTOP_PORT` before launch to use a fixed port. Browser builds use port 8080 by default.
 
 Steam desktop co-op has **Host game**, **Join friend**, public lobby browsing, and **Invite friends** in the pause menu. Configure the game's App ID and add the SDK runtime before building for Steam; see [Steam setup and release checks](docs/steam-coop.md). Builds without Steam configuration show the reason and keep solo/LAN available.

@@ -48,7 +48,7 @@
 
 ### Netcode, config & brand
 - `protocol.js` — JSON message types (`MSG`), client actions (`ACT`), events (`EV`; `BOW_FOUND` when an explorer takes their bow at the hunter's camp; `RESOURCE` for map resources, gathered with `ACT.GATHER`; the volcano's `VOLCANO`, `BOMB`, `GEYSER`, `COLUMN`, `TREASURE`), snapshot field lists (boss attack clip/start/duration/sequence), player flags (`PF`), `EQUIP`, dino states (`DS`, including Sarcosuchus swimming and committed attacks), `DINO_TYPES`; the header documents the authority model.
-- `config.js` — `CONFIG`: all tunables (net, world, player, weapons, hit zones, volcano – heat, eruption cycle, lava bombs, the mountain path's bomb zone (`slope`), geysers, sinking columns, the treasure, ash rain –, fruit – kinds with a `role` and optional `buff`, and the `buffs` –, loot, dinos, tracks, mission, render, audio).
+- `config.js` — `CONFIG`: all tunables (net, the demo's `demo.maxPlayers`, world, player, weapons, hit zones, volcano – heat, eruption cycle, lava bombs, the mountain path's bomb zone (`slope`), geysers, sinking columns, the treasure, ash rain –, fruit – kinds with a `role` and optional `buff`, and the `buffs` –, loot, dinos, tracks, mission, render, audio).
 - `brand.js` — `BRAND` (name, slug, storage prefix), `storageKey`, `migrateStorage`.
 
 ## Entry points

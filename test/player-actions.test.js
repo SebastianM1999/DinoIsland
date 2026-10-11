@@ -356,3 +356,15 @@ test('without a bow (island 1, before the hunter\'s camp) the bow slot is locked
   held.add('primary'); frame(CONFIG.weapons.bow.maxDrawTime); held.clear(); frame();
   assert.equal(shots.length, 1);
 });
+
+test('without firearms in the pack (the demo) there are no gun slots and the gun keys select nothing', t => {
+  const { game, actions, frame } = fixture(t);
+  game.me.inv.guns = {};
+  frame();
+  assert.deepEqual(game.hotbar.map((s) => s.id), ['spear', 'bow', 'trap', 'fruit']);
+  actions.select(EQUIP.indexOf('pistol'));
+  actions.select(EQUIP.indexOf('rifle'));
+  assert.equal(EQUIP[game.eq], 'spear');
+  actions.select(EQUIP.indexOf('bow'));
+  assert.equal(EQUIP[game.eq], 'bow', 'the other slots still work');
+});

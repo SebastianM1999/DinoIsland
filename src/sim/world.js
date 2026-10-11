@@ -63,10 +63,14 @@ const SPRINT_STRIKE_WINDOW = 2;
 export class ServerWorld {
   /**
    * @param {{ send:(to:number|'*', msg:object, except?:number)=>void, log?:(...a:any[])=>void }} host
-   * @param {{ level?: number, variant?: number }} [opts] start island (variant: layout override for testing, default the level's fixed map)
+   * @param {{ level?: number, variant?: number, demo?: boolean }} [opts] start island (variant: layout override for testing,
+   *   default the level's fixed map); demo: the demo (CONFIG.demo – island 1 only, see `demo` below)
    */
   constructor(host, opts = {}) {
     this.host = host;
+    // The demo: island 1 only (after the boat it starts over), at most CONFIG.demo.maxPlayers,
+    // no firearms, no XP or skills (saved profiles are neither used nor overwritten).
+    this.demo = !!opts.demo;
     this.log = host.log || (() => {});
     this.now = 0;
     this.players = new Map();
@@ -74,7 +78,7 @@ export class ServerWorld {
     this.store = Object.fromEntries(LOOT_KEYS.map((k) => [k, 0]));
     this.upgrades = new Set();          // team upgrades built at the workbench (survive islands)
     this.fruitRng = makeRng((Math.random() * 0xffffffff) >>> 0);
-    this.#loadLevel(opts.level ?? 0, opts.variant);
+    this.#loadLevel(this.demo ? 0 : opts.level ?? 0, opts.variant);
     this.mission = new Mission(this);
     this.dinos.spawnAll();
   }
@@ -108,7 +112,7 @@ export class ServerWorld {
 
   /** The team set sail: build the next island, its fixed map (after the last one: the first island again). */
   nextLevel() {
-    this.#loadLevel(this.levelIndex + 1 < LEVEL_COUNT ? this.levelIndex + 1 : 0);
+    this.#loadLevel(!this.demo && this.levelIndex + 1 < LEVEL_COUNT ? this.levelIndex + 1 : 0);
     this.mission.startIsland();
     this.dinos.spawnAll();
     const caps = this.caps();
@@ -128,7 +132,7 @@ export class ServerWorld {
       p.inv.traps = Math.max(p.inv.traps, caps.traps);
       p.inv.spear = true;
       p.inv.spearHealth = W.spear.durability;
-      p.inv.guns = gunInventory(); p.inv.reloading = null;
+      p.inv.guns = this.gunInventory(); p.inv.reloading = null;
       p.inv.caps = caps;
       p.inv.upgrades = [...this.upgrades];
     }
@@ -150,13 +154,15 @@ export class ServerWorld {
 
   /** @param {(id:number)=>void} [attach] called with the new id before the welcome is sent */
   join(name, attach, outfit, profile) {
-    if (this.players.size >= CONFIG.net.maxPlayers) return { ok: false, reason: 'The expedition is full (4 players max).' };
+    const max = this.demo ? CONFIG.demo.maxPlayers : CONFIG.net.maxPlayers;
+    if (this.players.size >= max) return { ok: false, reason: `The expedition is full (${max} players max${this.demo ? ' in the demo' : ''}).` };
     const used = new Set([...this.players.values()].map((p) => p.slot));
     let slot = 0;
     while (used.has(slot)) slot++;
     const clean = String(name || '').replace(/[^\p{L}\p{N} _\-.]/gu, '').trim().slice(0, 14) || `Player ${slot + 1}`;
     const sp = this.spawnPoint(slot);
-    const prof = sanitizeProfile(profile);   // a saved profile comes from the client: never trust it
+    // (a saved profile comes from the client: never trust it; the demo has no skills at all)
+    const prof = sanitizeProfile(this.demo ? null : profile);
     const mods = skillMods(prof.skills);
     const p = {
       id: this.id(),
@@ -230,7 +236,7 @@ export class ServerWorld {
     // (island 1: each explorer finds the bow at the hunter's camp; elsewhere it was found on island 1)
     const bow = !this.layout.bowCamp;
     return {
-      guns: gunInventory(), reloading: null,
+      guns: this.gunInventory(), reloading: null,
       bow,
       arrows: bow ? W.bow.startArrows : 0,
       arrowUses: Array(bow ? W.bow.startArrows : 0).fill(W.bow.uses),
@@ -512,6 +518,7 @@ export class ServerWorld {
   // ------------------------------------------------------------------ skills / xp
 
   sendProf(p) {
+    if (this.demo) return;   // (no XP or skills: the explorer's saved profile stays as it was)
     const prof = p.creative ? creativeProfile() : { xp: p.prof.xp, bonus: p.prof.bonus, skills: p.prof.skills };
     this.send(p.id, { t: MSG.PROF, prof });
   }
@@ -528,6 +535,7 @@ export class ServerWorld {
 
   /** XP (and bonus skill points) for every connected player, wherever they are, alive or not. */
   awardXp(amount, why, bonus = 0) {
+    if (this.demo) return;
     for (const p of this.players.values()) {
       const before = progress(p.prof);
       p.prof.xp = Math.min(MAX_XP, p.prof.xp + amount);
@@ -540,6 +548,7 @@ export class ServerWorld {
   }
 
   skillAction(p, m) {
+    if (this.demo) return;
     if (this.now < p.nextSkillAt) return;
     p.nextSkillAt = this.now + 0.1;
     if (p.creative) return this.toast('Creative mode already has every skill', 'info', p.id);
@@ -774,7 +783,7 @@ export class ServerWorld {
     this.normalizeArrows(p.inv);
     if (!p.inv.spear) p.inv.spearHealth = W.spear.durability;
     p.inv.spear = true;
-    p.inv.guns = gunInventory(); p.inv.reloading = null;
+    p.inv.guns = this.gunInventory(); p.inv.reloading = null;
     this.sendInv(p);
     p.epoch++;
     this.event(EV.RESPAWN, { id: p.id, x: r2(p.x), z: r2(p.z), yaw: p.yaw, k: p.epoch });
@@ -1120,7 +1129,7 @@ export class ServerWorld {
           inv.spear = true;
           inv.spearHealth = it.health ?? W.spear.durability;
         } else if (it.kind === 'pistol' || it.kind === 'rifle') {
-          if (inv.guns[it.kind].owned !== false) return;
+          if (!inv.guns[it.kind] || inv.guns[it.kind].owned !== false) return;
           inv.guns[it.kind] = { ...it.ammo, owned: true };
         } else if (it.kind === 'torch') {
           if (inv.torch) return this.fullAlert(p, 'You already carry a torch', 'torch');
@@ -1237,7 +1246,7 @@ export class ServerWorld {
           n = inv.fruit.filter(f => f === kind).length;
           inv.fruit = inv.fruit.filter(f => f !== kind);
         } else if (kind === 'pistol' || kind === 'rifle') {
-          if (inv.guns[kind].owned === false) return;
+          if (!inv.guns[kind] || inv.guns[kind].owned === false) return;
           const ammo = { loaded: inv.guns[kind].loaded, reserve: inv.guns[kind].reserve };
           inv.guns[kind] = { owned: false, loaded: 0, reserve: 0 };
           if (inv.reloading === kind) inv.reloading = null;
@@ -1322,7 +1331,7 @@ export class ServerWorld {
         this.normalizeArrows(inv);
         if (!inv.spear) inv.spearHealth = W.spear.durability;
         inv.spear = true;
-        inv.guns = gunInventory(); inv.reloading = null;
+        inv.guns = this.gunInventory(); inv.reloading = null;
         this.sendInv(p);
         this.toast('Basic ammunition resupplied', 'arrow', p.id);
         return;
@@ -1687,8 +1696,14 @@ export class ServerWorld {
     return { t: MSG.SNAP, now: r3(this.now), w: this.worldEpoch, n: this.snapSeq, tickMs: r2(this.tickDurationMs ?? 0), p, d: rows };
   }
 
+  /** A fresh set of firearms – none in the demo (spear and bow only). */
+  gunInventory() {
+    return this.demo ? {} : gunInventory();
+  }
+
   fullState() {
     return {
+      demo: this.demo,
       players: [...this.players.values()].map((p) => this.publicPlayer(p)),
       dinos: this.dinos.describeAll(),
       items: [...this.items.values()],

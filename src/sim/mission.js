@@ -71,9 +71,12 @@ export class Mission {
       { text: `Repair the boat on the east beach (${found}/${relics.length} parts)`, done: repaired },
       { text: `Set sail together (${this.atBoat}/${Math.max(1, this.alive)} at the boat)`, done: this.phase === 'sailing' },
     ];
-    const won = this.phase === 'sailing' && L.last;
+    // (the demo ends after island 1: that is its last island)
+    const last = L.last || this.world.demo;
+    const won = this.phase === 'sailing' && last;
     return {
-      level: { index: L.index, number: L.number, name: L.name, biome: L.biome.id, last: L.last },
+      level: { index: L.index, number: L.number, name: L.name, biome: L.biome.id, last },
+      demo: this.world.demo,
       step: this.phase,
       title: won ? `You escaped ${BRAND.name}!` : this.phase === 'sailing' ? 'Island complete!' : `Island ${L.number}: ${L.name}`,
       won,
@@ -157,9 +160,9 @@ export class Mission {
         this.phase = 'sailing';
         this.completedIn = Math.round(w.now - this.startedAt);
         this.islandsDone++;
-        const last = w.layout.level.last;
+        const last = w.layout.level.last || w.demo;
         this.doneTimer = last ? SAIL_DELAY * 2.5 : SAIL_DELAY;
-        w.toast(last ? `All aboard! You escaped ${BRAND.name} – well done!` : 'All aboard! Setting sail for the next island…', 'quest');
+        w.toast(w.demo ? 'All aboard! That was the demo – well done!' : last ? `All aboard! You escaped ${BRAND.name} – well done!` : 'All aboard! Setting sail for the next island…', 'quest');
         this.onEvent('island');
         this.broadcast();
       }

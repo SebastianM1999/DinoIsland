@@ -2,7 +2,7 @@
 > The browser/Electron game client: menu and lobby flow, Three.js rendering of the island, local player prediction, input, HUD/UI, audio and the connection to the authoritative world.
 
 ## Files
-- `main.js` — entry point loaded by `index.html`: menu/lobby, starting a session in the chosen mode, building a `Game` per island, live left-aligned expedition menu with keyboard navigation, leave/back-to-menu.
+- `main.js` — entry point loaded by `index.html`: menu/lobby (the demo: `?demo=1` or a demo server's `/status` – `applyDemoMenu` keeps island 1, hides the skill tree and levels via `body.is-demo`, solo starts the demo), starting a session in the chosen mode, building a `Game` per island, live left-aligned expedition menu with keyboard navigation, leave/back-to-menu.
 - `core/` — `Game` shell (main loop, wiring of all subsystems), renderer, graphics auto-tier, settings, saved profile, resource disposal.
 - `net/` — `Net` session over WebSocket, Steam bridge or the solo Web Worker; clock sync, snapshot ordering, interpolation buffer, LAN address helpers.
 - `input/` — `Input`: keyboard/mouse to named actions, pointer lock.
