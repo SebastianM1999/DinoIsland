@@ -11,6 +11,7 @@ import { SampleBank, SamplePicker } from './samples.js';
 import { IslandMusic } from './music.js';
 
 const A = CONFIG.audio;
+const REVERB_RELEASE_MS = 5000;   // gain ramp (about 1.6 s to silence) plus the 2.9 s impulse tail
 const smoothstep = (a, b, x) => { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 
 export class GameAudio {
@@ -55,14 +56,16 @@ export class GameAudio {
     this.ambBus = this.ctx.createGain();
     this.ambBus.gain.value = 0.35;
     this.ambBus.connect(this.master);
-    // stone reverb for the Hollow Mountain: effects and ambience feed a convolver with a generated impulse, the send opens with the depth into the mountain
+    // stone reverb for the Hollow Mountain: effects and ambience feed a convolver (generated impulse) through a send
+    // that opens with the depth into the mountain. The convolver exists and is wired only while the send is open
+    // (#reverbLevel), so every other island and the cave's coves pay nothing for it.
     this.reverbSend = this.ctx.createGain();
     this.reverbSend.gain.value = 0;
-    this.reverb = this.ctx.createConvolver();
-    this.reverb.buffer = this.#makeImpulse(2.9, 2.4);
     this.sfx.connect(this.reverbSend);
     this.ambBus.connect(this.reverbSend);
-    this.reverbSend.connect(this.reverb).connect(this.master);
+    this.reverb = null;
+    this.reverbWired = false;
+    this.reverbOff = null;
     this.cave = { on: false, drone: null, layers: null, rumbleAt: 0, creakAt: 0 };
     // long buffers + random start offsets: loops built on them never audibly repeat
     this.noiseBuf = this.#makeNoise(6);
@@ -125,6 +128,31 @@ export class GameAudio {
     this.nextNote = 0;
   }
 
+  /**
+   * Set the reverb send level (0..1 of its full gain). Wires the convolver on first demand and unwires it again once
+   * the send has been silent long enough for the gain ramp and the 2.9 s tail to die out, so there is no click.
+   */
+  #reverbLevel(t, level) {
+    if (level > 0.001) {
+      clearTimeout(this.reverbOff); this.reverbOff = null;
+      if (!this.reverbWired) {
+        if (!this.reverb) { this.reverb = this.ctx.createConvolver(); this.reverb.buffer = this.#makeImpulse(2.9, 2.4); }
+        this.reverbSend.connect(this.reverb);
+        this.reverb.connect(this.master);
+        this.reverbWired = true;
+      }
+    } else if (this.reverbWired && !this.reverbOff) {
+      this.reverbOff = setTimeout(() => {
+        this.reverbOff = null;
+        this.reverbSend.disconnect(this.reverb);
+        this.reverb.disconnect();
+        this.reverbWired = false;
+      }, REVERB_RELEASE_MS);
+      this.reverbOff.unref?.();
+    }
+    this.reverbSend.gain.setTargetAtTime(0.62 * level, t, 0.4);
+  }
+
   /** A reverb impulse: decaying stereo noise whose highs die first (wet stone). */
   #makeImpulse(seconds, decay) {
     const len = Math.floor(this.ctx.sampleRate * seconds);
@@ -145,6 +173,7 @@ export class GameAudio {
   /** The Hollow Mountain's music: the borrowed tracks low-passed and a slow multi-voice drone beneath. */
   #caveMusic(on) {
     const t = this.ctx.currentTime;
+    if (!on && this.reverbWired) this.#reverbLevel(t, 0);   // left the mountain: stop feeding the convolver
     this.cave.on = on;
     this.musicLP.frequency.setTargetAtTime(on ? 1500 : 22000, t, 0.4);
     if (on && !this.cave.drone) {
@@ -787,7 +816,7 @@ export class GameAudio {
    * (`wet` 0..1). Outside (the coves) none of it is heard and the surf and birds carry on.
    */
   #caveAmbience(t, inside, wet) {
-    this.reverbSend.gain.setTargetAtTime(0.62 * inside, t, 0.4);
+    this.#reverbLevel(t, inside);
     if (!this.cave.layers && inside > 0.02) {
       this.cave.layers = {
         wind: this.#loopLayer({ brown: true, type: 'lowpass', f: 240, q: 0.6, wobble: 90, wobbleRate: 0.11, positional: false }),
