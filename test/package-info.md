@@ -86,7 +86,7 @@ Grouped by the module area they mainly cover. Many simulation tests also check t
 - `dino-skin.test.js` — procedural skin loft faces outward.
 - `audio.test.js` — complete audio catalog/provenance, sample variation/failures, positional creature layers and cleanup, mute and synthesized fallbacks, music transitions and boss-area music, footstep surfaces and cadence; HTTP serving of audio files.
 - `creature-steps.test.js` — dinosaur species stride/weight profiles, walking/running cadence, oversized titan contacts, grounded gating, teleport cancellation and frame-rate independence.
-- `graphics-tier.test.js` — automatic graphics tier choice and auto-tune.
+- `graphics-tier.test.js` — conservative graphics startup, measured promotion, sustained three-FPS recovery, hidden-tab exclusion, isolated hitch rejection, frame-cap handling, versioned saved calibration and workload rechecks.
 - `frame-hitches.test.js` — frame-freeze guards: `requestPrograms` waits for linked programs, `WorldPost.compile` targets, `usesPost`, and no client code toggles a light's `visible`.
 - `input-panels.test.js` — Escape/E panel handling, raw pointer-lock fallback/retry, focus/lock resets and cursor-warp rejection (`src/client/input/input.js`).
 - `ordering.test.js` — packet ordering and action/state dependencies under unreliable transport (client `Net` + `ServerWorld`).

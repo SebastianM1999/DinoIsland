@@ -1,7 +1,7 @@
 // Automatic graphics level per PC. Players never pick it: the GPU's name gives
 // a first guess, then the first game measures GPU time per frame and steps the
-// level until it fits. The result is stored per GPU, so it is measured once
-// (again only after a driver/GPU change). Render scale and contact shading
+// level until it fits. A versioned saved result is a starting point, rechecked
+// each session and when sustained slowdown returns. Render scale and contact shading
 // stay player settings on top of it.
 
 import { CONFIG } from '../../shared/config.js';
@@ -13,10 +13,10 @@ import { storageKey } from '../../shared/brand.js';
  * of grass/flower instances drawn.
  */
 export const TIERS = [
-  { name: 'Low', pixelRatio: 1, shadows: false, shadowSize: 1024, shadowRange: 48, grass: 0.35, lodNear: 60 },
-  { name: 'Medium', pixelRatio: 1.25, shadows: true, shadowSize: 1024, shadowRange: 48, grass: 0.65, lodNear: 80 },
-  { name: 'High', pixelRatio: CONFIG.render.maxPixelRatio, shadows: true, shadowSize: CONFIG.render.shadowMapSize, shadowRange: 60, grass: 1, lodNear: 100 },
-  { name: 'Ultra', pixelRatio: 2, shadows: true, shadowSize: 3072, shadowRange: 70, grass: 1, lodNear: 130 },
+  { name: 'Low', pixelRatio: 0.75, msaaSamples: 0, foliageShadows: false, shadows: false, shadowSize: 1024, shadowRange: 48, grass: 0.35, lodNear: 60 },
+  { name: 'Medium', pixelRatio: 1, msaaSamples: 2, foliageShadows: false, shadows: true, shadowSize: 1024, shadowRange: 48, grass: 0.65, lodNear: 80 },
+  { name: 'High', pixelRatio: CONFIG.render.maxPixelRatio, msaaSamples: 4, foliageShadows: true, shadows: true, shadowSize: CONFIG.render.shadowMapSize, shadowRange: 60, grass: 1, lodNear: 100 },
+  { name: 'Ultra', pixelRatio: 2, msaaSamples: 4, foliageShadows: true, shadows: true, shadowSize: 3072, shadowRange: 70, grass: 1, lodNear: 130 },
 ];
 const TOP = TIERS.length - 1;
 
@@ -30,17 +30,16 @@ export const SLOW_FRAME_MS = 22;
 const WARMUP = 3;     // s after a level change before measuring (shader compiles, shadow maps)
 const WINDOW = 4;     // s of samples per measurement
 const KEY = storageKey('graphics-tier');
+export const CALIBRATION_VERSION = 2;
 
 /** First guess from the WebGL renderer string (unreliable: measured afterwards). */
 export function guessTier(name = '') {
   const n = name.toLowerCase();
   if (/swiftshader|llvmpipe|software|basic render/.test(n)) return 0;
   if (/mali|adreno|powervr|videocore/.test(n)) return 0;
-  if (/\bmx ?\d{3}\b|gt 10[23]0|gt 7[0-9]0/.test(n)) return 1;   // entry-level NVIDIA
-  if (/geforce|rtx|gtx|quadro|radeon (rx|pro)|\barc\b/.test(n)) return TOP;
-  if (/radeon.*\b(7[6-9]0m|8[0-9]0m|890m)\b|apple m\d (pro|max|ultra)/.test(n)) return 2;   // strong iGPUs
-  if (/apple|intel|radeon/.test(n)) return 1;   // other integrated graphics
-  return 2;
+  // GPU names do not establish browser/driver performance. Start at Medium;
+  // measured headroom can promote strong hardware after the world is ready.
+  return 1;
 }
 
 /**
@@ -49,6 +48,12 @@ export function guessTier(name = '') {
  * @returns {{tier:number, done:boolean}}
  */
 export function decide({ tier, gpuMs = null, frameMs = null, failed = new Set() }) {
+  // GPU queries omit JavaScript, driver submission and presentation stalls.
+  // A fast GPU alone must not promote an unplayably slow visible workload.
+  if (frameMs !== null && frameMs > SLOW_FRAME_MS && tier > 0) {
+    failed.add(tier);
+    return { tier: tier - 1, done: failed.has(tier - 1) };
+  }
   if (gpuMs !== null) {
     if (gpuMs > BUDGET_MS) {
       failed.add(tier);
@@ -58,7 +63,6 @@ export function decide({ tier, gpuMs = null, frameMs = null, failed = new Set() 
     return { tier, done: true };
   }
   // No GPU timer (e.g. Firefox/Safari): only step down, never up.
-  if (frameMs !== null && frameMs > SLOW_FRAME_MS && tier > 0) return { tier: tier - 1, done: false };
   return { tier, done: true };
 }
 
@@ -78,9 +82,10 @@ export class GraphicsAutoTune {
     this.failed = new Set();
     let saved = null;
     try { saved = JSON.parse(storage?.getItem(KEY) ?? 'null'); } catch { /* storage blocked or corrupt */ }
-    const same = saved && saved.gpu === gpu && Number.isInteger(saved.tier) && saved.tier >= 0 && saved.tier <= TOP;
+    const same = saved && saved.version === CALIBRATION_VERSION && saved.gpu === gpu && Number.isInteger(saved.tier) && saved.tier >= 0 && saved.tier <= TOP;
     this.tier = same ? saved.tier : guessTier(gpu);
-    this.active = !(same && saved.done);
+    this.active = true;   // previous sessions cannot establish the current workload
+    this.slowT = 0;
     this.#reset();
   }
 
@@ -91,19 +96,36 @@ export class GraphicsAutoTune {
   /**
    * Feed one rendered frame. `gpuMs` is a fresh timer result or null,
    * `frameCapped` true while an FPS limit below 60 hides real frame times.
+   * Visibility is explicit: a long visible frame is evidence, not a hidden tab.
    */
-  frame(rawDt, gpuMs, frameCapped = false) {
-    if (!this.active || !(rawDt > 0) || rawDt > 0.25) return;   // hidden tab / hitch
-    this.t += rawDt;
+  frame(rawDt, gpuMs, frameCapped = false, visible = true) {
+    if (!visible) { this.#reset(); this.slowT = 0; return; }
+    if (!Number.isFinite(rawDt) || !(rawDt > 0)) return;
+    const validGpu = Number.isFinite(gpuMs) && gpuMs >= 0;
+    // A single hitch cannot advance an entire measurement window.
+    const elapsed = Math.min(rawDt, 1);
+    if (!this.active) {
+      const slow = (validGpu && gpuMs > BUDGET_MS) || (!frameCapped && rawDt * 1000 > SLOW_FRAME_MS);
+      this.slowT = slow ? this.slowT + elapsed : 0;
+      if (this.slowT < WINDOW) return;
+      this.active = true;
+      this.slowT = 0;
+      this.#reset();
+    }
+    this.t += elapsed;
     if (this.t < WARMUP) return;
-    if (gpuMs !== null) this.gpuSamples.push(gpuMs);
+    if (validGpu) this.gpuSamples.push(gpuMs);
     if (!frameCapped) this.frameSamples.push(rawDt * 1000);
     if (this.t < WARMUP + WINDOW) return;
-    const timed = this.gpuSamples.length >= 20;
+    // At 3 FPS four seconds only produces twelve samples. Requiring twenty
+    // would finish calibration without ever measuring the failing workload.
+    const timed = this.gpuSamples.length >= 6;
+    const frames = this.frameSamples.length >= 6;
+    if (!timed && !frames) { this.#reset(); return; }
     const next = decide({
       tier: this.tier, failed: this.failed,
       gpuMs: timed ? median(this.gpuSamples) : null,
-      frameMs: !timed && this.frameSamples.length >= 20 ? median(this.frameSamples) : null,
+      frameMs: frames ? median(this.frameSamples) : null,
     });
     this.active = !next.done;
     if (next.tier !== this.tier) { this.tier = next.tier; this.apply(this.tier); }
@@ -112,6 +134,6 @@ export class GraphicsAutoTune {
   }
 
   save() {
-    try { this.storage?.setItem(KEY, JSON.stringify({ gpu: this.gpu, tier: this.tier, done: !this.active })); } catch { /* storage may be blocked */ }
+    try { this.storage?.setItem(KEY, JSON.stringify({ version: CALIBRATION_VERSION, gpu: this.gpu, tier: this.tier, done: !this.active })); } catch { /* storage may be blocked */ }
   }
 }
