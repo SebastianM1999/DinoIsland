@@ -57,7 +57,7 @@ export function buildBowCamp(terrain, layout) {
   const props = mesh(merge([
     stumpGeometry(),
     // the quiver leans on the stump's trail side, the basket lies tipped over beside it
-    place(quiverGeometry(), [0.42, 0.3, 0.38], [-0.35, 0.3, -0.2]),
+    place(quiverGeometry(), [0.62, 0.27, 0.3], [0.1, 0.5, 0.32]),
     place(basketGeometry(), [-0.62, 0.25, 0.42], [Math.PI / 2 - 0.15, 0, 0.5]),
     place(fireRingGeometry(), [0.1, 0, 1.25]),
   ]), MAT.standard);
