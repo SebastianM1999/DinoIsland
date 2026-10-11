@@ -718,6 +718,7 @@ export class Hud {
     const name = ITEM_INFO[slot.id === 'fruit' ? slot.sub : slot.id]?.name || slot.label || slot.id;
     const gun = inv.guns?.[slot.id];
     let detail = slot.id === 'spear' ? (slot.enabled === false ? 'Spear missing · replace at camp' : `Durability ${slot.count ?? `${inv.spearHealth ?? 100}%`}`)
+      : slot.id === 'bow' && inv.bow === false ? 'No bow yet · find it at the hunter\'s camp by the trail, before the mountain'
       : slot.id === 'bow' ? `${slot.count ?? inv.arrows ?? 0} arrows · next arrow lasts ${inv.arrows ? Math.min(...(inv.arrowUses?.length ? inv.arrowUses : [CONFIG.weapons.bow.uses])) : 0} shots`
       : slot.id === 'trap' ? `${slot.count ?? 0} traps available`
       : slot.id === 'fruit' ? `${slot.count ?? 0} fruit carried · F to eat`

@@ -84,6 +84,7 @@ export const EV = {
   ITEM_REMOVE: 'item-',     // { id, by }
   FRUIT: 'fruit',           // { spot, count } (0..4 fruit left on the plant)
   RESOURCE: 'res',          // { spot, up, by? }  a map resource was gathered (up: false, by) or grew back (up: true)
+  BOW_FOUND: 'bow',         // { id }  a player took their bow from the hunter's camp (layout.bowCamp)
   WALL_TORCH: 'wtorch',     // { torch, by }  a wall torch was lit (it stays lit for the island)
   SHOT: 'shot',             // { by, kind, o, end } remote gun effects
   FIRE: 'fire',             // { by, kind, o, v, pid }            remote projectile visuals

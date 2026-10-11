@@ -120,8 +120,11 @@ export class ServerWorld {
         downed: false, downT: 0, reviving: null, lastStandUsed: false, invulnUntil: 0,
         lastMoveAt: this.now, moveBudget: 3.5, epoch: p.epoch + 1, breath: DIVE.breath, drownT: 0,
       });
-      p.inv.arrows = caps.arrows;
-      p.inv.arrowUses = Array(caps.arrows).fill(W.bow.uses);
+      if (!this.layout.bowCamp) p.inv.bow = true;
+      if (p.inv.bow) {
+        p.inv.arrows = caps.arrows;
+        p.inv.arrowUses = Array(caps.arrows).fill(W.bow.uses);
+      }
       p.inv.traps = Math.max(p.inv.traps, caps.traps);
       p.inv.spear = true;
       p.inv.spearHealth = W.spear.durability;
@@ -224,10 +227,13 @@ export class ServerWorld {
   }
 
   freshInventory() {
+    // (island 1: each explorer finds the bow at the hunter's camp; elsewhere it was found on island 1)
+    const bow = !this.layout.bowCamp;
     return {
       guns: gunInventory(), reloading: null,
-      arrows: W.bow.startArrows,
-      arrowUses: Array(W.bow.startArrows).fill(W.bow.uses),
+      bow,
+      arrows: bow ? W.bow.startArrows : 0,
+      arrowUses: Array(bow ? W.bow.startArrows : 0).fill(W.bow.uses),
       spear: true,
       spearHealth: W.spear.durability,
       traps: W.trap.startCount,
@@ -634,6 +640,7 @@ export class ServerWorld {
       inv.arrowUses = Array(caps.arrows).fill(W.bow.uses);
       changed = true;
     }
+    set('bow', true);
     set('spear', true);
     set('spearHealth', W.spear.durability);
     set('traps', Math.max(inv.traps, caps.traps));
@@ -763,7 +770,7 @@ export class ServerWorld {
     p.moveBudget = 3.5;
     p.breath = DIVE.breath; p.drownT = 0;
     p.knockBudgetUntil = 0;
-    p.inv.arrows = Math.max(p.inv.arrows, W.bow.startArrows);
+    if (p.inv.bow) p.inv.arrows = Math.max(p.inv.arrows, W.bow.startArrows);
     this.normalizeArrows(p.inv);
     if (!p.inv.spear) p.inv.spearHealth = W.spear.durability;
     p.inv.spear = true;
@@ -1017,7 +1024,7 @@ export class ServerWorld {
             speed < 5 || speed > maxSpeed) return;
         let health;
         if (kind === 'arrow') {
-          if (inv.arrows <= 0) return;
+          if (!inv.bow || inv.arrows <= 0) return;
           this.normalizeArrows(inv);
           health = inv.arrowUses.shift() - 1;
           inv.arrows--;
@@ -1311,7 +1318,7 @@ export class ServerWorld {
       case ACT.REFILL: {
         if (!p.alive || !this.nearAny(p, this.stations().refill, 6)) return;
         // free basic resupply only; everything else is crafted (ACT.CRAFT)
-        inv.arrows = Math.max(inv.arrows, Math.min(W.bow.startArrows, this.caps().arrows));
+        if (inv.bow) inv.arrows = Math.max(inv.arrows, Math.min(W.bow.startArrows, this.caps().arrows));
         this.normalizeArrows(inv);
         if (!inv.spear) inv.spearHealth = W.spear.durability;
         inv.spear = true;
@@ -1585,6 +1592,16 @@ export class ServerWorld {
         this.event(EV.RELIC, { id: r.id, kind: r.kind, by: p.id });
         this.mission.onRelicFound(r, p);
         this.awardXp(RELIC_XP, 'Boat part', RELIC_POINTS);
+      }
+      // the hunter's camp (island 1): walk up to it to take your own bow, with a full quiver's start
+      const camp = this.layout.bowCamp;
+      if (camp && !p.inv.bow && (camp.x - p.x) ** 2 + (camp.z - p.z) ** 2 <= W.bow.pickupReach ** 2 && Math.abs(camp.y - p.y) < 3) {
+        p.inv.bow = true;
+        p.inv.arrows = Math.max(p.inv.arrows, Math.min(W.bow.startArrows, this.caps().arrows));
+        this.normalizeArrows(p.inv);
+        this.event(EV.BOW_FOUND, { id: p.id });
+        this.toast(`${p.name} found a bow`, 'bow');
+        this.sendInv(p);
       }
       // the hut / the base campfire is a safe, healing place
       const st = this.stations();

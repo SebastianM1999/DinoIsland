@@ -71,6 +71,7 @@ export function* buildLayoutSteps(terrain) {
     bushes: [],
     fruitSpots: [],
     resourceSpots: [],
+    bowCamp: null,
     colliders: { circles: [], boxes: [] },
     dinoZones: { brachio: [], stego: [], raptor: [] },
     nests: [],
@@ -1384,6 +1385,52 @@ export function* buildLayoutSteps(terrain) {
           add(type, x, z);
         }
       }
+    }
+  }
+
+  // ---------------------------------------------------------- bow camp
+  // An abandoned hunter's camp (biome.bowCamp): a stump with the bow on it, a quiver
+  // and a basket, a few metres off the trail where it nears the main mountain's foot
+  // (35-50 % of the way from the hut). Placed last with its own random stream, clear of
+  // trees, rocks and the rest, so everything above keeps its spot; only the (visual)
+  // bushes right on it make way.
+  if (biome.bowCamp && plan.trail.length > 4 && plan.mainPeak) {
+    const rb = makeRng(S ^ 0xb0c4);
+    const pk = plan.mainPeak, tr = plan.trail;
+    const len = [0];
+    for (let i = 1; i < tr.length; i++) len.push(len[i - 1] + Math.hypot(tr[i].x - tr[i - 1].x, tr[i].z - tr[i - 1].z));
+    const total = len[len.length - 1];
+    // (trees reserve wide room for their crowns: check the solid things themselves)
+    const clear = (x, z) => layout.trees.every((t) => Math.hypot(t.x - x, t.z - z) > 2.2 * t.scale) &&
+      layout.rocks.every((r) => Math.hypot(r.x - x, r.z - z) > r.R + 1.5) &&
+      layout.logs.every((l) => Math.hypot(l.x - x, l.z - z) > l.len / 2 + 1.5) &&
+      [...layout.fruitSpots, ...layout.relics].every((o) => Math.hypot(o.x - x, o.z - z) > 4) &&
+      layout.nests.every((n) => Math.hypot(n.x - x, n.z - z) > 8);
+    // candidates every 2 m along that stretch, 6-12 m to either side; the nearest to the mountain's foot wins
+    const cands = [];
+    for (let i = 1; i < tr.length; i++) {
+      const q = tr[i - 1], p = tr[i], l = Math.hypot(p.x - q.x, p.z - q.z) || 1;
+      const nx = -(p.z - q.z) / l, nz = (p.x - q.x) / l;
+      for (let k = 0; k < l; k += 2) {
+        if (len[i - 1] + k < total * 0.35 || len[i - 1] + k > total * 0.5) continue;
+        const cx = q.x + (p.x - q.x) * k / l, cz = q.z + (p.z - q.z) * k / l;
+        for (const side of [1, -1]) {
+          for (let d = 6; d <= 12; d += 1.5) {
+            const x = cx + nx * side * d, z = cz + nz * side * d;
+            cands.push({ x, z, nx: nx * side, nz: nz * side, foot: Math.abs(Math.hypot(x - pk.x, z - pk.z) - pk.radius) + d * 0.5 + rb() });
+          }
+        }
+      }
+    }
+    cands.sort((u, v) => u.foot - v.foot);
+    const c = cands.find(({ x, z }) => dry(x, z, 0.8) && terrain.slopeAt(x, z) < 0.3 && distToPath(x, z) > 5.5 &&
+      outsideGrove(x, z, 4) && !nearHut(x, z, 6) && clear(x, z));
+    if (c) {
+      // (the stump faces the trail)
+      layout.bowCamp = { x: c.x, z: c.z, y: terrain.heightAt(c.x, c.z), rot: Math.atan2(-c.nx, -c.nz) };
+      reserve(c.x, c.z, 3);
+      layout.bushes = layout.bushes.filter((bu) => Math.hypot(bu.x - c.x, bu.z - c.z) > 2.6);
+      circles.push({ x: c.x, z: c.z, r: 0.42, top: layout.bowCamp.y + 0.55, stand: true, kind: 'stump' });
     }
   }
 

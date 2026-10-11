@@ -12,6 +12,7 @@ function setup() {
   const world = new ServerWorld({ send: (to, msg) => messages.push({ to, msg }) });
   const { id } = world.join('Smith');
   const player = world.players.get(id);
+  Object.assign(player.inv, { bow: true, arrows: 12, arrowUses: Array(12).fill(3) });   // (island 1: the bow is found at the hunter's camp – bow-find.test.js)
   const rack = world.layout.hut.arrowRack;
   player.x = rack.x; player.z = rack.z; player.y = world.terrain.heightAt(rack.x, rack.z);
   const craft = (recipe) => world.receive(player.id, { t: MSG.ACT, a: ACT.CRAFT, recipe });

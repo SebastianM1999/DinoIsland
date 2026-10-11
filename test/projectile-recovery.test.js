@@ -10,6 +10,7 @@ function setup() {
   const world = new ServerWorld({ send() {} });
   const { id } = world.join('Hunter');
   const player = world.players.get(id);
+  player.inv.bow = true;   // (island 1: the bow is found at the hunter's camp – bow-find.test.js)
   player.inv.arrows = 1; player.inv.arrowUses = [3];
   const dino = world.dinos.list.find(d => d.type === 'raptor');
   dino.hp = 10000; dino.x = player.x; dino.z = player.z - 6; dino.y = player.y; dino.yaw = 0;

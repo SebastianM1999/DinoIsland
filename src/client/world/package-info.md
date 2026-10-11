@@ -22,6 +22,7 @@
 - `rocks.js` — `buildRocks` / `rockGeo`: boulders from `shared/rockShapes.js` tables (stone kind per rock from `biome.rocks.kinds`, clustered by region) and sea stacks (with palms on green islands).
 - `logs.js` — `buildLogs`: fallen trunks from `layout.logs`, merged into one mesh.
 - `resourceNodes.js` — `buildResourceNodes`: the map resources at `layout.resourceSpots` (one InstancedMesh per kind; resin on the visible bark of its tree), `setUp(spotId, up)` with pop-in, `isUp`, `getAnchor`, a soft glow pulse.
+- `bowCamp.js` — `buildBowCamp`: the hunter's camp at `layout.bowCamp` (stump, quiver, basket; the bow and a golden glow only while the local explorer has none: `setTaken`), `minimapMarkers`.
 - `fruitPlants.js` — `buildFruitPlants`: the fruit of every kind by its role (`KINDS`: bush, tree, glowing plant – berry/mango/dragon, swamp marshberry/swampfig/glowlotus, volcano emberchili/ashplum/obsidianfig); `setCount(spotId, n)` with pop-in.
 - `hut.js` — `buildHut`: hunting hut (cabin, drop-off, workbench, mission board, wardrobe, flag, campfire, camp ground from `hutFloor`) or the small landing camp on islands 2+.
 - `base.js` — `buildBaseView`: the team base on islands 2+ (plot stakes, scaffolding, camp/lodge/fort stages, towers, raid damage); `setBase`, `shoot`; `stakePoint`.
