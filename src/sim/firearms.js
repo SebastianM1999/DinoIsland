@@ -14,7 +14,7 @@ export function gunAction(world, player, message) {
   const kind = message.kind;
   if (!GUNS.includes(kind) || !player.alive || player.eating || EQUIP[player.eq] !== kind) return;
   const ammo = player.inv.guns[kind], spec = CONFIG.weapons[kind];
-  if (ammo.owned === false) return;
+  if (!ammo || ammo.owned === false) return;   // (none in the demo)
   if (message.a === ACT.RELOAD) {
     if (player.inv.reloading || ammo.loaded >= spec.magazine || ammo.reserve <= 0) return;
     player.inv.reloading = kind;
@@ -56,6 +56,7 @@ export function updateGunReload(world, player) {
   if (!player.alive || EQUIP[player.eq] !== kind) { player.inv.reloading = null; world.sendInv(player); return; }
   if (world.now < player.reloadUntil) return;
   const ammo = player.inv.guns[kind];
+  if (!ammo) { player.inv.reloading = null; return; }
   const rounds = Math.min(CONFIG.weapons[kind].magazine - ammo.loaded, ammo.reserve);
   ammo.loaded += rounds; ammo.reserve -= rounds; player.inv.reloading = null;
   world.sendInv(player);

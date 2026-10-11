@@ -61,6 +61,7 @@ Where each feature lives in each layer. Paths are relative to `src/` unless they
 | Outfits | outfits.js | world.js (`ACT.OUTFIT`) | ui/wardrobe.js, models/playerModel.js | outfits |
 | Audio | | | audio/* | audio |
 | Graphics tier, settings | | | core/renderer.js, graphicsTier.js, settings.js, ui/menus.js | graphics-tier |
+| Demo (island 1 only, 1-2 explorers, no firearms, no XP/skills; `?demo=1`, `--demo`, `DINO_DEMO=1`) | config.js (`demo`) | world.js (`demo`: start island, `join` cap, `gunInventory`, profile/XP/skills off, `nextLevel`), mission.js (won after island 1), firearms.js (no gun), worker.js | main.js (`applyDemoMenu`), core/game.js (`demo`), player/actions.js (no gun slots), ui/hud.js (demo win card), css (`body.is-demo`); server/index.js, gameHost.js, desktop/main.cjs | demo, player-actions |
 | Hosting, LAN, internet, Steam | brand.js | worker.js | net/, ui/steamLobby.js, ui/internetTest.js | http-host, lan-address, internet-host, steam-coop |
 
 ## Known hot spots

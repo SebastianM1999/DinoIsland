@@ -277,6 +277,7 @@ export class PlayerActions {
     if (i === this.game.eq) return;
     // (island 1: no bow in hand until you found yours at the hunter's camp)
     if (EQUIP[i] === 'bow' && this.inv.bow === false) return this.fullAlert("No bow yet – find it at the hunter's camp before the mountain", 'bow');
+    if ((EQUIP[i] === 'pistol' || EQUIP[i] === 'rifle') && !this.inv.guns?.[EQUIP[i]]) return;   // (no firearms: the demo)
     this.game.eq = i;
     this.drawing = false;
     this.drawT = 0;
@@ -664,7 +665,7 @@ export class PlayerActions {
       } else if (it.kind === 'spear') {
         if (this.inv.spear) continue;
       } else if (it.kind === 'pistol' || it.kind === 'rifle') {
-        if (this.inv.guns[it.kind].owned !== false) continue;
+        if (this.inv.guns?.[it.kind]?.owned !== false) continue;
       } else if (it.kind === 'trap') {
         if (this.inv.traps >= caps.traps) full = ['You carry as many traps as you can', 'trap'];
       } else if (Object.hasOwn(CONFIG.fruit.types, it.kind)) {
@@ -708,7 +709,8 @@ export class PlayerActions {
         : { id: 'bow', label: SLOT_LABEL.bow, count: inv.arrows, enabled: inv.arrows > 0 },
       { id: 'trap', label: SLOT_LABEL.trap, count: inv.traps, enabled: inv.traps > 0 },
       { id: 'fruit', label: SLOT_LABEL.fruit, count: inv.fruit.length, enabled: inv.fruit.length > 0, sub: fruitType || undefined },
-      ...['pistol', 'rifle'].map(id => ({ id, label: `${SLOT_LABEL[id]} - R reload`, count: inv.guns?.[id]?.loaded ?? 0, enabled: (inv.guns?.[id]?.loaded ?? 0) > 0 })),
+      // (no firearms in the pack – the demo: no slots for them)
+      ...['pistol', 'rifle'].filter(id => inv.guns?.[id]).map(id => ({ id, label: `${SLOT_LABEL[id]} - R reload`, count: inv.guns[id].loaded ?? 0, enabled: (inv.guns[id].loaded ?? 0) > 0 })),
     ], g.eq);
     const caps = this.caps;
     hud.setInventory({

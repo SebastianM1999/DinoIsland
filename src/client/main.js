@@ -30,6 +30,15 @@ const DEBUG_VARIANT = Number(DEBUG_QUERY.get('variant')) || undefined;   // ?var
 const DEBUG_BASE = Math.max(0, Math.min(3, Number(DEBUG_QUERY.get('base')) || 0));
 const DEBUG_RAID = Math.max(0, Number(DEBUG_QUERY.get('raid')) || 0);   // ?raid=10: first raid in 10 s (with ?base)
 const DEBUG_DEV = DEBUG_QUERY.has('dev') || DEBUG_QUERY.has('pin');   // ?dev: the dev pin tool (F8, client/core/devPins.js)
+// The demo (CONFIG.demo): ?demo=1, or a demo server says so in /status (pollLobby). Solo games then run
+// the demo too; the menu offers neither other islands nor the skill tree.
+let demo = DEBUG_QUERY.get('demo') === '1';
+function applyDemoMenu() {
+  if (!demo) return;
+  document.body.classList.add('is-demo');
+  $('play-island').value = '0';
+  for (const id of ['btn-home-skills', 'tour-next']) { const b = $(id); if (b) b.hidden = true; }
+}
 document.title = BRAND.name;
 
 // SVG filter that gives HUD and menu panels their brush-stroke edges.
@@ -85,7 +94,7 @@ async function startMenuTour() {
   const selected = island => {
     if (request !== tourRequest) return;
     tourIsland = island.index;
-    $('play-island').value = String(unlockedStartingIsland(island.index));
+    $('play-island').value = String(demo ? 0 : unlockedStartingIsland(island.index));
     // Selection remains usable while the previous preview is being cancelled.
     $('tour-next').disabled = false;
     $('menu-preview').classList.toggle('has-live-tour', !!menuTour && menuTour !== menuPostcards && !island.loading && island.available);
@@ -214,7 +223,7 @@ async function start(mode, options = {}) {
     const profile = loadProfile();   // saved XP and skills; the host re-validates them
     if (mode === 'internet') options.url = await internetTest.start();
     net = mode === 'steam' ? await Net.steam(window.dinoSteam, options, name, outfit, profile) :
-      mode === 'online' || mode === 'internet' ? await Net.connect(websocketAddress(options.url ?? serverInput.value), name, outfit, profile) : await Net.local(name, outfit, { level: DEBUG_QUERY.has('island') ? DEBUG_ISLAND : unlockedStartingIsland(Number($('play-island').value)), variant: DEBUG_VARIANT, dev: DEBUG_DEV, baseStage: DEBUG_BASE, raidIn: DEBUG_RAID }, profile);
+      mode === 'online' || mode === 'internet' ? await Net.connect(websocketAddress(options.url ?? serverInput.value), name, outfit, profile) : await Net.local(name, outfit, { level: demo ? 0 : DEBUG_QUERY.has('island') ? DEBUG_ISLAND : unlockedStartingIsland(Number($('play-island').value)), variant: DEBUG_VARIANT, dev: DEBUG_DEV, baseStage: DEBUG_BASE, raidIn: DEBUG_RAID, demo }, profile);
   } catch (err) {
     if (mode === 'internet') internetTest.stop();
     busy = false;
@@ -421,6 +430,7 @@ nameInput.addEventListener('input', () => {
   try { localStorage.setItem(storageKey('name'), nameInput.value.slice(0, 14)); } catch { /* storage may be blocked */ }
 });
 serverInput.value = served ? `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}` : `ws://localhost:${CONFIG.net.port}`;
+applyDemoMenu();
 const hashMsg = new URLSearchParams(location.hash.slice(1)).get('msg');
 if (hashMsg) {
   status.textContent = hashMsg;
@@ -433,6 +443,7 @@ async function pollLobby() {
     try {
       const res = await fetch('/status', { cache: 'no-store' });
       const s = await res.json();
+      if (s.demo && !demo) { demo = true; applyDemoMenu(); }
       const list = $('lobby-players');
       list.replaceChildren(...s.players.map((p) => {
         const li = document.createElement('li');
@@ -445,7 +456,7 @@ async function pollLobby() {
         status.textContent = s.players.length
           ? `${s.players.length}/${s.maxPlayers} explorers on this server`
           : 'The server is empty – start the expedition!';
-        if (s.players.length >= s.maxPlayers) status.textContent = 'The server is full (4/4).';
+        if (s.players.length >= s.maxPlayers) status.textContent = `The server is full (${s.maxPlayers}/${s.maxPlayers}).`;
       }
     } catch {
       status.textContent = 'No co-op server found – you can still play solo.';

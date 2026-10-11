@@ -11,7 +11,9 @@ let internet;
 
 async function launch() {
   const { createGameServer } = await import('../server/index.js');
-  const { httpServer, host, internet: internetHost } = createGameServer();
+  // the demo build: `--demo` or DINO_DEMO=1 (CONFIG.demo – island 1, two explorers, spear and bow)
+  const demo = process.argv.includes('--demo') || process.env.DINO_DEMO === '1';
+  const { httpServer, host, internet: internetHost } = createGameServer({ demo });
   internet = internetHost;
   server = httpServer;
   gameHost = host;
@@ -57,7 +59,7 @@ async function launch() {
     if (!url.startsWith(localUrl)) event.preventDefault();
   });
   stopSteam = await installSteam(app, win, localUrl);
-  await win.loadURL(localUrl);
+  await win.loadURL(demo ? `${localUrl}?demo=1` : localUrl);
 }
 
 app.whenReady().then(launch).catch((error) => {

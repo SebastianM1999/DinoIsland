@@ -10,7 +10,8 @@ import { installCaveBakes } from './caveBake.js';
 const NET = CONFIG.net;
 const MAX_MSG_BYTES = 8 * 1024;
 
-export function startGameHost(httpServer = null, { onConnection } = {}) {
+/** demo: host the demo (CONFIG.demo: island 1 only, two explorers, no firearms or skills). */
+export function startGameHost(httpServer = null, { onConnection, demo = false } = {}) {
   installCaveBakes();   // (the Hollow Mountain's baked walk grid: assets/cave, see src/shared/caveBake.js)
   const wss = httpServer ? new WebSocketServer({ server: httpServer, maxPayload: MAX_MSG_BYTES }) : null;
   /** @type {Map<number, import('ws').WebSocket>} */
@@ -37,7 +38,7 @@ export function startGameHost(httpServer = null, { onConnection } = {}) {
       }
     },
     log: (...a) => console.log('[world]', ...a),
-  });
+  }, { demo });
 
   function attachConnection(ws, addr = 'local') {
     let playerId = null;
@@ -124,7 +125,8 @@ export function startGameHost(httpServer = null, { onConnection } = {}) {
     },
     status() {
       return {
-        maxPlayers: NET.maxPlayers,
+        demo,
+        maxPlayers: demo ? CONFIG.demo.maxPlayers : NET.maxPlayers,
         players: [...world.players.values()].map((p) => ({ name: p.name, slot: p.slot, alive: p.alive })),
         mission: world.mission.state().title,
       };
