@@ -348,7 +348,7 @@ export class Game {
     scene.add(this.resourceNodes.group);
     yield;
     this.bowCamp = buildBowCamp(this.terrain, this.layout);
-    this.bowCamp.setTaken(this.me.inv?.bow !== false);
+    this.bowCamp.setTaken(this.net.welcome.inv?.bow !== false);   // (built before this.me exists)
     scene.add(this.bowCamp.group);
     yield;
     // islands with building plots start at a small landing camp; the team builds its own base
@@ -457,7 +457,7 @@ export class Game {
     const i = CONTRACTS.findIndex((c) => c.id === id);
     const c = i >= 0 ? m.contracts?.[i] : null;
     // (island 1: until you have your bow, finding it heads the list – only on this explorer's screen)
-    const own = this.layout?.bowCamp && this.me.inv?.bow === false ? [{ text: "Find your bow at the hunter's camp before the mountain", done: false }] : [];
+    const own = this.layout?.bowCamp && this.me?.inv?.bow === false ? [{ text: "Find your bow at the hunter's camp before the mountain", done: false }] : [];
     const objectives = c
       ? [...own, ...m.objectives, { text: `${CONTRACTS[i].title}: ${c.progress}/${CONTRACTS[i].goal}`, done: c.done }]
       : [...own, ...m.objectives];
