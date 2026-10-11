@@ -56,23 +56,28 @@ test('Resume retries pointer lock after a temporary browser cooldown', async () 
 });
 
 function mouseFixture(requestPointerLock = () => Promise.resolve()) {
-  const listeners = new Map(), docListeners = new Map();
-  const oldAdd = globalThis.addEventListener, oldDocument = globalThis.document;
+  const listeners = new Map(), docListeners = new Map(), targetListeners = new Map();
+  const oldAdd = globalThis.addEventListener, oldRemove = globalThis.removeEventListener, oldDocument = globalThis.document;
   globalThis.addEventListener = (name, fn) => listeners.set(name, fn);
-  globalThis.document = { addEventListener: (name, fn) => docListeners.set(name, fn), pointerLockElement: null };
-  const target = { addEventListener() {}, requestPointerLock };
+  const remove = map => (name, fn) => { if (map.get(name) === fn) map.delete(name); };
+  globalThis.removeEventListener = remove(listeners);
+  globalThis.document = { addEventListener: (name, fn) => docListeners.set(name, fn), removeEventListener: remove(docListeners), pointerLockElement: null,
+    exitPointerLock() { this.pointerLockElement = null; docListeners.get('pointerlockchange')?.(); } };
+  const target = { addEventListener: (name, fn) => targetListeners.set(name, fn), removeEventListener: remove(targetListeners), requestPointerLock };
   const input = new Input(target);
   input.enabled = true;
-  const emit = (name, event = {}) => listeners.get(name)(event);
+  const emit = (name, event = {}) => listeners.get(name)?.(event);
   const lock = (element = target) => {
     document.pointerLockElement = element;
-    docListeners.get('pointerlockchange')();
+    docListeners.get('pointerlockchange')?.();
   };
   const move = (x, y = 0, position = {}) => emit('mousemove', {
     movementX: x, movementY: y, screenX: 500, screenY: 300, clientX: 500, clientY: 300, ...position,
   });
-  return { input, emit, lock, move, restore() {
+  return { input, emit, lock, move, target, listeners, docListeners, targetListeners, restore() {
+    input.dispose();
     globalThis.addEventListener = oldAdd;
+    globalThis.removeEventListener = oldRemove;
     globalThis.document = oldDocument;
   } };
 }
@@ -92,6 +97,58 @@ test('Pointer-lock transitions discard cursor rebasing spikes and pending input'
     assert.deepEqual(f.input.takeMouse(), { x: 0, y: 0, wheel: 0 });
     f.move(7);
     assert.equal(f.input.takeMouse().x, 7);
+  } finally { f.restore(); }
+});
+
+test('Disposed input removes every event listener and cannot queue actions or panel hooks', () => {
+  const f = mouseFixture();
+  try {
+    f.lock();
+    f.emit('keydown', { code: 'KeyW', repeat: false, preventDefault() {} });
+    assert.equal(f.input.isHeld('forward'), true);
+    let hooks = 0;
+    f.input.onPanelToggle = () => { hooks++; return true; };
+    f.input.onLockChange = () => { hooks++; };
+    f.input.dispose();
+    f.input.dispose(); // teardown is safe twice
+    assert.equal(f.listeners.size + f.docListeners.size + f.targetListeners.size, 0);
+    f.input.enabled = true;
+    assert.equal(f.input.enabled, false);
+    f.emit('keydown', { code: 'KeyE', repeat: false, preventDefault() {} });
+    f.lock(); f.move(0); f.move(20); f.emit('wheel', { deltaY: 1 });
+    assert.equal(hooks, 0);
+    assert.equal(f.input.isHeld('forward'), false);
+    assert.equal(f.input.wasPressed('interact'), false);
+    assert.deepEqual(f.input.takeMouse(), { x: 0, y: 0, wheel: 0 });
+  } finally { f.restore(); }
+});
+
+test('Disposing input cancels cooldown retries and prevents later pointer-lock requests', async () => {
+  let attempts = 0;
+  const f = mouseFixture(() => { attempts++; return Promise.reject(new Error('Cooldown')); });
+  try {
+    f.input.requestLock();
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(f.input.lockPending, true);
+    f.input.dispose();
+    f.input.requestLock();
+    await new Promise(resolve => setTimeout(resolve, 750));
+    assert.equal(attempts, 1);
+    assert.equal(f.input.lockPending, false);
+  } finally { f.restore(); }
+});
+
+test('A browser lock request finishing after disposal releases the abandoned target', async () => {
+  let resolve;
+  const f = mouseFixture(() => new Promise(done => { resolve = done; }));
+  try {
+    f.input.requestLock();
+    f.input.dispose();
+    document.pointerLockElement = f.target;
+    resolve();
+    await new Promise(done => setImmediate(done));
+    assert.equal(document.pointerLockElement, null);
+    assert.equal(f.input.lockPending, false);
   } finally { f.restore(); }
 });
 

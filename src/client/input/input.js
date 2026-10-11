@@ -31,6 +31,8 @@ export class Input {
   /** @param {HTMLElement} target element that receives pointer lock */
   constructor(target) {
     this.target = target;
+    this.listeners = [];
+    this.disposed = false;
     this.held = new Set();
     this.pressed = new Set();   // pressed since last endFrame()
     this.released = new Set();
@@ -45,18 +47,18 @@ export class Input {
     this.onLockChange = null;
     this.onPanelToggle = null;
 
-    addEventListener('keydown', (e) => this.#onKey(e, true));
-    addEventListener('keyup', (e) => this.#onKey(e, false));
-    addEventListener('blur', () => { this.focused = false; this.#releaseAll(); });
-    addEventListener('focus', () => { this.focused = true; this.#resetMouse(); });
-    target.addEventListener('mousedown', (e) => this.#onMouse(e, true));
-    addEventListener('mouseup', (e) => this.#onMouse(e, false));
-    target.addEventListener('contextmenu', (e) => e.preventDefault());
-    addEventListener('mousemove', (e) => this.#onMove(e));
-    addEventListener('wheel', (e) => {
+    this.#listen(globalThis, 'keydown', (e) => this.#onKey(e, true));
+    this.#listen(globalThis, 'keyup', (e) => this.#onKey(e, false));
+    this.#listen(globalThis, 'blur', () => { this.focused = false; this.#releaseAll(); });
+    this.#listen(globalThis, 'focus', () => { this.focused = true; this.#resetMouse(); });
+    this.#listen(target, 'mousedown', (e) => this.#onMouse(e, true));
+    this.#listen(globalThis, 'mouseup', (e) => this.#onMouse(e, false));
+    this.#listen(target, 'contextmenu', (e) => e.preventDefault());
+    this.#listen(globalThis, 'mousemove', (e) => this.#onMove(e));
+    this.#listen(globalThis, 'wheel', (e) => {
       if (this.#mouseActive() && Number.isFinite(e.deltaY)) this.wheel += Math.sign(e.deltaY);
     }, { passive: true });
-    document.addEventListener('pointerlockchange', () => {
+    this.#listen(document, 'pointerlockchange', () => {
       this.locked = document.pointerLockElement === target;
       this.#resetMouse();
       if (!this.locked) this.#releaseAll();
@@ -64,8 +66,26 @@ export class Input {
     });
   }
 
+  #listen(target, type, handler, options) {
+    target.addEventListener(type, handler, options);
+    this.listeners.push(() => target.removeEventListener(type, handler, options));
+  }
+
+  /** Permanently release an abandoned shell; ordinary island changes reuse it. */
+  dispose() {
+    if (this.disposed) return;
+    this.disposed = true;
+    for (const remove of this.listeners) remove();
+    this.listeners.length = 0;
+    this.onPanelToggle = this.onLockChange = null;
+    this.enabled = false;
+    this.exitLock();
+    this.locked = false;
+    this.endFrame();
+  }
+
   requestLock() {
-    if (this.locked || this.lockPending) return;
+    if (this.disposed || this.locked || this.lockPending) return;
     this.lockPending = true;
     const generation = this.lockGeneration ?? 0;
     const attempt = async (retries = 0) => {
@@ -79,6 +99,8 @@ export class Input {
           if (error.name !== 'NotSupportedError' || generation !== (this.lockGeneration ?? 0)) throw error;
           await this.target.requestPointerLock();
         }
+        // A browser request already in flight may finish after disposal.
+        if (this.disposed && document.pointerLockElement === this.target) document.exitPointerLock();
         this.lockPending = false;
       } catch {
         if (retries < 2 && this.enabled && generation === (this.lockGeneration ?? 0)) {
@@ -97,7 +119,7 @@ export class Input {
     clearTimeout(this.lockRetry);
     this.lockPending = false;
     this.#resetMouse();
-    if (document.pointerLockElement) document.exitPointerLock();
+    if (document.pointerLockElement === this.target) document.exitPointerLock();
   }
 
   #onKey(e, down) {
@@ -147,8 +169,8 @@ export class Input {
 
   get enabled() { return this._enabled; }
   set enabled(on) {
-    this._enabled = on;
-    if (!on) this.#releaseAll();
+    this._enabled = Boolean(on) && !this.disposed;
+    if (!this._enabled) this.#releaseAll();
     else this.#resetMouse();
   }
 

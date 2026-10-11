@@ -2,7 +2,7 @@
 > Turns raw keyboard and mouse events into named game actions and manages pointer lock, so gameplay code never deals with physical keys.
 
 ## Files
-- `input.js` — `Input`: the key-binding table (`KEY_BINDINGS`), per-frame held/pressed/released sets, accumulated mouse movement and wheel, pointer-lock request/exit with retry, panel-toggle hook.
+- `input.js` — `Input`: the key-binding table (`KEY_BINDINGS`), per-frame held/pressed/released sets, accumulated mouse movement and wheel, pointer-lock request/exit with retry, panel-toggle hook; `dispose()` permanently removes DOM listeners and cancels pointer-lock retries when a shell is abandoned.
 
 ## Entry points
 - `Input` is constructed once by `src/client/core/game.js` (`new Input(canvas)`) and handed on to the next island's `Game` through `dispose()` / `reuse`.

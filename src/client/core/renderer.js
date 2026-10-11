@@ -43,7 +43,8 @@ export class Renderer {
     this.camera = new THREE.PerspectiveCamera(CONFIG.player.fov, 1, 0.1, R.viewDistance);
     this.camera.rotation.order = 'YXZ';
     this.reset();
-    addEventListener('resize', () => this.resize());
+    this.resizeListener = () => this.resize();
+    addEventListener('resize', this.resizeListener);
     this.unsubSettings = onSettings((st) => this.applySettings(st));
     this.autoTune = new GraphicsAutoTune((tier) => this.setTier(tier), gpuName(r.getContext()));
     this.setTier(this.autoTune.tier);
@@ -380,6 +381,7 @@ export class Renderer {
   }
 
   dispose() {
+    removeEventListener('resize', this.resizeListener);
     this.unsubSettings?.();
     this.post?.dispose();
     this.sun?.shadow.dispose();
