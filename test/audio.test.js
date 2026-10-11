@@ -336,3 +336,63 @@ test('HTTP server delivers WAV, Ogg music and credit notices with correct types'
     assert.ok((await response.arrayBuffer()).byteLength>100);
   }
 });
+
+test('the stone reverb convolver exists and is wired only while the cave send is open', async t => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const oldWindow = globalThis.window, oldFetch = globalThis.fetch;
+  const ctx = effectContext();
+  let convolvers = 0;
+  const create = ctx.createConvolver;
+  ctx.createConvolver = () => { convolvers++; return create(); };
+  ctx.createStereoPanner = () => ({ pan: { value: 0 }, connect(to) { return to; }, disconnect() {} });
+  ctx.resume = async () => {};
+  globalThis.window = { AudioContext: class { constructor() { return ctx; } } };
+  globalThis.fetch = async () => ({ ok: true, arrayBuffer: async () => new ArrayBuffer(4) });
+  try {
+    const audio = new GameAudio();
+    audio.startAmbient();
+    const outputs = [];
+    const track = node => { const c = node.connect, d = node.disconnect; node.connect = function (to) { outputs.push(['c', node === audio.reverbSend ? 'send' : 'reverb', to]); return c.call(this, to); }; node.disconnect = function (...a) { outputs.push(['d', node === audio.reverbSend ? 'send' : 'reverb']); return d?.apply(this, a); }; return node; };
+    track(audio.reverbSend);
+    // Outside the mountain (any island, or the cave's coves): no convolver at all.
+    audio.setIsland('jungle');
+    for (let i = 0; i < 5; i++) audio.update(0.1, { cave: 0 });
+    assert.equal(convolvers, 0);
+    assert.equal(audio.reverbWired, false);
+    // Entering the cave builds and wires it once; the send gain follows the depth.
+    audio.setIsland('cave');
+    audio.update(0.1, { cave: 0 });
+    assert.equal(convolvers, 0, 'the entrance alone costs nothing');
+    audio.update(0.1, { cave: 0.5 });
+    audio.update(0.1, { cave: 1 });
+    assert.equal(convolvers, 1);
+    assert.equal(audio.reverbWired, true);
+    assert.ok(Math.abs(audio.reverbSend.gain.value - 0.62) < 1e-9);
+    assert.ok(audio.reverb.buffer);
+    // Back outside: the send closes at once, the convolver stays until the tail has died, then it is unwired.
+    audio.update(0.1, { cave: 0 });
+    assert.equal(audio.reverbSend.gain.value, 0);
+    assert.equal(audio.reverbWired, true);
+    t.mock.timers.tick(4900);
+    assert.equal(audio.reverbWired, true, 'the 2.9 s tail must be allowed to ring out first');
+    t.mock.timers.tick(200);
+    assert.equal(audio.reverbWired, false);
+    assert.ok(audio.reverb.disconnected);
+    assert.ok(outputs.some(([kind, who]) => kind === 'd' && who === 'send'));
+    // Re-entering rewires the same convolver without regenerating the impulse; coming back before the release cancels it.
+    audio.update(0.1, { cave: 1 });
+    assert.equal(convolvers, 1);
+    assert.equal(audio.reverbWired, true);
+    audio.update(0.1, { cave: 0 });
+    t.mock.timers.tick(2000);
+    audio.update(0.1, { cave: 1 });
+    t.mock.timers.tick(10000);
+    assert.equal(audio.reverbWired, true);
+    // Sailing to another island releases the reverb too.
+    audio.setIsland('jungle');
+    t.mock.timers.tick(5100);
+    assert.equal(audio.reverbWired, false);
+  } finally {
+    globalThis.window = oldWindow; globalThis.fetch = oldFetch;
+  }
+});
