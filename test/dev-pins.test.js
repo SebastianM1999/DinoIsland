@@ -31,15 +31,17 @@ test('ACT.DEV_TP moves a creative player only in a ?dev solo world', () => {
 
 function fakeReq(url, method, address, body) {
   const listeners = {};
+  let finish;
+  const finished = new Promise(resolve => { finish = resolve; });
   const req = { url, method, headers: { 'content-type': 'application/json' }, socket: { remoteAddress: address },
     on(ev, fn) { (listeners[ev] ??= []).push(fn); return req; }, destroy() {} };
-  const res = { code: 0, body: '', writableEnded: false,
-    writeHead(c) { this.code = c; return this; }, end(b = '') { this.body = String(b); this.writableEnded = true; } };
+  const res = { code: 0, body: '', writableEnded: false, finished,
+    writeHead(c) { this.code = c; return this; }, end(b = '') { this.body = String(b); this.writableEnded = true; finish(); } };
   setImmediate(() => { if (body !== undefined) for (const fn of listeners.data ?? []) fn(Buffer.from(body)); for (const fn of listeners.end ?? []) fn(); });
   return { req, res };
 }
 
-test('the pin endpoint writes reports only for a local source checkout', async () => {
+test('the pin endpoint writes reports only for a local source checkout', { timeout: 5000 }, async () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'pins-'));
   try {
     // no .git: not a source checkout, nothing answers
@@ -54,7 +56,7 @@ test('the pin endpoint writes reports only for a local source checkout', async (
     // local: write one, list it
     ({ req, res } = fakeReq('/__dev/pin', 'POST', '127.0.0.1', JSON.stringify({ meta: { note: 'Hole in roof!', level: { index: 3, variant: 9 } }, png: 'data:image/png;base64,iVBORw0KGgo=' })));
     handleDevPins(req, res, root);
-    await new Promise((r) => setTimeout(r, 20));
+    await res.finished;
     assert.equal(res.code, 200);
     const { id } = JSON.parse(res.body);
     assert.match(id, /hole-in-roof$/);
