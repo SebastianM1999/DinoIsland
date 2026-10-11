@@ -1,7 +1,7 @@
 // Network message formats (JSON). Every message is an object with a `t` type field.
 //
 // Authority model:
-//   * The server owns the world: dinosaurs, loot/items, fruit, traps,
+//   * The server owns the world: dinosaurs, loot/items, fruit, map resources, traps,
 //     player health, inventories, the mission and the hut store.
 //   * Clients own only their own movement (position/look is sent ~20x/s)
 //     and report attacks/projectile results, which the server validates
@@ -51,6 +51,7 @@ export const ACT = {
   LAND: 'land',         // { kind, pid, p:[x,y,z], dino?, zone?, rt?, attach?, pose? } projectile impact
   PICKUP: 'pickup',     // { item }
   HARVEST: 'harvest',   // { spot }
+  GATHER: 'gather',     // { spot }                            take a map resource (layout.resourceSpots)
   EAT: 'eat',           // { fruit? }                          start eating (type optional)
   GIVE: 'give',         // { to }                              give a fruit to a teammate
   TRAP: 'trap',         // { x, z, yaw }
@@ -82,6 +83,7 @@ export const EV = {
   ITEM_ADD: 'item+',        // { item }
   ITEM_REMOVE: 'item-',     // { id, by }
   FRUIT: 'fruit',           // { spot, count } (0..4 fruit left on the plant)
+  RESOURCE: 'res',          // { spot, up, by? }  a map resource was gathered (up: false, by) or grew back (up: true)
   WALL_TORCH: 'wtorch',     // { torch, by }  a wall torch was lit (it stays lit for the island)
   SHOT: 'shot',             // { by, kind, o, end } remote gun effects
   FIRE: 'fire',             // { by, kind, o, v, pid }            remote projectile visuals

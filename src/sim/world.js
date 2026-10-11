@@ -92,6 +92,7 @@ export class ServerWorld {
     this.projectiles = new Map();
     this.tracks = [];
     this.fruit = this.layout.fruitSpots.map((s) => ({ spot: s.id, count: this.rollFruitCount(), regrowAt: 0 }));
+    this.resources = this.layout.resourceSpots.map((s) => ({ spot: s.id, up: true, regrowAt: 0 }));
     this.spottedDinos = new Set();
     this.relics = this.layout.relics.map((r) => ({ ...r, found: false, byName: null }));
     this.base = freshBase();          // the team's own base (islands 2+, see shared/base.js)
@@ -292,6 +293,18 @@ export class ServerWorld {
     if (this.now < (p.nextFullAlert ?? 0)) return;
     p.nextFullAlert = this.now + 3;
     this.send(p.id, { t: MSG.EV, e: EV.FULL, text, icon });
+  }
+
+  /** Put loot into a player's pack: false (and a "pack full" alert) when it is too heavy. */
+  addLoot(p, kind, n) {
+    const caps = this.caps();
+    if (this.carryWeight(p) + CONFIG.loot[kind].weight * n > caps.carry + 1e-6) {
+      this.fullAlert(p, `Your pack is full (${this.carryWeight(p)}/${caps.carry}) – drop off loot at the hut`, 'weight');
+      return false;
+    }
+    p.inv.loot[kind] += n;
+    this.toast(`${CONFIG.loot[kind].name} +${n}`, kind, p.id);
+    return true;
   }
 
   carryWeight(p) {
@@ -1115,14 +1128,22 @@ export class ServerWorld {
           if (inv.fruit.length + it.n > caps.fruit) return this.fullAlert(p, 'Your fruit pouch is full', 'fruit');
           inv.fruit.push(...Array(it.n).fill(it.kind));
         } else if (CONFIG.loot[it.kind]) {
-          const weight = CONFIG.loot[it.kind].weight * it.n;
-          if (this.carryWeight(p) + weight > caps.carry + 1e-6) {
-            return this.fullAlert(p, `Your pack is full (${this.carryWeight(p)}/${caps.carry}) – drop off loot at the hut`, 'weight');
-          }
-          inv.loot[it.kind] += it.n;
-          this.toast(`${CONFIG.loot[it.kind].name} +${it.n}`, it.kind, p.id);
+          if (!this.addLoot(p, it.kind, it.n)) return;
         } else return;
         this.removeItem(it.id, p.id);
+        this.sendInv(p);
+        this.mission.onLootChanged();
+        return;
+      }
+      case ACT.GATHER: {
+        if (!p.alive) return;
+        const r = this.resources[m.spot | 0];
+        const spot = this.layout.resourceSpots[m.spot | 0];
+        if (!r || !spot || !r.up || !this.near(p, spot.x, spot.z, CONFIG.resources.reach + 1)) return;
+        if (!this.addLoot(p, spot.type, 1)) return;
+        r.up = false;
+        r.regrowAt = this.now + CONFIG.resources.regrow[spot.type];
+        this.event(EV.RESOURCE, { spot: spot.id, up: false, by: p.id });
         this.sendInv(p);
         this.mission.onLootChanged();
         return;
@@ -1579,6 +1600,13 @@ export class ServerWorld {
         this.event(EV.FRUIT, { spot: f.spot, count: f.count });
       }
     }
+    // map resources grow back
+    for (const r of this.resources) {
+      if (!r.up && this.now >= r.regrowAt) {
+        r.up = true;
+        this.event(EV.RESOURCE, { spot: r.spot, up: true });
+      }
+    }
     // taken torches at their spots come back
     for (const s of this.torchSpawns) if (s.item === null && this.now >= s.respawnAt) this.#spawnTorch(s, true);
     // stale items
@@ -1648,6 +1676,7 @@ export class ServerWorld {
       dinos: this.dinos.describeAll(),
       items: [...this.items.values()],
       fruit: this.fruit.map((f) => f.count),
+      resources: this.resources.filter((r) => !r.up).map((r) => r.spot),   // the spots gathered right now
       wallTorches: [...(this.wallTorchesLit ?? [])],
       spottedDinos: [...this.spottedDinos],
       traps: [...this.traps.values()],

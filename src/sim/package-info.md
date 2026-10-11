@@ -28,11 +28,11 @@
 - downed/revive/death: `killPlayer`, `downPlayer`, `defeatPlayer`, `startRevive`/`updateRevive`, `updateDowned`, `respawnPlayer`.
 - skills / XP: `awardXp`, `skillAction`, `refreshMods`, `grantDash`, `damageMul`, `sendProf`.
 - base: `stations`, `safeZone`, `baseAction`, `towerAction`, `repairBase`, `finishBuilding`, `pay`, `creativeSupply`.
-- messages: `receive` -> `onState` (movement validation: move budget, collision, sea, grove barrier, epoch/sequence), `receiveAction` (validates the bundled state, replays against state history for overtaken packets), `onAct` (one `case ACT.*` per action: creative, spot, shot/reload, melee, fire/land, pickup, harvest, eat, give, trap, drop, deposit, outfit, repair, unstuck, butcher, refill, craft, base, skill, revive, dash, respawn).
+- messages: `receive` -> `onState` (movement validation: move budget, collision, sea, grove barrier, epoch/sequence), `receiveAction` (validates the bundled state, replays against state history for overtaken packets), `onAct` (one `case ACT.*` per action: creative, spot, shot/reload, melee, fire/land, pickup, harvest, gather (map resources: `addLoot`, `EV.RESOURCE`), eat, give, trap, drop, deposit, outfit, repair, unstuck, butcher, refill, craft, base, skill, revive, dash, respawn).
 - `craft`, `validMeleeHit`, `validProjectileLanding`, `canSpotDino`, `groveBlocks`, `unstuck`.
 - items: `spawnItem`, `removeItem`, `dropInventoryItem`, `dropLoot`, `addTrack`.
 - fruit: `applyFruit` (heal, heal over time, fruit buffs in `p.buffs`, e.g. Lotus Skin's lower damage in `hurtPlayer`), `buffsLeft` (sent with every inventory), `bestFruitIndex`.
-- tick: `step(dt)` (player upkeep, eating/regen/aura, lava, relic pickup, campfire healing, fruit regrowth, item/projectile/track expiry, then dinos, towers, raids, volcano, dino history, player-dino contact, mission), `snapshotDue`, `hitPose`, `snapshot`, `fullState`.
+- tick: `step(dt)` (player upkeep, eating/regen/aura, lava, relic pickup, campfire healing, fruit regrowth, map resource regrowth, item/projectile/track expiry, then dinos, towers, raids, volcano, dino history, player-dino contact, mission), `snapshotDue`, `hitPose`, `snapshot`, `fullState`.
 
 ## Entry points
 - `ServerWorld` (`world.js`): constructed by `server/gameHost.js` (online/LAN/Steam host) and by `worker.js` (solo). Hosts call `join`, `leave`, `receive(id, msg)`, `step(dt)` at `CONFIG.net.tickRate`, `snapshotDue(dt)` + `snapshot()`, and supply `host.send(to, msg, except)`.

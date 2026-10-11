@@ -69,6 +69,7 @@ Grouped by the module area they mainly cover. Many simulation tests also check t
 - `base.test.js` — base building stages, costs, colliders, camp stations, towers.
 - `raids.test.js` — raids on the team's base and base repair (`src/sim/raids.js`); four scoped random seeds include a narrow-channel navigation regression, with a focused continuous-path edge check.
 - `inventory-drop.test.js` — dropping, picking up and depositing inventory stacks without duplication.
+- `resources.test.js` — map resources: island 1's spots (count, spread, dry, off the path, resin on its tree, deterministic; none elsewhere), gathering, refusals, regrowth, late join, depositing and paying for an upgrade, the client nodes.
 - `discovery-fruit.test.js` — fruit plant harvests/regrowth, shared dinosaur sightings, fruit plant visuals.
 - `outfits.test.js` — outfit sanitizing, server outfit changes, player model outfits.
 

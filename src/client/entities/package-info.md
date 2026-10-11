@@ -6,7 +6,7 @@
 - `dinoViews.js` — `SPECIES` table and `DinoView`/`DinoViews`: interpolated, animated dinosaurs (culled by hand: the skinned meshes opt out of Three's frustum culling, so a view that is off screen and further than `SHADOW_REACH` or past the fog is hidden) with hit spheres, health bars, spotting, raycast and minimap markers.
 - `sarcoEffects.js` — server-triggered water ambush warning eye glints, silt burst and swimming wakes (the Sump Lurker uses it without glints and with weaker wakes).
 - `gunEffects.js` — `GunEffects`: short-lived bullet tracer lines plus the shot sound, from `EV.SHOT` events.
-- `items.js` — `Items`: loot, dropped/lodged arrows and spears, firearms, fruit and traps on the ground (`EV.ITEM_*`, `EV.TRAP_*`); keeps one hidden copy of every loot model so the renderer's warm-up frame compiles and uploads them before the first drop.
+- `items.js` — `Items`: loot (map resources with their `models/props/resources.js` models), dropped/lodged arrows and spears, firearms, fruit and traps on the ground (`EV.ITEM_*`, `EV.TRAP_*`); keeps one hidden copy of every loot model so the renderer's warm-up frame compiles and uploads them before the first drop.
 - `projectiles.js` — `Projectiles`: arrows and thrown spears in flight; own shots simulated locally, remote shots replayed from `EV.FIRE`.
 - `relics.js` — `Relics`: glowing boat-part pickups, removed when the server reports them found.
 - `remotePlayers.js` — `RemotePlayers`: other co-op players, interpolated, with nameplates, outfits and equipment.

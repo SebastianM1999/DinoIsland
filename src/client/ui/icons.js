@@ -77,6 +77,24 @@ export const ICONS = {
   teeth: svg(`<path d="M9 4.5c4-1.5 10-1.5 14 0 .8 5-1 12-4.5 18.5-.8 1.6-1.6 3.8-2.5 5-.9-1.2-1.7-3.4-2.5-5C10 16.5 8.2 9.5 9 4.5z" fill="#fbf4e2" stroke="${OUT}" stroke-width="1"/>
     <path d="M12 7c.2 4.5 1.4 9.5 3.4 14" stroke="#e1d3b2" stroke-width="1.6" stroke-linecap="round" fill="none"/>`),
 
+  // map resources (config.js loot): amber resin drops, a dark ironwood branch, a healing herb
+  resin: svg(`<path d="M16 3c4.5 6 8 10.5 8 15a8 8 0 0 1-16 0c0-4.5 3.5-9 8-15z" fill="#f5a524" stroke="${OUT}" stroke-width="1.2" stroke-linejoin="round"/>
+    <path d="M16 8c2.6 3.8 4.6 6.8 4.6 9.8" stroke="#ffd166" stroke-width="2" stroke-linecap="round" fill="none"/>
+    <ellipse cx="12.6" cy="18.5" rx="1.6" ry="2.6" fill="#fff1b8"/>
+    <path d="M24.5 23.5c1.6 2 2.6 3.4 2.6 4.6a2.6 2.6 0 0 1-5.2 0c0-1.2 1-2.6 2.6-4.6z" fill="#d9770f" stroke="${OUT}" stroke-width="0.9"/>`),
+
+  ironwood: svg(`<path d="M3.5 20.5 23 9.5l3.5 6.2L7 26.7z" fill="#3b2e26" stroke="${OUT}" stroke-width="1.2" stroke-linejoin="round"/>
+    <path d="M14 15.2 17 7.5l2.6 1-2 7" fill="#2e241e" stroke="${OUT}" stroke-width="1" stroke-linejoin="round"/>
+    <path d="M8 21.5 20 14.5M10 24 22.5 17" stroke="#5c4532" stroke-width="1.2" stroke-linecap="round"/>
+    <ellipse cx="24.8" cy="12.6" rx="2.4" ry="3.6" transform="rotate(-30 24.8 12.6)" fill="#8a6a48" stroke="${OUT}" stroke-width="1"/>
+    <ellipse cx="24.8" cy="12.6" rx="1" ry="1.6" transform="rotate(-30 24.8 12.6)" fill="#5c4532"/>`),
+
+  herb: svg(`<path d="M16 28V13" stroke="#5aa63a" stroke-width="2" stroke-linecap="round"/>
+    <path d="M16 24c-6 1-10-2-11-7 5-1 9 1 11 7zM16 21c5.5 1 9.5-1.5 11-6.5-5-1-9 1-11 6.5z" fill="#a6e46e" stroke="${OUT}" stroke-width="1" stroke-linejoin="round"/>
+    <path d="M7.5 18c3 .8 5.6 2.6 8 5.5M24.5 15c-3 .8-5.6 2.4-8.2 5.3" stroke="#5aa63a" stroke-width="0.9" fill="none"/>
+    <g fill="#ffffff" stroke="${OUT}" stroke-width="0.8"><circle cx="16" cy="6" r="2.4"/><circle cx="12.2" cy="8.8" r="2.4"/><circle cx="19.8" cy="8.8" r="2.4"/><circle cx="13.6" cy="12.6" r="2.4"/><circle cx="18.4" cy="12.6" r="2.4"/></g>
+    <circle cx="16" cy="9.6" r="2" fill="#ffd84a" stroke="${OUT}" stroke-width="0.8"/>`),
+
   plates: svg(`<path d="M3 26 9 8l6 18z" fill="#f08a3a" stroke="${OUT}" stroke-width="1" stroke-linejoin="round"/>
     <path d="M13 26 20 4l7.5 22z" fill="#6fb541" stroke="${OUT}" stroke-width="1" stroke-linejoin="round"/>
     <path d="M9 12v11M20 8.5V23" stroke="#fff" stroke-width="1.2" stroke-linecap="round" opacity=".45"/>`),

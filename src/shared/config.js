@@ -218,6 +218,18 @@ export const CONFIG = {
     // from butchering carcasses with the knife (V); building material for the base
     bones:  { name: 'Bones',  weight: 1.5 },
     skull:  { name: 'Skull',  weight: 4 },
+    // map resources, gathered at fixed spots (CONFIG.resources, levels.js biome.resources)
+    resin:    { name: 'Resin',        weight: 0.5 },
+    ironwood: { name: 'Ironwood',     weight: 1.5 },
+    herb:     { name: 'Healing herb', weight: 0.3 },
+  },
+  // Map resources: they lie at fixed spots (shared/layout.js resourceSpots), are
+  // gathered with E (ACT.GATHER) like fruit and grow back after `regrow` seconds.
+  // `spread`: least distance between two spots of the same kind.
+  resources: {
+    regrow: { resin: 150, ironwood: 180, herb: 120 },
+    reach: 3.2,
+    spread: 18,
   },
   pickupRange: 2.4,
   lootDespawn: 300,

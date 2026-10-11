@@ -21,6 +21,7 @@
 - `vegetation.js` — `buildVegetation`: instanced trees, bushes, ferns, grass and flowers per biome with wind, per-kind biome tints (`biome.vegetation.tints`), chunks past the fog culled; `setQuality`/`setDensity`; `VEG_TUNING`.
 - `rocks.js` — `buildRocks` / `rockGeo`: boulders from `shared/rockShapes.js` tables (stone kind per rock from `biome.rocks.kinds`, clustered by region) and sea stacks (with palms on green islands).
 - `logs.js` — `buildLogs`: fallen trunks from `layout.logs`, merged into one mesh.
+- `resourceNodes.js` — `buildResourceNodes`: the map resources at `layout.resourceSpots` (one InstancedMesh per kind; resin on the visible bark of its tree), `setUp(spotId, up)` with pop-in, `isUp`, `getAnchor`, a soft glow pulse.
 - `fruitPlants.js` — `buildFruitPlants`: the fruit of every kind by its role (`KINDS`: bush, tree, glowing plant – berry/mango/dragon, swamp marshberry/swampfig/glowlotus, volcano emberchili/ashplum/obsidianfig); `setCount(spotId, n)` with pop-in.
 - `hut.js` — `buildHut`: hunting hut (cabin, drop-off, workbench, mission board, wardrobe, flag, campfire, camp ground from `hutFloor`) or the small landing camp on islands 2+.
 - `base.js` — `buildBaseView`: the team base on islands 2+ (plot stakes, scaffolding, camp/lodge/fort stages, towers, raid damage); `setBase`, `shoot`; `stakePoint`.
@@ -50,7 +51,7 @@
 - `core/game.js` `#buildWorld()` calls every `build*` here with `(terrain, layout)` (`buildSky(gfx, layout)`, `buildWater(..., sunDir)`), adds each `.group` to the scene and calls `update(dt, time, cam)` on all but logs each frame (`worldUpdaters`). It also calls `water.ripple/splash`, `sky.mood`, `fruitPlants.setCount`, `baseView.setBase/shoot`, `grove.strike/flash`, `sites.boat.setRepaired/setParts`, `vegetation/rocks.setQuality`.
 - `player/actions.js` uses `stakePoint` from `base.js`.
 - `models/props/*` and `models/fruit.js` reuse `veg/shapes.js`, `veg/plants.js` and `hut/pieces.js`.
-- Tests: `test/water.test.js`, `test/discovery-fruit.test.js`, `test/props.test.js` (trees, `BUSH_TYPES`).
+- Tests: `test/water.test.js`, `test/discovery-fruit.test.js`, `test/resources.test.js` (resource nodes), `test/props.test.js` (trees, `BUSH_TYPES`).
 
 ## Rules
 - Visual only and deterministic: everything with a collider or gameplay meaning (trees, bushes, rocks, logs, hut, plots, sites, arena) is placed from `layout` / `terrain`. Purely decorative detail (grass tufts, flowers) is scattered here with seeded `shared/rng.js` and has no collider; `Math.random` appears only in particle/flicker effects (embers, smoke, fire light).

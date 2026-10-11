@@ -569,6 +569,17 @@ export class PlayerActions {
       if (inv.fruit.length >= this.caps.fruit) return { text: `Fruit pouch full (${this.caps.fruit})`, run: null };
       return { text: `Pick ${name} (${g.fruitCounts[best.id]} left)`, run: () => net.act(ACT.HARVEST, { spot: best.id }) };
     }
+    // 1b. a map resource (resin on the bark, ironwood, a healing herb)
+    let res = null, rd = Infinity;
+    for (const s of g.layout.resourceSpots || []) {
+      const d = Math.hypot(s.x - pos.x, s.z - pos.z);
+      if (d < CONFIG.resources.reach && d < rd && g.resourceNodes?.isUp(s.id)) { rd = d; res = s; }
+    }
+    if (res) {
+      const loot = CONFIG.loot[res.type];
+      if (this.carryWeight() + loot.weight > this.caps.carry + 1e-6) return { text: `Pack full – drop off loot at the hut`, run: null };
+      return { text: `Gather ${loot.name}`, run: () => net.act(ACT.GATHER, { spot: res.id }) };
+    }
     // 2. a carcass to butcher with the knife (hold V)
     if (this.butcher) return { text: 'Butchering…', key: 'V', run: null };
     const carcass = this.findCarcass();

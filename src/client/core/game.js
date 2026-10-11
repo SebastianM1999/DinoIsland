@@ -25,6 +25,7 @@ import { buildVegetation } from '../world/vegetation.js';
 import { buildRocks } from '../world/rocks.js';
 import { setSurfaceQuality } from '../world/surfaceDetail.js';
 import { buildFruitPlants } from '../world/fruitPlants.js';
+import { buildResourceNodes } from '../world/resourceNodes.js';
 import { buildHut } from '../world/hut.js';
 import { buildBaseView } from '../world/base.js';
 import { BasePanel } from '../ui/basePanel.js';
@@ -295,6 +296,7 @@ export class Game {
     this.vegetation = buildVegetation(this.terrain, this.layout);
     this.rocks = buildRocks(this.terrain, this.layout);
     this.fruitPlants = buildFruitPlants(this.terrain, this.layout);
+    this.resourceNodes = buildResourceNodes(this.terrain, this.layout);
     // islands with building plots start at a small landing camp; the team builds its own base
     this.hut = buildHut(this.terrain, this.layout, { landing: hasBasePlots(this.layout) });
     this.baseView = buildBaseView(this.terrain, this.layout);
@@ -317,11 +319,11 @@ export class Game {
         if (Math.hypot(x - this.player.pos.x, z - this.player.pos.z) < 14) this.shake = Math.max(this.shake, 0.35);
       },
     });
-    scene.add(this.sky.group, this.water.group, this.vegetation.group, this.rocks.group, this.fruitPlants.group, this.hut.group, this.baseView.group, this.sites.group, this.grove.group, this.logs.group, this.bossArena.group, this.swampArena.group, this.swampFx.group, this.volcanoArena.group, this.volcanoFx.group);
+    scene.add(this.sky.group, this.water.group, this.vegetation.group, this.rocks.group, this.fruitPlants.group, this.resourceNodes.group, this.hut.group, this.baseView.group, this.sites.group, this.grove.group, this.logs.group, this.bossArena.group, this.swampArena.group, this.swampFx.group, this.volcanoArena.group, this.volcanoFx.group);
     // the Hollow Mountain: roof, cave air, decor, crystal lights, drips (world/caveWorld.js)
     this.caveWorld = this.layout.plan.cave ? buildCaveWorld(this.terrain, this.layout, this.gfx, terrainMesh, this.water) : null;
     if (this.caveWorld) { scene.add(this.caveWorld.group); this.caveWorld.audio = this.audio; }
-    this.worldUpdaters = [this.sky, this.water, this.vegetation, this.rocks, this.fruitPlants, this.hut, this.baseView, this.sites, this.grove, this.bossArena, this.swampArena, this.swampFx, this.volcanoArena, this.volcanoFx, ...(this.caveWorld ? [this.caveWorld] : [])];
+    this.worldUpdaters = [this.sky, this.water, this.vegetation, this.rocks, this.fruitPlants, this.resourceNodes, this.hut, this.baseView, this.sites, this.grove, this.bossArena, this.swampArena, this.swampFx, this.volcanoArena, this.volcanoFx, ...(this.caveWorld ? [this.caveWorld] : [])];
     // under the water: tinted short fog, bubbles and motes (world/underwater.js, #underwaterView)
     this.underwater = buildUnderwater();
     scene.add(this.underwater.group);
@@ -375,6 +377,7 @@ export class Game {
     this.wallTorchesLit = new Set(world.wallTorches ?? []);   // Hollow Mountain wall torches the team has lit
     this.caveWorld?.wallTorches.setLit(this.wallTorchesLit);
     world.fruit.forEach((count, id) => this.fruitPlants.setCount(id, count));
+    for (const id of world.resources ?? []) this.resourceNodes.setUp(id, false);
     this.hud.setPlayer({ name: this.me.name, slot: this.me.slot });
     this.#showMission();
     for (const sys of this.systems) sys.onWelcome?.(world);
@@ -540,6 +543,12 @@ export class Game {
     net.on(`ev:${EV.FRUIT}`, (m) => {
       this.fruitCounts[m.spot] = m.count;
       this.fruitPlants.setCount(m.spot, m.count);
+    });
+    net.on(`ev:${EV.RESOURCE}`, (m) => {
+      this.resourceNodes.setUp(m.spot, m.up);
+      if (m.up) return;
+      const at = this.resourceNodes.getAnchor(m.spot);
+      this.audio.play('gather', at ? { pos: { x: at.x, y: at.y, z: at.z } } : {});
     });
     net.on(`ev:${EV.TOAST}`, (m) => this.hud.toast(m.text, m.icon));
     net.on(`ev:${EV.FULL}`, (m) => this.actions.fullAlert(m.text, m.icon));
