@@ -279,6 +279,10 @@ async function launch(net, reuse = null, { openMenu = false } = {}) {
     net.close();
     internetTest.stop();
     loadingUi.stop();
+    // A failed expedition transition has already retired its previous Game.
+    // Reload through the normal teardown so the borrowed renderer/input shell
+    // cannot survive behind a new menu or another launch.
+    if (reuse) { backToMenu(`Could not start the game: ${err.message}`); return false; }
     menu.hidden = false;
     void startMenuTour();
     menuAudio?.startMenuMusic();
