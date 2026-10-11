@@ -2,7 +2,8 @@
 import * as THREE from 'three';
 import { planIsland } from '../../shared/island.js';
 import { Terrain } from '../../shared/terrain.js';
-import { buildLayout } from '../../shared/layout.js';
+import { buildLayoutSteps } from '../../shared/layout.js';
+import { runBuildSteps } from '../core/buildSteps.js';
 import { LEVELS } from '../../shared/levels.js';
 import { preloadCaveBake } from '../../shared/caveBakeLoad.js';
 import { hasBasePlots } from '../../shared/base.js';
@@ -121,10 +122,10 @@ export async function createMenuTour(canvas, onIsland = () => {}, { signal } = {
     const baked = await preloadCaveBake(selected, variant);
     if (!current()) return null;
     if (LEVELS[selected].biome === 'cave' && !baked) throw new Error('Cave preview bake unavailable');
-    const islandTerrain = new Terrain(planIsland(selected, variant));
+    const islandTerrain = await runBuildSteps(Terrain.createSteps(planIsland(selected, variant)), { signal: buildSignal });
     await yieldToMenu();
     if (!current()) return null;
-    const layout = buildLayout(islandTerrain), sky = layout.biome.sky;
+    const layout = await runBuildSteps(buildLayoutSteps(islandTerrain), { signal: buildSignal }), sky = layout.biome.sky;
     await yieldToMenu();
     if (!current()) return null;
     const islandScene = new THREE.Scene();

@@ -75,6 +75,7 @@ Grouped by the module area they mainly cover. Many simulation tests also check t
 - `outfits.test.js` — outfit sanitizing, server outfit changes, player model outfits.
 
 ### Client (headless)
+- `world-construction.test.js` — cooperative Terrain/layout construction preserves all deterministic samples, placements, colliders and surface queries across outdoor biomes while exposing scheduling boundaries.
 - `terrain-streaming.test.js` — terrain chunk topology/attribute seam preservation, bounded mesh activation, GPU eviction/revisit/disposal, and cancellable UI construction scheduling.
 - `interpolation.test.js` — packet reordering, bounded extrapolation, short-path angle interpolation and bounded long-session snapshot storage.
 - `resource-lifetime.test.js` — owned GPU resource disposal once across scenes, cache resource retention, shader uniform textures and per-instance buffer cleanup.

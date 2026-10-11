@@ -52,6 +52,7 @@
 - `brand.js` — `BRAND` (name, slug, storage prefix), `storageKey`, `migrateStorage`.
 
 ## Entry points
+- `Terrain.createSteps(plan)` and `buildLayoutSteps(terrain)` expose deterministic row/placement boundaries for cooperative client loading. The normal constructor and `buildLayout` drain the same steps synchronously for the simulation. Shared generators never read clocks or schedule tasks; partial worlds must not be used for gameplay.
 - `planIsland` -> `new Terrain(plan)` -> `buildLayout(terrain)` is the world-building chain, run identically by `src/sim/world.js` and `src/client/core/game.js` (also `src/client/ui/preview.js`, and many tests).
 - `protocol.js` and `config.js` are imported almost everywhere: `src/sim/*` and `src/sim/ai/*`, `src/client/*`, `server/gameHost.js`, `server/index.js`, `desktop/steam-session.js`.
 - `collision.js` is used by `src/client/player/controller.js` (local movement) and `src/sim/dinos.js`, `src/sim/unstuck.js`, `src/sim/world.js` (server checks).

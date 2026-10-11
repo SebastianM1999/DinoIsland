@@ -16,10 +16,24 @@ import { caveBakeFor, decodeWalk } from './caveBake.js';
  * CONFIG.volcano.heat (players) and sim/pathfind.js (dinosaurs).
  */
 export const HEAT = { reach: 12, fumarole: 7, gutter: 4 };
+const DEFER_TERRAIN = Symbol('terrain construction');
 
 export class Terrain {
   /** @param {ReturnType<typeof planIsland>} [plan] defaults to level 1 */
-  constructor(plan = planIsland(0, 1)) {
+  constructor(plan = planIsland(0, 1), deferred = null) {
+    if (deferred === DEFER_TERRAIN) return;
+    const steps = this.#build(plan);
+    while (!steps.next().done);
+  }
+
+  /** Same deterministic sampling, with row boundaries for client scheduling. */
+  static *createSteps(plan) {
+    const terrain = new Terrain(plan, DEFER_TERRAIN);
+    yield* terrain.#build(plan);
+    return terrain;
+  }
+
+  *#build(plan) {
     this.plan = plan;
     const size = WORLD.size, segments = WORLD.segments;
     this.size = size;
@@ -32,6 +46,7 @@ export class Terrain {
       for (let i = 0; i <= segments; i++) {
         this.heights[j * n1 + i] = islandHeight(plan, -this.half + i * this.cell, -this.half + j * this.cell);
       }
+      yield;
     }
     this.hutGround = HUT_GROUND;
     // roof (cave level): sampled on the same grid as the heights; null everywhere else
@@ -43,6 +58,7 @@ export class Terrain {
         for (let i = 0; i <= segments; i++) {
           this.ceilings[j * n1 + i] = caveCeiling(plan, -this.half + i * this.cell, -this.half + j * this.cell);
         }
+        yield;
       }
     }
     // the Hollow Mountain's walls: floor and roof sampled finely from the very volume the client draws (caveWalk.js)
@@ -58,6 +74,7 @@ export class Terrain {
           const x = -this.half + i * this.cell, z = -this.half + j * this.cell, h = W.height(x, z);
           if (h === h) { this.heights[j * n1 + i] = h; this.ceilings[j * n1 + i] = W.ceiling(x, z); }
         }
+        yield;
       }
     }
     // bogs (swamp): how much bog each grid vertex lies in (0..1) and its water level (NaN = none)
@@ -73,6 +90,7 @@ export class Terrain {
           this.bogMask[j * n1 + i] = s.mask;
           this.bogLevel[j * n1 + i] = s.bog.level;
         }
+        yield;
       }
     }
     // heat (volcano): distance from every grid vertex to the nearest lava (two-pass chamfer)
@@ -85,6 +103,7 @@ export class Terrain {
           // (the lava along the ridge path's ditch warms the path but does not burn on it)
           if (this.lavaLevelAt(x, z) !== null) dist[j * n1 + i] = riverQuery(plan, x, z, 12, 'lava')?.flow.gutter ? HEAT.gutter : 0;
         }
+        yield;
       }
       const c1 = this.cell, c2 = this.cell * Math.SQRT2;
       const relax = (k, kk, w) => { if (dist[kk] + w < dist[k]) dist[k] = dist[kk] + w; };
@@ -94,6 +113,7 @@ export class Terrain {
           if (i > 0) relax(k, k - 1, c1);
           if (j > 0) { relax(k, k - n1, c1); if (i > 0) relax(k, k - n1 - 1, c2); if (i < segments) relax(k, k - n1 + 1, c2); }
         }
+        yield;
       }
       for (let j = segments; j >= 0; j--) {
         for (let i = segments; i >= 0; i--) {
@@ -101,6 +121,7 @@ export class Terrain {
           if (i < segments) relax(k, k + 1, c1);
           if (j < segments) { relax(k, k + n1, c1); if (i < segments) relax(k, k + n1 + 1, c2); if (i > 0) relax(k, k + n1 - 1, c2); }
         }
+        yield;
       }
       this.heatMask = new Float32Array(N);
       for (let j = 0; j <= segments; j++) {
@@ -110,6 +131,7 @@ export class Terrain {
           for (const f of plan.fumaroles || []) h = Math.max(h, 0.85 * (1 - smoothstep(0.5, HEAT.fumarole, Math.hypot(x - f.x, z - f.z))));
           this.heatMask[j * n1 + i] = h;
         }
+        yield;
       }
     }
   }
