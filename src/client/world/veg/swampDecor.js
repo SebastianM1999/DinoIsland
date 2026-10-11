@@ -61,50 +61,67 @@ function pneumatophoreGeometry() {
  * @returns {THREE.InstancedMesh[]}
  */
 export function buildSwampDecor(terrain, layout) {
+  const steps = buildSwampDecorSteps(terrain, layout);
+  let step;
+  do { step = steps.next(); } while (!step.done);
+  return step.value;
+}
+
+export function* buildSwampDecorSteps(terrain, layout) {
   if (!terrain.bogMask) return [];
   const plan = layout.plan;
   const rng = makeRng(plan.seed ^ 0x11a7);
   const out = [];
-  const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), p = new THREE.Vector3(), s = new THREE.Vector3();
-  const arena = layout.swampArena;
-  const sample = (count, accept) => {
-    const pts = [];
-    for (let i = 0; i < count * 30 && pts.length < count; i++) {
-      const x = rng.range(-plan.A, plan.A), z = rng.range(-plan.B, plan.B);
-      const r = accept(x, z);
-      if (r) pts.push(r);
-    }
-    return pts;
-  };
-  const offPath = (x, z, pad) => layout.distToPath(x, z) > pad;
+  let completed = false;
+  try {
+    const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), p = new THREE.Vector3(), s = new THREE.Vector3();
+    const arena = layout.swampArena;
+    const sample = function* (count, accept) {
+      const pts = [];
+      for (let i = 0; i < count * 30 && pts.length < count; i++) {
+        if (i && i % 64 === 0) yield;
+        const x = rng.range(-plan.A, plan.A), z = rng.range(-plan.B, plan.B);
+        const r = accept(x, z);
+        if (r) pts.push(r);
+      }
+      return pts;
+    };
+    const offPath = (x, z, pad) => layout.distToPath(x, z) > pad;
 
-  // floating: lily pads in the open water, duckweed patches in the still corners
-  const onWater = (min, max) => (x, z) => {
-    const b = terrain.bogAt(x, z), lvl = terrain.bogLevelAt(x, z);
-    if (b < min || b > max || lvl === null || terrain.heightAt(x, z) > lvl - 0.04 || !offPath(x, z, 3)) return null;
-    return { x, z, y: lvl + 0.012 };
-  };
-  const lilies = sample(520, onWater(0.55, 1.01));
-  const duck = sample(240, onWater(0.3, 1.01));
-  // the breathing roots stand in the mud of the shores (wet or just dry)
-  const roots = sample(800, (x, z) => {
-    const b = terrain.bogAt(x, z);
-    if (b < 0.08 || b > 0.75 || !offPath(x, z, 2.6) || (arena && insideSwampArena(arena, x, z, -2))) return null;
-    return { x, z, y: terrain.heightAt(x, z) };
-  });
-
-  const add = (list, geo, mat, name, scale, { cast = false } = {}) => {
-    if (!list.length) return;
-    const m = instanced(geo, mat, list.length, { cast, receive: true, name });
-    list.forEach((o, i) => {
-      e.set(0, rng() * TAU, 0); q.setFromEuler(e);
-      const k = scale[0] + rng() * (scale[1] - scale[0]);
-      m.setMatrixAt(i, m4.compose(p.set(o.x, o.y, o.z), q, s.set(k, k, k)));
+    // floating: lily pads in the open water, duckweed patches in the still corners
+    const onWater = (min, max) => (x, z) => {
+      const b = terrain.bogAt(x, z), lvl = terrain.bogLevelAt(x, z);
+      if (b < min || b > max || lvl === null || terrain.heightAt(x, z) > lvl - 0.04 || !offPath(x, z, 3)) return null;
+      return { x, z, y: lvl + 0.012 };
+    };
+    const lilies = yield* sample(520, onWater(0.55, 1.01));
+    const duck = yield* sample(240, onWater(0.3, 1.01));
+    // the breathing roots stand in the mud of the shores (wet or just dry)
+    const roots = yield* sample(800, (x, z) => {
+      const b = terrain.bogAt(x, z);
+      if (b < 0.08 || b > 0.75 || !offPath(x, z, 2.6) || (arena && insideSwampArena(arena, x, z, -2))) return null;
+      return { x, z, y: terrain.heightAt(x, z) };
     });
-    out.push(m);
-  };
-  add(lilies, lilyGeometry(), LEAF_MAT, 'swamp-lilies', [0.28, 0.5]);
-  add(duck, duckweedGeometry(), LEAF_MAT, 'swamp-duckweed', [0.8, 2.2]);
-  add(roots, pneumatophoreGeometry(), MAT.standard, 'swamp-pneumatophores', [0.8, 1.4]);
-  return out;
+
+    const add = function* (list, geo, mat, name, scale, { cast = false } = {}) {
+      if (!list.length) return;
+      const m = instanced(geo, mat, list.length, { cast, receive: true, name });
+      out.push(m);
+      for (let i = 0; i < list.length; i++) {
+        if (i && i % 64 === 0) yield;
+        const o = list[i];
+        e.set(0, rng() * TAU, 0); q.setFromEuler(e);
+        const k = scale[0] + rng() * (scale[1] - scale[0]);
+        m.setMatrixAt(i, m4.compose(p.set(o.x, o.y, o.z), q, s.set(k, k, k)));
+      }
+      yield;
+    };
+    yield* add(lilies, lilyGeometry(), LEAF_MAT, 'swamp-lilies', [0.28, 0.5]);
+    yield* add(duck, duckweedGeometry(), LEAF_MAT, 'swamp-duckweed', [0.8, 2.2]);
+    yield* add(roots, pneumatophoreGeometry(), MAT.standard, 'swamp-pneumatophores', [0.8, 1.4]);
+    completed = true;
+    return out;
+  } finally {
+    if (!completed) for (const mesh of out) mesh.dispose();
+  }
 }
