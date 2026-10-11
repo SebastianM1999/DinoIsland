@@ -31,11 +31,12 @@ function barkPoint(tree, height, side, out) {
   while (i < pts.length - 1 && pts[i][1] < ly) i++;
   const k = Math.max(0, Math.min(1, (ly - pts[i - 1][1]) / (pts[i][1] - pts[i - 1][1] || 1)));
   const ax = pts[i - 1][0] + (pts[i][0] - pts[i - 1][0]) * k, az = pts[i - 1][2] + (pts[i][2] - pts[i - 1][2]) * k;
-  const r = shape.r(Math.min(1, ly / pts[pts.length - 1][1]));
-  // the world direction (cos side, sin side), turned into the tree's own frame (by its yaw)
-  const a = Math.PI / 2 - side - tree.rot;
-  out.set(ax + Math.sin(a) * r, ly, az + Math.cos(a) * r);
-  return out.applyMatrix4(treeMatrix(tree, new THREE.Matrix4()));
+  const r = shape.r(Math.min(1, ly / pts[pts.length - 1][1])) * tree.scale;
+  // the trunk's axis there (bent, leaning, turned: the tree's own frame), then out to the bark in world space
+  out.set(ax, ly, az).applyMatrix4(treeMatrix(tree, new THREE.Matrix4()));
+  out.x += Math.cos(side) * r;
+  out.z += Math.sin(side) * r;
+  return out;
 }
 
 export function buildResourceNodes(terrain, layout) {
