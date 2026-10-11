@@ -48,6 +48,7 @@
 - `veg/spatialInstances.js` — `SpatialInstances`: splits instances into 80 m chunks so each batch is culled separately (and hidden past `setCullDistance`); quality/density control.
 
 ## Entry points
+- `terrainChunks.js` splits outdoor terrain cells without changing globally computed normals/colours. `TerrainChunks` retains CPU geometry and loads camera-neighbour GPU meshes in bounded batches, preloads a fog margin, and evicts distant buffers with hysteresis. `buildTerrainMeshAsync` yields between vertex rows/chunks; cave rendering continues to use its bake. Release a chunk controller before disposing its attached scene resources.
 - `core/game.js` `#buildWorld()` calls every `build*` here with `(terrain, layout)` (`buildSky(gfx, layout)`, `buildWater(..., sunDir)`), adds each `.group` to the scene and calls `update(dt, time, cam)` on all but logs each frame (`worldUpdaters`). It also calls `water.ripple/splash`, `sky.mood`, `fruitPlants.setCount`, `baseView.setBase/shoot`, `grove.strike/flash`, `sites.boat.setRepaired/setParts`, `vegetation/rocks.setQuality`.
 - `player/actions.js` uses `stakePoint` from `base.js`.
 - `models/props/*` and `models/fruit.js` reuse `veg/shapes.js`, `veg/plants.js` and `hut/pieces.js`.

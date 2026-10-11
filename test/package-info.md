@@ -74,6 +74,7 @@ Grouped by the module area they mainly cover. Many simulation tests also check t
 - `outfits.test.js` — outfit sanitizing, server outfit changes, player model outfits.
 
 ### Client (headless)
+- `terrain-streaming.test.js` — terrain chunk topology/attribute seam preservation, bounded mesh activation, GPU eviction/revisit/disposal, and cancellable UI construction scheduling.
 - `interpolation.test.js` — packet reordering, bounded extrapolation, short-path angle interpolation and bounded long-session snapshot storage.
 - `resource-lifetime.test.js` — owned GPU resource disposal once across scenes, cache resource retention, shader uniform textures and per-instance buffer cleanup.
 - `performance-samples.test.js` — frame-time percentiles expose stalls, remain bounded over long sessions and reject invalid timing samples; deterministic checks, not an FPS benchmark.
