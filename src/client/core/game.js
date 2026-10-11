@@ -110,7 +110,10 @@ export class Game {
       return game;
     } catch (error) {
       game.buildSteps = null;
-      game.dispose();
+      const shell = game.dispose();
+      if (shell.gfx && shell.gfx !== reuse?.gfx) shell.gfx.dispose();
+      if (shell.input && shell.input !== reuse?.input) shell.input.dispose?.();
+      if (shell.audio && shell.audio !== reuse?.audio) shell.audio.dispose?.();
       throw error;
     }
   }
@@ -258,7 +261,10 @@ export class Game {
     this.systems.push(this.torches);
     this.#applyWelcome(w);
     const cam = this.player.pos;
-    this.terrainView.loadAround?.(cam, this.layout.biome.sky.fogFar);
+    // Fog fades by view depth, so preload the horizontal frustum corners too.
+    const corner = Math.sqrt(1 + (Math.tan(this.gfx.camera.fov * Math.PI / 360) * this.gfx.camera.aspect) ** 2);
+    this.terrainView.range = this.layout.biome.sky.fogFar * corner;
+    this.terrainView.loadAround?.(cam, this.terrainView.range);
     while (this.terrainView.pending?.length) { this.terrainView.pump(4); yield; }
     yield;
     this.wardrobe = new Wardrobe({
@@ -924,6 +930,8 @@ export class Game {
     WIND.uTime.value = this.time;
     const cam = this.gfx.camera.position;
     this.#mood(dt, cam);
+    const corner = Math.sqrt(1 + (Math.tan(this.gfx.camera.fov * Math.PI / 360) * this.gfx.camera.aspect) ** 2);
+    this.terrainView.range = (this.gfx.scene.fog?.far ?? this.layout.biome.sky.fogFar) * corner;
     for (const u of this.worldUpdaters) u.update?.(dt, this.time, cam);
     this.#underwaterView(dt);
     for (const sys of this.systems) sys.update?.(dt, renderTime);

@@ -241,7 +241,11 @@ async function start(mode, options = {}) {
 let keepCreative = false;
 async function launch(net, reuse = null, { openMenu = false } = {}) {
   let disconnectReason = 'Disconnected while loading the island';
-  net.onClose = reason => { disconnectReason = reason || disconnectReason; };
+  const buildAbort = new AbortController();
+  net.onClose = reason => {
+    disconnectReason = reason || disconnectReason;
+    buildAbort.abort(new Error(disconnectReason));
+  };
   const lv = net.welcome.world.level;
   // Decorative photographs must never delay simulation or shader loading.
   void preloadMapPreviews(lv.index);
@@ -258,7 +262,7 @@ async function launch(net, reuse = null, { openMenu = false } = {}) {
     // the Hollow Mountain's baked mesh and walk grid, if the site has them (assets/cave): the island then builds in a second, not seven
     await preloadCaveBake(lv.index, lv.variant);
     const { Game } = await loadGameModule();
-    game = await Game.create(canvas, net, reuse ?? (menuAudio ? { audio: menuAudio } : null));
+    game = await Game.create(canvas, net, reuse ?? (menuAudio ? { audio: menuAudio } : null), { signal: buildAbort.signal });
     net.on(`ev:${EV.MISSION}`, ({ mission }) => {
       // This comes from the host after parts, repair and sailing are complete.
       // Creative expeditions and scenery previews do not earn map unlocks.

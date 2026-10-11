@@ -52,15 +52,25 @@ test('A pending photograph from another island cannot delay the selected island'
   let unblock;
   const blocked = new Promise(resolve => { unblock = resolve; });
   globalThis.Image = class {
-    decode() { return this.src.includes('island-4-') ? blocked : Promise.resolve(); }
+    decode() { return this.src.includes('island-3-') ? blocked : Promise.resolve(); }
   };
   try {
     const api = await import('../src/client/ui/mapPreviews.js?independent');
-    const cave = api.preloadMapPreviews(3);
+    const otherIsland = api.preloadMapPreviews(2);
     await api.preloadMapPreviews(0);
     assert.equal(api.mapPreviewFrames(0).length, 3);
-    assert.equal(api.mapPreviewFrames(3).length, 0);
-    unblock(); await cave;
-    assert.equal(api.mapPreviewFrames(3).length, 3);
+    assert.equal(api.mapPreviewFrames(2).length, 0);
+    unblock(); await otherIsland;
+    assert.equal(api.mapPreviewFrames(2).length, 3);
   } finally { unblock?.(); globalThis.Image = old; }
+});
+
+test('The cave has a live bake preview without requesting nonexistent postcard assets', async () => {
+  const f = await fixture('cave');
+  try {
+    await f.api.preloadMapPreviews(3);
+    assert.deepEqual(f.api.previewURLs(3), []);
+    assert.deepEqual(f.api.mapPreviewFrames(3), []);
+    assert.deepEqual(f.requests, []);
+  } finally { f.restore(); }
 });

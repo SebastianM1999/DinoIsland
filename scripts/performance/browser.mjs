@@ -149,7 +149,8 @@ try {
         const game = new Game(document.getElementById('game'), net);
         window.benchmarkGame = game;
         // Controlled benchmark fixture: production still chooses tiers automatically.
-        game.gfx.autoTune.active = false;
+        // Freeze both calibration and later slow-workload monitoring.
+        game.gfx.autoTune.frame = () => {};
         game.gfx.autoTune.tier = 1;
         game.gfx.setTier(TIERS.indexOf(TIERS[1]));
         await game.gfx.prepare();

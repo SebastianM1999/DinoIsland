@@ -23,7 +23,7 @@ import { buildSwampFx } from '../world/swampFx.js';
 import { buildVolcanoArena } from '../world/volcanoArena.js';
 import { setSurfaceBiome, setSurfaceQuality, SURFACE } from '../world/surfaceDetail.js';
 
-const QUALITY = { name: 'Medium', grass: 0.65, lodNear: 45, shadowRange: 40 };
+const QUALITY = { name: 'Medium', grass: 0.65, lodNear: 45, shadowRange: 40, shadows: true, foliageShadows: false };
 const SHOT_SECONDS = 38;
 const SPEED = 1.65;
 
@@ -167,7 +167,8 @@ export async function createMenuTour(canvas, onIsland = () => {}, { signal } = {
     setSurfaceQuality(QUALITY);
     const builders = [
       async () => { const group = await buildTerrainMeshAsync(islandTerrain, layout, {
-        signal: buildSignal, position: { x: result.path[0].x, y: islandTerrain.heightAt(result.path[0].x, result.path[0].z) + 2.1, z: result.path[0].z }, range: reach,
+        signal: buildSignal, position: { x: result.path[0].x, y: islandTerrain.heightAt(result.path[0].x, result.path[0].z) + 2.1, z: result.path[0].z },
+        range: reach * Math.sqrt(1 + (Math.tan(camera.fov * Math.PI / 360) * camera.aspect) ** 2),
       }); return { group, update: group.update?.bind(group) }; },
       () => buildSky({ scene: islandScene, sunDir }, layout),
       () => buildWater(islandTerrain, layout, sunDir),

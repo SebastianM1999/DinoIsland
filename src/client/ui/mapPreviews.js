@@ -3,9 +3,12 @@ import { LEVELS } from '../../shared/levels.js';
 const cache = new Map();
 const pending = new Map();
 export const PREVIEW_SHOTS = 3;
+// Hollow Mountain uses its live baked tour until actual cave photographs are
+// committed; don't issue three known-404 requests on every cave selection.
+const POSTCARD_SHOTS = [3, 3, 3, 0];
 export function previewURLs(index) {
   if (!Number.isInteger(index) || !LEVELS[index]) return [];
-  return Array.from({ length: PREVIEW_SHOTS }, (_, shot) =>
+  return Array.from({ length: POSTCARD_SHOTS[index] ?? 0 }, (_, shot) =>
     new URL(`../../../assets/previews/island-${index + 1}-${shot + 1}.jpg`, import.meta.url).href);
 }
 export function mapPreviewFrames(index) { return (cache.get(index) || []).map(image => image.src); }
