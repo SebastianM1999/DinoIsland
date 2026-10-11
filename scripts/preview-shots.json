@@ -1,0 +1,28 @@
+{ "1": [
+  { "name": "beach-hut", "from": [-152, 22, 3], "to": [-118, -2, 5] },
+  { "name": "waterfall", "from": [-46, 10, 9], "to": [-18, -4, 9], "fov": 58 },
+  { "name": "river", "from": [-70, -30, 4], "to": [-102, -58, 2] },
+  { "name": "beach-rock", "from": [20, 62, 3], "to": [60, 40, 3], "dinos": false },
+  { "name": "hut-aerial", "from": [-185, 30, 22], "to": [-130, 0, 8] }
+],
+  "2": [
+  { "name": "arena-high", "from": [-30, -45, 22], "to": [8, 0, 3], "fov": 60 },
+  { "name": "nest", "from": [-150, -10, 7], "to": [-190, -22, 4] },
+  { "name": "bog-high", "from": [90, 40, 14], "to": [140, 28, 1], "fov": 60, "dinos": false },
+  { "name": "arena-n", "from": [0, -50, 9], "to": [16, 0, 3], "fov": 60 },
+  { "name": "ruins-mist", "from": [-45, -35, 14], "to": [-65, -66, 4], "fov": 60 }
+],
+  "3": [
+  { "name": "volcano-s", "from": [0, 150, 18], "to": [-14, 0, 55], "fov": 60 },
+  { "name": "lava-flow", "from": [-34, 84, 12], "to": [-42, 118, 2], "fov": 60 },
+  { "name": "trail-n", "from": [-30, -125, 6], "to": [-10, -150, 3] },
+  { "name": "aerial", "from": [-190, 60, 70], "to": [0, 0, 30], "fov": 60 },
+  { "name": "ruins", "from": [118, 52, 8], "to": [140, 39, 4], "dinos": false }
+],
+  "4": [
+  { "name": "hut-cove", "from": [-250, 30, 4], "to": [-227, 12, 4] },
+  { "name": "crystals-a", "from": [-30, -108, 2.5], "to": [-47, -117, 3], "dinos": false },
+  { "name": "east-cove", "from": [268, 4, 6], "to": [190, 12, 28], "fov": 60 },
+  { "name": "crystals-b", "from": [-30, -108, 2.5], "to": [-10, -100, 8], "dinos": false },
+  { "name": "east-boat", "from": [212, 10, 4], "to": [240, -2, 3] }
+] }
