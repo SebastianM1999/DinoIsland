@@ -27,7 +27,11 @@ function island2() {
 test('island 1 keeps its hunting hut; later islands get building plots and a landing camp', () => {
   const first = new ServerWorld({ send() {} }, { level: 0, variant: 7 });
   assert.equal(first.layout.basePlots.length, 0);
-  assert.ok(first.stations().workbench && first.safeZone(), 'the hut crafts and is safe');
+  assert.equal(first.layout.hut.kind, 'tent');
+  assert.ok(first.safeZone(), 'the tent camp is safe');
+  assert.equal(first.stations().workbench, null, 'the camp table is built by the team first');
+  assert.equal(first.stations().wardrobe, null, 'no wardrobe at the tent');
+  assert.equal(first.stations().board, null, 'no mission board at the tent');
   const { world } = island2();
   assert.ok(world.layout.basePlots.length >= 2, 'a choice of plots');
   const st = world.stations();

@@ -43,6 +43,7 @@ test('creative mode grants every skill and gives the earned ones back afterwards
 test('creative mode crafts for free and keeps the inventory full', () => {
   const { world, p, act } = solo();
   act({ a: ACT.CREATIVE, on: true });
+  world.base.bench = true;   // island 1's camp table stands
   const bench = world.stations().workbench;
   Object.assign(p, { x: bench.x, z: bench.z });
   const r = RECIPES.find((x) => x.kind === 'upgrade' && !x.requires && unlockIsland(x) === 1);

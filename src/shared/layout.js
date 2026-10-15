@@ -132,14 +132,20 @@ export function* buildLayoutSteps(terrain) {
       rot: dmath.atan2(-(hf.x - p.x), -(hf.z - p.z)),
     };
   });
-  // islands with base plots start at a small landing camp: no cabin, wardrobe or mission board
+  // islands with base plots start at a small landing camp: no cabin, wardrobe or mission board.
+  // Island 1 is a small expedition camp: a tent (the base's stage-1 tent, client/world/hut/tent.js),
+  // no wardrobe or mission board, and the team builds its camp table on the arrow rack's site
+  // (shared/base.js campStations, base.bench). Later islands without plots keep the cabin.
   const landing = layout.basePlots.length > 0;
-  if (!landing) boxes.push({ x: hut.x, z: hut.z + 1, hw: 5.4, hd: 4.2, rot: 0, top: g + 7 });           // cabin
+  hut.kind = landing ? 'landing' : plan.level.index === 0 ? 'tent' : 'cabin';
+  if (hut.kind === 'cabin') boxes.push({ x: hut.x, z: hut.z + 1, hw: 5.4, hd: 4.2, rot: 0, top: g + 7 });
+  if (hut.kind === 'tent') boxes.push({ x: hut.x, z: hut.z + 0.5, hw: 2.6, hd: 2.2, rot: 0, top: g + 2.8 });
   boxes.push({ x: hut.dropOff.x, z: hut.dropOff.z, hw: 1.1, hd: 0.8, rot: 0, top: g + 1.1 });
+  // the workbench; on island 1 its building site until the table stands (same footprint)
   boxes.push({ x: hut.arrowRack.x, z: hut.arrowRack.z, hw: 1.4, hd: 0.6, rot: 0, top: g + 1.0 });
-  if (!landing) circles.push({ x: hut.missionBoard.x, z: hut.missionBoard.z, r: 0.5 });
+  if (hut.kind === 'cabin') circles.push({ x: hut.missionBoard.x, z: hut.missionBoard.z, r: 0.5 });
   circles.push({ x: hut.flag.x, z: hut.flag.z, r: 0.3 });
-  if (!landing) boxes.push({ x: hut.wardrobe.x, z: hut.wardrobe.z - 0.15, hw: 1.05, hd: 0.55, rot: 0, top: g + 2.2 });
+  if (hut.kind === 'cabin') boxes.push({ x: hut.wardrobe.x, z: hut.wardrobe.z - 0.15, hw: 1.05, hd: 0.55, rot: 0, top: g + 2.2 });
   for (let i = 0; i < 4; i++) {
     const a = -Math.PI / 2 + (i - 1.5) * 0.45;
     // face east, toward the island and the boat

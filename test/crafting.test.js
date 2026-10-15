@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { ServerWorld } from '../src/sim/world.js';
-import { ACT, MSG } from '../src/shared/protocol.js';
+import { ACT, EV, MSG } from '../src/shared/protocol.js';
 import { CONFIG } from '../src/shared/config.js';
 import { RECIPES, RECIPE_BY_ID, upgradeMods } from '../src/shared/crafting.js';
 
@@ -13,6 +13,7 @@ function setup() {
   const { id } = world.join('Smith');
   const player = world.players.get(id);
   Object.assign(player.inv, { bow: true, arrows: 12, arrowUses: Array(12).fill(3) });   // (island 1: the bow is found at the hunter's camp – bow-find.test.js)
+  world.base.bench = true;   // island 1: the team's camp table stands (building it: below)
   const rack = world.layout.hut.arrowRack;
   player.x = rack.x; player.z = rack.z; player.y = world.terrain.heightAt(rack.x, rack.z);
   const craft = (recipe) => world.receive(player.id, { t: MSG.ACT, a: ACT.CRAFT, recipe });
@@ -170,4 +171,48 @@ test('the free refill only restores basic arrows, not traps', () => {
   assert.equal(player.inv.arrows, W.bow.startArrows);
   assert.equal(player.inv.traps, 0);
   assert.ok(messages.length > 0);
+});
+
+test('island 1: the team builds its camp table at the tent from the hut store, and it makes tier-1 recipes only', () => {
+  const sent = [];
+  const world = new ServerWorld({ send: (to, msg) => sent.push({ to, msg }) });
+  const player = world.players.get(world.join('Smith').id);
+  const act = (m) => world.receive(player.id, { t: MSG.ACT, ...m });
+  const site = world.stations().benchSite;
+  assert.ok(site, 'a building site before the table stands');
+  assert.equal(world.stations().workbench, null);
+  for (const k of Object.keys(world.store)) world.store[k] = 0;
+  // no crafting yet
+  player.x = site.x; player.z = site.z;
+  act({ a: ACT.CRAFT, recipe: 'arrows' });
+  assert.equal(world.upgrades.size, 0);
+  // too far away, then too poor: nothing is built and nothing is paid
+  Object.assign(world.store, { ironwood: 3, resin: 2 });
+  player.x = site.x + 20;
+  act({ a: ACT.BASE, op: 'bench' });
+  assert.equal(world.base.bench, false);
+  player.x = site.x;
+  world.store.resin = 1;
+  act({ a: ACT.BASE, op: 'bench' });
+  assert.equal(world.base.bench, false);
+  assert.equal(world.store.ironwood, 3, 'a refused build pays nothing');
+  world.store.resin = 2;
+  act({ a: ACT.BASE, op: 'bench' });
+  assert.equal(world.base.bench, true);
+  assert.equal(world.store.ironwood + world.store.resin, 0);
+  assert.ok(sent.some((s) => s.msg.e === EV.BASE && s.msg.base.bench === true), 'every client learns the table stands');
+  assert.equal(world.stations().benchSite, null);
+  assert.ok(world.stations().workbench);
+  // building it again costs nothing more
+  Object.assign(world.store, { ironwood: 3, resin: 2 });
+  act({ a: ACT.BASE, op: 'bench' });
+  assert.equal(world.store.ironwood, 3);
+  // a late joiner sees the table
+  assert.equal(world.fullState().base.bench, true);
+  // tier 2 stays out of reach at the camp table, even in creative mode
+  act({ a: ACT.CREATIVE, on: true });
+  act({ a: ACT.CRAFT, recipe: 'bow1' });
+  assert.ok(world.upgrades.has('bow1'));
+  act({ a: ACT.CRAFT, recipe: 'bow2' });
+  assert.ok(!world.upgrades.has('bow2'));
 });

@@ -263,7 +263,10 @@ test('camp interaction input opens the matching panel or requests basic resupply
     station[key] = { x: 0, z: 0 }; pressed.add('interact'); frame();
     assert.equal(opened.at(-1)[0], name); delete station[key];
   }
-  station.refill.push({ x: 0, z: 0 }); pressed.add('interact'); frame();
+  // island 1: the camp table's building site comes before the tent's free resupply
+  station.benchSite = { x: 0, z: 0 }; station.refill.push({ x: 0, z: 0 }); pressed.add('interact'); frame();
+  assert.deepEqual(requests.at(-1), { a: ACT.BASE, op: 'bench' }); delete station.benchSite;
+  pressed.add('interact'); frame();
   assert.deepEqual(requests.at(-1), { a: ACT.REFILL }); station.refill.length = 0;
   game.layout.boat = { interact: { x: 0, z: 0 } }; game.mission = { relics: [{ found: true }], boat: { repaired: false } };
   pressed.add('interact'); frame(); assert.equal(opened.at(-1)[0], 'Boat');

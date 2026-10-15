@@ -51,18 +51,20 @@ export class CraftingPanel {
 
   row(r) {
     const built = new Set(this.state.upgrades);
-    const locked = unlockIsland(r) > this.state.island;
+    // island 1's camp table makes tier-1 recipes only (shared/base.js CAMP_BENCH)
+    const benchLocked = (r.tier || 0) > (this.state.maxTier ?? Infinity);
+    const locked = unlockIsland(r) > this.state.island || benchLocked;
     const isUpgrade = r.kind === 'upgrade';
     const done = isUpgrade && built.has(r.id);
     const needsPrev = isUpgrade && r.requires && !built.has(r.requires);
     const afford = this.afford(r);
     let label = 'Craft';
     if (done) label = 'Built';
-    else if (locked) label = `Island ${unlockIsland(r)}`;
+    else if (locked) label = benchLocked && unlockIsland(r) <= this.state.island ? 'Camp table' : `Island ${unlockIsland(r)}`;
     else if (needsPrev) label = 'Needs previous';
     const disabled = done || locked || needsPrev || !afford;
     const cls = done ? ' is-done' : locked || needsPrev ? ' is-locked' : '';
-    const sub = locked ? `Unlocks on island ${unlockIsland(r)}` : esc(r.text);
+    const sub = !locked ? esc(r.text) : unlockIsland(r) > this.state.island ? `Unlocks on island ${unlockIsland(r)}` : 'Needs a bigger workbench than the camp table';
     return `<li class="craft-row${cls}">
       <span class="craft-ic">${icon(r.icon)}</span>
       <span class="craft-txt"><b>${esc(r.name)}${isUpgrade ? ` <em>${LINE_NAME[r.line]} · tier ${r.tier}</em>` : ''}</b><small>${sub}</small></span>

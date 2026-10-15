@@ -31,7 +31,7 @@ import { buildBowCamp } from '../world/bowCamp.js';
 import { buildHutSteps } from '../world/hut.js';
 import { buildBaseView } from '../world/base.js';
 import { BasePanel } from '../ui/basePanel.js';
-import { campStations, safeZone, applyBaseColliders, hasBasePlots, freshBase } from '../../shared/base.js';
+import { campStations, safeZone, applyBaseColliders, hasBasePlots, freshBase, CAMP_BENCH } from '../../shared/base.js';
 import { WIND } from '../models/kit.js';
 import { RemotePlayers } from '../entities/remotePlayers.js';
 import { Hud } from '../ui/hud.js';
@@ -506,6 +506,7 @@ export class Game {
       store: this.store,
       upgrades: this.me.inv?.upgrades || [],
       island: this.mission?.level?.number ?? 1,
+      maxTier: this.stations().miniBench ? CAMP_BENCH.maxTier : Infinity,
       creative: this.player.creative,
     });
   }
@@ -515,6 +516,7 @@ export class Game {
     this.base = base;
     applyBaseColliders(this.layout, base);
     this.baseView.setBase(base);
+    this.hut?.setBench(!!base.bench);
     this.#syncBase();
   }
 
