@@ -45,6 +45,7 @@ export class Input {
     this.mousePosition = null;
     this.enabled = false;       // gameplay input only while playing
     this.onLockChange = null;
+    this.onLockFailed = null;   // the browser refused the mouse (no user gesture yet, Escape cooldown)
     this.onPanelToggle = null;
 
     this.#listen(globalThis, 'keydown', (e) => this.#onKey(e, true));
@@ -77,7 +78,7 @@ export class Input {
     this.disposed = true;
     for (const remove of this.listeners) remove();
     this.listeners.length = 0;
-    this.onPanelToggle = this.onLockChange = null;
+    this.onPanelToggle = this.onLockChange = this.onLockFailed = null;
     this.enabled = false;
     this.exitLock();
     this.locked = false;
@@ -108,6 +109,7 @@ export class Input {
           this.lockRetry = setTimeout(() => attempt(retries + 1), 650);
         } else {
           this.lockPending = false;
+          if (generation === (this.lockGeneration ?? 0)) this.onLockFailed?.();
         }
       }
     };
