@@ -25,7 +25,7 @@
 - `resourceNodes.js` — `buildResourceNodes`: the map resources at `layout.resourceSpots` (one InstancedMesh per kind; resin on the visible bark of its tree), `setUp(spotId, up)` with pop-in, `isUp`, `getAnchor`, a soft glow pulse.
 - `bowCamp.js` — `buildBowCamp`: the hunter's camp at `layout.bowCamp` (stump, quiver, basket; the bow and a golden glow only while the local explorer has none: `setTaken`), `minimapMarkers`.
 - `fruitPlants.js` — `buildFruitPlants`: the fruit of every kind by its role (`KINDS`: bush, tree, glowing plant – berry/mango/dragon, swamp marshberry/swampfig/glowlotus, volcano emberchili/ashplum/obsidianfig); `setCount(spotId, n)` with pop-in.
-- `hut.js` — `buildHut` / `buildHutSteps`: hunting hut (cabin, drop-off, workbench, mission board, wardrobe, flag, campfire, camp ground from `hutFloor`) or the small landing camp on islands 2+.
+- `hut.js` — `buildHut` / `buildHutSteps` by `layout.hut.kind`: island 1's tent camp (tent, drop-off, flag, campfire, the camp table's building site until `setBench(true)`), the hunting hut (cabin, drop-off, workbench, mission board, wardrobe, flag, campfire, camp ground from `hutFloor`) on later islands without plots, or the small landing camp.
 - `base.js` — `buildBaseView`: the team base on islands 2+ (plot stakes, scaffolding, camp/lodge/fort stages, towers, raid damage); `setBase`, `shoot`; `stakePoint`.
 - `baseGround.js` — `flagstones` (irregular laid slabs with joints, optional gaps for stepping stones) and `campClutter` (a few varied stones, sticks, firewood) used by `hutFloor` (hunting hut / landing camp) and `baseFloor` (base yard and paths that grow with the stage, plank porch before the cabin; decoration, no collider) and `stoneWall` (the volcanic fort wall: coursed blocks, pillars, merlons, gate towers inside the palisade colliders); stone pieces use the `rock` detail material.
 - `sites.js` — `buildSites`: places boat, caves, spring cave, ruins, nest and volcano FX from `models/props/`.
@@ -38,6 +38,7 @@
 
 ### hut/
 - `hut/cabin.js` — `buildCabin` and `CABIN` dimensions of the log cabin.
+- `hut/tent.js` — `buildTent` (island 1's camp and base stage 1) and `buildBenchSite` (stakes and planks where the camp table will stand).
 - `hut/pieces.js` — shared building pieces and palette (`COL`, `tone`, `box`, `plank`, `log`, `crate`, `barrel`, `lashing`, `footprint`).
 - `hut/props.js` — static hut props (drop-off, workbench, mission board, wardrobe, flagpole, campfire) returning `{ std, glossy, glow }` geometry lists; `ARROW_BARREL`, `FLAG_ATTACH`.
 - `hut/fx.js` — animated parts: waving flag, campfire flames and light, pooled smoke, arrow stock.
