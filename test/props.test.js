@@ -181,7 +181,6 @@ test('ruins overgrowth: rubble and collapsed walls get colliders and leave the e
     for (let z = -11; z < -1.6; z += 0.25) assert.ok(!blocked(0, z, cols), `seed ${seed}: entrance clear at z=${z}`);
   }
 });
-
 test('leaf crowns: every leafy tree has a crown collider inside its visible foliage, at its height', () => {
   for (const [type, n] of Object.entries(TREE_VARIANTS)) {
     for (let v = 0; v < n; v++) {
