@@ -89,10 +89,11 @@ export function* buildHutSteps(terrain, layout, { landing = false } = {}) {
   yield;
   const propsMesh = mesh(merge(propsStd));
   propsMesh.name = 'hut-props';
-  const glossyMesh = mesh(merge(glossy), MAT.glossy);
-  glossyMesh.name = 'hut-glossy';
-  const glowMesh = mesh(merge(glow), MAT.glow, { cast: false, receive: false });
-  glowMesh.name = 'hut-glow';
+  // (the tent camp has nothing glossy or glowing until its table stands)
+  const glossyMesh = glossy.length ? mesh(merge(glossy), MAT.glossy) : null;
+  if (glossyMesh) glossyMesh.name = 'hut-glossy';
+  const glowMesh = glow.length ? mesh(merge(glow), MAT.glow, { cast: false, receive: false }) : null;
+  if (glowMesh) glowMesh.name = 'hut-glow';
   const floorMesh = floorStone.length ? mesh(merge(floorStone), detailMaterial(MAT.standard, 'rock')) : null;
   if (floorMesh) floorMesh.name = 'hut-floor';
   group.add(...[cabinMesh, propsMesh, glossyMesh, glowMesh, floorMesh].filter(Boolean));
