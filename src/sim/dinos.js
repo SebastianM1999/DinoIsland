@@ -22,6 +22,7 @@ import { sumpLurkerBrain } from './ai/sumpLurker.js';
 import { crystalPlodderBrain } from './ai/crystalPlodder.js';
 import { aquaticGroundHeight, carcassSurface } from './ai/aquatic.js';
 import { raiderStep } from './raids.js';
+import { ALPHA, canBeAlpha, alphaTitle } from '../shared/dinoRank.js';
 import { findPath, canWalkSegment } from './pathfind.js';
 
 const BRAINS = { brachio: brachioBrain, stego: stegoBrain, raptor: raptorBrain, 'gloom-raptor': gloomRaptorBrain, ptera: pteraBrain, trex: trexBrain, 'alpha-sarcosuchus': sarcosuchusBrain, 'sump-lurker': sumpLurkerBrain, 'crystal-plodder': crystalPlodderBrain };
@@ -67,6 +68,9 @@ export class DinoSystem {
   /** Create a dinosaur. `extra` is merged into its state (group, home, ...). */
   spawn(type, x, z, extra = {}) {
     const c = CONFIG.dinos[type];
+    // a rare alpha among the ordinary animals (shared/dinoRank.js): bigger, tougher, twice the loot
+    if (extra.alpha === undefined && this.world.alphas && canBeAlpha(type, extra) && Math.random() < ALPHA.chance) extra = { ...extra, alpha: true };
+    if (extra.alpha) extra = { scale: ALPHA.scale, radius: c.radius * ALPHA.scale, title: alphaTitle(c.name), ...extra };
     // never spawn inside a tree, in water or on a cliff: search outward in a
     // spiral for the nearest spot where the whole body fits and it can walk off
     let yaw = Math.random() * Math.PI * 2;
@@ -96,6 +100,7 @@ export class DinoSystem {
       timer: 0,
       ...extra,
     };
+    if (d.alpha) d.maxHp = d.hp = Math.round(d.hp * ALPHA.hpMul);
     this.list.push(d);
     this.byId.set(d.id, d);
     BRAINS[type].init?.(d, this);
@@ -114,6 +119,7 @@ export class DinoSystem {
     const desc = { id: d.id, type: d.type, x: r2(d.x), y: r2(d.y), z: r2(d.z), yaw: r3(d.yaw), st: d.st, hp: Math.ceil(d.hp), maxHp: d.maxHp, alive: d.alive, fl: d.fl };
     if (d.scale) desc.sc = d.scale;       // oversized animal (the grove's titan)
     if (d.title) desc.name = d.title;
+    if (d.alpha) desc.alpha = 1;           // a rare alpha (shared/dinoRank.js)
     if (d.butchered) desc.bu = 1;          // carved up with the knife
     if (CONFIG.dinos[d.type].aquatic?.phaseClips) desc.phase = d.phase ? { ...d.phase } : null;
     return desc;
@@ -521,7 +527,7 @@ export class DinoSystem {
     if (!this.canReach(d, p, origin)) return; // the bite/tail hits the tree in between
     const dx = p.x - (origin?.x ?? d.x), dz = p.z - (origin?.z ?? d.z);
     const l = Math.hypot(dx, dz) || 1;
-    this.world.hurtPlayer(p, dmg * this.dmgMul, { kx: (dx / l) * knock, kz: (dz / l) * knock, down,
+    this.world.hurtPlayer(p, dmg * this.dmgMul * (d.alpha ? ALPHA.dmgMul : 1), { kx: (dx / l) * knock, kz: (dz / l) * knock, down,
       src: d.type, from: { id: d.id, x: r2(d.x), y: r2(d.y), z: r2(d.z) } });
   }
 
@@ -620,13 +626,15 @@ export class DinoSystem {
     if (!d.raid && !d.boss) this.respawnQueue.push({ type: d.type, at: this.world.now + c.respawn, group: d.group });
   }
 
+  /**
+   * The carcass lies on the ground (a pterosaur once it landed): the arrows stuck in it
+   * fall out and it can be butchered. Its loot comes only from butchering (sim/world.js).
+   */
   dropCarcassLoot(d) {
-    if (d.lootDropped) return;
-    d.lootDropped = true;
-    const c = CONFIG.dinos[d.type];
-    const loot = { ...c.loot };
-    if (d.carryingMeat) loot.meat = (loot.meat || 0) + 1;
-    this.world.dropLoot(d.x, d.z, loot, d.arrowsStuck);
+    if (d.settled) return;
+    d.settled = true;
+    if (d.carryingMeat) d.carcassMeat = 1;   // the meat a pterosaur stole comes back with its carcass
+    this.world.dropLoot(d.x, d.z, {}, d.arrowsStuck);
     d.arrowsStuck = 0;
   }
 

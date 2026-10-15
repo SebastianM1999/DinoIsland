@@ -19,6 +19,7 @@ import { DinoSystem } from './dinos.js';
 import { Mission } from './mission.js';
 import { resolveCircle, penetration } from '../shared/collision.js';
 import { resolveDinoContact, DINO_CONTACT, dinoBodyCircles } from '../shared/dinoContact.js';
+import { butcherTime, carcassLoot } from '../shared/dinoRank.js';
 import { makeRng } from '../shared/rng.js';
 import { lineBlocked, DINO_SIGHTING } from '../shared/visibility.js';
 import { sanitizeOutfit, sameOutfit } from '../shared/outfits.js';
@@ -71,6 +72,9 @@ export class ServerWorld {
     // The demo: island 1 only (after the boat it starts over), at most CONFIG.demo.maxPlayers,
     // no firearms, no XP or skills (saved profiles are neither used nor overwritten).
     this.demo = !!opts.demo;
+    // rare alphas among the spawns (shared/dinoRank.js). The hosts turn them on; a bare world
+    // (the tests) keeps every animal ordinary unless a spawn asks for an alpha.
+    this.alphas = !!opts.alphas;
     this.log = host.log || (() => {});
     this.now = 0;
     this.players = new Map();
@@ -387,16 +391,24 @@ export class ServerWorld {
     const d = this.dinos.get(id);
     const K = W.knife;
     // a carcass on the ground (fallen pterosaurs only once they landed), not yet butchered
-    if (!p.alive || p.eating || p.butcher || !d || d.alive || d.butchered || !d.lootDropped) return;
+    if (!p.alive || p.eating || p.butcher || !d || d.alive || d.butchered || !d.settled) return;
     if (this.carcassDistance(p, d) > K.reach + P.radius || Math.abs(p.y - d.y) > 4 * (d.scale || 1)) return;
-    const time = CONFIG.dinos[d.type].butcher.time * p.mods.knifeTimeMul;   // Butcher's Eye
+    // one butcher per carcass at a time: a teammate already at work keeps it
+    if (d.butcherBy != null && d.butcherBy !== p.id && this.players.get(d.butcherBy)?.butcher?.dino === d.id) {
+      return this.toast(`${this.players.get(d.butcherBy).name} is already butchering it`, 'bones', p.id);
+    }
+    // 3 s, an alpha 5 s, a boss 10 s (shared/dinoRank.js); Butcher's Eye halves it
+    const time = butcherTime(d) * p.mods.knifeTimeMul;
     p.butcher = { dino: d.id, until: this.now + time, x: p.x, z: p.z };
+    d.butcherBy = p.id;
     d.deadT = Math.max(d.deadT, time + 2);   // the carcass stays until it is done
     this.event(EV.BUTCHER, { id: p.id, dino: d.id, t: time });
   }
 
   stopButcher(p) {
     if (!p.butcher) return;
+    const d = this.dinos.get(p.butcher.dino);
+    if (d?.butcherBy === p.id) d.butcherBy = null;
     p.butcher = null;
     this.event(EV.BUTCHER, { id: p.id, dino: null, t: 0 });
   }
@@ -408,8 +420,9 @@ export class ServerWorld {
     if (this.now < b.until) return;
     p.butcher = null;
     d.butchered = true;
+    d.butcherBy = null;
     d.deadT = Math.min(d.deadT, W.knife.sinkTime);
-    const { loot } = CONFIG.dinos[d.type].butcher;
+    const loot = carcassLoot(d);
     this.dropLoot(d.x, d.z, loot);
     this.event(EV.BUTCHER, { id: p.id, dino: null, t: 0, done: true });
     this.event(EV.BUTCHERED, { id: d.id });

@@ -258,7 +258,7 @@ export const CONFIG = {
       body: [[0, 2.2], [1.8, 2.6], [3.6, 1.15], [5.4, .8], [6.75, .6], [7.35, .4],
         [-1.8, 2.6], [-3.6, 1.1], [-5.4, .78], [-7.2, .5], [-8.4, .35], [-9.1, .2]],
       loot: { meat: 8, hide: 6, teeth: 6 },
-      butcher: { time: 10, loot: { bones: 10, skull: 1, plates: 6 } },
+      butcher: { loot: { bones: 10, skull: 1, plates: 6 } },
       respawn: 0, // The arena boss is unique and stays defeated.
     },
     brachio: {
@@ -282,7 +282,7 @@ export const CONFIG = {
       body: [[0, 1.6], [2.1, 1.65], [3.7, 0.9], [-2.0, 1.6], [-3.4, 0.9], [-4.8, 0.7]],
       scale: 1,
       loot: { meat: 4, hide: 2 },
-      butcher: { time: 6, loot: { bones: 6, skull: 1 } },   // knife (V) on the carcass: seconds, extra drops
+      butcher: { loot: { bones: 6, skull: 1 } },   // knife (V) on the carcass: what it gives on top of `loot` (time: shared/dinoRank.js)
       respawn: 120,
     },
     stego: {
@@ -311,7 +311,7 @@ export const CONFIG = {
       // footprint [forward offset m, radius m] measured from art/sources/stego (tail tip and spikes left out)
       body: [[0, 1.0], [1.23, 0.85], [2.12, 0.38], [2.8, 0.33], [-0.72, 0.95], [-1.87, 0.6], [-2.88, 0.38]],
       loot: { meat: 2, hide: 1, plates: 2 },
-      butcher: { time: 4, loot: { bones: 4, skull: 1, plates: 1 } },
+      butcher: { loot: { bones: 4, skull: 1, plates: 1 } },
       respawn: 150,
     },
     raptor: {
@@ -329,7 +329,7 @@ export const CONFIG = {
       radius: 0.7,
       body: [[0, 0.25], [0.6, 0.18]],
       loot: { meat: 1, teeth: 2 },
-      butcher: { time: 5, loot: { bones: 2, skull: 1 } },
+      butcher: { loot: { bones: 2, skull: 1 } },
       respawn: 90,
     },
     // Cave raptor kin (Hollow Mountain tunnels): blind, hunts by noise. Spawns only where the layout lists
@@ -354,7 +354,7 @@ export const CONFIG = {
       radius: 0.8,
       body: [[0, 0.28], [0.7, 0.2]],
       loot: { meat: 1, teeth: 2 },
-      butcher: { time: 5, loot: { bones: 2, skull: 1 } },
+      butcher: { loot: { bones: 2, skull: 1 } },
       respawn: 90,
     },
     // Cave ambusher of the flooded tunnels (Hollow Mountain): lies submerged, lunges at players who swim or stand at
@@ -379,7 +379,7 @@ export const CONFIG = {
       // footprint of the fitted ~5 m model: snout to +2.2 m, sprawled legs ~0.55 m out, tail tip to -2.7 m
       body: [[0, 0.6], [0.9, 0.55], [1.6, 0.25], [2.1, 0.15], [-0.9, 0.6], [-1.8, 0.35], [-2.5, 0.15]],
       loot: { meat: 3, hide: 2, teeth: 3 },
-      butcher: { time: 6, loot: { bones: 4, skull: 1 } },
+      butcher: { loot: { bones: 4, skull: 1 } },
       respawn: 150,
     },
     // Cave herbivore of the Hollow Mountain's big halls: heavily armoured, crystals on its back. Peaceful until hit or
@@ -407,7 +407,7 @@ export const CONFIG = {
       // footprint [forward offset m, radius m] of the fitted ~6 m model (snout to +3 m, club tail to -2.9 m)
       body: [[0.2, 1.0], [-0.5, 1.0], [1.3, 0.75], [2.15, 0.32], [2.85, 0.22], [-1.4, 0.3], [-2.4, 0.42], [-2.85, 0.2]],
       loot: { meat: 3, hide: 2 },
-      butcher: { time: 5, loot: { bones: 5, skull: 1 } },
+      butcher: { loot: { bones: 5, skull: 1 } },
       respawn: 200,
     },
     ptera: {
@@ -425,7 +425,7 @@ export const CONFIG = {
       attackCooldown: 9,
       radius: 1.2,
       loot: { meat: 1, claws: 2 },
-      butcher: { time: 4, loot: { bones: 1, hide: 1 } },
+      butcher: { loot: { bones: 1, hide: 1 } },
       respawn: 90,
     },
     trex: {
@@ -445,7 +445,7 @@ export const CONFIG = {
       // footprint against trees/rocks: [forward offset m, radius m] along the body (measured from the model)
       body: [[0.2, 1.15], [1.7, 0.95], [3.1, 0.6], [4.1, 0.4], [-1.6, 0.8], [-2.9, 0.55]],
       loot: { meat: 6, teeth: 4 },
-      butcher: { time: 6, loot: { bones: 6, skull: 1, teeth: 2 } },
+      butcher: { loot: { bones: 6, skull: 1, teeth: 2 } },
       respawn: 300,
     },
   },

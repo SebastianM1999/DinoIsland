@@ -88,7 +88,7 @@ export class DinoView {
     ctx.scene.add(this.root);
 
     const bar = document.createElement('div');
-    bar.className = 'dino-bar';
+    bar.className = desc.alpha ? 'dino-bar is-alpha' : 'dino-bar';   // a rare alpha (shared/dinoRank.js): red frame
     bar.innerHTML = `<span class="db-name"></span><span class="db-hp"><i></i></span>`;
     bar.querySelector('.db-name').textContent = desc.name || CONFIG.dinos[desc.type].name;
     bar.hidden = true;

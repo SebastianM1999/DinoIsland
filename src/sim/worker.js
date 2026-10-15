@@ -22,7 +22,7 @@ function start(name, outfit, { level = 0, variant, dev = false, baseStage = 0, r
       if (msg.t !== 'snap') reliableSeq++;
       postMessage({ ...msg, r: reliableSeq });
     },
-  }, { level, variant: Number.isFinite(variant) && variant > 0 ? variant : undefined, demo: !!demo });   // (?variant=N: a fixed layout, e.g. to revisit a dev pin)
+  }, { level, variant: Number.isFinite(variant) && variant > 0 ? variant : undefined, demo: !!demo, alphas: true });   // (?variant=N: a fixed layout, e.g. to revisit a dev pin)
   world.devTools = !!dev;   // (?dev: the dev pin tool may teleport, ACT.DEV_TP)
   // testing aid (?base=1..3): the base already stands on the first plot
   if (baseStage > 0 && world.layout.basePlots.length) {

@@ -5,6 +5,7 @@ import { ServerWorld } from '../src/sim/world.js';
 import { MSG, ACT, EV, PF, EQUIP } from '../src/shared/protocol.js';
 import { CONFIG } from '../src/shared/config.js';
 import { MAX_XP, MAX_BONUS_POINTS, XP_BY_TYPE, RELIC_XP, xpForLevel, DASH } from '../src/shared/skills.js';
+import { BUTCHER_TIME } from '../src/shared/dinoRank.js';
 
 const P = CONFIG.player;
 /** A profile with every point it could ever need (levels 30 + 12 bonus). */
@@ -209,7 +210,7 @@ test('Steady Hands shortens the reload and the Butchers Eye the knife time', () 
   put(p, d.x - 1.5, d.z); d.x = p.x + 1.5; d.z = p.z;
   world.dinos.kill(d, p.id);
   act(p, { a: ACT.BUTCHER, dino: d.id });
-  assert.ok(Math.abs(p.butcher.until - (world.now + CONFIG.dinos.raptor.butcher.time * 0.5)) < 1e-9);
+  assert.ok(Math.abs(p.butcher.until - (world.now + BUTCHER_TIME.normal * 0.5)) < 1e-9);
 });
 
 test('Unshakable removes knockback and knockdown; rank 1 halves the knockback', () => {

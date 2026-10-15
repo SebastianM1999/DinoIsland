@@ -59,7 +59,7 @@ export class PlayerActions {
     this.eatingT = 0;
     this.butcher = null;     // { dino, t, time, startedAt, x, z, confirmed } while holding V
     this.butcherFinish = null;
-    this.butcherRetry = 0;
+    this.knifeLatch = false;  // a butchering ended (done, refused, cancelled): V must be released before the next
     this.reviving = null;    // { id, t, start } while holding E on a downed teammate (t = channel seconds once the server confirms)
     this.reviveRetry = 0;
     this.autoPickT = 0;
@@ -415,7 +415,8 @@ export class PlayerActions {
     const { dir } = this.aim();
     let best = null, bd = Infinity;
     for (const v of g.dinos.map.values()) {
-      if (v.alive || v.butchered || !v.grounded()) continue;
+      // the server's height check (sim/world.js startButcher): no carcass on a ledge far above or below
+      if (v.alive || v.butchered || !v.grounded() || Math.abs(v.pos.y - pos.y) > 4 * (v.scale || 1)) continue;
       for (const [x, z, r] of dinoBodyCircles(v, v.pos.x, v.pos.z, v.yaw)) {
         const dx = x - pos.x, dz = z - pos.z;
         const d = Math.max(0, Math.hypot(dx, dz) - r);
@@ -433,14 +434,15 @@ export class PlayerActions {
       // full ring for at least one frame, even if the event arrives during a stall.
       this.butcherFinish = m.done && this.butcher ? { until: null } : null;
       this.butcher = null;
-    } else if (this.butcher?.dino === m.dino) {
+    } else if (this.butcher?.dino === m.dino && !this.butcher.confirmed) {
+      // the server's channel (3 / 5 / 10 s by rank, shared/dinoRank.js): the ring fills once over it
       this.butcher.confirmed = true;
       this.butcher.time = m.t;
     }
   }
 
   knifeProgress(now = performance.now() / 1000) {
-    if (this.butcher) return Math.min(1, this.butcher.t / this.butcher.time);
+    if (this.butcher) return this.butcher.confirmed ? Math.min(1, this.butcher.t / this.butcher.time) : 0;
     if (this.butcherFinish) {
       this.butcherFinish.until ??= now + 0.25;
       if (now < this.butcherFinish.until) return 1;
@@ -452,7 +454,7 @@ export class PlayerActions {
   updateKnife(dt, enabled, held, now = performance.now() / 1000) {
     const g = this.game;
     const pos = g.player.pos;
-    this.butcherRetry = Math.max(0, this.butcherRetry - dt);
+    if (!held) this.knifeLatch = false;
     const b = this.butcher;
     if (b) {
       // Movement dt is capped at 50 ms. The server's channel is real elapsed
@@ -460,19 +462,21 @@ export class PlayerActions {
       b.t = Math.max(b.t, now - b.startedAt);
       const v = g.dinos.map.get(b.dino);
       const moved = Math.hypot(pos.x - b.x, pos.z - b.z) > W.knife.moveCancel;
-      // the server did not take it (too far, someone else is faster): don't hammer it
+      // the server did not take it (too far, a teammate is at it): wait for V to be released
       const refused = !b.confirmed && b.t > 0.6;
       if (!enabled || !held || !v || v.butchered || moved || refused) {
         if (!refused) g.net.act(ACT.BUTCHER, { stop: 1 });
         this.butcher = null;
-        if (refused) this.butcherRetry = 1;
       }
       return;
     }
-    if (this.knifeProgress(now) != null || !enabled || !held || this.butcherRetry > 0) return;
+    // one carcass per press of V: the ring never starts over by itself
+    if (!enabled || !held || this.knifeLatch || this.knifeProgress(now) != null) return;
     const v = this.findCarcass();
     if (!v) return;
-    this.butcher = { dino: v.id, t: 0, time: CONFIG.dinos[v.type].butcher.time * g.mods.knifeTimeMul, startedAt: now, x: pos.x, z: pos.z, confirmed: false };
+    this.knifeLatch = true;
+    // the duration comes with the server's confirmation (onButcher)
+    this.butcher = { dino: v.id, t: 0, time: Infinity, startedAt: now, x: pos.x, z: pos.z, confirmed: false };
     g.net.act(ACT.BUTCHER, { dino: v.id });
     g.audio?.play('swing');
   }
