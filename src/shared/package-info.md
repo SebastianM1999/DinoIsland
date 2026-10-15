@@ -29,7 +29,7 @@
 ### Collider/shape builders
 - `siteFrame.js` — local-to-world frame for placed sites (`toWorld`, `boxRot`, `siteBox`).
 - `collision.js` — 2D collision against circle and oriented-box colliders (`resolveCircle`, `penetration`, `standTop`), segment/ray tests (`segmentColliders`, `raySphere`, `segmentSphere`).
-- `treeShapes.js` — trunk centerlines per tree type (`TRUNKS`) and `treeColliders` built from the same numbers as the meshes.
+- `treeShapes.js` — trunk centerlines per tree type (`TRUNKS`) and `treeColliders` built from the same numbers as the meshes; leaf crowns (`CROWNS`, `treeCrownCollider`, measured from the foliage meshes) for `layout.crownColliders`, which only dinosaurs collide with.
 - `rockShapes.js` — rock ring tables (`ROCK_VARIANTS`: boulder, block, slab, stepped, formation, crag, table rock; `rockTable`), `placeRock`, walkable surface `rockSurfaceAt`/`rockHeightAt`; pebbles below `PEBBLE_SCALE` have no collision.
 - `caveShape.js` — cave dome dimensions, colliders, interior/mouth points, rock piles.
 - `ruinsShape.js` — ruins plaza layout from a seed (`ruinsLayout`), colliders, altar top for the relic.
@@ -37,13 +37,14 @@
 - `springShape.js` — waterfall grotto SDF (`springSdf`, 3D noise helpers), lip/floor offsets and `springColliders`.
 
 ### Gameplay rules & catalogs
-- `base.js` — team base on islands after the first: stages, costs per island, towers, repair costs, plot geometry, palisade, colliders, camp stations and safe zone.
+- `base.js` — team base on islands after the first: stages, costs per island, towers, repair costs, plot geometry, palisade, colliders, camp stations and safe zone; island 1's tent camp (`layout.hut.kind === 'tent'`: no wardrobe or mission board) and its camp table (`CAMP_BENCH`, `base.bench`, tier-1 recipes only: `miniBench`).
 - `crafting.js` — workbench recipes (supplies and team upgrades by tier; the tier 1 upgrades cost island 1's resources: resin, ironwood, healing herb), `upgradeMods`, `canAfford`, `unlockIsland`.
 - `skills.js` — skill trees, XP/levels (`LEVEL_CAP`, `xpForLevel`, `levelFromXp`), XP rewards, `DASH`, profile buy/validation (`sanitizeProfile`, `canBuy`, `buy`), `skillMods`, `creativeProfile`.
 - `missions.js` — team contracts (`CONTRACTS`) for the mission board: event key, goal, reward.
 - `relics.js` — boat-part relic kinds and which site type hides each (`RELICS`, `RELIC_KINDS`, `RELIC_FOR_SITE`); the cave level's sites are `cave` (crystal hall), `lake` (bell, a chamber with a flooded tunnel) and `abyss` (compass, the farthest chamber).
 - `outfits.js` — hat/top/pants catalogs, `defaultOutfit`, `sanitizeOutfit`, `sameOutfit`.
 - `dinoContact.js` — player-vs-dinosaur body contact: `dinoBodyCircles` footprint and swept `resolveDinoContact`; `DINO_CONTACT` damage/knockback/cooldown.
+- `dinoRank.js` — ranks of dinosaurs: rare alphas (`ALPHA`: chance, scale, health, damage, loot), bosses (T-Rex, Alpha Sarcosuchus, leashed arena animals); `butcherTime` (3 / 5 / 10 s) and `carcassLoot` (all of a carcass's loot comes from butchering).
 - `gunshots.js` — `shotEnd`: where a hitscan shot stops (colliders, grove barrier, terrain, the cave roof), used for tracers and validation.
 - `visibility.js` — `lineBlocked` (terrain, cave roof, tree/rock occlusion) and `DINO_SIGHTING` thresholds for dinosaur discovery.
 
@@ -72,7 +73,7 @@
 - Protocol changes must stay in sync with `src/sim/world.js` (handler), `src/client/net/net.js` (sender) and the 8 KiB inbound cap in `server/gameHost.js` / 8192-byte cap in `desktop/steam-session.js`. Steam's unreliable routing depends on the `snap`/`state` type strings.
 - Renaming `BRAND.slug` or `storagePrefix` has player-visible effects (Steam lobby visibility, saved settings); see the notes in `brand.js`.
 
-- The butcher protocol distinguishes successful completion (`EV.BUTCHER.done`) from cancellation; timings in `CONFIG.dinos` are reduced by `skillMods.knifeTimeMul` on the server.
+- The butcher protocol distinguishes successful completion (`EV.BUTCHER.done`) from cancellation; the time comes from the rank (`dinoRank.js`), reduced by `skillMods.knifeTimeMul` on the server, and reaches the client in `EV.BUTCHER.t`. A kill drops only the stuck arrows.
 
 ## Not here
 - Authoritative game logic (AI, damage, inventory, raids, missions progress): `src/sim/`.

@@ -11,7 +11,7 @@
 - `itemInfo.js` — `ITEM_INFO`: names and tooltip texts for inventory items, numbers taken from `CONFIG`.
 - `craftingPanel.js` — `CraftingPanel`: hut workbench dialog (supplies tab and team upgrades tab, refill).
 - `basePanel.js` — `BasePanel`: base dialog on islands 2+ (pick plot, upgrade stage, build/upgrade towers, repair).
-- `boatPanel.js` — `BoatPanel`: boat wreck dialog listing found/missing boat parts and the Repair button.
+- `boatPanel.js` — `BoatPanel`: boat wreck dialog listing found/missing boat parts and the Repair button; once repaired, Set sail (Enter) and Inventory (Tab).
 - `grovePrompt.js` — `GrovePrompt`: Yes/No warning and hint shown at the giant's pen barrier.
 - `wardrobe.js` — `Wardrobe` (hat/top/pants picker with rotatable 3D preview) and `savedOutfit()` from localStorage.
 - `skillPanel.js` — `SkillPanel`: skill tree dialog (key K), numeric ranks/costs and readable locked states, a viewport-fitted three-branch tree without scrolling, aggregate tier spending/progress, with optimistic buys reverted after a timeout. All three branches and tiers fit the viewport without tree scrolling; selected skill explanations remain in the footer. Locked tiles remain keyboard-inspectable; purchase rules stay in the shared model.

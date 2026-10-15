@@ -46,7 +46,8 @@ Grouped by the module area they mainly cover. Many simulation tests also check t
 - `props.test.js` — cave, ruins, boat, tree colliders and relic/prop meshes match (shared shapes + `src/client/models/props/*`); pines keep their needles over the trunk to the tip, without gaps.
 - `traversal.test.js` — the player controller gets over every fallen trunk and ruin stone on real islands without server corrections.
 - `swim.test.js` — swimming in rivers/lakes, climbing out on banks, sea stays blocked (PlayerController).
-- `movement.test.js` — `resolveCircle`/`penetration`, player controller, server movement correction, unstuck (`src/sim/unstuck.js`), dinosaur spawn spots.
+- `movement.test.js` — `resolveCircle`/`penetration`, player controller, server movement correction, unstuck (`src/sim/unstuck.js`), dinosaur spawn spots, leaf crowns (a brachiosaurus neck, not players).
+- `dino-water.test.js` — land dinosaurs swim across island 1's river on the way, never into the sea, never spawn in water.
 
 ### Simulation: dinosaurs and combat (src/sim)
 - `sarcosuchus-boss.test.js` — central island 2 boss spawn, harmless telegraphs, committed lunge dodges and miss recovery, shoulder shove, swept tail knockback, low-health chains, safe-zone exclusion, arena damage boundaries and no respawn; bank targeting across fifteen variants, backwards retreats, floating corpse continuity, late-join phase synchronization, vertical strike avoidance and emergence without shore-height pops.
@@ -63,7 +64,7 @@ Grouped by the module area they mainly cover. Many simulation tests also check t
 - `firearms.test.js` — pistol/rifle actions, reload, fire rate under host ticks, gun grips (`src/sim/firearms.js` + client viewmodel/player model).
 - `weapons.test.js` — client spear throw, bow/arrow/trap hand contacts and release sync (viewmodel, projectiles, player model).
 - `projectile-recovery.test.js` — arrow/spear wear, refill, lodged spears and recovery (server + client `Items`).
-- `butcher.test.js` — butchering carcasses, bones/skulls as loot, low-FPS client stroke/ring timing and completion versus cancellation.
+- `butcher.test.js` — butchering carcasses (3 / 5 / 10 s by rank, one player at a time, one pass per press of V), loot only from butchering (alphas double), alpha spawns, low-FPS client stroke/ring timing and completion versus cancellation.
 
 ### Simulation: progression, base and economy
 - `skills.test.js` — skill tree data, XP/level math, buying, `sanitizeProfile`, `skillMods` (pure shared/skills.js).

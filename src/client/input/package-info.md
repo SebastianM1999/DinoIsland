@@ -7,7 +7,7 @@
 ## Entry points
 - `Input` is constructed once by `src/client/core/game.js` (`new Input(canvas)`) and handed on to the next island's `Game` through `dispose()` / `reuse`.
 - `Game` uses `isHeld`, `wasPressed`, `wasReleased`, `takeMouse`, `endFrame` (once per frame, after render), `enabled` (set in `start`/`stop`), `requestLock`, `exitLock`, and sets `onPanelToggle`.
-- `src/client/main.js` sets `onLockChange` (pause card), reads `locked` / `lockPending`, and calls `requestLock` / `exitLock` (resume, canvas click, Steam overlay).
+- `src/client/main.js` sets `onLockChange` (pause card) and `onLockFailed` (the browser refused the mouse: a "click" hint, never the pause card at spawn), reads `locked` / `lockPending`, and calls `requestLock` / `exitLock` (resume, Escape on the pause card, canvas click, Steam overlay).
 - Action queries come only from `src/client/core/game.js` and `src/client/player/actions.js` (through `game.input`).
 
 ## Actions
