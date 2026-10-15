@@ -6,7 +6,7 @@ import { CAVE, CAVE_WALKWAY, caveColliders, caveInterior, caveMouth, caveRockPil
 import { ruinsColliders, ruinsCenter, ruinsLayout, RUINS_ALTAR_TOP } from '../src/shared/ruinsShape.js';
 import { BOAT, boatColliders, boatInteractPoint } from '../src/shared/boatShape.js';
 import { resolveCircle } from '../src/shared/collision.js';
-import { TRUNKS, treeColliders } from '../src/shared/treeShapes.js';
+import { TRUNKS, treeColliders, CROWNS, treeCrownCollider } from '../src/shared/treeShapes.js';
 import { relicMesh, relicModel } from '../src/client/models/props/relics.js';
 import { buildBoat } from '../src/client/models/props/boat.js';
 import { buildCave } from '../src/client/models/props/cave.js';
@@ -180,4 +180,23 @@ test('ruins overgrowth: rubble and collapsed walls get colliders and leave the e
     // straight walk from outside through the arch to the altar
     for (let z = -11; z < -1.6; z += 0.25) assert.ok(!blocked(0, z, cols), `seed ${seed}: entrance clear at z=${z}`);
   }
+});
+
+test('leaf crowns: every leafy tree has a crown collider inside its visible foliage, at its height', () => {
+  for (const [type, n] of Object.entries(TREE_VARIANTS)) {
+    for (let v = 0; v < n; v++) {
+      const c = treeCrownCollider({ id: v, type, x: 0, z: 0, y: 0, scale: 1, rot: 0, lean: 0, hue: 0.5, sink: 0 });
+      if (!CROWNS[type]) { assert.equal(c, null, `${type}: no crown`); continue; }
+      const g = treeGeometry(type, v).foliage;
+      g.computeBoundingBox();
+      const b = g.boundingBox;
+      assert.ok(c && c.kind === 'crown', `${type}:${v} has a crown`);
+      // within the leaves: no invisible wall beside or below the foliage
+      assert.ok(c.bottom >= b.min.y - 0.05 && c.top <= b.max.y + 0.05, `${type}:${v} height ${c.bottom}..${c.top} in ${b.min.y.toFixed(2)}..${b.max.y.toFixed(2)}`);
+      const reach = Math.max(b.max.x - c.x, c.x - b.min.x, b.max.z - c.z, c.z - b.min.z);
+      assert.ok(c.r > 0.5 && c.r < reach, `${type}:${v} radius ${c.r} inside the reach ${reach.toFixed(2)}`);
+    }
+  }
+  // leafy trees whose foliage is a real canopy all have one
+  for (const type of ['round', 'tall', 'jungle', 'giant', 'kapok', 'palm', 'pine', 'mango']) assert.ok(CROWNS[type], type);
 });

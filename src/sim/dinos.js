@@ -39,6 +39,11 @@ const stepOver = (d) => Math.max(0.2, Math.min(1.2, radiusOf(d) * 0.35));
 const wadeDepth = (d) => (d.type === 'brachio' ? 1.2 : 0.35);
 const SWIM_SPEED = 0.6;
 const SWIM_SINK = 0.7;
+// Leaf crowns (shared/treeShapes.js CROWNS) stop the long necks: a brachiosaurus walks into the
+// canopy up to its head (m, before scale). Shorter animals pass below it - on a slope a crown
+// downhill hangs at their feet, and the paths (sim/pathfind.js) do not plan round crowns.
+const NECK_HEIGHT = { brachio: 8.5 };
+const crownTop = (d) => (NECK_HEIGHT[d.type] ?? 0) * (d.scale || 1);
 /** Stuck safety net: seconds of wanting to move without getting anywhere before a nudge. */
 const NUDGE_INSIDE = 2;     // standing inside a collider / on ground it can't stand on
 const NUDGE_BLOCKED = 6;    // blocked on free ground (goal unreachable)
@@ -57,6 +62,7 @@ export class DinoSystem {
     this.groups = new Map();
     this.respawnQueue = [];
     this.colliders = world.layout.colliders;
+    this.crowns = world.layout.crownColliders ?? { circles: [], boxes: [] };   // leaf crowns: a tall body or a flyer bumps into them
     // harder islands: tougher and harder-hitting dinosaurs
     const diff = world.layout.level.difficulty;
     this.hpMul = Math.pow(diff, 0.85);
@@ -402,11 +408,15 @@ export class DinoSystem {
       // strongest push per axis over all body circles
       let px = 0, pz = 0;
       for (const [cx, cz, r] of this.bodyCircles(d, x, z, yaw)) {
-        resolveCircle(cx, cz, r, this.colliders, tmp, y0, y1);
-        if (!tmp.hit) continue;
-        const dx = tmp.x - cx, dz = tmp.z - cz;
-        if (Math.abs(dx) > Math.abs(px)) px = dx;
-        if (Math.abs(dz) > Math.abs(pz)) pz = dz;
+        // trunks, rocks, walls up to the hip; leaf crowns up to the top of the head
+        for (const [list, top] of [[this.colliders, y1], [this.crowns, gy + crownTop(d)]]) {
+          if (top <= y0) continue;
+          resolveCircle(cx, cz, r, list, tmp, y0, top);
+          if (!tmp.hit) continue;
+          const dx = tmp.x - cx, dz = tmp.z - cz;
+          if (Math.abs(dx) > Math.abs(px)) px = dx;
+          if (Math.abs(dz) > Math.abs(pz)) pz = dz;
+        }
       }
       if (!px && !pz) break;
       x += px; z += pz;
@@ -419,9 +429,10 @@ export class DinoSystem {
   /** Would the body (slightly slimmed, so brushing past a trunk is fine) overlap an obstacle at (x, z)? */
   bodyBlocked(d, x, z, yaw, scale = 0.85) {
     const gy = this.terrain.heightAt(x, z);
-    const y0 = gy + stepOver(d), y1 = gy + Math.max(1.5, radiusOf(d));
+    const y0 = gy + stepOver(d), y1 = gy + Math.max(1.5, radiusOf(d)), head = gy + crownTop(d);
     for (const [cx, cz, r] of this.bodyCircles(d, x, z, yaw)) {
       if (penetration(cx, cz, r * scale, this.colliders, y0, y1) > 0.01) return true;
+      if (head > y0 && penetration(cx, cz, r * scale, this.crowns, y0, head) > 0.01) return true;
     }
     return false;
   }

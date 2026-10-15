@@ -6,8 +6,11 @@
 import { CONFIG } from '../../shared/config.js';
 import { DS, EV, MSG } from '../../shared/protocol.js';
 import { WORLD } from '../../shared/island.js';
+import { resolveCircle } from '../../shared/collision.js';
 
 const C = CONFIG.dinos.ptera;
+const BODY_R = 1.2;                     // the flyer's body against crowns and trunks (m)
+const hit = { x: 0, z: 0, hit: false };
 /** Circling areas spread along the island (west, middle, east, and the beaches). */
 function areasOf(plan) {
   return [
@@ -18,7 +21,7 @@ function areasOf(plan) {
   ];
 }
 
-function flyTo(sys, d, tx, ty, tz, speed, dt, agility = 2.2) {
+export function flyTo(sys, d, tx, ty, tz, speed, dt, agility = 2.2) {
   const dx = tx - d.x, dy = ty - d.y, dz = tz - d.z;
   const len = Math.hypot(dx, dy, dz) || 1;
   const k = Math.min(1, agility * dt);
@@ -33,6 +36,12 @@ function flyTo(sys, d, tx, ty, tz, speed, dt, agility = 2.2) {
   d.z = Math.max(-lim, Math.min(lim, d.z));
   const ground = sys.terrain.heightAt(d.x, d.z);
   d.y = Math.max(d.y, Math.max(ground, 0) + 1.2);
+  // leaf crowns and trunks are solid: it slides round them instead of flying through
+  for (const list of [sys.crowns, sys.colliders]) {
+    if (!list) continue;
+    resolveCircle(d.x, d.z, BODY_R, list, hit, d.y - BODY_R, d.y + BODY_R);
+    if (hit.hit) { d.x = hit.x; d.z = hit.z; }
+  }
   d.yaw = Math.atan2(-d.vx, -d.vz);
   d.spd = Math.hypot(d.vx, d.vy, d.vz);
   return len;

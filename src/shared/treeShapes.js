@@ -187,3 +187,36 @@ export function treeColliders(t) {
   }
   return out;
 }
+
+/**
+ * Leaf crowns that stop dinosaurs (sim/dinos.js: a tall body walks into them, a pterosaur
+ * cannot fly through them; players and shots ignore them). Per type and trunk variant, in
+ * local tree space before scale: [cx, cz, bottom, top, r]. Measured from the foliage meshes
+ * of client/world/veg/trees.js (the bottom where the lowest tenth of the leaves hangs, a
+ * radius a little inside the crown's 80 % reach); test/props.test.js keeps them in step.
+ * Bare snags, burnt trunks and the low fronds of banana and nipa (understory, bushy) have none.
+ */
+export const CROWNS = {
+  palm: [[1.24, -0.07, 6.48, 8.92, 2.8], [2.35, -0.44, 5.66, 8.22, 2.8]],
+  round: [[0.3, -0.05, 3.81, 7.09, 1.9], [0.21, 0.06, 4.11, 7.52, 1.8]],
+  tall: [[0.23, -0.19, 5.24, 10.03, 2.2]],
+  jungle: [[0.48, 0.19, 8.02, 12.89, 3.2]],
+  mango: [[0.13, 0.18, 3.16, 6.91, 2.4]],
+  bamboo: [[-0.19, 0.2, 5.06, 10.38, 2.1], [-0.23, -0.01, 7.09, 12.02, 1.75]],
+  giant: [[-0.21, -0.07, 16.75, 28.42, 6.4], [0.12, 0.27, 16.03, 26.26, 6.4]],
+  kapok: [[-0.14, 0.25, 10.75, 12.73, 4.8], [0.22, 0.08, 9.77, 11.99, 4.9]],
+  pine: [[-0.03, -0.06, 4.05, 11.16, 1.4], [0.01, 0.09, 3.24, 9.11, 1.3]],
+  mangrove: [[-0.25, 0.09, 4.14, 7.1, 2.8], [0.07, -0.09, 3.59, 6.56, 2.8]],
+  swampfig: [[-0.17, -0.08, 4.46, 6.47, 3.0]],
+  ashplum: [[0.24, 0.2, 3.19, 4.78, 2.0]],
+};
+
+/** The crown collider of a layout tree: { x, z, r, bottom, top, kind: 'crown' } in world space, or null. */
+export function treeCrownCollider(t) {
+  const c = CROWNS[t.type]?.[treeVariant(t)];
+  if (!c) return null;
+  const [cx, cz, bottom, top, r] = c;
+  // the crown's centre follows the trunk's lean; its height span stays upright
+  const lo = treePoint(t, [cx, bottom, cz]), hi = treePoint(t, [cx, top, cz]);
+  return { x: (lo[0] + hi[0]) / 2, z: (lo[2] + hi[2]) / 2, r: r * t.scale, bottom: lo[1], top: hi[1], kind: 'crown' };
+}
