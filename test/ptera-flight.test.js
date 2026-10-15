@@ -34,7 +34,8 @@ test('dead flyer retains altitude, falls with momentum, and drops loot only at i
   assert.equal(d.grounded, true);
   assert.equal(drops.length, 1);
   assert.equal(drops[0][0], d.x);
-  assert.equal(drops[0][2].meat, 2);
+  assert.deepEqual(drops[0][2], {}, 'a kill drops only the stuck arrows; the loot comes from butchering');
+  assert.equal(d.carcassMeat, 1, 'the stolen meat stays with the carcass');
   system.update(1);
   assert.equal(drops.length, 1);
   assert.equal(d.vy, 0);

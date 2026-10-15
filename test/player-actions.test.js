@@ -317,10 +317,15 @@ test('knife input finds only grounded unfinished carcasses and cancels movement 
   assert.equal(actions.knifeProgress(now), 0.5);
   game.player.pos.x += CONFIG.weapons.knife.moveCancel + 0.1; frame();
   assert.deepEqual(requests.at(-1), { a: ACT.BUTCHER, stop: 1 }); assert.equal(actions.butcher, null);
-  game.player.pos.x = 0; frame(); const count = requests.length;
+  // still holding V after the cancel: the knife waits for a fresh press, the ring never restarts by itself
+  game.player.pos.x = 0; frame(); frame(1); assert.equal(actions.butcher, null);
+  held.delete('knife'); frame(); held.add('knife'); frame(); const count = requests.length;
+  assert.deepEqual(requests.at(-1), { a: ACT.BUTCHER, dino: 7 });
+  assert.equal(actions.knifeProgress(now), 0, 'an empty ring until the server confirms');
   now += 0.7; frame(); assert.equal(actions.butcher, null);
   assert.equal(requests.length, count, 'refused starts do not send a redundant stop');
-  frame(0.5); assert.equal(requests.length, count); frame(0.6); assert.equal(requests.length, count + 1);
+  frame(0.5); frame(0.6); assert.equal(requests.length, count, 'no retry while V stays held');
+  held.delete('knife'); frame(); held.add('knife'); frame(); assert.equal(requests.length, count + 1);
   emit(EV.BUTCHER, { id: 1, dino: 7, t: 2 }); emit(EV.BUTCHER, { id: 1, done: true });
   assert.equal(actions.knifeProgress(now), 1); now += 0.3; assert.equal(actions.knifeProgress(now), null);
 });

@@ -38,7 +38,7 @@ export function startGameHost(httpServer = null, { onConnection, demo = false } 
       }
     },
     log: (...a) => console.log('[world]', ...a),
-  }, { demo });
+  }, { demo, alphas: true });
 
   function attachConnection(ws, addr = 'local') {
     let playerId = null;
