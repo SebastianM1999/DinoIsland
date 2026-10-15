@@ -1,6 +1,6 @@
 // Main quest per island: "Find the boat parts hidden on the island, repair
 // the wrecked boat on the far beach, and set sail together to the next
-// island." Plus the team contracts from the mission board, whose progress
+// island" - when a player at the boat chooses to (ACT.SAIL), never on its own. Plus the team contracts from the mission board, whose progress
 // survives from island to island. Server-side; clients only display it.
 
 import { EV } from '../shared/protocol.js';
@@ -9,7 +9,6 @@ import { RELICS } from '../shared/relics.js';
 import { BRAND } from '../shared/brand.js';
 
 const SAIL_RADIUS = 18;          // everyone alive must stand this close to the boat
-const SAIL_HOLD = 3;             // seconds the team has to stay there
 const SAIL_DELAY = 7;            // seconds of "island complete" before the next island loads
 
 export class Mission {
@@ -27,7 +26,6 @@ export class Mission {
     this.phase = 'search';        // search -> repaired -> sailing
     this.startedAt = this.world.now;
     this.completedIn = 0;
-    this.sailT = 0;
     this.doneTimer = 0;
     this.atBoat = 0;
     this.alive = 0;
@@ -69,7 +67,7 @@ export class Mission {
         return { text: r.found ? `${def.name} found` : `Find the ${def.name} – ${def.hint}`, done: r.found, relic: r.kind };
       }),
       { text: `Repair the boat on the east beach (${found}/${relics.length} parts)`, done: repaired },
-      { text: `Set sail together (${this.atBoat}/${Math.max(1, this.alive)} at the boat)`, done: this.phase === 'sailing' },
+      { text: `Set sail together at the boat: E, then Set sail (${this.atBoat ?? 0}/${Math.max(1, this.alive ?? 0)} at the boat)`, done: this.phase === 'sailing' },
     ];
     // (the demo ends after island 1: that is its last island)
     const last = L.last || this.world.demo;
@@ -111,8 +109,32 @@ export class Mission {
     const missing = p.creative ? [] : this.world.relics.filter((r) => !r.found);
     if (missing.length) return `Still missing: ${missing.map((r) => RELICS[r.kind].name).join(', ')}`;
     this.phase = 'repaired';
-    this.world.toast(`${p.name} repaired the boat! Gather the whole team at the boat to set sail.`, 'quest');
+    this.world.toast(`${p.name} repaired the boat! Gather the whole team at the boat and set sail when you are ready.`, 'quest');
     this.world.event(EV.BOAT, { repaired: true });
+    this.broadcast();
+    return null;
+  }
+
+  /**
+   * A player at the repaired boat sets sail. The whole living team has to be at the boat;
+   * returns a reason string when it can't be done yet.
+   */
+  sail(p) {
+    const w = this.world;
+    if (this.phase !== 'repaired' || !p.alive) return null;
+    const b = w.layout.boat;
+    const atBoat = (q) => (q.x - b.x) ** 2 + (q.z - b.z) ** 2 < SAIL_RADIUS ** 2;
+    if (!atBoat(p)) return null;
+    const alive = [...w.players.values()].filter((q) => q.alive);
+    const missing = alive.filter((q) => !atBoat(q));
+    if (missing.length) return `Wait for the whole team: ${missing.map((q) => q.name).join(', ')} ${missing.length > 1 ? 'are' : 'is'} not at the boat`;
+    this.phase = 'sailing';
+    this.completedIn = Math.round(w.now - this.startedAt);
+    this.islandsDone++;
+    const last = w.layout.level.last || w.demo;
+    this.doneTimer = last ? SAIL_DELAY * 2.5 : SAIL_DELAY;
+    w.toast(w.demo ? 'All aboard! That was the demo – well done!' : last ? `All aboard! You escaped ${BRAND.name} – well done!` : `${p.name} casts off – setting sail for the next island…`, 'quest');
+    this.onEvent('island');
     this.broadcast();
     return null;
   }
@@ -153,17 +175,6 @@ export class Mission {
       if (near !== this.atBoat || alive !== this.alive) {
         this.atBoat = near;
         this.alive = alive;
-        this.broadcast();
-      }
-      this.sailT = alive > 0 && near === alive ? this.sailT + dt : 0;
-      if (this.sailT >= SAIL_HOLD) {
-        this.phase = 'sailing';
-        this.completedIn = Math.round(w.now - this.startedAt);
-        this.islandsDone++;
-        const last = w.layout.level.last || w.demo;
-        this.doneTimer = last ? SAIL_DELAY * 2.5 : SAIL_DELAY;
-        w.toast(w.demo ? 'All aboard! That was the demo – well done!' : last ? `All aboard! You escaped ${BRAND.name} – well done!` : 'All aboard! Setting sail for the next island…', 'quest');
-        this.onEvent('island');
         this.broadcast();
       }
     } else if (this.phase === 'sailing') {

@@ -285,6 +285,8 @@ export class Game {
     });
     this.boatPanel = new BoatPanel({
       onRepair: () => this.net.act(ACT.REPAIR),
+      onSail: () => this.net.act(ACT.SAIL),
+      onInventory: () => this.input.onPanelToggle('inventory'),
       onClose: () => this.input.onPanelToggle('close'),
     });
     this.hud.addPanel('boat', { el: this.boatPanel.el, onOpen: () => this.boatPanel.onOpen() });

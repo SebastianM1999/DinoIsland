@@ -1336,6 +1336,12 @@ export class ServerWorld {
         if (reason) this.toast(reason, 'crate', p.id);
         return;
       }
+      case ACT.SAIL: {
+        // a player at the repaired boat decides when the team leaves (sim/mission.js sail)
+        const reason = this.mission.sail(p);
+        if (reason) this.toast(reason, 'boat', p.id);
+        return;
+      }
       case ACT.UNSTUCK: return this.unstuck(p, !!m.manual);
       case ACT.DEV_TP: {
         // dev pin tool (client/core/devPins.js): revisit a pinned spot. Only a solo world started with ?dev allows it

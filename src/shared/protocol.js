@@ -64,10 +64,11 @@ export const ACT = {
   CREATIVE: 'creative', // { on }                              creative mode (invincible, flying)
   OUTFIT: 'outfit',     // { outfit }                          change clothes at the hut wardrobe
   REPAIR: 'repair',     // {}                                  repair the boat with the found parts
+  SAIL: 'sail',         // {}                                  set sail from the repaired boat (everyone alive at the boat)
   UNSTUCK: 'unstuck',   // { manual? }                         move me to the nearest free spot (auto: client stuck detector,
                         //                                     manual: U key); server-validated and rate-limited
   BUTCHER: 'butcher',   // { dino, stop? }                     start (hold V) / stop butchering a carcass with the knife
-  BASE: 'base',         // { op: 'build', plot } | { op: 'upgrade' } | { op: 'tower', slot, kind } | { op: 'towerUp', slot } | { op: 'repair' }
+  BASE: 'base',         // { op: 'build', plot } | { op: 'upgrade' } | { op: 'tower', slot, kind } | { op: 'towerUp', slot } | { op: 'repair' } | { op: 'bench' } (island 1's camp table)
                         //                                     build / grow the team's base and its towers (islands 2+)
   SKILL: 'skill',       // { op: 'buy', id } | { op: 'reset' }  spend a point / reset all points (only at camp)
   REVIVE: 'revive',     // { to } start reviving a downed teammate (hold E) | { stop: true }
