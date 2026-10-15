@@ -15,6 +15,7 @@ import { buildCabin, CABIN } from './hut/cabin.js';
 import { buildDropOff, buildWorkbench, buildMissionBoard, buildWardrobe, buildFlagpole, buildCampfire, FLAG_ATTACH } from './hut/props.js';
 import { createFlag, createFire, createSmoke } from './hut/fx.js';
 import { COL, box, plank, log, lashing } from './hut/pieces.js';
+import { buildTent } from './hut/tent.js';
 import { stoneWall, baseFloor } from './baseGround.js';
 import { detailMaterial } from './surfaceDetail.js';
 
@@ -63,34 +64,6 @@ function borderPegs(style, r) {
     const a = (i / 14) * Math.PI * 2;
     out.push(log(0.7, 0.05, [Math.sin(a) * r, 0.35, Math.cos(a) * r], 'y', { body: style.post, seed: i + 7, ends: [false, true] }));
   }
-  return out;
-}
-
-/** Lean-to tent (camp): two A-frames, ridge pole and a hide / canvas roof. Origin = BASE_LOCAL.tent. */
-function tent(style) {
-  const out = [];
-  // W = full width at the ground, D = half length, H = ridge height
-  const W = 4.6, D = 2.2, H = 2.6;
-  const slant = Math.hypot(W / 2, H);
-  const lean = Math.atan2(W / 2, H);          // leg tilt from vertical
-  for (const z of [-D, D]) {
-    for (const s of [-1, 1]) {
-      // leg from the ground at x = s·W/2 up to the ridge
-      out.push(log(slant + 0.35, 0.08, [s * W / 4, H / 2, z], 'y', { body: style.log[1], seed: 5 + s, rot: [0, 0, s * lean] }));
-    }
-  }
-  out.push(log(D * 2 + 0.6, 0.08, [0, H, 0], 'z', { body: style.log[2], seed: 9 }));
-  const rise = Math.atan2(H, W / 2);          // roof angle above the ground
-  for (const s of [-1, 1]) {
-    // thin slab (visible from both sides), sagging a little between the poles
-    let cloth = new THREE.BoxGeometry(slant - 0.05, 0.04, D * 2 + 0.3, 6, 1, 4);
-    cloth = deform(cloth, (v) => { v.y -= Math.cos((v.z / (D + 0.15)) * Math.PI / 2) * 0.06 + jitter(v, 0.015, 3); });
-    out.push(part(cloth, (c) => (Math.abs(Math.sin(c.z * 3)) > 0.9 ? style.clothDark : style.cloth),
-      [s * W / 4, H / 2 + 0.06, 0], [0, 0, -s * rise]));
-  }
-  // bedrolls and a crate inside
-  out.push(box(0.7, 0.18, 1.7, style.clothDark, [-0.6, 0.09, 0.4], [0, 0.1, 0]));
-  out.push(box(0.7, 0.18, 1.7, style.cloth, [0.6, 0.09, 0.2], [0, -0.08, 0]));
   return out;
 }
 
@@ -295,7 +268,7 @@ export function buildBaseView(terrain, layout) {
       prop(buildWorkbench(), at('workbench'), 0, std, glossy, glow);
       prop(buildFlagpole(), at('flag'), 0, std, glossy, glow);
       prop(buildCampfire(), at('fire'), 0, std, glossy, glow);
-      if (stage === 1) std.push(...tent(style).map((geo) => place(geo, at('tent'))));
+      if (stage === 1) std.push(...buildTent(style).map((geo) => place(geo, at('tent'))));
     }
     if (stage >= 2) {
       const cabin = buildCabin();

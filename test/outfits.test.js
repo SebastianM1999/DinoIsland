@@ -23,9 +23,20 @@ test('outfits are validated and fall back to the slot default', () => {
   assert.deepEqual(sanitizeOutfit(null, 1), defaultOutfit(1));
 });
 
+test("island 1's tent camp has no wardrobe: the outfit stays as joined", () => {
+  const world = new ServerWorld({ send() {} });
+  const pa = world.players.get(world.join('Ada', null, { hat: 4, top: 3, pants: 2 }).id);
+  assert.equal(world.stations().wardrobe, null);
+  const wd = world.layout.hut.wardrobe;   // where the cabin's wardrobe stands on later islands
+  pa.x = wd.x; pa.z = wd.z - 1.5;
+  world.onAct(pa, { a: ACT.OUTFIT, outfit: { hat: 9, top: 9, pants: 9 } });
+  assert.deepEqual(pa.outfit, { hat: 4, top: 3, pants: 2 });
+});
+
 test('players join with an outfit and can only change it at the hut wardrobe', () => {
   const sent = [];
-  const world = new ServerWorld({ send: (to, message) => sent.push({ to, message }) });
+  // the hunting hut with its wardrobe: a later island without base plots (the Hollow Mountain)
+  const world = new ServerWorld({ send: (to, message) => sent.push({ to, message }) }, { level: 3, variant: 4 });
   const a = world.join('Ada', null, { hat: 4, top: 3, pants: 2 });
   const b = world.join('Bo');
   const pa = world.players.get(a.id);

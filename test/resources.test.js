@@ -126,6 +126,7 @@ test('gathered resources go to the hut store and pay for the first upgrades', ()
   assert.deepEqual([world.store.resin, world.store.ironwood], [2, 2]);
   const rack = world.layout.hut.arrowRack;
   player.x = rack.x; player.z = rack.z;
+  world.base.bench = true;   // the camp table stands (shared/base.js CAMP_BENCH; built in crafting.test.js)
   world.receive(player.id, { t: MSG.ACT, a: ACT.CRAFT, recipe: 'spear1' });
   assert.ok(world.upgrades.has('spear1'));
 });

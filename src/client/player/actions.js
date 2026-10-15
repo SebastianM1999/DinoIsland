@@ -11,7 +11,7 @@ import { shotEnd } from '../../shared/gunshots.js';
 import { insideGrove } from '../../shared/grove.js';
 import { segmentColliders } from '../../shared/collision.js';
 import { dinoBodyCircles } from '../../shared/dinoContact.js';
-import { PLOT_KINDS, MAX_STAGE, plotPoint } from '../../shared/base.js';
+import { PLOT_KINDS, MAX_STAGE, CAMP_BENCH, plotPoint } from '../../shared/base.js';
 import { stakePoint } from '../world/base.js';
 import { upgradeMods } from '../../shared/crafting.js';
 import { GunEffects } from '../entities/gunEffects.js';
@@ -619,9 +619,14 @@ export class PlayerActions {
     if (st.workbench && near(st.workbench, 4)) {
       return { text: 'Open the crafting box', run: () => g.openCrafting() };
     }
-    // the landing camp's supply bench: free basic resupply only (crafting needs a camp)
+    // island 1: the camp table's building site at the tent (shared/base.js CAMP_BENCH)
+    if (st.benchSite && near(st.benchSite, CAMP_BENCH.reach)) {
+      const cost = Object.entries(CAMP_BENCH.cost).map(([k, n]) => `${n} ${CONFIG.loot[k]?.name ?? k}`).join(', ');
+      return { text: `Build the camp table (${cost} from the hut store)`, run: () => net.act(ACT.BASE, { op: 'bench' }) };
+    }
+    // the landing camp's supply bench / island 1's tent: free basic resupply only
     const bench = st.refill.find((r) => near(r, 4));
-    if (bench) return { text: 'Free basic resupply (build a camp to craft)', run: () => net.act(ACT.REFILL) };
+    if (bench) return { text: st.miniBench ? 'Free basic resupply' : 'Free basic resupply (build a camp to craft)', run: () => net.act(ACT.REFILL) };
     if (st.board && near(st.board, 3.5)) {
       return { text: 'Open the mission board', run: () => g.openBoard() };
     }

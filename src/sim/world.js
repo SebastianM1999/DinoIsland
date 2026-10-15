@@ -28,7 +28,7 @@ import { TORCH, WALL_TORCH } from '../shared/torch.js';
 import { CAVE_WALK_MAX } from '../shared/caveField.js';
 import { findUnstuckSpot, goodSpot } from './unstuck.js';
 import { nearDino, plausibleZone } from './hitCheck.js';
-import { freshBase, campStations, safeZone as baseSafeZone, hasBasePlots, PLOT_REACH, MAX_STAGE, stageCost, BUILD_TIME, BASE_STAGES, applyBaseColliders, baseSpawnPoints, TOWERS, TOWER_SLOTS, towerCost, repairCost } from '../shared/base.js';
+import { freshBase, CAMP_BENCH, campStations, safeZone as baseSafeZone, hasBasePlots, PLOT_REACH, MAX_STAGE, stageCost, BUILD_TIME, BASE_STAGES, applyBaseColliders, baseSpawnPoints, TOWERS, TOWER_SLOTS, towerCost, repairCost } from '../shared/base.js';
 import { updateTowers } from './towers.js';
 import { Raids } from './raids.js';
 import { Volcano } from './volcano.js';
@@ -661,10 +661,22 @@ export class ServerWorld {
     if (changed) this.sendInv(p);
   }
 
+  /** Island 1: put up the camp table on its site at the tent (shared/base.js CAMP_BENCH), paid from the hut store. */
+  buildCampBench(p) {
+    const site = this.stations().benchSite;
+    if (!p.alive || !site || !this.near(p, site.x, site.z, CAMP_BENCH.reach + P.radius)) return;
+    if (!this.pay(p, CAMP_BENCH.cost)) return this.toast('Not enough materials in the hut store for the camp table', 'crate', p.id);
+    this.base.bench = true;
+    this.event(EV.STORE, { store: this.store });
+    this.event(EV.BASE, { base: this.publicBase() });
+    this.toast(`${p.name} built the camp table – craft supplies and first upgrades`, 'crate');
+  }
+
   /** Build (op 'build' on a plot) or grow (op 'upgrade') the team's base from the hut store. */
   baseAction(p, m) {
     const b = this.base;
     const deny = (text) => this.toast(text, 'crate', p.id);
+    if (m.op === 'bench') return this.buildCampBench(p);
     if (!p.alive || !hasBasePlots(this.layout)) return;
     if (m.op === 'tower' || m.op === 'towerUp') return this.towerAction(p, m);
     if (m.op === 'repair') return this.repairBase(p);
@@ -1351,13 +1363,15 @@ export class ServerWorld {
 
   /** Craft a supply or a team upgrade from the hut store at the workbench. */
   craft(p, id) {
-    const h = this.stations().workbench;
+    const st = this.stations();
+    const h = st.workbench;
     const r = RECIPE_BY_ID[id];
     const deny = (text) => this.toast(text, 'crate', p.id);
-    if (!h) return deny('Build a camp first – its workbench crafts');
+    if (!h) return deny(st.benchSite ? 'Build the camp table first' : 'Build a camp first – its workbench crafts');
     if (!r || !p.alive || !this.near(p, h.x, h.z, 6)) return;
     const inv = p.inv;
     if (unlockIsland(r) > this.levelIndex + 1) return deny(`${r.name} unlocks on island ${unlockIsland(r)}`);
+    if (st.miniBench && (r.tier || 0) > CAMP_BENCH.maxTier) return deny('The camp table only makes tier-1 recipes');
     if (r.kind === 'upgrade') {
       if (this.upgrades.has(r.id)) return deny(`${r.name} is already built`);
       if (r.requires && !this.upgrades.has(r.requires)) return deny(`Build ${RECIPE_BY_ID[r.requires].name} first`);

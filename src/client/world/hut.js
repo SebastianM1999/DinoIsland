@@ -1,5 +1,7 @@
-// The hunting hut ("Jagdhütte") base: log cabin, drop-off crates, workbench
-// with arrow barrel, mission board, wardrobe, flagpole with waving flag and a campfire
+// The camp the team starts an island at (layout.hut.kind): island 1's expedition tent
+// with crates, flag, campfire and the camp table the team builds on its site; the
+// hunting hut ("Jagdhütte": log cabin, workbench with arrow barrel, mission board,
+// wardrobe) on later islands without base plots; the landing camp elsewhere. Campfire
 // with flames, light and smoke. Static pieces are merged into a handful of
 // meshes; animated parts live in hut/fx.js.
 
@@ -8,6 +10,7 @@ import { MAT, merge, mesh, place } from '../models/kit.js';
 import { buildCabin, CABIN } from './hut/cabin.js';
 import { buildDropOff, buildWorkbench, buildMissionBoard, buildWardrobe, buildFlagpole, buildCampfire, ARROW_BARREL, FLAG_ATTACH } from './hut/props.js';
 import { createFlag, createFire, createSmoke, createArrows } from './hut/fx.js';
+import { buildTent, buildBenchSite } from './hut/tent.js';
 import { hutFloor } from './baseGround.js';
 import { detailMaterial } from './surfaceDetail.js';
 
@@ -16,7 +19,8 @@ const ANIM_RANGE = 220; // skip animation when the camera is farther than this
 /**
  * landing: the small landing camp of islands 2+ (shared/base.js) – crates,
  * supply bench, flag and a cold fire pit; no cabin, wardrobe or mission board.
- * @returns {{ group: THREE.Group, update(dt:number, time:number, camPos?:THREE.Vector3):void, setArrowStock(n:number):void, arrowSlots:number }}
+ * The tent camp (island 1) shows the camp table's building site until setBench(true).
+ * @returns {{ group: THREE.Group, update(dt:number, time:number, camPos?:THREE.Vector3):void, setArrowStock(n:number):void, setBench(built:boolean):void, arrowSlots:number }}
  */
 export function buildHut(terrain, layout, options) {
   const steps = buildHutSteps(terrain, layout, options);
@@ -35,7 +39,8 @@ export function* buildHutSteps(terrain, layout, { landing = false } = {}) {
   // Local offset of a layout point (ground height from the terrain).
   const local = (p) => [p.x - hut.x, terrain.heightAt(p.x, p.z) - hut.y, p.z - hut.z];
 
-  const cabin = landing ? { std: [], glossy: [], glow: [] } : buildCabin();
+  const kind = hut.kind ?? (landing ? 'landing' : 'cabin');
+  const cabin = kind === 'cabin' ? buildCabin() : { std: [], glossy: [], glow: [] };
   yield;
   const propsStd = [];
   const glossy = [...cabin.glossy];
@@ -53,10 +58,13 @@ export function* buildHutSteps(terrain, layout, { landing = false } = {}) {
   const firePos = local(hut.campfire);
 
   add(buildDropOff(), dropPos);
-  add(buildWorkbench(), benchPos);
+  // the tent camp's table comes and goes with base.bench: kept apart from the merged props
+  const tentCamp = kind === 'tent';
+  if (!tentCamp) add(buildWorkbench(), benchPos);
+  if (tentCamp) propsStd.push(...buildTent().map((geo) => place(geo, [0, 0, 0])));
   // Mission board faces the campfire (its front is local -z).
   const bdx = firePos[0] - boardPos[0], bdz = firePos[2] - boardPos[2];
-  if (!landing) {
+  if (kind === 'cabin') {
     add(buildMissionBoard(), boardPos, Math.atan2(-bdx, -bdz));
     add(buildWardrobe(), local(hut.wardrobe));
   }
@@ -68,15 +76,15 @@ export function* buildHutSteps(terrain, layout, { landing = false } = {}) {
   const xz = (p) => [p[0], p[2]];
   const floor = hutFloor({
     fire: xz(firePos), bench: xz(benchPos), drop: xz(dropPos), flag: xz(flagPos),
-    door: landing ? null : [0.7, CABIN.CZ - CABIN.HZ - 0.9],
-    board: landing ? null : xz(boardPos),
-    wardrobe: landing ? null : xz(local(hut.wardrobe)),
+    door: kind === 'cabin' ? [0.7, CABIN.CZ - CABIN.HZ - 0.9] : tentCamp ? [0, -2.4] : null,
+    board: kind === 'cabin' ? xz(boardPos) : null,
+    wardrobe: kind === 'cabin' ? xz(local(hut.wardrobe)) : null,
   }, layout.biome?.id, (lx, lz) => terrain.heightAt(hut.x + lx, hut.z + lz) - hut.y);
   const floorStone = [];
   for (const g of floor) (g.userData.stone ? floorStone : propsStd).push(g);
   yield;
 
-  const cabinMesh = landing ? null : mesh(merge(cabin.std));
+  const cabinMesh = cabin.std.length ? mesh(merge(cabin.std)) : null;
   if (cabinMesh) cabinMesh.name = 'hut-cabin';
   yield;
   const propsMesh = mesh(merge(propsStd));
@@ -88,6 +96,20 @@ export function* buildHutSteps(terrain, layout, { landing = false } = {}) {
   const floorMesh = floorStone.length ? mesh(merge(floorStone), detailMaterial(MAT.standard, 'rock')) : null;
   if (floorMesh) floorMesh.name = 'hut-floor';
   group.add(...[cabinMesh, propsMesh, glossyMesh, glowMesh, floorMesh].filter(Boolean));
+
+  // the tent camp's table (built by the team) and its building site before that
+  let benchGroup = null, siteMesh = null;
+  if (tentCamp) {
+    const bench = buildWorkbench();
+    benchGroup = new THREE.Group();
+    benchGroup.name = 'hut-bench';
+    benchGroup.add(...[mesh(merge(bench.std.map((geo) => place(geo, benchPos)))),
+      bench.glossy.length ? mesh(merge(bench.glossy.map((geo) => place(geo, benchPos))), MAT.glossy) : null,
+      bench.glow.length ? mesh(merge(bench.glow.map((geo) => place(geo, benchPos))), MAT.glow, { cast: false, receive: false }) : null].filter(Boolean));
+    siteMesh = mesh(merge(buildBenchSite().map((geo) => place(geo, benchPos))));
+    siteMesh.name = 'hut-bench-site';
+    group.add(benchGroup, siteMesh);
+  }
 
   // Flag: +x of the cloth points downwind (matches the vegetation wind).
   const flag = createFlag();
@@ -105,12 +127,18 @@ export function* buildHutSteps(terrain, layout, { landing = false } = {}) {
   const ch = CABIN.chimney;
   const smoke = landing ? null : createSmoke([
     { x: firePos[0], y: firePos[1] + 0.95, z: firePos[2], count: 10, size: 0.34, rise: 0.95, life: 3.2, dark: 0.5 },
-    { x: ch.x, y: ch.top + 0.25, z: CABIN.CZ - ch.d, count: 9, size: 0.46, rise: 1.1, life: 4.2, dark: 0.42 },
+    ...(kind === 'cabin' ? [{ x: ch.x, y: ch.top + 0.25, z: CABIN.CZ - ch.d, count: 9, size: 0.46, rise: 1.1, life: 4.2, dark: 0.42 }] : []),
   ]);
   if (smoke) group.add(smoke.mesh);
 
   const arrows = createArrows({ x: benchPos[0] + ARROW_BARREL.x, y: benchPos[1] + ARROW_BARREL.y, z: benchPos[2] + ARROW_BARREL.z, r: ARROW_BARREL.r });
   group.add(arrows.mesh);
+  const setBench = (built) => {
+    if (!tentCamp) return;
+    benchGroup.visible = arrows.mesh.visible = !!built;
+    siteMesh.visible = !built;
+  };
+  setBench(false);
 
   const center = new THREE.Vector3(hut.x, hut.y, hut.z);
 
@@ -123,6 +151,7 @@ export function* buildHutSteps(terrain, layout, { landing = false } = {}) {
       fire?.update(time);
       smoke?.update(Math.min(dt, 0.1));
     },
+    setBench,
     /** Show n arrows in the barrel (clamped to arrowSlots). */
     setArrowStock(n) {
       arrows.setStock(n);

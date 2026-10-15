@@ -105,10 +105,16 @@ export function repairCost(base, levelIndex) {
   return out;
 }
 
-/** Fresh (unbuilt) base state, replicated to clients as-is. */
+/**
+ * Fresh (unbuilt) base state, replicated to clients as-is. `bench`: island 1's camp table
+ * stands (the team builds it at the tent, CAMP_BENCH; tier-1 recipes only).
+ */
 export function freshBase() {
-  return { plot: null, stage: 0, building: null, hp: 0, maxHp: 0, damaged: false, towers: [] };
+  return { plot: null, stage: 0, building: null, hp: 0, maxHp: 0, damaged: false, towers: [], bench: false };
 }
+
+/** Island 1's camp table: what it costs and how close to its site the builder stands. */
+export const CAMP_BENCH = { cost: { ironwood: 3, resin: 2 }, reach: 4.5, maxTier: 1 };
 
 /** Does this island let the team build a base (every island after the first)? */
 export const hasBasePlots = (layout) => (layout.basePlots?.length ?? 0) > 0;
@@ -223,14 +229,26 @@ export function applyBaseColliders(layout, base) {
 // ------------------------------------------------------------------ stations
 
 /**
- * Where the team's camp functions are right now. Island 1: the hunting hut.
- * Later islands: the landing camp (drop-off, free resupply), plus everything
- * the base offers once a stage stands.
+ * Where the team's camp functions are right now. Island 1: the expedition tent
+ * (fire, crates, free resupply at the tent; the camp table once the team built it
+ * on `benchSite`, tier-1 recipes only: `miniBench`). Plotless later islands: the
+ * hunting hut. Islands with plots: the landing camp (drop-off, free resupply),
+ * plus everything the base offers once a stage stands.
  * @returns {{ fire: {x,z,y}|null, healR: number, healRate: number, dropOff: object[], refill: object[],
- *   workbench: object|null, wardrobe: object|null, board: object|null, home: {x,z} }}
+ *   workbench: object|null, wardrobe: object|null, board: object|null, home: {x,z},
+ *   benchSite?: object|null, miniBench?: boolean }}
  */
 export function campStations(layout, base, levelIndex) {
   const h = layout.hut;
+  if (h.kind === 'tent') {
+    const built = !!base?.bench;
+    return {
+      fire: h.campfire, healR: CONFIG.player.hutHealRadius, healRate: 1,
+      dropOff: [h.dropOff], refill: [h.arrowRack, h], workbench: built ? h.arrowRack : null,
+      wardrobe: null, board: null, home: h,
+      benchSite: built ? null : h.arrowRack, miniBench: true,
+    };
+  }
   if (!levelIndex || !hasBasePlots(layout)) {
     return {
       fire: h.campfire, healR: CONFIG.player.hutHealRadius, healRate: 1,
