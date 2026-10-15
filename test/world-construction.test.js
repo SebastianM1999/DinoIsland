@@ -26,3 +26,23 @@ test('scheduled terrain and placement preserve complete client/server worlds on 
     }
   }
 });
+
+test('island 1 builds its tent camp: no cabin, the table site until the team builds the table', async () => {
+  const { buildHut } = await import('../src/client/world/hut.js');
+  const { levelDef } = await import('../src/shared/levels.js');
+  const terrain = new Terrain(planIsland(0, levelDef(0).variant));
+  const layout = buildLayout(terrain);
+  assert.equal(layout.hut.kind, 'tent');
+  const hut = buildHut(terrain, layout, { landing: false });
+  const named = (name) => hut.group.getObjectByName(name);
+  assert.equal(named('hut-cabin'), undefined, 'no log cabin');
+  assert.ok(named('hut-props'));
+  assert.equal(named('hut-bench').visible, false, 'no table yet');
+  assert.equal(named('hut-bench-site').visible, true, 'its building site');
+  hut.setBench(true);
+  assert.equal(named('hut-bench').visible, true);
+  assert.equal(named('hut-bench-site').visible, false);
+  // later islands without plots keep the hunting hut with its cabin
+  const cave = buildLayout(new Terrain(planIsland(3, levelDef(3).variant)));
+  assert.equal(cave.hut.kind, 'cabin');
+});
