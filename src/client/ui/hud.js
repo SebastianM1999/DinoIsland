@@ -280,14 +280,9 @@ export class Hud {
       this._renderInventory();
     });
     this.$invPanel.addEventListener('keydown', e => {
-      if (e.key === 'Tab') {
-        e.stopPropagation(); // Tab navigates this panel; Escape still closes it.
-        const controls = [...this.$invPanel.querySelectorAll('button:not(:disabled), input')];
-        const i = controls.indexOf(document.activeElement);
-        if ((e.shiftKey && i <= 0) || (!e.shiftKey && i === controls.length - 1)) {
-          e.preventDefault(); controls[e.shiftKey ? controls.length - 1 : 0]?.focus();
-        }
-      } else if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key)) {
+      // Tab is the inventory key: it bubbles on to Input, which closes the panel the way it opened
+      // it. The arrow keys move between the cells; Escape also closes.
+      if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key)) {
         const controls = [...this.$invPanel.querySelectorAll('button:not(:disabled), input')];
         const i = controls.indexOf(document.activeElement);
         e.preventDefault(); e.stopPropagation();

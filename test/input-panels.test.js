@@ -237,3 +237,49 @@ test('X toggles live quests once per press without becoming a held gameplay acti
     assert.deepEqual(toggles, ['quests']);
   } finally { f.restore(); }
 });
+
+test('a refused pointer lock reports once so the game asks for a click instead of pausing', async () => {
+  const oldAdd = globalThis.addEventListener, oldDocument = globalThis.document;
+  globalThis.addEventListener = () => {};
+  globalThis.document = { addEventListener() {}, pointerLockElement: null };
+  try {
+    let attempts = 0, failed = 0;
+    const input = new Input({ addEventListener() {}, requestPointerLock() { attempts++; return Promise.reject(new Error('No gesture')); } });
+    input.enabled = true;
+    input.onLockFailed = () => failed++;
+    input.requestLock();
+    await new Promise(resolve => setTimeout(resolve, 1500));
+    assert.equal(attempts, 3);
+    assert.equal(failed, 1);
+    assert.equal(input.lockPending, false);
+    // a lock given up on purpose (a panel opened) is not a refusal
+    input.requestLock();
+    input.exitLock();
+    await new Promise(resolve => setTimeout(resolve, 800));
+    assert.equal(failed, 1);
+  } finally {
+    globalThis.addEventListener = oldAdd;
+    globalThis.document = oldDocument;
+  }
+});
+
+test('Tab toggles the inventory both ways', () => {
+  const listeners = new Map();
+  const oldAdd = globalThis.addEventListener, oldDocument = globalThis.document;
+  globalThis.addEventListener = (name, fn) => listeners.set(name, fn);
+  globalThis.document = { addEventListener() {}, pointerLockElement: null };
+  try {
+    const input = new Input({ addEventListener() {}, requestPointerLock() {} });
+    input.enabled = true;
+    let open = false;
+    input.onPanelToggle = action => { if (action === 'inventory') open = !open; return true; };
+    const key = (down) => listeners.get(down ? 'keydown' : 'keyup')({ code: 'Tab', repeat: false, preventDefault() {} });
+    key(true); key(false);
+    assert.equal(open, true);
+    key(true); key(false);
+    assert.equal(open, false);
+  } finally {
+    globalThis.addEventListener = oldAdd;
+    globalThis.document = oldDocument;
+  }
+});

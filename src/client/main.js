@@ -285,6 +285,11 @@ async function launch(net, reuse = null, { openMenu = false } = {}) {
   game.input.onLockChange = (locked) => {
     setPaused(!locked && game?.running && !game.hud.isPanelOpen() && !game.input.lockPending);
   };
+  // The mouse could not be captured (the browser wants a click first): play on, unpaused, and
+  // ask for that click instead of opening the pause menu over the island.
+  game.input.onLockFailed = () => {
+    if (game?.running && paused.hidden && !game.hud.isPanelOpen()) game.hud.toast('Click to look around');
+  };
   game.onPanelChange = () => setPaused(false);
   game.onLeave = (reason) => backToMenu(reason);
   // The team set sail: the server sends a fresh welcome for the next island.
@@ -303,8 +308,10 @@ async function launch(net, reuse = null, { openMenu = false } = {}) {
     game.input.exitLock();
     setPaused(true);
   } else {
+    // Spawn straight into the island: the lock arrives asynchronously, and if the browser
+    // refuses it a click on the canvas captures the mouse (onLockFailed), never the pause menu.
+    setPaused(false);
     game.input.requestLock();
-    setPaused(!game.input.locked);
   }
   return true;
 }
@@ -348,6 +355,16 @@ $('btn-resume').addEventListener('click', resumeGame);
 $('btn-pause-close').addEventListener('click', resumeGame);
 paused.addEventListener('click', (e) => {
   if (e.target === paused) resumeGame();
+});
+// Escape leaves the pause menu again. The Escape that released the mouse opened it; a key
+// event arriving together with that opening is the same press, not a second one.
+let pausedAt = 0;
+new MutationObserver(() => { if (!paused.hidden) pausedAt = performance.now(); }).observe(paused, { attributes: true, attributeFilter: ['hidden'] });
+document.addEventListener('keydown', (event) => {
+  if (event.key !== 'Escape' || event.repeat || paused.hidden || settingsUi.isOpen()) return;
+  if (performance.now() - pausedAt < 250) return;
+  event.preventDefault();
+  resumeGame();
 });
 // Keep keyboard navigation inside the live menu; settings manages its own focus.
 paused.addEventListener('keydown', event => {
