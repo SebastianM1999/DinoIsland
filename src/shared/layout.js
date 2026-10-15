@@ -4,7 +4,7 @@
 // for AI, relic pickups and the boat.
 
 import { makeRng, fbm, smoothstep } from './rng.js';
-import { TRUNKS, TREE_SINK, treeColliders, treeVariant } from './treeShapes.js';
+import { TRUNKS, TREE_SINK, treeColliders, treeVariant, treeCrownCollider } from './treeShapes.js';
 import { placeRock, rockSurfaceAt, PEBBLE_SCALE } from './rockShapes.js';
 import { RELIC_FOR_SITE } from './relics.js';
 import { caveColliders, caveInterior, caveMouth, caveRockPiles } from './caveShape.js';
@@ -74,6 +74,7 @@ export function* buildLayoutSteps(terrain) {
     resourceSpots: [],
     bowCamp: null,
     colliders: { circles: [], boxes: [] },
+    crownColliders: { circles: [], boxes: [] },   // leaf crowns: only dinosaurs collide (shared/treeShapes.js CROWNS)
     dinoZones: { brachio: [], stego: [], raptor: [] },
     nests: [],
     trexPatrol: [],
@@ -896,6 +897,8 @@ export function* buildLayoutSteps(terrain) {
     layout.trees.push(t);
     reserve(x, z, spacing * 2.2);
     circles.push(...treeColliders(t));
+    const crown = treeCrownCollider(t);
+    if (crown) layout.crownColliders.circles.push(crown);
     return t;
   };
   const clearOfSites = (x, z, pad) => distToPath(x, z) > 3 + pad && riverDist(x, z) > 2 + pad && poolDist(x, z) > 3 + pad && !nearBoat(x, z, 6);

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { ServerWorld } from '../src/sim/world.js';
 import { CONFIG } from '../src/shared/config.js';
 import { MSG, ACT, EV } from '../src/shared/protocol.js';
-import { BASE_STAGES, BUILD_TIME, MAX_STAGE, TOWERS, stageCost, towerCost, plotPoint, campStations } from '../src/shared/base.js';
+import { BASE_STAGES, BUILD_TIME, MAX_STAGE, TOWERS, stageCost, towerCost, plotPoint, campStations, applyBaseColliders } from '../src/shared/base.js';
 import { penetration } from '../src/shared/collision.js';
 
 const P = CONFIG.player;
@@ -215,4 +215,16 @@ test('a ballista cannot hit a pterosaur in the air, an arrow tower can', () => {
   act({ a: ACT.BASE, op: 'tower', slot: 1, kind: 'arrow' });
   for (let i = 0; i < 20; i++) { keepFlying(); run(0.1); }
   assert.ok(events.some((m) => m.e === EV.TOWER_SHOT && m.kind === 'arrow'));
+});
+
+test('moving a base to another plot moves its colliders for small movers too (same number of boxes)', () => {
+  const { world } = island2();
+  const layout = world.layout;
+  const [a, b] = layout.basePlots;
+  const crate = (plot) => plotPoint(plot, 'dropOff');
+  applyBaseColliders(layout, { plot: 0, stage: 1, towers: [] });
+  assert.ok(penetration(crate(a).x, crate(a).z, 0.3, layout.playerColliders) > 0, 'the crate on plot A blocks');
+  applyBaseColliders(layout, { plot: 1, stage: 1, towers: [] });
+  assert.equal(penetration(crate(a).x, crate(a).z, 0.3, layout.playerColliders), 0, 'nothing left on plot A');
+  assert.ok(penetration(crate(b).x, crate(b).z, 0.3, layout.playerColliders) > 0, 'the crate on plot B blocks');
 });

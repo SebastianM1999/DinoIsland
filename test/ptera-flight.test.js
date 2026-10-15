@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { DinoSystem } from '../src/sim/dinos.js';
-import { pteraBrain } from '../src/sim/ai/ptera.js';
+import { pteraBrain, flyTo } from '../src/sim/ai/ptera.js';
 import { DS } from '../src/shared/protocol.js';
 
 function fixture() {
@@ -9,7 +9,7 @@ function fixture() {
   const world = {
     now: 0, players: new Map(), spottedDinos: new Set(), traps: new Map(),
     terrain: { heightAt: () => 3 },
-    layout: { colliders: [], hut: { campfire: { x: -200, z: -200 } }, level: { difficulty: 1 } },
+    layout: { colliders: { circles: [], boxes: [] }, hut: { campfire: { x: -200, z: -200 } }, level: { difficulty: 1 } },
     event() {}, toast() {}, dropLoot: (...args) => drops.push(args),
     safeZone: () => ({ x: -200, z: -200, r: 14 }),
     mission: { onDinoKilled() {} }, awardXp() {}, onPlayerKill() {},
@@ -77,4 +77,21 @@ for (const meat of [0, 1]) test(`ptera attack immediately climbs without landing
   }
   assert.ok(d.y > low + 3);
   assert.equal(hits, 1);
+});
+
+test('a pterosaur cannot fly through a leaf crown: it slides round it at crown height and passes over it above', () => {
+  const { system } = fixture();
+  // a crown 10..16 m up, 4 m wide, right between the flyer and its goal (shared/treeShapes.js treeCrownCollider)
+  system.crowns = { circles: [{ x: 0, z: 0, r: 4, bottom: 10, top: 16, kind: 'crown' }], boxes: [] };
+  const inside = (d) => Math.hypot(d.x, d.z) < 4 && d.y > 10 && d.y < 16;
+  const d = { id: 1, type: 'ptera', x: -20, y: 13, z: 0.3, vx: 0, vy: 0, vz: 0 };
+  for (let i = 0; i < 200; i++) {
+    flyTo(system, d, 20, 13, 0.3, 12, 0.05);
+    assert.ok(!inside(d), `inside the crown at ${d.x.toFixed(1)},${d.y.toFixed(1)},${d.z.toFixed(1)}`);
+  }
+  assert.ok(d.x > 10, 'it still got past');
+  // high above the crown it flies straight on
+  const high = { id: 2, type: 'ptera', x: -20, y: 22, z: 0, vx: 0, vy: 0, vz: 0 };
+  for (let i = 0; i < 80; i++) flyTo(system, high, 20, 22, 0, 12, 0.05);
+  assert.ok(Math.abs(high.z) < 0.5, 'no detour above the treetops');
 });

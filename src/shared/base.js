@@ -220,9 +220,10 @@ export function applyBaseColliders(layout, base) {
   layout.colliders.boxes.push(...next.boxes);
   layout.colliders.circles.push(...next.circles);
   layout.playerColliders.circles.push(...next.circles);
-  // the circle lookup grid (collision.js) is rebuilt on its next use
-  layout.colliders._grid = null;
-  layout.playerColliders._grid = null;
+  // the lookup grids (collision.js) are rebuilt on their next use; the box grid too, or a swap
+  // that keeps the number of boxes (the same stage on another plot) would leave it stale
+  layout.colliders._grid = layout.colliders._boxGrid = null;
+  layout.playerColliders._grid = layout.playerColliders._boxGrid = null;
   layout._baseColliders = next;
 }
 

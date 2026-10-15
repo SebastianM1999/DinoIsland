@@ -188,3 +188,28 @@ test('a dinosaur wedged inside a collider is nudged free', () => {
   world.dinos.update(0.05);
   assert.ok(sys.standsFree(d, d.x, d.z, d.yaw) || !sys.bodyBlocked(d, d.x, d.z, d.yaw), 'moved out of the trunk');
 });
+
+test('leaf crowns stop a brachiosaurus neck but not the animals that pass below them, and never players', () => {
+  const world = new ServerWorld({ send() {} });
+  const sys = world.dinos;
+  assert.ok(world.layout.crownColliders.circles.length > 50, 'island 1 has crowns');
+  assert.ok(!world.layout.playerColliders.circles.some((c) => c.kind === 'crown'), 'players walk under crowns');
+  assert.ok(!world.layout.colliders.circles.some((c) => c.kind === 'crown'), 'shots and lines of sight ignore crowns');
+  // a low crown (a round tree's, ~4-7 m) on open ground
+  const crown = world.layout.crownColliders.circles.find((c) => world.layout.trees.some((t) => t.type === 'round' && Math.hypot(t.x - c.x, t.z - c.z) < 1.5));
+  assert.ok(crown, 'a round tree');
+  const ground = world.terrain.heightAt(crown.x, crown.z);
+  assert.ok(crown.bottom - ground < CONFIG.dinos.brachio.radius + 8, 'low enough for a brachiosaurus head');
+  const at = (type) => ({ type, radius: CONFIG.dinos[type].radius, x: crown.x, z: crown.z, yaw: 0 });
+  // (the crown, not the trunk: test a spot under the crown's rim, beside the trunk)
+  const rim = { x: crown.x + crown.r * 0.7, z: crown.z };
+  const blockedAt = (type) => {
+    const d = at(type);
+    const saved = sys.colliders;
+    sys.colliders = { circles: [], boxes: [] };   // trunks aside: only the crown
+    try { return sys.bodyBlocked(d, rim.x, rim.z, 0); } finally { sys.colliders = saved; }
+  };
+  assert.equal(blockedAt('raptor'), false, 'a raptor runs under it');
+  assert.equal(blockedAt('trex'), false, 'a T-Rex walks under the canopy');
+  assert.equal(blockedAt('brachio'), true, 'a brachiosaurus bumps into it');
+});
