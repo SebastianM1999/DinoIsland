@@ -49,7 +49,7 @@ export function canWalkSegment(sys, d, x0, z0, x1, z1) {
   let prev = t.heightAt(x0, z0);
   for (let s = 1; s <= n; s++) {
     const x = x0 + (x1 - x0) * (s / n), z = z0 + (z1 - z0) * (s / n), y = t.heightAt(x, z);
-    if (!sys.walkable(x, z, d, y < prev)) return false;
+    if (!sys.walkable(x, z, d, y < prev, true)) return false;
     prev = y;
   }
   return true;
@@ -77,7 +77,8 @@ export function findPath(sys, d, fx, fz, tx, tz, reach = 8, maxNodes = MAX_NODES
     let v = open.get(k);
     if (v === undefined) {
       const x = i * CELL, z = j * CELL;
-      v = sys.walkable(x, z, d) ? 2 : sys.walkable(x, z, d, true) ? 1 : 0;
+      // (land animals swim across rivers and lakes on the way: DinoSystem.walkable `swim`)
+      v = sys.walkable(x, z, d, false, true) ? 2 : sys.walkable(x, z, d, true, true) ? 1 : 0;
       open.set(k, v);
       heights.set(k, sys.terrain.heightAt(x, z));
     }

@@ -172,7 +172,7 @@ test('pathfinding plans the way down a wall and never up one', () => {
         back++;
         for (let i = 1; i < up.length; i++) {
           const a = up[i - 1], b = up[i];
-          if (!sys.walkable(b.x, b.z, d)) {
+          if (!sys.walkable(b.x, b.z, d, false, true)) {   // (on the way: swimming across water is fine)
             assert.ok(t.heightAt(b.x, b.z) < t.heightAt(a.x, a.z), `${type}: the way up climbs steep ground at ${b.x},${b.z}`);
           }
         }
@@ -185,12 +185,13 @@ test('pathfinding plans the way down a wall and never up one', () => {
 
 test('steering follows the reachable route entry and does not round a blocked corner', () => {
   for (const start of [{ x: 1.9, z: 1.9 }, { x: 2.4, z: 0.9 }]) {
-    // A small forbidden pool lies between the feet and the second grid center.
+    // A small forbidden lava pool lies between the feet and the second grid center
+    // (water no longer stops a land animal on the way: it swims across).
     // The first center is reachable, including when it is within the normal
     // waypoint proximity threshold. Both shortcuts must keep the entry turn.
     const terrain = {
-      heightAt: () => 0, slopeAt: () => 0, lavaLevelAt: () => null,
-      waterDepthAt: (x, z) => Math.hypot(x - 2.5, z - 2.5) <= 0.8 ? 2 : 0,
+      heightAt: () => 0, slopeAt: () => 0, waterDepthAt: () => 0,
+      lavaLevelAt: (x, z) => Math.hypot(x - 2.5, z - 2.5) <= 0.8 ? 0 : null,
     };
     const world = { now: 1, terrain, layout: { level: { difficulty: 1 }, colliders: { circles: [], boxes: [] } }, safeZone: () => null };
     const sys = new DinoSystem(world);
