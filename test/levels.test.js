@@ -65,13 +65,22 @@ test('find the parts, repair the boat and sail to the next island together', () 
   world.receive(a.id, { t: MSG.ACT, a: ACT.REPAIR });
   assert.equal(world.mission.phase, 'repaired');
 
-  // everyone at the boat for a few seconds -> sail -> next island + fresh welcome
+  // standing at the repaired boat does not sail by itself: a player decides (ACT.SAIL)
   const welcomes = () => sent.filter((s) => s.to === a.id && s.message.t === MSG.WELCOME).length;
   const before = welcomes();
-  for (let i = 0; i < 20 * 12; i++) {
-    Object.assign(p, { x: boat.interact.x, z: boat.interact.z });
-    world.step(0.05);
-  }
+  const stay = (seconds) => { for (let i = 0; i < 20 * seconds; i++) { Object.assign(p, { x: boat.interact.x, z: boat.interact.z }); world.step(0.05); } };
+  stay(12);
+  assert.equal(world.mission.phase, 'repaired', 'no automatic departure');
+  // a teammate far from the boat holds the departure back
+  const b = world.players.get(world.join('Late').id);
+  Object.assign(b, { x: boat.x + 60, z: boat.z });
+  world.receive(a.id, { t: MSG.ACT, a: ACT.SAIL });
+  assert.equal(world.mission.phase, 'repaired');
+  assert.ok(sent.some((s) => s.to === a.id && /Late/.test(s.message.text ?? '')), 'told who is missing');
+  Object.assign(b, { x: boat.interact.x, z: boat.interact.z });
+  world.receive(a.id, { t: MSG.ACT, a: ACT.SAIL });
+  assert.equal(world.mission.phase, 'sailing');
+  stay(12);
   assert.equal(world.levelIndex, 1);
   assert.equal(world.mission.phase, 'search');
   assert.equal(world.mission.islandsDone, 1);

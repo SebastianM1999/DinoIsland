@@ -113,6 +113,8 @@ test('the boat ends the demo: a win on island 1, then island 1 starts over', () 
   const b = world.layout.boat;
   p.x = b.x; p.z = b.z;
   for (let i = 0; i < 5; i++) world.mission.update(1);
+  assert.equal(world.mission.state().complete, false, "the repaired boat waits for a player to set sail");
+  world.receive(p.id, { t: MSG.ACT, a: ACT.SAIL });
   const m = world.mission.state();
   assert.equal(m.complete, true);
   assert.equal(m.won, true, 'the demo is won after island 1');

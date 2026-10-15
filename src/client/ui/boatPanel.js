@@ -1,6 +1,8 @@
 // Boat dialog: opens with E at the wreck on the east beach. Shows the three
 // boat parts of this island (found / still missing, with a hint where to
-// look), and the Repair button once all of them are found.
+// look), and the Repair button once all of them are found. Once repaired the
+// team leaves only when a player chooses to: Set sail (Enter), after a look
+// into the inventory (Tab) if they like.
 
 import { RELICS } from '../../shared/relics.js';
 import { icon } from './icons.js';
@@ -8,9 +10,11 @@ import { icon } from './icons.js';
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
 export class BoatPanel {
-  /** @param {{ onRepair: () => void, onClose: () => void }} opts */
-  constructor({ onRepair, onClose }) {
+  /** @param {{ onRepair: () => void, onSail?: () => void, onInventory?: () => void, onClose: () => void }} opts */
+  constructor({ onRepair, onSail, onInventory, onClose }) {
     this.onRepair = onRepair;
+    this.onSail = onSail;
+    this.onInventory = onInventory;
     this.onClose = onClose;
     this.mission = null;
     this.el = document.createElement('section');
@@ -20,7 +24,15 @@ export class BoatPanel {
       const b = e.target.closest('button');
       if (!b) return;
       if (b.dataset.act === 'repair') this.onRepair?.();
+      if (b.dataset.act === 'sail') this.onSail?.();
+      if (b.dataset.act === 'inventory') this.onInventory?.();
       if (b.dataset.act === 'close') this.onClose?.();
+    });
+    // Enter sets sail from anywhere in the dialog (the focused button keeps its own Enter)
+    this.el.addEventListener('keydown', (e) => {
+      if (e.key !== 'Enter' || e.target.closest?.('button')) return;
+      const sail = this.el.querySelector('[data-act="sail"]');
+      if (sail) { e.preventDefault(); this.onSail?.(); }
     });
   }
 
@@ -55,7 +67,9 @@ export class BoatPanel {
     }).join('');
     let status, action = '';
     if (repaired) {
-      status = `The boat is seaworthy! ${esc(sail?.text || 'Gather everyone here to set sail.')}`;
+      status = m.complete ? 'All aboard – the boat is under way!' : `The boat is seaworthy! ${esc(sail?.text || 'Gather everyone here to set sail.')}`;
+      action = m.complete ? '' : `<button type="button" class="wd-btn wd-primary" data-act="sail">${icon('boat')} Set sail <kbd>Enter</kbd></button>
+        <button type="button" class="wd-btn" data-act="inventory">Inventory <kbd>Tab</kbd></button>`;
     } else if (all || this.creative) {
       status = all ? 'All parts are here. Fix her up and get ready to sail!' : 'Creative mode: the boat can be repaired without the parts.';
       action = `<button type="button" class="wd-btn wd-primary" data-act="repair">${icon('boat')} Repair the boat</button>`;
@@ -76,5 +90,9 @@ export class BoatPanel {
       <footer class="wd-foot">${action}<button type="button" class="wd-btn" data-act="close">Close</button></footer>`;
   }
 
-  onOpen() { this.render(); }
+  onOpen() {
+    this.render();
+    // Enter on the focused Set sail button casts off
+    this.el.querySelector('[data-act="sail"]')?.focus({ preventScroll: true });
+  }
 }
