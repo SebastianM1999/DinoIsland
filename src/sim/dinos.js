@@ -35,6 +35,10 @@ const push = { x: 0, z: 0, hit: false };
 /** Obstacles lower than this are stepped over (a T-Rex strides over a knee-high rock, a raptor does not). */
 const radiusOf = (d) => d.radius ?? CONFIG.dinos[d.type].radius;
 const stepOver = (d) => Math.max(0.2, Math.min(1.2, radiusOf(d) * 0.35));
+// land animals wade this deep and swim deeper (only on the way: DinoSystem.walkable `swim`), slower, back out of the water
+const wadeDepth = (d) => (d.type === 'brachio' ? 1.2 : 0.35);
+const SWIM_SPEED = 0.6;
+const SWIM_SINK = 0.7;
 /** Stuck safety net: seconds of wanting to move without getting anywhere before a nudge. */
 const NUDGE_INSIDE = 2;     // standing inside a collider / on ground it can't stand on
 const NUDGE_BLOCKED = 6;    // blocked on free ground (goal unreachable)
@@ -188,8 +192,10 @@ export class DinoSystem {
    * `downhill`: the animal is heading down to this spot. Then steep ground is fine (it runs down a
    * mountain wall instead of standing on the rim staring at a player below); only climbing up
    * steep ground is limited. Without it the spot itself must be gentle (spawns, goals).
+   * `swim`: on the way (move, strafe, paths) land animals wade and swim through rivers,
+   * lakes and bogs too; spawns and goals stay on dry land. The sea stays theirs to avoid.
    */
-  walkable(x, z, d, downhill = false) {
+  walkable(x, z, d, downhill = false, swim = false) {
     const t = this.terrain;
     // the grove's titan never leaves its pen (no part of its body crosses the
     // stones; its centre is held by the leash in move()); everyone else stays out
@@ -200,11 +206,14 @@ export class DinoSystem {
       return false;
     }
     const aquatic = CONFIG.dinos[d.type].aquatic;   // water animals wade/swim through deep water (sim/ai/aquatic.js)
-    if (t.waterDepthAt(x, z) > (aquatic ? aquatic.maxWaterDepth : d.type === 'brachio' ? 1.2 : 0.35)) return false;
-    if (aquatic && t.seaDepthAt(x, z) > CONFIG.player.maxWadeDepth) return false;
+    const depth = t.waterDepthAt(x, z);
+    const swims = swim && !aquatic && d.type !== 'ptera' && depth > wadeDepth(d);   // a land animal crossing water
+    if (!swims && depth > (aquatic ? aquatic.maxWaterDepth : wadeDepth(d))) return false;
+    if ((aquatic || swims) && t.seaDepthAt(x, z) > CONFIG.world.maxWadeDepth) return false;
     // the heightfield is continuous, so there is no wall too steep to run down (move() slows the
-    // descent to an along-the-surface speed); one shut in a pit below scrambles out (#detour)
-    if (!downhill && t.slopeAt(x, z) > climbSlope(d) && !(d.scrambleUntil > this.world.now) && !(aquatic && t.waterDepthAt(x, z) > 0.5)) return false;
+    // descent to an along-the-surface speed); one shut in a pit below scrambles out (#detour).
+    // Swimming, the bank under water does not count
+    if (!downhill && t.slopeAt(x, z) > climbSlope(d) && !(d.scrambleUntil > this.world.now) && !((aquatic || swim) && depth > 0.5)) return false;
     if (t.lavaLevelAt(x, z) !== null) return false;
     // under the roof of the Hollow Mountain: never where a body does not fit (Infinity elsewhere)
     if (t.isCave && t.clearanceAt(x, z) < (d.type === 'raptor' ? 3.5 : 7)) return false;
@@ -212,6 +221,19 @@ export class DinoSystem {
     const zone = this.world.safeZone();
     if (zone && !d.raid && (x - zone.x) ** 2 + (z - zone.z) ** 2 < (zone.r + 10) ** 2) return false;
     return Math.abs(x) < CONFIG.world.size / 2 - 20 && Math.abs(z) < CONFIG.world.size / 2 - 20;
+  }
+
+  /** Is land animal `d` out of its depth (swimming, not wading)? */
+  swimming(d) {
+    return !CONFIG.dinos[d.type].aquatic && d.type !== 'ptera' && this.terrain.waterDepthAt(d.x, d.z) > wadeDepth(d);
+  }
+
+  /** Height of a land animal: on the ground, or swimming with its back out of the water. */
+  swimHeight(d) {
+    const ground = this.terrain.heightAt(d.x, d.z);
+    if (!this.swimming(d)) return ground;
+    const water = this.terrain.waterLevelAt(d.x, d.z);
+    return water === null ? ground : Math.max(ground, water - radiusOf(d) * SWIM_SINK);
   }
 
   /** Turn toward (tx, tz) and walk at `speed`, avoiding unwalkable ground. Returns remaining distance. */
@@ -287,8 +309,8 @@ export class DinoSystem {
   move(d, want, dt, accel = 4, lockedHeading = false) {
     d.spd += clamp(want - d.spd, -accel * 2 * dt, accel * dt);
     if (d.spd < 0.01) { d.spd = 0; return; }
-    // wading through a bog (swamp) slows walkers like players (fliers never touch it)
-    const step = d.spd * dt * (d.type === 'ptera' ? 1 : this.terrain.swampSpeedAt?.(d.x, d.z) ?? 1);
+    // wading through a bog (swamp) slows walkers like players (fliers never touch it); a land animal swims slower
+    const step = d.spd * dt * (d.type === 'ptera' ? 1 : (this.terrain.swampSpeedAt?.(d.x, d.z) ?? 1) * (this.swimming(d) ? SWIM_SPEED : 1));
     let fx = -Math.sin(d.yaw), fz = -Math.cos(d.yaw);
     const look = Math.max(2, d.radius * 1.5);
     // downhill may be steep (see walkable). Judged over the look-ahead, not the tiny step: the
@@ -299,7 +321,7 @@ export class DinoSystem {
     // The first stride counts too: a gentle spot beyond a steep step up is no way out
     const open = (px, pz, yaw) => {
       const dn = down(px, pz), k = Math.min(1, 0.6 / look);
-      return this.walkable(px, pz, d, dn) && this.walkable(d.x + (px - d.x) * k, d.z + (pz - d.z) * k, d, dn) &&
+      return this.walkable(px, pz, d, dn, true) && this.walkable(d.x + (px - d.x) * k, d.z + (pz - d.z) * k, d, dn, true) &&
         !this.bodyBlocked(d, px, pz, yaw);
     };
     if (!open(d.x + fx * look, d.z + fz * look, d.yaw)) {
@@ -324,7 +346,7 @@ export class DinoSystem {
     // judge a full stride, not the ground under its feet: standing on a spot just over the climb
     // limit must not pin it (any tiny step there reads as "steep, uphill")
     const stride = Math.max(step, 0.6);
-    if (!this.walkable(d.x + fx * stride, d.z + fz * stride, d, down(d.x + fx * look, d.z + fz * look)) || this.#pastLeash(d, nx, nz)) { d.spd *= 0.5; if (!lockedHeading) d.yaw += 1.5 * dt * (d.avoidSide || 1); this.#progress(d, 0, want, dt); return; }
+    if (!this.walkable(d.x + fx * stride, d.z + fz * stride, d, down(d.x + fx * look, d.z + fz * look), true) || this.#pastLeash(d, nx, nz)) { d.spd *= 0.5; if (!lockedHeading) d.yaw += 1.5 * dt * (d.avoidSide || 1); this.#progress(d, 0, want, dt); return; }
     // on a steep wall the speed runs along the surface: a raptor slides down a cliff instead of
     // dropping 40 m/s (and the client's interpolation can follow)
     const drop = Math.abs(h0 - this.terrain.heightAt(nx, nz));
@@ -456,7 +478,7 @@ export class DinoSystem {
     if (!d.stuckAt) d.stuckAt = { x: d.x, z: d.z };
     if (blocked < NUDGE_INSIDE) return;
     // steep ground under its feet is fine (it got there running downhill); water, lava, a no-go zone or a trunk are not
-    const inside = !this.walkable(d.x, d.z, d, true) || this.bodyBlocked(d, d.x, d.z, d.yaw);
+    const inside = !this.walkable(d.x, d.z, d, true, true) || this.bodyBlocked(d, d.x, d.z, d.yaw);
     const wedged = blocked >= NUDGE_BLOCKED && Math.hypot(d.x - d.stuckAt.x, d.z - d.stuckAt.z) < 1.5;
     if (!inside && !wedged) return;
     // only teleport when it really can't walk off; a merely unreachable goal just gets replaced
@@ -497,7 +519,7 @@ export class DinoSystem {
   strafe(d, dx, dz, speed, dt) {
     const length = Math.hypot(dx, dz) || 1, step = speed * dt;
     let nx = d.x + dx / length * step, nz = d.z + dz / length * step;
-    if (!this.walkable(nx, nz, d) || this.#pastLeash(d, nx, nz) || this.bodyBlocked(d, nx, nz, d.yaw)) { d.spd = 0; return; }
+    if (!this.walkable(nx, nz, d, false, true) || this.#pastLeash(d, nx, nz) || this.bodyBlocked(d, nx, nz, d.yaw)) { d.spd = 0; return; }
     if (this.resolveBody(d, nx, nz, d.yaw)) { nx = push.x; nz = push.z; }
     const moved = Math.hypot(nx - d.x, nz - d.z);
     d.x = nx; d.z = nz; d.trackDist += moved; d.spd = moved / dt;
@@ -646,6 +668,10 @@ export class DinoSystem {
     for (let i = this.list.length - 1; i >= 0; i--) {
       const d = this.list[i];
       if (!d.alive) {
+        if (!CONFIG.dinos[d.type].aquatic && d.type !== 'ptera') {
+          // a land animal killed while swimming sinks to the bed (and can be butchered there)
+          d.y = Math.max(this.terrain.heightAt(d.x, d.z), d.y - 1.5 * dt);
+        }
         if (CONFIG.dinos[d.type].aquatic) {
           const ground = this.terrain.heightAt(d.x, d.z), surface = carcassSurface(d, this.terrain);
           // Preserve the lethal-hit pose and settle slowly: no snap into the mud
@@ -701,7 +727,7 @@ export class DinoSystem {
       if (CONFIG.dinos[d.type].aquatic) {
         d.y = aquaticGroundHeight(d, this.terrain);
         d.swimOffset = d.y - this.terrain.heightAt(d.x, d.z);
-      } else if (d.type !== 'ptera' || d.grounded) d.y = this.terrain.heightAt(d.x, d.z);
+      } else if (d.type !== 'ptera' || d.grounded) d.y = this.swimHeight(d);
 
       // footprints
       const sp = TRACK_SPACING[d.type];
