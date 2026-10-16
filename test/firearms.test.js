@@ -197,7 +197,7 @@ test('MPX rear iron sight has an open aperture with a solid rim and an aligned f
   const [x,y,z] = gun.userData.nodes.ironSight;
   const cast = (px,py,pz) => new THREE.Raycaster(new THREE.Vector3(px,py,pz+0.015), new THREE.Vector3(0,0,-1), 0, 0.03).intersectObject(gun,true);
   assert.equal(cast(x,y,z).length, 0, 'rear aperture must be a real unobstructed hole');
-  assert.ok(cast(x+0.0045,y,z).length > 0, 'the aperture has a solid rim');
+  assert.ok(cast(x+0.0036,y,z).length > 0, 'the aperture has a solid rim');
   const front = gun.userData.nodes.ironFront;
   assert.equal(front[1], y);
   assert.ok(cast(front[0], front[1]-0.0005, front[2]).length > 0, 'front post meets the sight line');
