@@ -15,7 +15,7 @@
 
 ### reference/models/
 - `reference/models/pistol.js` — `buildPistol()`: the P-19 pistol assembly.
-- `reference/models/smg.js` — `buildSmg()`: the MPX-9 assembly, licensed with the other reference models.
+- `reference/models/smg.js` — `buildSmg()`: the MPX-9 assembly, licensed with the other reference models; Dinosaur Island uses photo-referenced front post/protective ears and a rear plate with a true circular through-aperture and side guards, with the optic removed.
 - `reference/models/rifle.js` — `buildRifle()`: the M4A1 rifle assembly.
 
 - The adapter moves the CoD hand nodes for the bigger cartoon hands (`adaptHands`: rifle support hand 40 mm back under the rear third of the handguard and re-oriented by `SUPPORT_GRIP` (palm on the lower far side at clock 305 degrees, fingers rolled toward the muzzle, so the wrist stays nearly in line with the forearm and the fingers stay below the top of the handguard), pistol hands up/back so the index reaches the trigger, and the pistol support hand's fingers raised 20 degrees (`PISTOL_CUP_ORIENTATION`) so the forearm and hand line up, rifle bolt travel shortened and dipping (`RIFLE_BOLT_TRAVEL`) so a locked-back carrier stays in the receiver instead of floating behind it); clips follow because they read the nodes.

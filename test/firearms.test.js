@@ -1,3 +1,4 @@
+import { makeFirearm } from '../src/client/models/firearms/index.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
@@ -189,4 +190,15 @@ test('the rifle support hand grips UNDER the rear third of the handguard and the
       assert.ok(z <= hg.z0 + 0.01 && z >= hg.z1, `finger joint z ${z}`);
     }
   }
+});
+
+test('MPX rear iron sight has an open aperture with a solid rim and an aligned front post', () => {
+  const gun = makeFirearm('mpx'); gun.updateMatrixWorld(true);
+  const [x,y,z] = gun.userData.nodes.ironSight;
+  const cast = (px,py,pz) => new THREE.Raycaster(new THREE.Vector3(px,py,pz+0.015), new THREE.Vector3(0,0,-1), 0, 0.03).intersectObject(gun,true);
+  assert.equal(cast(x,y,z).length, 0, 'rear aperture must be a real unobstructed hole');
+  assert.ok(cast(x+0.0045,y,z).length > 0, 'the aperture has a solid rim');
+  const front = gun.userData.nodes.ironFront;
+  assert.equal(front[1], y);
+  assert.ok(cast(front[0], front[1]-0.0005, front[2]).length > 0, 'front post meets the sight line');
 });
