@@ -33,31 +33,31 @@ import {
 function addMpxIronSights(body, railTop, frontZ, rearZ) {
   const put = (geo, key, transform) => { body.add(geo, key, transform); geo.dispose(); };
   for (const z of [frontZ, rearZ]) {
-    put(box(0.028, 0.006, 0.028, 0.001, 2), 'alu', { y: railTop + 0.003, z });
-    put(box(0.023, 0.006, 0.017, 0.0008, 2), 'steel', { y: railTop + 0.009, z });
-    put(rodZ(0.0045, 0.0045, 0.03, 24, 0.0006), 'steel', { y: railTop + 0.009, z: z + 0.004, ry: Math.PI / 2 });
+    put(box(0.0224, 0.0048, 0.0224, 0.0008, 2), 'alu', { y: railTop + 0.0024, z });
+    put(box(0.0184, 0.0048, 0.0136, 0.00064, 2), 'steel', { y: railTop + 0.0072, z });
+    put(rodZ(0.0036, 0.0036, 0.024, 24, 0.00048), 'steel', { y: railTop + 0.0072, z: z + 0.0032, ry: Math.PI / 2 });
     // Side adjustment drum and clamp screw, kept below the sight line.
-    put(rodZ(0.004, 0.004, 0.005, 24, 0.0005), 'steel', { x: 0.017, y: railTop + 0.009, z: z + 0.004, ry: Math.PI / 2 });
-    addScrew(body, 'steel', -0.015, railTop + 0.009, z + 0.004, 0.0028, 'x');
+    put(rodZ(0.0032, 0.0032, 0.004, 24, 0.0004), 'steel', { x: 0.0136, y: railTop + 0.0072, z: z + 0.0032, ry: Math.PI / 2 });
+    addScrew(body, 'steel', -0.012, railTop + 0.0072, z + 0.0032, 0.00224, 'x');
   }
   // Tall protective ears frame the front post, with inward-sloping shoulders.
   for (const side of [-1, 1]) {
-    const ear = [[0.0075,0.011],[0.013,0.011],[0.013,0.035],[0.0115,0.037],[0.0085,0.026]];
-    put(extrude(ear.map(([x,y]) => [x * side,y]), 0.010, { bevel: 0.0005, bevelSegments: 2 }), 'steel', { y: railTop, z: frontZ });
-    put(box(0.0045, 0.027, 0.012, 0.0008, 2), 'steel', { x: side * 0.011, y: railTop + 0.0235, z: rearZ });
+    const ear = [[0.006,0.0088],[0.0104,0.0088],[0.0104,0.028],[0.0092,0.0296],[0.0068,0.0208]];
+    put(extrude(ear.map(([x,y]) => [x * side,y]), 0.008, { bevel: 0.0004, bevelSegments: 2 }), 'steel', { y: railTop, z: frontZ });
+    put(box(0.0036, 0.0216, 0.0096, 0.00064, 2), 'steel', { x: side * 0.0088, y: railTop + 0.0188, z: rearZ });
   }
-  put(extrude([[-0.002,0.011],[0.002,0.011],[0.0007,0.024],[-0.0007,0.024]], 0.003, { bevel: 0.0002 }), 'steel', { y: railTop, z: frontZ });
+  put(extrude([[-0.0016,0.0088],[0.0016,0.0088],[0.00056,0.0192],[-0.00056,0.0192]], 0.0024, { bevel: 0.00016 }), 'steel', { y: railTop, z: frontZ });
   // Rounded rear aperture on a narrow stem, separated from both side guards.
-  const outline = [[-0.006,0.011],[0.006,0.011],[0.006,0.024]];
+  const outline = [[-0.0048,0.0088],[0.0048,0.0088],[0.0048,0.0192]];
   for (let i = 1; i <= 24; i++) {
     const a = i / 24 * Math.PI;
-    outline.push([0.006 * Math.cos(a), 0.024 + 0.006 * Math.sin(a)]);
+    outline.push([0.0048 * Math.cos(a), 0.0192 + 0.0048 * Math.sin(a)]);
   }
   const hole = Array.from({ length: 32 }, (_, i) => {
     const a = -i / 32 * Math.PI * 2;
-    return [0.0025 * Math.cos(a), 0.024 + 0.0025 * Math.sin(a)];
+    return [0.002 * Math.cos(a), 0.0192 + 0.002 * Math.sin(a)];
   });
-  put(extrude(outline, 0.0035, { holes: [hole], bevel: 0.0003, bevelSegments: 2 }), 'steel', { y: railTop, z: rearZ });
+  put(extrude(outline, 0.0028, { holes: [hole], bevel: 0.00024, bevelSegments: 2 }), 'steel', { y: railTop, z: rearZ });
 }
 
 export function buildSmg() {
@@ -335,10 +335,10 @@ export function buildSmg() {
       chamber: [0, bore, portZ],
       eject: [rRec + 0.006, bore + 0.002, portZ],
       ejectDir: [0.9, 0.4, 0.18],
-      sight: [0, railTop + 0.024, 0.028],
+      sight: [0, railTop + 0.0192, 0.028],
       sightAxis: [0, 0, -1],
-      ironSight: [0, railTop + 0.024, 0.028],
-      ironFront: [0, railTop + 0.024, -0.248],
+      ironSight: [0, railTop + 0.0192, 0.028],
+      ironFront: [0, railTop + 0.0192, -0.248],
       // Wrist targets, derived the same way as the rifle's (see models/rifle.js):
       // knuckle/grip contact point minus the palm offset along the hand axis.
       gripR: {
