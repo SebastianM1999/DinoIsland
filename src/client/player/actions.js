@@ -54,6 +54,7 @@ export class PlayerActions {
     this.vm = new Viewmodel(game.gfx, game.me.slot);
     this.gunEffects = new GunEffects(game);
     this.reloadT = 0;
+    this.reloadEmpty = false;   // the running reload started on an empty magazine
     this.cooldown = 0;
     this.drawT = 0;
     this.drawing = false;
@@ -219,7 +220,10 @@ export class PlayerActions {
     this.gunEffects.update(dt);
     this.reloadT = this.inv.reloading ? this.reloadT + dt : 0;
     // guns are always fired from the hip (no aim-down-sights)
-    this.vm.setGunPose(false, this.inv.reloading === tool ? Math.min(0.98, this.reloadT / (W[tool].reloadTime * this.game.mods.reloadMul)) : 0);
+    // a reload started on an empty magazine plays the long clip (latched by reloadGun); otherwise an empty magazine locks the slide back
+    const reloading = this.inv.reloading === tool;
+    this.vm.setGunPose(false, reloading ? Math.min(0.98, this.reloadT / (W[tool].reloadTime * this.game.mods.reloadMul)) : 0,
+      reloading ? this.reloadEmpty : this.inv.guns?.[tool]?.loaded === 0);
     this.vm.setDraw(this.drawing ? this.drawT / W.bow.maxDrawTime : 0);
 
     // placement tools with a ghost preview
@@ -346,6 +350,7 @@ export class PlayerActions {
     const tool = this.tool, ammo = this.inv.guns?.[tool];
     if (!ammo || this.inv.reloading || ammo.loaded >= W[tool].magazine || !ammo.reserve) return;
     this.reloadT = 0;
+    this.reloadEmpty = ammo.loaded === 0;
     this.game.net.act(ACT.RELOAD, { kind: tool });
     this.game.audio?.play('reload');
   }

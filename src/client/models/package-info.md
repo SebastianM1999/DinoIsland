@@ -6,10 +6,11 @@
 - `kit.js` — the model kit: shared materials `MAT` (standard, glossy, glow), `WIND` uniforms + `windMaterial` (keeps a shader patch already on its base material, e.g. surface detail), and shape helpers (`deform`, `paint`, `place`, `part`, `merge`, `mesh`, `tube`, `blob`, `spike`, `limb`, `eye`, `wrap`, `rockGeometry`, `smoothNormals`, `prep`, `jitter`).
 - `playerModel.js` — `PlayerModel`: rigged, procedurally animated co-op explorer with outfit slots (hats, tops, pants from `shared/outfits.js`) and held weapons/tools/firearms.
 - `weapons.js` — cached spear, bow (+ string), arrow, trap (open/sprung), meat and knife geometry; `BOW_REST`, `ARROW_TIP_Y`; `make*` mesh helpers.
-- `hands.js` — `handGeometry`: grip-centred first-person hands.
+- `fabric.js` — `fabric(top)`: plain/plaid/striped fabric colour function, shared by the player model and the first-person sleeves.
 - `fruit.js` — fruit geometry/material per type (`berry`, `mango`, `dragon`; swamp `marshberry`, `swampfig`, `glowlotus`; volcano `emberchili`, `ashplum`, `obsidianfig`), `FRUIT_GLOW`, `makeFruitMesh`.
 - `dino/` — dinosaur models and animation (own `package-info.md`).
 - `firearms/` — pistol and rifle models (own `package-info.md`).
+- `arms/` — first-person cartoon arms on the Claude-of-Duty rig and grip maths (own `package-info.md`).
 
 ### props/
 - `props/common.js` — helpers for site props: 3D noise (`noise3`, `fbm3`), `roundedBox`, `orient`, `groundIt`, SDF mesher (`sdfMesh`, `sdfRay`), `gridNormals`, cached glow/double-sided/additive materials.
@@ -26,7 +27,7 @@
 - `kit.js` is imported almost everywhere in `client/world/`, `client/entities/`, `client/player/` and `models/dino/`; `core/game.js` advances `WIND.uTime` each frame.
 - `PlayerModel`: `entities/remotePlayers.js`, `ui/wardrobe.js`, `player/weapon-preview.js`.
 - `weapons.js`: `entities/items.js`, `entities/projectiles.js`, `player/viewmodel.js`, `player/actions.js`, `world/base.js`, `PlayerModel`.
-- `hands.js`: `player/viewmodel.js`. `fruit.js`: `entities/items.js`, `player/viewmodel.js`, `world/fruitPlants.js`.
+- `arms/`: `player/viewmodel.js`. `fruit.js`: `entities/items.js`, `player/viewmodel.js`, `world/fruitPlants.js`.
 - Props: `world/sites.js` (boat, caves, ruins, nest, volcano); `entities/relics.js` (`relicMesh`); `props/boat.js` uses `relicModel`.
 - Tests: `test/props.test.js`, `test/weapons.test.js`, `test/outfits.test.js`, `test/firearms.test.js`.
 

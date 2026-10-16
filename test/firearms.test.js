@@ -4,8 +4,10 @@ import * as THREE from 'three';
 import { gunAction, updateGunReload, gunInventory } from '../src/sim/firearms.js';
 import { ACT, EQUIP } from '../src/shared/protocol.js';
 import { CONFIG } from '../src/shared/config.js';
-import { Viewmodel } from '../src/client/player/viewmodel.js';
-import { PlayerModel } from '../src/client/models/playerModel.js';
+import { Viewmodel, GUN_SCALE, CONVERGE, solveBoreQuat } from '../src/client/player/viewmodel.js';
+import { PlayerModel, GUN_GRIPS_3P } from '../src/client/models/playerModel.js';
+import { HAND_SCALE, scaledGrip, wristTarget } from '../src/client/models/arms/cartoonArm.js';
+import { makeSampleResult } from '../src/client/models/firearms/reference/clips.js';
 
 function fixture(kind) {
   const d = { id: 2, type: 'raptor', x: 0, y: 0, z: -10, radius: 0.7, alive: true, hp: 70 };
@@ -50,26 +52,50 @@ for (const kind of ['pistol', 'rifle']) {
     p.eq = 0; updateGunReload(w, p); assert.equal(a.loaded, 0); assert.equal(p.inv.reloading, null);
   });
 }
-test('gun grips follow the weapon in first-person and co-op, including recoil and reload', () => {
+test('first-person gun hands stay welded to their grips through sway, bob, lag, recoil and the reload clip', () => {
   const vm = new Viewmodel({ viewCamera: new THREE.PerspectiveCamera() }, 0);
-  const model = new PlayerModel(0);
+  const walk = { speed: 5, sprint: false, grounded: true, lookX: 1, lookY: 0 };
+  const at = (gun, grip) => gun.localToWorld(new THREE.Vector3().fromArray(grip.pos));
+  const hand = (h) => h.getWorldPosition(new THREE.Vector3());
   for (const kind of ['pistol', 'rifle']) {
     vm.setTool(kind);
-    for (let i = 0; i < 50; i++) vm.update(1 / 60, { speed: 5, sprint: false, grounded: true, lookX: 1, lookY: 0 });
-    vm.fireGun(); vm.setGunPose(true, 0.5);
-    vm.update(1 / 60, { speed: 5, sprint: false, grounded: true, lookX: 1, lookY: 0 });
-    vm.root.updateMatrixWorld(true);
-    const gun = vm.guns[kind];
-    for (const [contact, hand] of [['gripR', vm.rHand], ['gripL', vm.lHand]]) {
-      assert.ok(gun.localToWorld(gun.userData[contact].clone()).distanceTo(hand.getWorldPosition(new THREE.Vector3())) < 1e-6);
+    for (let i = 0; i < 150; i++) vm.update(1 / 60, walk);
+    assert.equal(vm.tool, kind); assert.equal(vm.phase, 'hold'); assert.equal(vm.armR.pose, kind === 'pistol' ? 'grip:pistol' : 'grip:rifle');
+    const gun = vm.guns[kind], nodes = gun.userData.nodes;
+    // the guns are drawn bigger than CoD's, their wrist targets scale with them (knuckles stay on the grip surface)
+    const grip = (n) => scaledGrip(n, HAND_SCALE, GUN_SCALE[kind]);
+    for (let i = 0; i < 12; i++) {
+      if (i % 4 === 0) vm.fireGun();
+      vm.update(1 / 60, { ...walk, lookX: 5 * i, lookY: -3 * i });
+      vm.root.updateMatrixWorld(true);
+      // the CoD wrist targets, moved by scaledGrip for the bigger cartoon hands
+      assert.ok(at(gun, grip(nodes.gripR)).distanceTo(hand(vm.rHand)) < 1e-6, kind + ' right hand');
+      assert.ok(at(gun, grip(nodes.gripL)).distanceTo(hand(vm.lHand)) < 1e-6, kind + ' left hand');
     }
-    model.animate(1 / 60, { eq: kind, spd: 0, pitch: 0.2, alive: true, grounded: true }); model.root.updateMatrixWorld(true);
-    for (const [contact, arm] of [['gripR', model.armR], ['gripL', model.armL]]) {
-      assert.ok(model.toolRig.localToWorld(model.held[kind].userData[contact].clone()).distanceTo(arm.localToWorld(new THREE.Vector3(0, -0.46, 0))) < 1e-6);
-    }
+    assert.equal(vm.armL.pose, kind === 'rifle' ? 'clamp:rifle' : 'cup');
+    // reload: the right hand stays on the grip, the left one follows the clip's key
+    const clip = vm.clips[kind].reloadTac, res = makeSampleResult();
+    vm.setGunPose(false, 0.5, false);
+    vm.update(1 / 60, walk); vm.root.updateMatrixWorld(true);
+    clip.sample(0.5 * clip.duration, res);
+    const target = new THREE.Vector3(), quat = new THREE.Quaternion();
+    wristTarget(target, quat, res.lhand.pos, res.lhand.finger, res.lhand.back, HAND_SCALE, GUN_SCALE[kind]);
+    assert.ok(at(gun, grip(nodes.gripR)).distanceTo(hand(vm.rHand)) < 1e-6, kind + ' right hand during the reload');
+    assert.ok(gun.localToWorld(target).distanceTo(hand(vm.lHand)) < 1e-6, kind + ' left hand follows the reload clip');
+    vm.setGunPose(false, 0, false);
+    for (let i = 0; i < 30; i++) vm.update(1 / 60, walk);
   }
 });
 
+test('third-person gun grips follow the weapon in co-op, including pitch and recoil', () => {
+  const model = new PlayerModel(0);
+  for (const kind of ['pistol', 'rifle']) {
+    model.animate(1 / 60, { eq: kind, spd: 0, pitch: 0.2, alive: true, grounded: true }); model.root.updateMatrixWorld(true);
+    for (const [contact, arm] of [['r', model.armR], ['l', model.armL]]) {
+      assert.ok(model.toolRig.localToWorld(GUN_GRIPS_3P[kind][contact].clone()).distanceTo(arm.localToWorld(new THREE.Vector3(0, -0.46, 0))) < 1e-6);
+    }
+  }
+});
 
 test('automatic rifle fire survives quantized host ticks without permitting a burst of extra shots', () => {
   const { w, p, shot } = fixture('rifle');
@@ -81,5 +107,86 @@ test('automatic rifle fire survives quantized host ticks without permitting a bu
     assert.equal(p.inv.guns.rifle.loaded, CONFIG.weapons.rifle.magazine - i - 1);
     for (let j = 0; j < 5; j++) gunAction(w, p, shot);
     assert.equal(p.inv.guns.rifle.loaded, CONFIG.weapons.rifle.magazine - i - 1);
+  }
+});
+
+const flatVm = (kind) => {
+  const vm = new Viewmodel({ viewCamera: new THREE.PerspectiveCamera() }, 0);
+  vm.flat = true;
+  vm.setTool(kind);
+  for (let i = 0; i < 200; i++) vm.update(1 / 60, { speed: 0, sprint: false, grounded: true, lookX: 0, lookY: 0 });
+  vm.root.updateMatrixWorld(true);
+  return vm;
+};
+
+test('the bore of both guns passes through the crosshair point CONVERGE metres ahead and the flash/tracer origin is the muzzle', () => {
+  const target = new THREE.Vector3(0, 0, -CONVERGE);
+  assert.equal(CONVERGE, 25);
+  for (const kind of ['pistol', 'rifle']) {
+    const vm = flatVm(kind);
+    assert.equal(vm.phase, 'hold');
+    const gun = vm.guns[kind];
+    const muzzle = vm.muzzlePosition(new THREE.Vector3());
+    const dir = new THREE.Vector3(0, 0, -1).transformDirection(gun.matrixWorld);
+    // miss distance of the ray from the muzzle along the bore to the target
+    const toTarget = target.clone().sub(muzzle);
+    const miss = toTarget.clone().addScaledVector(dir, -toTarget.dot(dir)).length();
+    assert.ok(miss < 1e-3, `${kind} bore misses the crosshair point by ${miss} m`);
+    assert.ok(toTarget.dot(dir) > 0, 'the bore points toward it');
+    // the point of the bore ray at that depth projects to the screen centre
+    const cam = vm.gfx.viewCamera; cam.updateMatrixWorld(true);
+    const at = muzzle.clone().addScaledVector(dir, (CONVERGE + muzzle.z) / -dir.z);
+    const ndc = at.clone().project(cam);
+    assert.ok(Math.abs(ndc.x) < 1e-4 && Math.abs(ndc.y) < 1e-4, `${kind} bore at ${CONVERGE} m projects to ${ndc.x},${ndc.y}`);
+    // nearly parallel to the view axis
+    assert.ok(Math.acos(-dir.z) < 0.01, `${kind} bore is ${Math.acos(-dir.z)} rad off the view axis`);
+    // the flash sits on the bore just ahead of the muzzle (0.04 gun units), so shots leave where the flash is drawn
+    const flash = gun.userData.flash.getWorldPosition(new THREE.Vector3());
+    assert.ok(Math.abs(flash.distanceTo(muzzle) - 0.04 * GUN_SCALE[kind]) < 1e-9);
+    assert.ok(flash.clone().sub(muzzle).normalize().distanceTo(dir) < 1e-9);
+  }
+});
+
+test('the bore solve holds for any cant: the ray still hits the crosshair point and the aim shifts by milliradians only', () => {
+  const pos = new THREE.Vector3(0.13, -0.18, -0.33);
+  const muzzle = [0, 0.075, -0.502];
+  const dirs = [0, 0.4, -0.7].map((roll) => {
+    const q = solveBoreQuat(new THREE.Quaternion(), pos, muzzle, 1.15, roll);
+    const m = new THREE.Vector3(...muzzle).multiplyScalar(1.15).applyQuaternion(q).add(pos);
+    const d = new THREE.Vector3(0, 0, -1).applyQuaternion(q);
+    const t = new THREE.Vector3(0, 0, -CONVERGE).sub(m);
+    assert.ok(t.addScaledVector(d, -t.dot(d)).length() < 1e-6);
+    return d;
+  });
+  assert.ok(dirs[0].distanceTo(dirs[1]) < 0.01 && dirs[0].distanceTo(dirs[2]) < 0.01);
+});
+
+test('the rifle support hand grips UNDER the rear third of the handguard and the firing hands lie on their grips', () => {
+  for (const kind of ['pistol', 'rifle']) {
+    const vm = flatVm(kind);
+    const gun = vm.guns[kind], nodes = gun.userData.nodes;
+    const inv = gun.matrixWorld.clone().invert();
+    // palm contact: 5 cm (scaled) along the fingers from the wrist, in gun space
+    const palm = (arm) => {
+      const q = arm.hand.getWorldQuaternion(new THREE.Quaternion());
+      return arm.hand.getWorldPosition(new THREE.Vector3()).addScaledVector(new THREE.Vector3(0, 0, -1).applyQuaternion(q), 0.05 * HAND_SCALE).applyMatrix4(inv);
+    };
+    // right hand: the palm is where the (scaled) CoD grip target puts it
+    const g = scaledGrip(nodes.gripR, HAND_SCALE, GUN_SCALE[kind]);
+    const expected = new THREE.Vector3().fromArray(g.pos).addScaledVector(new THREE.Vector3().fromArray(g.finger), 0.05 * HAND_SCALE / GUN_SCALE[kind]);
+    assert.ok(palm(vm.armR).distanceTo(expected) < 1e-6, `${kind} right palm on the grip`);
+    assert.ok(palm(vm.armR).z > 0 - 0.02 && palm(vm.armR).y < nodes.triggerPivot.pos[1] + 0.01, `${kind} right palm sits on the grip behind the trigger`);
+    if (kind !== 'rifle') continue;
+    const hg = nodes.handguard;
+    const p = palm(vm.armL);
+    const third = hg.z1 + (hg.z0 - hg.z1) * 2 / 3;       // rear third: z between this and z0 (z0 is the rear end, -0.145)
+    assert.ok(p.z <= hg.z0 && p.z >= third, `left palm z ${p.z} within the rear third ${third}..${hg.z0}`);
+    const dist = Math.hypot(p.x - 0, p.y - hg.axis[1]);
+    assert.ok(dist < hg.r + 0.03 && p.y < hg.axis[1], `left palm ${dist} from the handguard axis, below it`);
+    // every finger joint is on the handguard's extent
+    for (const f of vm.armL.fingers) for (const j of f.joints) {
+      const z = j.getWorldPosition(new THREE.Vector3()).applyMatrix4(inv).z;
+      assert.ok(z <= hg.z0 + 0.01 && z >= hg.z1, `finger joint z ${z}`);
+    }
   }
 });
