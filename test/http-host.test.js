@@ -52,7 +52,7 @@ test('HTTP host serves the game and routes firearm shots and reloads between two
       ws.on('message', receive);
     });
   }
-  for (const kind of ['pistol', 'rifle']) {
+  for (const kind of ['pistol', 'rifle', 'mpx']) {
     const player = host.world.players.get(a.welcome.id);
     a.ws.send(JSON.stringify({ t: 'state', x: player.x, y: player.y, z: player.z, yaw: 0, pitch: 0, eq: EQUIP.indexOf(kind) }));
     const ammo = message(a.ws, m => m.t === 'inv' && m.inv.guns[kind].loaded === CONFIG.weapons[kind].magazine - 1);

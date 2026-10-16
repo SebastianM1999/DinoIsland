@@ -17,7 +17,7 @@ function fixture(kind) {
   const shot = { a: ACT.SHOT, kind, o: [0, CONFIG.player.eyeHeight, 0], dir: [0, 0, -1], dino: d.id, p: [0, CONFIG.player.eyeHeight, -10], zone: 'body' };
   return { w, p, d, shot };
 }
-for (const kind of ['pistol', 'rifle']) {
+for (const kind of ['pistol', 'rifle', 'mpx']) {
   test(`${kind} consumes rounds, damages only on a valid ray, and enforces cooldown and empty magazine`, () => {
     const { w, p, d, shot } = fixture(kind);
     gunAction(w, p, shot);
@@ -57,10 +57,10 @@ test('first-person gun hands stay welded to their grips through sway, bob, lag, 
   const walk = { speed: 5, sprint: false, grounded: true, lookX: 1, lookY: 0 };
   const at = (gun, grip) => gun.localToWorld(new THREE.Vector3().fromArray(grip.pos));
   const hand = (h) => h.getWorldPosition(new THREE.Vector3());
-  for (const kind of ['pistol', 'rifle']) {
+  for (const kind of ['pistol', 'rifle', 'mpx']) {
     vm.setTool(kind);
     for (let i = 0; i < 150; i++) vm.update(1 / 60, walk);
-    assert.equal(vm.tool, kind); assert.equal(vm.phase, 'hold'); assert.equal(vm.armR.pose, kind === 'pistol' ? 'grip:pistol' : 'grip:rifle');
+    assert.equal(vm.tool, kind); assert.equal(vm.phase, 'hold'); assert.equal(vm.armR.pose, 'grip:' + kind);
     const gun = vm.guns[kind], nodes = gun.userData.nodes;
     // the guns are drawn bigger than CoD's, their wrist targets scale with them (knuckles stay on the grip surface)
     const grip = (n) => scaledGrip(n, HAND_SCALE, GUN_SCALE[kind]);
@@ -72,7 +72,7 @@ test('first-person gun hands stay welded to their grips through sway, bob, lag, 
       assert.ok(at(gun, grip(nodes.gripR)).distanceTo(hand(vm.rHand)) < 1e-6, kind + ' right hand');
       assert.ok(at(gun, grip(nodes.gripL)).distanceTo(hand(vm.lHand)) < 1e-6, kind + ' left hand');
     }
-    assert.equal(vm.armL.pose, kind === 'rifle' ? 'clamp:rifle' : 'cup');
+    assert.equal(vm.armL.pose, kind === 'rifle' ? 'clamp:rifle' : kind === 'mpx' ? 'foregrip:mpx' : 'cup');
     // reload: the right hand stays on the grip, the left one follows the clip's key
     const clip = vm.clips[kind].reloadTac, res = makeSampleResult();
     vm.setGunPose(false, 0.5, false);
@@ -89,7 +89,7 @@ test('first-person gun hands stay welded to their grips through sway, bob, lag, 
 
 test('third-person gun grips follow the weapon in co-op, including pitch and recoil', () => {
   const model = new PlayerModel(0);
-  for (const kind of ['pistol', 'rifle']) {
+  for (const kind of ['pistol', 'rifle', 'mpx']) {
     model.animate(1 / 60, { eq: kind, spd: 0, pitch: 0.2, alive: true, grounded: true }); model.root.updateMatrixWorld(true);
     for (const [contact, arm] of [['r', model.armR], ['l', model.armL]]) {
       assert.ok(model.toolRig.localToWorld(GUN_GRIPS_3P[kind][contact].clone()).distanceTo(arm.localToWorld(new THREE.Vector3(0, -0.46, 0))) < 1e-6);
@@ -97,16 +97,16 @@ test('third-person gun grips follow the weapon in co-op, including pitch and rec
   }
 });
 
-test('automatic rifle fire survives quantized host ticks without permitting a burst of extra shots', () => {
-  const { w, p, shot } = fixture('rifle');
-  const interval = CONFIG.weapons.rifle.cooldown;
+for (const kind of ['rifle', 'mpx']) test(`automatic ${kind} fire survives quantized host ticks without permitting a burst of extra shots`, () => {
+  const { w, p, shot } = fixture(kind);
+  const interval = CONFIG.weapons[kind].cooldown;
   const tick = 1 / CONFIG.net.tickRate;
   for (let i = 0; i < 10; i++) {
     w.now = Math.floor((i * interval + 1e-9) / tick) * tick;
     gunAction(w, p, shot);
-    assert.equal(p.inv.guns.rifle.loaded, CONFIG.weapons.rifle.magazine - i - 1);
+    assert.equal(p.inv.guns[kind].loaded, CONFIG.weapons[kind].magazine - i - 1);
     for (let j = 0; j < 5; j++) gunAction(w, p, shot);
-    assert.equal(p.inv.guns.rifle.loaded, CONFIG.weapons.rifle.magazine - i - 1);
+    assert.equal(p.inv.guns[kind].loaded, CONFIG.weapons[kind].magazine - i - 1);
   }
 });
 
@@ -122,7 +122,7 @@ const flatVm = (kind) => {
 test('the bore of both guns passes through the crosshair point CONVERGE metres ahead and the flash/tracer origin is the muzzle', () => {
   const target = new THREE.Vector3(0, 0, -CONVERGE);
   assert.equal(CONVERGE, 25);
-  for (const kind of ['pistol', 'rifle']) {
+  for (const kind of ['pistol', 'rifle', 'mpx']) {
     const vm = flatVm(kind);
     assert.equal(vm.phase, 'hold');
     const gun = vm.guns[kind];
@@ -162,7 +162,7 @@ test('the bore solve holds for any cant: the ray still hits the crosshair point 
 });
 
 test('the rifle support hand grips UNDER the rear third of the handguard and the firing hands lie on their grips', () => {
-  for (const kind of ['pistol', 'rifle']) {
+  for (const kind of ['pistol', 'rifle', 'mpx']) {
     const vm = flatVm(kind);
     const gun = vm.guns[kind], nodes = gun.userData.nodes;
     const inv = gun.matrixWorld.clone().invert();

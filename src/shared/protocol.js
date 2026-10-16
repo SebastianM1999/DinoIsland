@@ -44,8 +44,8 @@ export const MSG = {
 
 /** Client actions (msg.a). */
 export const ACT = {
-  SHOT: 'shot',         // { kind: 'pistol'|'rifle', o, dir, dino?, p?, zone?, rt? } validated hitscan
-  RELOAD: 'reload',     // { kind: 'pistol'|'rifle' }
+  SHOT: 'shot',         // { kind: 'pistol'|'rifle'|'mpx', o, dir, dino?, p?, zone?, rt? } validated hitscan
+  RELOAD: 'reload',     // { kind: 'pistol'|'rifle'|'mpx' }
   MELEE: 'melee',       // { dino, zone, p, rt }              spear stab hit
   FIRE: 'fire',         // { kind: 'arrow'|'spear', o:[x,y,z], v:[x,y,z], pid }
   LAND: 'land',         // { kind, pid, p:[x,y,z], dino?, zone?, rt?, attach?, pose? } projectile impact
@@ -150,7 +150,7 @@ export const PF = {
 };
 
 /** Equipment slot ids (`eq`). */
-export const EQUIP = ['spear', 'bow', 'trap', 'fruit', 'pistol', 'rifle'];
+export const EQUIP = ['spear', 'bow', 'trap', 'fruit', 'pistol', 'rifle', 'mpx'];
 
 /** Dinosaur animation/AI states (`st`). */
 export const DS = {

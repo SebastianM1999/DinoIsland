@@ -129,6 +129,7 @@ export const CONFIG = {
     },
     // spread: random cone half-angle (radians) of each shot; moving adds up to spreadMove on top
     pistol: { damage: 26, range: 85, cooldown: 0.28, magazine: 12, reserve: 48, reloadTime: 1.25, spread: 0.012, spreadMove: 0.02 },
+    mpx: { damage: 12, range: 85, cooldown: 0.075, magazine: 32, reserve: 96, reloadTime: 1.8, spread: 0.045, spreadMove: 0.035 },
     rifle: { damage: 19, range: 140, cooldown: 0.12, magazine: 30, reserve: 90, reloadTime: 1.65, spread: 0.02, spreadMove: 0.025 },
     trap: {
       startCount: 2,

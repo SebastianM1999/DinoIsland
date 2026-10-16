@@ -742,7 +742,7 @@
 .hud-equipped span { font-size: .75em; color: #d3dfcf; }
 .hud-quiver { display: none; } /* Ammo and arrow wear are explicit in the selected-equipment readout. */
 
-/* Inventory: pockets 1-6 and the 2x3 backpack beside the explorer (or the selected item's stats).
+/* Inventory: pockets 1-7 and the 2x3 backpack beside the explorer (or the selected item's stats).
    Everything fits the panel: cells scale with the viewport height, nothing scrolls. */
 .hud-inv { width: min(62em, 95vw); height: min(42em, 92vh); display: flex; flex-direction: column; overflow: hidden; }
 .hud-inv .hud-panel-head { flex: none; }
@@ -751,6 +751,7 @@
 .hud-inv h3 small { margin-left: auto; font-size: .7em; font-weight: 700; color: var(--ink-dim); }
 .hud-inv h3 small.is-slow { color: var(--orange); }
 .hud-pockets, .hud-backpack { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .5em; margin: 0; padding: 0; list-style: none; }
+.hud-pockets { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 .hud-inv .hud-cell { display: block; width: 100%; height: clamp(3.4em, 10.5vh, 6.2em); aspect-ratio: auto; padding: 0; border: 0; font: inherit; color: var(--ink); }
 .hud-inv .hud-cell-ic { inset: .45em .6em 1.9em; }
 .hud-inv .hud-cell-n { bottom: 1.3em; font-size: .9em; }
@@ -1405,7 +1406,7 @@ body.is-demo .hud-slot.is-empty { display: none; }
 }
 
 /* Keep the equipment strip clear of the vitals on handheld-width screens.
-   All six slots remain visible; panels retain their existing full-screen layout. */
+   All seven slots remain visible; panels retain their existing full-screen layout. */
 @media (max-width: 850px) {
   .hud-bc { left: auto; right: var(--hud-safe-x); bottom: calc(var(--hud-safe-y) + 9em); transform: none; }
   .hud-carry { justify-content: flex-end; }

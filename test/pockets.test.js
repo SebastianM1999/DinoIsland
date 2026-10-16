@@ -12,7 +12,7 @@ const memory = (init = {}) => {
 
 test('only a permutation of the EQUIP indices is a pocket order', () => {
   assert.ok(validPocketOrder(identityOrder()));
-  assert.ok(validPocketOrder([5, 4, 3, 2, 1, 0]));
+  assert.ok(validPocketOrder([6, 5, 4, 3, 2, 1, 0]));
   for (const bad of [null, {}, [0, 1, 2], [0, 0, 1, 2, 3, 4], [0, 1, 2, 3, 4, 6], [0, 1, 2, 3, 4, 1.5], [0, 1, 2, 3, 4, '5'], [...identityOrder(), 6]]) {
     assert.equal(validPocketOrder(bad), false, JSON.stringify(bad));
   }
@@ -21,10 +21,10 @@ test('only a permutation of the EQUIP indices is a pocket order', () => {
 test('a saved order survives a reload; missing, corrupt or blocked storage falls back to the default order', () => {
   const store = memory();
   assert.deepEqual(loadPocketOrder(store), identityOrder());
-  savePocketOrder([3, 1, 2, 0, 4, 5], store);
-  assert.deepEqual(loadPocketOrder(store), [3, 1, 2, 0, 4, 5]);
+  savePocketOrder([3, 1, 2, 0, 4, 5, 6], store);
+  assert.deepEqual(loadPocketOrder(store), [3, 1, 2, 0, 4, 5, 6]);
   savePocketOrder([0, 0, 0, 0, 0, 0], store);   // an invalid order is never written
-  assert.deepEqual(loadPocketOrder(store), [3, 1, 2, 0, 4, 5]);
+  assert.deepEqual(loadPocketOrder(store), [3, 1, 2, 0, 4, 5, 6]);
   assert.deepEqual(loadPocketOrder(memory({ [KEY]: '{not json' })), identityOrder());
   assert.deepEqual(loadPocketOrder(memory({ [KEY]: '[1,1,2,3,4,5]' })), identityOrder());
   const blocked = { getItem() { throw new Error('SecurityError'); }, setItem() { throw new Error('SecurityError'); } };
@@ -52,4 +52,9 @@ test('the wheel steps through pockets in their order and skips tools that cannot
   assert.equal(nextPocket(order, 0, 1, noBowNoGuns), 2, 'spear -> trap, the locked bow skipped');
   assert.equal(nextPocket(order, 2, 1, noBowNoGuns), 3, 'trap -> fruit, both guns skipped');
   assert.equal(nextPocket(order, 0, 1, () => false), 0, 'nothing else usable: stays');
+});
+
+test('pre-MPX pocket saves keep all six arranged tools and append the MPX', () => {
+  assert.deepEqual(loadPocketOrder(memory({ [KEY]: '[3,0,1,2,5,4]' })), [3,0,1,2,5,4,6]);
+  assert.deepEqual(loadPocketOrder(memory({ [KEY]: '[3,0,1,2,5,5]' })), identityOrder());
 });

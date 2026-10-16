@@ -37,7 +37,7 @@ function applyZoom() {
 TOPS.forEach((top, i) => outfit.add(new Option(top.name || top.id, i)));
 outfit.addEventListener('change', () => { const o = { top: +outfit.value, hat: 0, pants: 0 }; vm.setOutfit(o); model.setOutfit(o); });
 const effects = new GunEffects({ gfx, net: { on() {} } });
-const ammo = Object.fromEntries(['pistol', 'rifle'].map(k => [k, { loaded: CONFIG.weapons[k].magazine, reserve: CONFIG.weapons[k].reserve }]));
+const ammo = Object.fromEntries(['pistol', 'rifle', 'mpx'].map(k => [k, { loaded: CONFIG.weapons[k].magazine, reserve: CONFIG.weapons[k].reserve }]));
 let held = false, shotCooldown = 0, reloading = null, hasSpear = true, flyingSpear = null;
 let drawing = false, mouseX = 0, mouseY = 0, last = performance.now();
 const primary = document.querySelector('#primary');
@@ -92,7 +92,7 @@ function frame(now) {
   const sprint = document.querySelector('#sprint').checked;
   const walk = document.querySelector('#walk').checked || sprint;
   shotCooldown = Math.max(0, shotCooldown - dt);
-  if (held && tool.value === 'rifle') fireGun();
+  if (held && ['rifle', 'mpx'].includes(tool.value)) fireGun();
   if (reloading) {
     reloading.elapsed += dt;
     if (reloading.elapsed >= CONFIG.weapons[reloading.kind].reloadTime) {
@@ -112,7 +112,7 @@ function frame(now) {
     if (flyingSpear.obj.position.y <= 0.12) { flyingSpear.obj.position.y = 0.12; flyingSpear.landed = true; flyingSpear.obj.rotation.set(Math.PI / 2, 0, 0); }
   }
   const a = ammo[tool.value];
-  document.querySelector('#status').textContent = a ? `${tool.value === 'pistol' ? 'P-19 pistol - click to fire' : 'M4A1 rifle - hold to fire'} - ${a.loaded}/${a.reserve} rounds - R to reload${reloading ? ' - Reloading' : ''}`
+  document.querySelector('#status').textContent = a ? `${tool.value === 'pistol' ? 'P-19 pistol - click to fire' : tool.value === 'mpx' ? 'MPX-9 SMG - hold to fire' : 'M4A1 rifle - hold to fire'} - ${a.loaded}/${a.reserve} rounds - R to reload${reloading ? ' - Reloading' : ''}`
     : tool.value === 'spear' && !hasSpear ? 'Spear thrown into the scene. Click Reset spear to equip it again.' : tool.value === 'spear' ? 'Click to stab, or Throw spear to launch it into the scene.' : 'Hold the bow to draw. Move the pointer to inspect camera lag.';
   vm.setTool(tool.value, { fruitType: 'mango', hasSpear });
   vm.setDraw(drawing ? Math.min(1, vm.draw + dt) : 0);

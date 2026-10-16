@@ -54,7 +54,7 @@ const SWITCH_UP = 5;          // 1/s: raising it
 
 const SCALE = { bow: 0.7, trap: 0.3, torch: 0.75 };
 /** Guns are drawn bigger than Claude-of-Duty's metres (the old viewmodel did too); their grips are scaled with them. */
-export const GUN_SCALE = { pistol: 1.2, rifle: 1.15 };
+export const GUN_SCALE = { pistol: 1.2, rifle: 1.15, mpx: 1.2 };
 
 /**
  * Every gun's bore axis (from `nodes.muzzle` along the gun's -Z) is solved each frame to pass through the camera-space
@@ -72,6 +72,14 @@ export const GUN_DEFS = {
     swayScale: 1.15, bobScale: 1.1, magLen: 0.108,
     reloadTac: 1.6, reloadEmpty: 2.2, inspectTime: 2.6, drawTime: 0.42, holsterTime: 0.3,
     recoil: { pitch: 0.0125, yaw: 0.0032, kickBack: 0.012, kickUp: 0.0105, roll: 0.018, freq: 9.0, damping: 0.45 },
+  },
+  mpx: {
+    hipPos: [0.111, -0.163, -0.288], cant: -0.08,
+    shoulderL: [-0.12, -0.26, 0.03], reloadShoulderL: [-0.14, -0.30, 0.40],
+    sprintPos: [0.088, -0.24, -0.262], sprintRot: [-0.38, 0.58, 0.19],
+    swayScale: 0.92, bobScale: 0.95, magLen: 0.192,
+    reloadTac: 1.8, reloadEmpty: 1.8, inspectTime: 2.8, drawTime: 0.5, holsterTime: 0.35,
+    recoil: { pitch: 0.0058, yaw: 0.0026, kickBack: 0.0135, kickUp: 0.0052, roll: 0.026, freq: 10.5, damping: 0.4 },
   },
   rifle: {
     hipPos: [0.13, -0.18, -0.33], cant: -0.08,
@@ -186,7 +194,7 @@ let gripTable = null;
 export function toolGrips() {
   if (gripTable) return gripTable;
   const nodes = {};
-  for (const kind of ['pistol', 'rifle']) nodes[kind] = makeFirearm(kind).userData.nodes;
+  for (const kind of ['pistol', 'rifle', 'mpx']) nodes[kind] = makeFirearm(kind).userData.nodes;
   const gunGrip = (n, kind) => toGrip(scaledGrip(n, HAND_SCALE, GUN_SCALE[kind]));
   const fruitFinger = V3(0, 0.15, -0.99).normalize().toArray();
   const fruitBack = [0, -1, 0];
@@ -201,6 +209,7 @@ export function toolGrips() {
       lPose: 'clamp:rifle',
       nodes: nodes.rifle,
     },
+    mpx: { R: gunGrip(nodes.mpx.gripR, 'mpx'), L: gunGrip(nodes.mpx.gripL, 'mpx'), rPose: 'grip:mpx', lPose: 'foregrip:mpx', nodes: nodes.mpx },
     spear: { R: null },
     bow: { L: null },
     trap: { L: null, R: null },
@@ -208,7 +217,7 @@ export function toolGrips() {
     torch: { L: null },
     fruit: { R: toGrip({ pos: palm.toArray(), finger: fruitFinger, back: fruitBack }) },
   };
-  for (const kind of ['pistol', 'rifle']) {
+  for (const kind of ['pistol', 'rifle', 'mpx']) {
     const w = FIRING_GRIP[kind];
     g[kind].R.fit = { name: g[kind].rPose, base: 'grip', point: w.point, axis: w.axis, radius: w.radius, scale: GUN_SCALE[kind], trigger: w.trigger, keepThumb: true, thumb: w.thumb, thumbBase: w.thumbBase,
       grip: scaledGrip(nodes[kind].gripR, HAND_SCALE, GUN_SCALE[kind]) };
@@ -219,6 +228,9 @@ export function toolGrips() {
     const raw = cyl(scale, o);
     return toGrip(raw, { fit: { name, base, point: o.point, axis: o.axis, radius: o.fitRadius ?? o.radius, scale, grip: raw } });
   };
+  g.mpx.L = cylGrip(GUN_SCALE.mpx, 'foregrip:mpx', 'fist', { point: [0, 0.015, -0.208], axis: [0, -Math.cos(0.2), Math.sin(0.2)], radius: 0.015, normal: [-1, 0, 0], wrap: -1 });
+  // Keep clip home keys and fitted idle wrists on the same foregrip contact.
+  nodes.mpx.gripL = { pos: g.mpx.L.pos.toArray(), finger: g.mpx.L.finger, back: g.mpx.L.back };
   g.spear.R = cylGrip(1, 'fist:spear', 'fist', { point: [0, SPEAR_GRIP_Y, 0], axis: [0, 1, 0], radius: 0.036, normal: [0, 0, 1], wrap: -1 });
   g.bow.L = cylGrip(SCALE.bow, 'fist:bow', 'fist', { point: [0, -0.075, 0], axis: [0, 1, 0], radius: 0.036, normal: [-1, 0, 0.1], wrap: -1 });
   for (const [side, key, name] of [[1, 'R', 'fist:trapR'], [-1, 'L', 'fist:trapL']]) {
@@ -237,6 +249,7 @@ const FIRING_GRIP = {
   // the pistol's thumb: CoD's lies along the left of the frame, but the bigger hand sits up at the slide, so it is turned in
   // and down to stay inside the slide (it poked out of both sides of it)
   pistol: { point: [0, 0.022, 0.016], axis: [0, -0.949, 0.314], radius: 0.0165, trigger: [0.004, 0.014, -0.0145], thumb: [0.5, 0.34], thumbBase: [0.15, -0.95, -0.95] },
+  mpx: { point: [0, 0.033, 0.018], axis: [0, -Math.cos(0.36), Math.sin(0.36)], radius: 0.0165, trigger: [0.004, 0.034, -0.004] },
   rifle: { point: [0, 0.035, 0.015], axis: [0, -0.929, 0.371], radius: 0.0165, trigger: [0.004, 0.0345, -0.0035] },
 };
 
@@ -298,7 +311,7 @@ function eatClip(d) {
   });
 }
 
-const isGun = (t) => t === 'pistol' || t === 'rifle';
+const isGun = (t) => t === 'pistol' || t === 'rifle' || t === 'mpx';
 
 export class Viewmodel {
   constructor(gfx, slot) {
@@ -326,6 +339,8 @@ export class Viewmodel {
     fitGrip(this.armL, g.bow.L);
     fitGrip(this.armL, g.trap.L);
     fitGrip(this.armL, g.rifle.L);
+    fitGrip(this.armL, g.mpx.L);
+    fitGrip(this.armR, g.mpx.R);
     fitGrip(this.armR, g.pistol.R);
     fitGrip(this.armR, g.rifle.R);
     fitGrip(this.armT, g.torch.L);
@@ -348,7 +363,7 @@ export class Viewmodel {
     this.knife = mesh(knifeGeometry(), MAT.standard, { cast: false });
     this.fruitHolder = new THREE.Group();
     this.fruitMeshes = {};
-    this.guns = { pistol: makeFirearm('pistol'), rifle: makeFirearm('rifle') };
+    this.guns = { pistol: makeFirearm('pistol'), rifle: makeFirearm('rifle'), mpx: makeFirearm('mpx') };
     this.clips = {};
     for (const [kind, gun] of Object.entries(this.guns)) {
       gun.traverse((o) => { o.castShadow = false; });
@@ -367,7 +382,7 @@ export class Viewmodel {
     this.torch = makeTorch();
     this.torch.scale.setScalar(SCALE.torch);
     this.torch.traverse((o) => { o.castShadow = false; });
-    this.root.add(this.spear, this.bow, this.trap, this.knife, this.fruitHolder, this.guns.pistol, this.guns.rifle, this.torch);
+    this.root.add(this.spear, this.bow, this.trap, this.knife, this.fruitHolder, this.guns.pistol, this.guns.rifle, this.guns.mpx, this.torch);
 
     // ---- state ----
     this.tool = 'spear';

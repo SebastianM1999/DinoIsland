@@ -32,7 +32,7 @@ const P = CONFIG.player;
 /** Warn about dinosaurs (all but the Brachiosaurus) closer than this (m). */
 const DINO_ALERT_RANGE = 50;
 const LOOT_KEYS = Object.keys(CONFIG.loot);
-const SLOT_LABEL = { torch: 'Torch', spear: 'Spear', bow: 'Bow', trap: 'Trap', fruit: 'Fruit', pistol: 'P-19 pistol', rifle: 'M4A1 rifle' };
+const SLOT_LABEL = { torch: 'Torch', spear: 'Spear', bow: 'Bow', trap: 'Trap', fruit: 'Fruit', pistol: 'P-19 pistol', rifle: 'M4A1 rifle', mpx: 'MPX-9 SMG' };
 const _fwd = new THREE.Vector3();
 const _right = new THREE.Vector3();
 const _up = new THREE.Vector3();
@@ -70,7 +70,7 @@ export class PlayerActions {
     this.lastFullText = '';
     this.lastLoot = 0;
     this.promptAction = null;
-    this.pockets = loadPocketOrder();   // pocket -> EQUIP index (keys 1-6, hotbar, inventory)
+    this.pockets = loadPocketOrder();   // pocket -> EQUIP index (keys 1-7, hotbar, inventory)
 
     // placement ghosts
     const ghostMat = new THREE.MeshBasicMaterial({ color: '#ffe07a', transparent: true, opacity: 0.45, depthWrite: false });
@@ -204,11 +204,11 @@ export class PlayerActions {
         this.drawT = 0;
         this.vm.release();
       }
-    } else if (tool === 'pistol' || tool === 'rifle') {
+    } else if (tool === 'pistol' || tool === 'rifle' || tool === 'mpx') {
       const ammo = this.inv.guns?.[tool];
       const ready = canAct && ammo?.owned !== false && this.vm.tool === tool && !this.vm.pendingTool && this.vm.switchT < 0.05;
       if (ready && input.wasPressed('reloadHint')) this.reloadGun();
-      const trigger = tool === 'rifle' ? input.isHeld('primary') : input.wasPressed('primary');
+      const trigger = tool !== 'pistol' ? input.isHeld('primary') : input.wasPressed('primary');
       if (ready && trigger && this.cooldown <= 0 && !this.inv.reloading) {
         if (ammo?.loaded > 0) this.shootGun();
         else { g.audio?.play('empty'); this.cooldown = 0.25; }
@@ -218,6 +218,14 @@ export class PlayerActions {
     }
     if (tool !== 'bow' && this.drawing) { this.drawing = false; this.drawT = 0; }
     this.gunEffects.update(dt);
+    if (this.reloadSound && (!alive || this.inv.reloading !== this.reloadSoundKind || tool !== this.reloadSoundKind)) {
+      if (typeof this.reloadSound === 'function') this.reloadSound();
+      this.reloadSound = null;
+    }
+    if (alive && this.inv.reloading === 'mpx' && tool === 'mpx' && !this.reloadSound) {
+      this.reloadSoundKind = tool;
+      this.reloadSound = g.audio?.play('mpxReload', { duration: W[tool].reloadTime * g.mods.reloadMul });
+    }
     this.reloadT = this.inv.reloading ? this.reloadT + dt : 0;
     // guns are always fired from the hip (no aim-down-sights)
     // a reload started on an empty magazine plays the long clip (latched by reloadGun); otherwise an empty magazine locks the slide back
@@ -286,7 +294,7 @@ export class PlayerActions {
   /** Can EQUIP index `i` be taken in hand? (island 1: no bow until the hunter's camp; the demo: no firearms) */
   canSelect(i) {
     if (EQUIP[i] === 'bow' && this.inv.bow === false) return false;
-    if ((EQUIP[i] === 'pistol' || EQUIP[i] === 'rifle') && !this.inv.guns?.[EQUIP[i]]) return false;
+    if ((EQUIP[i] === 'pistol' || EQUIP[i] === 'rifle' || EQUIP[i] === 'mpx') && !this.inv.guns?.[EQUIP[i]]) return false;
     return i >= 0 && i < EQUIP.length;
   }
 
@@ -352,7 +360,7 @@ export class PlayerActions {
     this.reloadT = 0;
     this.reloadEmpty = ammo.loaded === 0;
     this.game.net.act(ACT.RELOAD, { kind: tool });
-    this.game.audio?.play('reload');
+    if (tool !== 'mpx') this.game.audio?.play('reload');
   }
 
   shootGun() {
@@ -706,7 +714,7 @@ export class PlayerActions {
         if (this.inv.torch) continue;   // one torch per player, the spot keeps its own
       } else if (it.kind === 'spear') {
         if (this.inv.spear) continue;
-      } else if (it.kind === 'pistol' || it.kind === 'rifle') {
+      } else if (it.kind === 'pistol' || it.kind === 'rifle' || it.kind === 'mpx') {
         if (this.inv.guns?.[it.kind]?.owned !== false) continue;
       } else if (it.kind === 'trap') {
         if (this.inv.traps >= caps.traps) full = ['You carry as many traps as you can', 'trap'];
@@ -753,7 +761,7 @@ export class PlayerActions {
       { id: 'trap', label: SLOT_LABEL.trap, count: inv.traps, enabled: inv.traps > 0 },
       { id: 'fruit', label: SLOT_LABEL.fruit, count: inv.fruit.length, enabled: inv.fruit.length > 0, sub: fruitType || undefined },
       // (no firearms in the pack – the demo: their pockets stay empty)
-      ...['pistol', 'rifle'].map(id => inv.guns?.[id] ? { id, label: `${SLOT_LABEL[id]} - R reload`, count: inv.guns[id].loaded ?? 0, enabled: (inv.guns[id].loaded ?? 0) > 0 } : null),
+      ...['pistol', 'rifle', 'mpx'].map(id => inv.guns?.[id] ? { id, label: `${SLOT_LABEL[id]} - R reload`, count: inv.guns[id].loaded ?? 0, enabled: (inv.guns[id].loaded ?? 0) > 0 } : null),
     ];
     hud.setHotbar(this.pockets.map((eq) => rows[eq]), pocketOf(this.pockets, g.eq));
     const caps = this.caps;

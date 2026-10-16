@@ -74,19 +74,19 @@ test('unknown drop requests and drops while downed cannot change the inventory',
   assert.equal(world.items.size, 0);
 });
 
-test('firearms retain ammunition when dropped, cancel reload and can be recovered', () => {
+for (const kind of ['rifle', 'mpx']) test(`${kind} retains ammunition when dropped, cancels reload and can be recovered`, () => {
   const { world, p, act } = setup();
-  p.inv.guns.rifle = { loaded: 8, reserve: 19 };
-  p.inv.reloading = 'rifle';
-  act(ACT.DROP, { kind: 'rifle' });
-  const item = [...world.items.values()].find(i => i.kind === 'rifle');
+  p.inv.guns[kind] = { loaded: 8, reserve: 19 };
+  p.inv.reloading = kind;
+  act(ACT.DROP, { kind: kind });
+  const item = [...world.items.values()].find(i => i.kind === kind);
   assert.deepEqual(item.ammo, { loaded: 8, reserve: 19 });
-  assert.equal(p.inv.guns.rifle.owned, false);
+  assert.equal(p.inv.guns[kind].owned, false);
   assert.equal(p.inv.reloading, null);
-  act(ACT.DROP, { kind: 'rifle' });
+  act(ACT.DROP, { kind: kind });
   assert.equal(world.items.size, 1);
   act(ACT.PICKUP, { item: item.id });
-  assert.deepEqual(p.inv.guns.rifle, { loaded: 8, reserve: 19, owned: true });
+  assert.deepEqual(p.inv.guns[kind], { loaded: 8, reserve: 19, owned: true });
 });
 
 test('creative supplies restore a dropped firearm and keep numeric inventory fields finite', () => {

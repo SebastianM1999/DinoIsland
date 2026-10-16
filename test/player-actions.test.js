@@ -18,7 +18,7 @@ function fixture(t) {
     me: { id: 1, slot: 0, alive: true, hp: 70, inv: {
       spear: true, spearHealth: 67, arrows: 3, arrowUses: [2, 2, 2], traps: 1,
       fruit: [], loot: {}, upgrades: [], reloading: null,
-      guns: { pistol: { owned: true, loaded: 2, reserve: 10 }, rifle: { owned: true, loaded: 2, reserve: 10 } },
+      guns: { pistol: { owned: true, loaded: 2, reserve: 10 }, rifle: { owned: true, loaded: 2, reserve: 10 }, mpx: { owned: true, loaded: 32, reserve: 96 } },
     } },
     player: { pos: new THREE.Vector3(), yaw: 0, moveSpeed: 0, onGround: true, sprinting: false },
     terrain: { heightAt: () => 0, waterLevelAt: () => null },
@@ -369,8 +369,8 @@ test('without firearms in the pack (the demo) there are no gun slots and the gun
   const { game, actions, frame } = fixture(t);
   game.me.inv.guns = {};
   frame();
-  assert.deepEqual(game.hotbar.map((s) => s?.id ?? null), ['spear', 'bow', 'trap', 'fruit', null, null], 'the gun pockets stay empty');
-  assert.deepEqual(game.inventoryHud.pockets.filter((s) => s.locked).map((s) => s.id), ['pistol', 'rifle']);
+  assert.deepEqual(game.hotbar.map((s) => s?.id ?? null), ['spear', 'bow', 'trap', 'fruit', null, null, null], 'the gun pockets stay empty');
+  assert.deepEqual(game.inventoryHud.pockets.filter((s) => s.locked).map((s) => s.id), ['pistol', 'rifle', 'mpx']);
   actions.select(EQUIP.indexOf('pistol'));
   actions.select(EQUIP.indexOf('rifle'));
   assert.equal(EQUIP[game.eq], 'spear');
@@ -391,8 +391,8 @@ test('number keys, the wheel, the hotbar and the inventory follow the pocket ord
   game.me.inv.fruit = ['berry'];
   pressed.add('slot1'); frame();
   assert.equal(actions.tool, 'fruit');
-  assert.deepEqual(game.hotbar.map((s) => s?.id), ['fruit', 'bow', 'trap', 'spear', 'pistol', 'rifle']);
-  assert.deepEqual(game.inventoryHud.pockets.map((s) => s.id), ['fruit', 'bow', 'trap', 'spear', 'pistol', 'rifle']);
+  assert.deepEqual(game.hotbar.map((s) => s?.id), ['fruit', 'bow', 'trap', 'spear', 'pistol', 'rifle', 'mpx']);
+  assert.deepEqual(game.inventoryHud.pockets.map((s) => s.id), ['fruit', 'bow', 'trap', 'spear', 'pistol', 'rifle', 'mpx']);
   assert.equal(game.inventoryHud.pockets[0].selected, true);
   assert.equal(game.inventoryHud.slots, CONFIG.player.backpackSlots);
   game.lastWheel = 1; frame(); game.lastWheel = 0;
@@ -432,4 +432,40 @@ test('auto-loot leaves a new material kind on the ground when every backpack slo
   assert.deepEqual(requests.filter((r) => r.a === ACT.PICKUP).map((r) => r.item), [42]);
   assert.match(alerts.at(-1)[0], /backpack is full/);
   frame();
+});
+
+test('MPX holds automatic fire, reloads with its sound and keeps a wider movement-sensitive cone without zoom', t => {
+  const { game, actions, equip, held, frame, requests, pressed, sounds } = fixture(t);
+  equip('mpx'); held.add('primary'); held.add('secondary');
+  const oldRandom = Math.random; Math.random = () => 0.5;
+  t.after(() => { Math.random = oldRandom; });
+  frame(0.075); frame(0.075);
+  const shots = requests.filter(m => m.a === ACT.SHOT);
+  assert.equal(shots.length, 2); assert.equal(game.me.inv.guns.mpx.loaded, 30);
+  assert.ok(sounds.includes('mpx')); assert.equal(actions.vm.ads, 0);
+  const radius = d => Math.hypot(d[0],d[1]) / -d[2];
+  const still = radius(shots[0].dir);
+  assert.ok(still > CONFIG.weapons.rifle.spread);
+  game.player.moveSpeed = CONFIG.player.sprintSpeed; frame(0.075);
+  const moving = radius(requests.filter(m => m.a === ACT.SHOT).at(-1).dir);
+  assert.ok(moving > still);
+  held.clear(); pressed.add('reloadHint'); frame();
+  assert.ok(requests.some(m => m.a === ACT.RELOAD && m.kind === 'mpx'));
+  assert.ok(!sounds.includes('mpxReload'), 'wait for host acceptance');
+  game.me.inv.reloading = 'mpx'; frame();
+  assert.ok(sounds.includes('mpxReload'));
+});
+
+test('MPX reload sound waits for acceptance and cancels on switch or death', t => {
+  const {game, actions, equip, frame, pressed} = fixture(t); equip('mpx');
+  const played = []; let cancels = 0;
+  game.audio.play = (name, opts) => { played.push([name, opts]); return name === 'mpxReload' ? () => { cancels++; } : undefined; };
+  game.me.inv.guns.mpx.loaded = 10; pressed.add('reloadHint'); frame();
+  assert.equal(played.length, 0);
+  game.me.inv.reloading = 'mpx'; frame(); frame();
+  assert.equal(played.length, 1); assert.equal(played[0][0], 'mpxReload');
+  assert.equal(played[0][1].duration, CONFIG.weapons.mpx.reloadTime);
+  actions.select(EQUIP.indexOf('rifle')); frame(); assert.equal(cancels, 1);
+  game.me.inv.reloading = null; equip('mpx'); game.me.inv.reloading = 'mpx'; frame();
+  game.me.alive = false; frame(); assert.equal(cancels, 2);
 });
