@@ -729,12 +729,12 @@ export class Game {
     // downed: frozen and lying, teammates may revive us until the countdown ends (then DEATH follows)
     net.on(`ev:${EV.DOWN}`, (m) => {
       if (m.id !== this.me.id) return;
-      this.#setDowned(m.t);
+      this.#setDowned(m.secs);
     });
     net.on(`ev:${EV.REVIVE}`, (m) => {
       if (m.id !== this.me.id || !this.downed) return;
-      this.downed.reviveBy = m.t > 0 ? m.by : null;
-      this.downed.reviveT = m.t;
+      this.downed.reviveBy = m.secs > 0 ? m.by : null;
+      this.downed.reviveT = m.secs;
       this.downed.reviveAt = this.time;
     });
     net.on(`ev:${EV.REVIVED}`, (m) => {

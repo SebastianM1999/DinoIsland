@@ -64,7 +64,7 @@ Grouped by the module area they mainly cover. Many simulation tests also check t
 - `firearms.test.js` — pistol/rifle actions, reload, fire rate under host ticks, gun grips (`src/sim/firearms.js` + client viewmodel/player model).
 - `weapons.test.js` — client spear throw, bow/arrow/trap hand contacts and release sync (viewmodel, projectiles, player model).
 - `projectile-recovery.test.js` — arrow/spear wear, refill, lodged spears and recovery (server + client `Items`).
-- `butcher.test.js` — butchering carcasses (3 / 5 / 10 s by rank, one player at a time, one pass per press of V), loot only from butchering (alphas double), alpha spawns, low-FPS client stroke/ring timing and completion versus cancellation.
+- `butcher.test.js` — butchering carcasses (3 / 5 / 10 s by rank, one player at a time, one pass per press of V), loot only from butchering (alphas double), alpha spawns, butcher/downed/revive events delivered through a real `Net` session, low-FPS client stroke/ring timing and completion versus cancellation.
 
 ### Simulation: progression, base and economy
 - `skills.test.js` — skill tree data, XP/level math, buying, `sanitizeProfile`, `skillMods` (pure shared/skills.js).

@@ -206,12 +206,12 @@ test('revive input waits for server duration, stops on damage and release, and r
   const { game, actions, held, frame, emit, requests } = fixture(t);
   game.remotes.map.set(2, { id: 2, name: 'Hunter', fl: PF.DOWNED, pos: new THREE.Vector3(1, 0, 0) });
   held.add('interact'); frame(); assert.deepEqual(requests, [{ a: ACT.REVIVE, to: 2 }]);
-  assert.equal(game.reviveTarget.progress, 0); emit(EV.REVIVE, { by: 1, id: 2, t: 2 }); frame(1);
+  assert.equal(game.reviveTarget.progress, 0); emit(EV.REVIVE, { by: 1, id: 2, secs: 2 }); frame(1);
   assert.equal(game.reviveTarget.progress, 0.5);
   emit(EV.HURT, { id: 2 }); assert.ok(actions.reviving);
   emit(EV.HURT, { id: 1 }); assert.deepEqual(requests.at(-1), { a: ACT.REVIVE, stop: true });
   frame(0.05); assert.equal(requests.length, 2); frame(1); assert.equal(requests.length, 3);
-  emit(EV.REVIVE, { by: 1, id: 2, t: 0 }); frame(0.05); assert.equal(requests.length, 3);
+  emit(EV.REVIVE, { by: 1, id: 2, secs: 0 }); frame(0.05); assert.equal(requests.length, 3);
   frame(1); assert.equal(requests.length, 4); held.clear(); frame();
   assert.deepEqual(requests.at(-1), { a: ACT.REVIVE, stop: true });
   held.add('interact'); frame(); emit(EV.REVIVED, { id: 2 }); assert.equal(actions.reviving, null);
@@ -312,8 +312,8 @@ test('knife input finds only grounded unfinished carcasses and cancels movement 
   corpse.alive = false; corpse.butchered = false; corpse.grounded = () => true;
   held.add('knife'); frame(); assert.deepEqual(requests, [{ a: ACT.BUTCHER, dino: 7 }]);
   assert.equal(actions.findInteraction(game.player.pos).text, 'Butchering…');
-  emit(EV.BUTCHER, { id: 2, dino: 7, t: 1 }); assert.equal(actions.butcher.confirmed, false);
-  emit(EV.BUTCHER, { id: 1, dino: 7, t: 2 }); now += 1; frame();
+  emit(EV.BUTCHER, { id: 2, dino: 7, secs: 1 }); assert.equal(actions.butcher.confirmed, false);
+  emit(EV.BUTCHER, { id: 1, dino: 7, secs: 2 }); now += 1; frame();
   assert.equal(actions.knifeProgress(now), 0.5);
   game.player.pos.x += CONFIG.weapons.knife.moveCancel + 0.1; frame();
   assert.deepEqual(requests.at(-1), { a: ACT.BUTCHER, stop: 1 }); assert.equal(actions.butcher, null);
@@ -326,7 +326,7 @@ test('knife input finds only grounded unfinished carcasses and cancels movement 
   assert.equal(requests.length, count, 'refused starts do not send a redundant stop');
   frame(0.5); frame(0.6); assert.equal(requests.length, count, 'no retry while V stays held');
   held.delete('knife'); frame(); held.add('knife'); frame(); assert.equal(requests.length, count + 1);
-  emit(EV.BUTCHER, { id: 1, dino: 7, t: 2 }); emit(EV.BUTCHER, { id: 1, done: true });
+  emit(EV.BUTCHER, { id: 1, dino: 7, secs: 2 }); emit(EV.BUTCHER, { id: 1, done: true });
   assert.equal(actions.knifeProgress(now), 1); now += 0.3; assert.equal(actions.knifeProgress(now), null);
 });
 

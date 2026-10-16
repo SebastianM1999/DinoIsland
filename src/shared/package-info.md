@@ -73,7 +73,7 @@
 - Protocol changes must stay in sync with `src/sim/world.js` (handler), `src/client/net/net.js` (sender) and the 8 KiB inbound cap in `server/gameHost.js` / 8192-byte cap in `desktop/steam-session.js`. Steam's unreliable routing depends on the `snap`/`state` type strings.
 - Renaming `BRAND.slug` or `storagePrefix` has player-visible effects (Steam lobby visibility, saved settings); see the notes in `brand.js`.
 
-- The butcher protocol distinguishes successful completion (`EV.BUTCHER.done`) from cancellation; the time comes from the rank (`dinoRank.js`), reduced by `skillMods.knifeTimeMul` on the server, and reaches the client in `EV.BUTCHER.t`. A kill drops only the stuck arrows.
+- The butcher protocol distinguishes successful completion (`EV.BUTCHER.done`) from cancellation; the time comes from the rank (`dinoRank.js`), reduced by `skillMods.knifeTimeMul` on the server, and reaches the client in `EV.BUTCHER.secs`. Event payloads never use `t` or `e` (the message type and event name): durations travel as `secs` (`EV.BUTCHER`, `EV.DOWN`, `EV.REVIVE`). A kill drops only the stuck arrows.
 
 ## Not here
 - Authoritative game logic (AI, damage, inventory, raids, missions progress): `src/sim/`.

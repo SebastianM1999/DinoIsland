@@ -112,14 +112,14 @@ export const EV = {
   OUTFIT: 'outfit',         // { id, outfit }                    a player changed clothes
   RELIC: 'relic',           // { id, kind, by }                  a boat part was found
   BOAT: 'boat',             // { repaired }                      the boat got repaired
-  BUTCHER: 'butcher',       // { id, dino, t, done? }            start (t seconds), stop (t 0), done true on completion
+  BUTCHER: 'butcher',       // { id, dino, secs, done? }         start (secs seconds), stop (secs 0), done true on completion
   BUTCHERED: 'butchered',   // { id }                            carcass id was butchered (sinks away)
   BASE: 'base',             // { base }                          the team's base changed (see shared/base.js freshBase)
   TOWER_SHOT: 'tshot',      // { slot, kind, o, end, dino }      a base tower fired
   RAID: 'raid',             // { raid: { phase, dir, left } }    raid announced (warn) / started / over (idle)
   XP: 'xp',                 // { amount, why, level?, free }     PRIVATE: you gained XP (level = new level when you levelled up, free = unspent points)
-  DOWN: 'down',             // { id, t, by }                     player id is downed and bleeds out in t seconds (teammates can revive)
-  REVIVE: 'revive',         // { id, by, t }                     by started reviving id (t = seconds; t 0 = stopped)
+  DOWN: 'down',             // { id, secs, by }                  player id is downed and bleeds out in secs seconds (teammates can revive)
+  REVIVE: 'revive',         // { id, by, secs }                  by started reviving id (secs = seconds; 0 = stopped)
   REVIVED: 'revived',       // { id, by, x, z }                  id was revived (replaces a respawn)
   HEAL: 'heal',             // { id, by, hp }                    Field Medic healed id
   VOLCANO: 'volcano',       // { phase, left, source? }          eruption cycle (sim/volcano.js): calm | rumble | erupt | ash (source: eruption | wind)
