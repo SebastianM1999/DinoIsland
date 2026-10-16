@@ -234,6 +234,9 @@ export const ICONS = {
 
   weight: svg(`<path d="M9 11h14l4 17H5z" fill="currentColor"/><circle cx="16" cy="7" r="3.5" fill="none" stroke="currentColor" stroke-width="2.4"/>`),
 
+  // a locked inventory pocket (tool not found yet / not in this game)
+  lock: svg(`<path d="M10.5 14v-3.5a5.5 5.5 0 0 1 11 0V14" fill="none" stroke="currentColor" stroke-width="3"/><rect x="7" y="14" width="18" height="14" rx="2.5" fill="currentColor"/>`),
+
   // --- boat + boat parts (relics)
   boat: svg(`<path d="M3 19h26l-4 7H8z" fill="#b77a45" stroke="${OUT}" stroke-width="1" stroke-linejoin="round"/>
     <path d="M3 19h26" stroke="#e0b03a" stroke-width="1.4"/>

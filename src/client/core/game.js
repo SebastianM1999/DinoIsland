@@ -195,6 +195,7 @@ export class Game {
         action = 'close';
       }
       if (action === 'close' && !this.hud.isPanelOpen()) return false;
+      if (action === 'close' && this.hud.inventoryBack()) return true;   // Esc on an item's stats: back to the explorer first
       let open;
       if (action === 'inventory') open = this.hud.toggleInventory();
       else if (action === 'map') open = this.hud.toggleMap();
@@ -434,6 +435,7 @@ export class Game {
         this.me.name = p.name;
         this.me.outfit = p.outfit;
         this.actions.vm.setOutfit(p.outfit);
+        this.hud.setOutfit(p.outfit);
         this.player.teleport(p.x, p.z, p.yaw);
       } else {
         this.remotes.add(p);
@@ -610,6 +612,7 @@ export class Game {
       if (m.id === this.me.id) {
         this.me.outfit = m.outfit;
         this.actions.vm.setOutfit(m.outfit);
+        this.hud.setOutfit(m.outfit);
         this.wardrobe.setWorn(m.outfit);
         this.hud.toast('New outfit on!', 'team');
       } else {

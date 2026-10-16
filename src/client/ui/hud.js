@@ -10,7 +10,7 @@ import { CONFIG } from '../../shared/config.js';
 import { icon, portraitSvg } from './icons.js';
 import { buildMapBase, buildMapBaseSteps, drawMap } from './minimap.js';
 import { revealMap } from './caveMap.js';
-import { ITEM_INFO } from './itemInfo.js';
+import { ITEM_INFO, itemStats } from './itemInfo.js';
 import { CONTRACTS as BOARD_CONTRACTS } from '../../shared/missions.js';
 import { RELICS } from '../../shared/relics.js';
 import { BRAND } from '../../shared/brand.js';
@@ -257,66 +257,93 @@ export class Hud {
     this.$downedCount = this.$downed.querySelector('.hud-downed-count');
     this.$downedKey = this.$downed.querySelector('.hud-downed-key');
 
+    // Inventory (Tab): pockets 1-6 and the 2x3 backpack on the left, the explorer (or the selected
+    // item's stats) on the right. The frame is built once so the 3D preview's canvas survives the
+    // item column re-rendering; only `.hud-inv-items` and the stats view are rebuilt.
     this.$invPanel = el('section', 'hud-panel hud-inv brush');
     this.$invPanel.setAttribute('aria-label', 'Inventory');
     this.$invPanel.hidden = true;
+    this.$invPanel.innerHTML = `
+      <header class="hud-panel-head"><h2>Inventory</h2><button type="button" class="wd-btn" data-inventory-action="close">Close <kbd>Esc</kbd></button></header>
+      <div class="hud-inv-body">
+        <div class="hud-inv-items"></div>
+        <aside class="hud-inv-detail" aria-label="Explorer and selected item">
+          <div class="hud-inv-character">
+            <canvas class="hud-inv-canvas" aria-label="Your explorer – drag to turn"></canvas>
+            <p class="hud-inv-note">Select a pocket or a backpack stack to see its stats.</p>
+          </div>
+          <div class="hud-inv-stats" hidden></div>
+        </aside>
+      </div>`;
+    this.$invItems = this.$invPanel.querySelector('.hud-inv-items');
+    this.$invCharacter = this.$invPanel.querySelector('.hud-inv-character');
+    this.$invStats = this.$invPanel.querySelector('.hud-inv-stats');
+    this.$invCanvas = this.$invPanel.querySelector('.hud-inv-canvas');
     this.$invPanel.addEventListener('click', e => {
       const cell = e.target.closest('[data-inventory-item]');
-      if (cell) { this._selectInventoryItem(cell.dataset.inventoryItem); return; }
+      if (cell) {
+        // clicking the selected cell again goes back to the explorer
+        const key = cell.dataset.inventoryItem;
+        this._selectInventoryItem(key === this._inventorySelection ? null : key);
+        return;
+      }
       const action = e.target.closest('[data-inventory-action]')?.dataset.inventoryAction;
-      if (action === 'close') { this.onCloseInventory?.(); return; }
+      if (action === 'close') { this._selectInventoryItem(null); this.onCloseInventory?.(); return; }
+      if (action === 'back') { this.inventoryBack(); return; }
       const item = this._inventoryItems?.get(this._inventorySelection);
       if (!item?.drop || (action !== 'drop' && action !== 'deposit')) return;
-      if (action === 'deposit' && !CONFIG.loot[item.kind]) return;
-      this.onInventoryDrop?.(item.kind, action === 'deposit');
-    });
-    this.$invPanel.addEventListener('focusin', e => {
-      const cell = e.target.closest('[data-inventory-item]');
-      if (cell) this._selectInventoryItem(cell.dataset.inventoryItem);
-    });
-    this.$invPanel.addEventListener('change', e => {
-      if (!e.target.matches('[data-inventory-empty]')) return;
-      this._showEmptyConsumables = e.target.checked;
-      this._renderInventory();
+      if (action === 'deposit' && !CONFIG.loot[item.drop]) return;
+      this.onInventoryDrop?.(item.drop, action === 'deposit');
     });
     this.$invPanel.addEventListener('keydown', e => {
       // Tab is the inventory key: it bubbles on to Input, which closes the panel the way it opened
-      // it. The arrow keys move between the cells; Escape also closes.
+      // it. The arrow keys move between the cells; 1-6 move the selected pocket there.
       if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key)) {
-        const controls = [...this.$invPanel.querySelectorAll('button:not(:disabled), input')];
+        const controls = [...this.$invPanel.querySelectorAll('button:not(:disabled)')];
         const i = controls.indexOf(document.activeElement);
         e.preventDefault(); e.stopPropagation();
         controls[(i + (['ArrowLeft', 'ArrowUp'].includes(e.key) ? -1 : 1) + controls.length) % controls.length]?.focus();
+        return;
+      }
+      const to = /^Digit([1-6])$/.exec(e.code)?.[1] - 1;
+      const from = this._inventoryItems?.get(this._inventorySelection)?.pocket;
+      if (Number.isInteger(to) && to < EQUIP.length && from != null) {
+        e.preventDefault(); e.stopPropagation();   // the key moves the pocket, it does not pick a tool
+        this._swapPockets(from, to);
       }
     });
     this.$invPanel.addEventListener('wheel', (e) => {
-      if (!e.deltaY || e.target.closest('.hud-inv-body')?.scrollHeight > e.target.closest('.hud-inv-body')?.clientHeight) return;
+      if (!e.deltaY) return;
       e.preventDefault();
       this.onInventoryWheel?.(Math.sign(e.deltaY));
     }, { passive: false });
     this.$invPanel.addEventListener('dragstart', (e) => {
-      const cell = e.target.closest('[data-drop-kind]');
+      const cell = e.target.closest('[data-pocket], [data-drop-kind]');
       if (!cell) return;
-      this._dragKind = cell.dataset.dropKind;
-      e.dataTransfer.setData('text/plain', this._dragKind);
+      this._dragPocket = cell.dataset.pocket != null ? Number(cell.dataset.pocket) : null;
+      this._dragKind = cell.dataset.dropKind || null;
+      e.dataTransfer.setData('text/plain', this._dragKind || `pocket ${this._dragPocket + 1}`);
       e.dataTransfer.effectAllowed = 'move';
       this.$tip.hidden = true;
     });
-    this.$invPanel.addEventListener('dragend', () => { this._dragKind = null; });
+    this.$invPanel.addEventListener('dragend', () => { this._dragKind = null; this._dragPocket = null; });
     this._onDragOver = (e) => {
-      if (!this._dragKind || !this._invOpen) return;
-      const store = e.target.closest?.('.hud-inv-store');
-      if (store && !CONFIG.loot[this._dragKind]) return;
-      if (store || e.target.closest?.('[data-world-drop]') || !this.$invPanel.contains(e.target)) e.preventDefault();
+      if (!this._invOpen) return;
+      if (this._dragPocket != null && e.target.closest?.('[data-pocket]')) { e.preventDefault(); return; }
+      if (this._dragKind && (e.target.closest?.('[data-world-drop]') || !this.$invPanel.contains(e.target))) e.preventDefault();
     };
     this._onDrop = (e) => {
-      if (!this._dragKind || !this._invOpen) return;
-      const store = !!e.target.closest?.('.hud-inv-store');
-      if (store && !CONFIG.loot[this._dragKind]) return;
-      if (!store && !e.target.closest?.('[data-world-drop]') && this.$invPanel.contains(e.target)) return;
-      e.preventDefault();
-      this.onInventoryDrop?.(this._dragKind, store);
+      if (!this._invOpen) return;
+      const pocket = e.target.closest?.('[data-pocket]');
+      if (this._dragPocket != null && pocket) {
+        e.preventDefault();
+        this._swapPockets(this._dragPocket, Number(pocket.dataset.pocket));
+      } else if (this._dragKind && (e.target.closest?.('[data-world-drop]') || !this.$invPanel.contains(e.target))) {
+        e.preventDefault();
+        this.onInventoryDrop?.(this._dragKind, false);
+      }
       this._dragKind = null;
+      this._dragPocket = null;
     };
     document.addEventListener('dragover', this._onDragOver);
     document.addEventListener('drop', this._onDrop);
@@ -423,6 +450,10 @@ export class Hud {
   dispose() {
     document.removeEventListener('dragover', this._onDragOver);
     document.removeEventListener('drop', this._onDrop);
+    this._disposed = true;
+    this._previewLoading = null;
+    this._preview?.dispose();
+    this._preview = null;
     this._ro?.disconnect();
     clearTimeout(this._threatTimer);
     for (const timer of this._timers) clearTimeout(timer);
@@ -444,6 +475,7 @@ export class Hud {
     if (this._c.player === key) return;
     this._c.player = key;
     const s = slot | 0;
+    this._slot = s;
     this.$portrait.innerHTML = portraitSvg(CONFIG.playerColors[s] || CONFIG.playerColors[0], s);
     this.$portrait.title = name || '';
     this.$name.textContent = name || 'Explorer';
@@ -732,80 +764,144 @@ export class Hud {
     this.$equipped.innerHTML = `<strong>${esc(name)}</strong><span>${esc(detail)}</span>`;
   }
 
+  /** Order of the pockets the inventory shows when actions have not sent one yet (the HUD preview, the first frame). */
+  _pocketRows(inv) {
+    if (inv.pockets?.length === EQUIP.length) return inv.pockets;
+    return EQUIP.map((id, eq) => ({ eq, id, owned: false, locked: false, count: null, selected: false }));
+  }
+
   _renderInventory() {
     const inv = this._inv || {};
     this._invDirty = false;
     // Only rebuild when the contents change – rebuilding every frame would
-    // break hover tooltips.
+    // break hover tooltips and drags.
     const maxCarry = inv.maxCarry ?? CONFIG.player.maxCarryWeight;
-    const sig = JSON.stringify([this._showEmptyConsumables, inv.guns, inv.reloading, inv.spear, inv.spearHealth, inv.arrowUses, inv.arrows, inv.maxArrows, inv.maxFruit, maxCarry, inv.traps, inv.fruit, inv.loot, inv.store, Math.round((inv.carryWeight || 0) * 10), Math.round((inv.speedFactor ?? 1) * 100)]);
+    const slots = inv.slots ?? CONFIG.player.backpackSlots;
+    const pockets = this._pocketRows(inv);
+    const loot = inv.loot || {};
+    const stacks = LOOT_KEYS.filter((k) => loot[k] > 0);
+    const sig = JSON.stringify([pockets, inv.fruit, inv.arrows, stacks.map((k) => loot[k]), stacks, slots, maxCarry, Math.round((inv.carryWeight || 0) * 10), Math.round((inv.speedFactor ?? 1) * 100)]);
     if (this._c.invSig === sig) return;
     this._c.invSig = sig;
     const focused = this.$invPanel.contains(document.activeElement) ? document.activeElement.dataset.inventoryItem : null;
-    const focusedAction = this.$invPanel.contains(document.activeElement) ? document.activeElement.dataset.inventoryAction : null;
-    const focusedFilter = document.activeElement.hasAttribute('data-inventory-empty');
-    const scroll = this.$invPanel.querySelector('.hud-inv-items')?.scrollTop || 0;
     this._inventoryItems = new Map();
-    const cell = (ic, n, name, tip = ic, drop = null, stored = false) => {
-      const key = `${stored ? 'store' : 'carry'}:${tip}`;
-      this._inventoryItems.set(key, { kind: tip, icon: ic, count: n, name, drop, stored });
-      return `<li><button type="button" class="hud-cell${(stored ? n > 0 : drop) ? '' : ' is-zero'}" data-inventory-item="${key}" aria-pressed="false" aria-label="${esc(name)}, ${esc(n ?? 0)}${stored ? ', stored at hut' : ''}" ${drop ? `draggable="true" data-drop-kind="${drop}"` : ''}><span class="hud-cell-ic">${icon(ic)}</span><span class="hud-cell-n">${esc(n ?? '')}</span><span class="hud-cell-name">${esc(name)}</span></button></li>`;
-    };
-    const fruitCounts = {};
-    for (const f of inv.fruit || []) fruitCounts[f] = (fruitCounts[f] || 0) + 1;
-    const loot = inv.loot || {}, store = inv.store || {};
-    const gear = [
-      cell('spear', inv.spear ? `${inv.spearHealth ?? 100}%` : 0, 'Spear health', 'spear', inv.spear ? 'spear' : null),
-      ...['pistol', 'rifle'].filter(k => inv.guns?.[k]).map(k => cell(k, inv.guns?.[k]?.owned === false ? 0 : `${inv.guns?.[k]?.loaded ?? 0}/${inv.guns?.[k]?.reserve ?? 0}`, k === 'pistol' ? 'Pistol' : 'Assault rifle', k, inv.guns?.[k] && inv.guns[k].owned !== false ? k : null)),
-      cell('arrow', `${inv.arrows ?? 0}/${inv.maxArrows ?? CONFIG.weapons.bow.maxArrows}`, 'Arrows', 'arrow', inv.arrows > 0 ? 'arrow' : null),
-      cell('trap', inv.traps ?? 0, 'Traps', 'trap', inv.traps > 0 ? 'trap' : null),
-    ].join('');
-    const consumables = FRUIT_KEYS.filter(k => this._showEmptyConsumables || fruitCounts[k] > 0).map(k => cell(k, fruitCounts[k] || 0, fruitName(k), k, fruitCounts[k] > 0 ? k : null)).join('');
-    const carried = LOOT_KEYS.map((k) => cell(k, loot[k] || 0, lootName(k), k, loot[k] > 0 ? k : null)).join('');
-    const stored = LOOT_KEYS.map((k) => cell(k, store[k] || 0, lootName(k), k, null, true)).join('');
+
+    const fruitKind = (inv.fruit || [])[0];
+    const pocketCells = pockets.map((p, i) => {
+      const key = `pocket:${i}`;
+      const icId = p.id === 'fruit' && FRUIT_KEYS.includes(fruitKind) ? fruitKind : p.id;
+      // what Drop places on the ground: the spear, a gun, the arrows (bow), a trap, the first fruit
+      const drop = p.locked || !p.owned ? null : p.id === 'bow' ? (inv.arrows > 0 ? 'arrow' : null) : p.id === 'fruit' ? fruitKind || null : p.id;
+      const name = ITEM_INFO[p.id]?.name || p.id;
+      this._inventoryItems.set(key, { kind: p.id, icon: icId, count: p.count, name, drop, pocket: i, locked: p.locked });
+      const state = p.locked ? ' is-locked' : p.owned ? '' : ' is-zero';
+      return `<li><button type="button" class="hud-cell hud-pocket${state}${p.selected ? ' is-held' : ''}" data-inventory-item="${key}" data-pocket="${i}" draggable="true" ${drop ? `data-drop-kind="${drop}"` : ''} aria-pressed="false" aria-label="Pocket ${i + 1}: ${esc(name)}${p.locked ? ', locked' : p.count != null ? `, ${esc(p.count)}` : ''}${p.selected ? ', in hand' : ''}">`
+        + `<span class="hud-pocket-n">${i + 1}</span><span class="hud-cell-ic">${icon(icId)}</span>`
+        + `${p.locked ? `<span class="hud-pocket-lock" aria-hidden="true">${icon('lock')}</span>` : `<span class="hud-cell-n">${esc(p.count ?? '')}</span>`}`
+        + `<span class="hud-cell-name">${esc(name)}</span></button></li>`;
+    }).join('');
+
+    let backpack = '';
+    for (let i = 0; i < Math.max(slots, stacks.length); i++) {
+      const k = stacks[i];
+      if (!k) { backpack += '<li><span class="hud-cell hud-bag-empty" aria-hidden="true"></span></li>'; continue; }
+      const key = `loot:${k}`;
+      this._inventoryItems.set(key, { kind: k, icon: k, count: loot[k], name: lootName(k), drop: k });
+      backpack += `<li><button type="button" class="hud-cell" data-inventory-item="${key}" draggable="true" data-drop-kind="${k}" aria-pressed="false" aria-label="${esc(lootName(k))}, ${loot[k]}"><span class="hud-cell-ic">${icon(k)}</span><span class="hud-cell-n">${loot[k]}</span><span class="hud-cell-name">${esc(lootName(k))}</span></button></li>`;
+    }
     const sf = inv.speedFactor ?? 1;
-    this.$invPanel.innerHTML = `
-      <header class="hud-panel-head"><h2>Inventory</h2><button type="button" class="wd-btn" data-inventory-action="close">Close <kbd>Esc</kbd></button></header>
-      <div class="hud-inv-body">
-        <div class="hud-inv-items">
-          <h3>Equipment &amp; supplies</h3><ul class="hud-grid">${gear}</ul>
-          <h3>Consumables</h3><label class="hud-inv-filter"><input type="checkbox" data-inventory-empty ${this._showEmptyConsumables ? 'checked' : ''}> Show empty consumables</label>
-          ${consumables ? `<ul class="hud-grid">${consumables}</ul>` : '<p class="hud-inv-note">No fruit carried. Gather fruit on this island.</p>'}
-          <h3>Carried materials</h3><ul class="hud-grid">${carried}</ul>
-          <p class="hud-inv-stat">${icon('weight')} Load <b class="${(inv.carryWeight || 0) >= maxCarry ? 'is-slow' : ''}">${Math.round((inv.carryWeight || 0) * 10) / 10} / ${maxCarry}</b> · Speed <b class="${sf < 0.95 ? 'is-slow' : ''}">${Math.round(sf * 100)}%</b></p>
-          <p class="hud-inv-note">Select an item to inspect it or use its actions. Dragging stacks also works.</p>
-          <div class="hud-inv-drop" data-world-drop>Drop here to place items on the ground</div>
-        <div class="hud-inv-store">
-          <h3>${icon('home')} Hut store</h3><ul class="hud-grid">${stored}</ul>
-          <p class="hud-inv-note">Team supplies. Deposit carried materials near a hut drop-off.</p>
-        </div>
-        </div>
-        <aside class="hud-inv-detail" aria-label="Selected item"></aside>
-      </div>`;
-    this._selectInventoryItem(this._inventoryItems.has(this._inventorySelection) ? this._inventorySelection : this._inventoryItems.keys().next().value);
-    this.$invPanel.querySelector('.hud-inv-items').scrollTop = scroll;
-    if (focusedFilter) this.$invPanel.querySelector('[data-inventory-empty]')?.focus({ preventScroll: true });
+    const w = Math.round((inv.carryWeight || 0) * 10) / 10;
+    this.$invItems.innerHTML = `
+      <h3>Pockets <small>drag to rearrange · select one and press 1-6</small></h3>
+      <ol class="hud-pockets">${pocketCells}</ol>
+      <h3>Backpack <small class="${stacks.length >= slots ? 'is-slow' : ''}">${stacks.length} / ${slots} stacks</small></h3>
+      <ol class="hud-backpack">${backpack}</ol>
+      <p class="hud-inv-stat">${icon('weight')} Load <b class="${w >= maxCarry ? 'is-slow' : ''}">${w} / ${maxCarry}</b> · Speed <b class="${sf < 0.95 ? 'is-slow' : ''}">${Math.round(sf * 100)}%</b></p>
+      <div class="hud-inv-drop" data-world-drop>Drag here to drop on the ground</div>`;
+    this._selectInventoryItem(this._inventoryItems.has(this._inventorySelection) ? this._inventorySelection : null);
     if (focused) this.$invPanel.querySelector(`[data-inventory-item="${focused}"]`)?.focus({ preventScroll: true });
-    if (focusedAction) {
-      const button = this.$invPanel.querySelector(`[data-inventory-action="${focusedAction}"]`);
-      if (button && !button.disabled) button.focus({ preventScroll: true });
-      else this.$invPanel.querySelector(`[data-inventory-item="${this._inventorySelection}"]`)?.focus({ preventScroll: true });
+  }
+
+  /** Pocket `a` and pocket `b` trade places (actions keeps and saves the order); the selection follows the moved tool. */
+  _swapPockets(a, b) {
+    if (a === b || !this.onPocketSwap) return;
+    this.onPocketSwap(a, b);
+    const inv = this._inv || {};
+    if (inv.pockets) {
+      const pockets = inv.pockets.slice();
+      [pockets[a], pockets[b]] = [pockets[b], pockets[a]];
+      this._inv = { ...inv, pockets };
+    }
+    const moved = this._inventorySelection === `pocket:${a}`;
+    this._renderInventory();
+    if (moved) {
+      this._selectInventoryItem(`pocket:${b}`);
+      this.$invPanel.querySelector(`[data-inventory-item="pocket:${b}"]`)?.focus({ preventScroll: true });
     }
   }
 
+  /** Shows the selected item's stats, or the explorer when `key` is null. */
   _selectInventoryItem(key) {
-    const item = this._inventoryItems?.get(key);
-    if (!item) return;
-    this._inventorySelection = key;
-    for (const cell of this.$invPanel.querySelectorAll('[data-inventory-item]')) cell.setAttribute('aria-pressed', String(cell.dataset.inventoryItem === key));
-    const info = ITEM_INFO[item.kind] || {};
-    this.$invPanel.querySelector('.hud-inv-detail').innerHTML = `<div class="hud-inv-detail-icon">${icon(item.icon)}</div>
-      <p class="hud-inv-kind">${esc(item.stored ? 'Team storage' : info.kind || 'Equipment')}</p><h3>${esc(info.name || item.name)}</h3>
-      <p class="hud-inv-quantity">${item.kind === 'spear' ? 'Durability: ' : ['pistol', 'rifle'].includes(item.kind) ? 'Loaded / reserve: ' : 'Quantity: '}${esc(item.count ?? 0)}${item.stored ? ' in the hut store' : ''}</p>
+    const item = key != null ? this._inventoryItems?.get(key) : null;
+    this._inventorySelection = item ? key : null;
+    for (const cell of this.$invPanel.querySelectorAll('[data-inventory-item]')) cell.setAttribute('aria-pressed', String(cell.dataset.inventoryItem === this._inventorySelection));
+    this.$invCharacter.hidden = !!item;
+    this.$invStats.hidden = !item;
+    this._syncPreview();
+    if (!item) { this.$invStats.innerHTML = ''; return; }
+    // (the fruit pocket describes the fruit it would eat first)
+    const info = ITEM_INFO[item.icon] || ITEM_INFO[item.kind] || {};
+    const material = !!CONFIG.loot[item.kind];
+    const rows = itemStats(item.icon, material ? item.count : 0);
+    const count = item.locked ? 'Locked' : item.kind === 'spear' ? `Durability ${item.count || 0}`
+      : ['pistol', 'rifle'].includes(item.kind) ? (item.count ? `Loaded / reserve ${item.count}` : 'Not carried')
+      : item.kind === 'bow' ? `Arrows ${item.count ?? 0}` : `Carried ${item.count ?? 0}`;
+    this.$invStats.innerHTML = `<div class="hud-inv-detail-icon">${icon(item.icon)}</div>
+      <p class="hud-inv-kind">${esc(item.pocket != null ? `Pocket ${item.pocket + 1} · ${info.kind || 'Equipment'}` : info.kind || 'Material')}</p><h3>${esc(info.name || item.name)}</h3>
+      <p class="hud-inv-quantity">${esc(count)}</p>
+      ${rows.length ? `<dl class="hud-inv-statrows">${rows.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('')}</dl>` : ''}
       <p>${esc(info.text || 'Equipment for your expedition.')}</p>${info.use ? `<p class="hud-inv-note">${esc(info.use)}</p>` : ''}
-      <div class="hud-inv-actions"><button type="button" class="wd-btn" data-inventory-action="drop" ${item.drop ? '' : 'disabled'}>Drop ${['spear', 'pistol', 'rifle'].includes(item.kind) ? 'equipment' : 'stack'}</button>
-      <button type="button" class="wd-btn wd-primary" data-inventory-action="deposit" ${item.drop && CONFIG.loot[item.kind] ? '' : 'disabled'}>Deposit stack at hut</button></div>
-      <p class="hud-inv-note">${item.stored ? 'Stored supplies are shared with your team.' : CONFIG.loot[item.kind] ? 'Move close to the hut drop-off to deposit. Actions affect the full stack.' : 'Drop places the carried item or stack on the ground.'}</p>`;
+      <div class="hud-inv-actions"><button type="button" class="wd-btn" data-inventory-action="back">Back</button>
+      <button type="button" class="wd-btn" data-inventory-action="drop" ${item.drop ? '' : 'disabled'}>Drop ${material ? 'stack' : ['spear', 'pistol', 'rifle'].includes(item.kind) ? 'equipment' : 'one stack'}</button>
+      ${material ? '<button type="button" class="wd-btn wd-primary" data-inventory-action="deposit">Deposit at hut</button>' : ''}</div>
+      ${material ? '<p class="hud-inv-note">Move close to the hut drop-off to deposit. Actions affect the full stack.</p>' : ''}`;
+  }
+
+  /**
+   * Inventory open with an item selected: go back to the explorer (Esc, Back) and report true;
+   * false when there was nothing to go back from, so Esc closes the panel.
+   */
+  inventoryBack() {
+    if (!this._invOpen || this._inventorySelection == null) return false;
+    const key = this._inventorySelection;
+    this._selectInventoryItem(null);
+    this.$invPanel.querySelector(`[data-inventory-item="${key}"]`)?.focus({ preventScroll: true });
+    return true;
+  }
+
+  /** The explorer's outfit for the inventory preview. */
+  setOutfit(outfit) {
+    this._outfit = outfit || null;
+    this._preview?.setOutfit(this._outfit);
+  }
+
+  /** Runs the 3D explorer only while the inventory shows it; builds it on first use. */
+  _syncPreview() {
+    const show = this._invOpen && this._inventorySelection == null && !this.root.hidden;
+    if (!show) { this._preview?.stop(); return; }
+    if (!this._preview) {
+      if (!this._previewLoading) {
+        const loading = this._previewLoading = import('./characterPreview.js').then(({ CharacterPreview }) => {
+          if (this._previewLoading !== loading || this._disposed) return;
+          this._preview = new CharacterPreview(this.$invCanvas, { slot: this._slot | 0, outfit: this._outfit });
+          this._syncPreview();
+        }).catch(() => { /* no WebGL: the inventory works without the explorer */ });
+      }
+      return;
+    }
+    const tool = this._pocketRows(this._inv || {}).find((p) => p.selected);
+    this._preview.setEquipped(tool && !tool.locked && tool.owned ? tool.id : 'none');
+    if (!this._preview.running) this._preview.start();
   }
 
   setTeam(members) {
@@ -1123,7 +1219,7 @@ export class Hud {
   }
 
   _closePanels(except) {
-    if (except !== 'inv' && this._invOpen) { this._invOpen = false; this.$invPanel.hidden = true; }
+    if (except !== 'inv' && this._invOpen) { this._invOpen = false; this.$invPanel.hidden = true; this._preview?.stop(); }
     if (except !== 'map' && this._mapOpen) { this._mapOpen = false; this.$mapPanel.hidden = true; }
     if (except !== 'board' && this._boardOpen) { this._boardOpen = false; this.$board.hidden = true; }
     for (const [name, p] of this._extras) if (except !== name && p.open) this._setExtra(p, false);
@@ -1134,10 +1230,15 @@ export class Hud {
     const open = force === undefined ? !this._invOpen : !!force;
     this._closePanels(open ? 'inv' : null);
     this._invOpen = open;
-    if (open) this._renderInventory();
     this.$invPanel.hidden = !open;
+    if (open) {
+      this._inventorySelection = null;   // every opening starts with the explorer
+      this._c.invSig = null;
+      this._renderInventory();
+      const held = this._pocketRows(this._inv || {}).findIndex((p) => p.selected);
+      this.$invPanel.querySelector(`[data-inventory-item="pocket:${Math.max(0, held)}"]`)?.focus({ preventScroll: true });
+    } else this._syncPreview();
     this.root.classList.toggle('has-panel', this.isPanelOpen());
-    if (open) this.$invPanel.querySelector(`[data-inventory-item="${this._inventorySelection}"]`)?.focus({ preventScroll: true });
     return open;
   }
 

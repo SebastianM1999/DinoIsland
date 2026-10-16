@@ -8,12 +8,13 @@
 - `caveMap.js` — `buildCaveMapBaseSteps` and fog of war for the Hollow Mountain's map: the interior is covered, `revealMap` (called from `Hud.setMinimap`) uncovers what the player has walked through; the coves show normally.
 - `minimap.js` — `buildMapBase` (`buildMapBaseSteps`, the same painted in row bands for the loading sequence) paints the island once to an offscreen canvas (swamp bogs and the swamp arena ring, the volcano's lava craters and crater rim included); `drawMap` blits a region plus markers each frame.
 - `icons.js` — `ICONS`, `icon(id)`, `portraitSvg()`: inline 32x32 SVG item/HUD icons with distinct equipment/material silhouettes at small sizes (every fruit kind, the map resources `resin`, `ironwood`, `herb`, `flame` for heat and the volcano's warnings, `ash` for the ash rain).
-- `itemInfo.js` — `ITEM_INFO`: names and tooltip texts for inventory items, numbers taken from `CONFIG`.
+- `itemInfo.js` — `ITEM_INFO`: names and tooltip texts for inventory items, numbers taken from `CONFIG` (no fixed slot numbers: pockets are rearrangeable); `itemStats(kind, count)`: the inventory's [label, value] stat rows (damage, range, magazine, heal, weight per unit and stack weight).
 - `craftingPanel.js` — `CraftingPanel`: hut workbench dialog (supplies tab and team upgrades tab, refill).
 - `basePanel.js` — `BasePanel`: base dialog on islands 2+ (pick plot, upgrade stage, build/upgrade towers, repair).
 - `boatPanel.js` — `BoatPanel`: boat wreck dialog listing found/missing boat parts and the Repair button; once repaired, Set sail (Enter) and Inventory (Tab).
 - `grovePrompt.js` — `GrovePrompt`: Yes/No warning and hint shown at the giant's pen barrier.
 - `wardrobe.js` — `Wardrobe` (hat/top/pants picker with rotatable 3D preview) and `savedOutfit()` from localStorage.
+- `characterPreview.js` — `CharacterPreview(canvas, { slot, outfit, equipped })`: the rotatable explorer on a wooden platform (own WebGL renderer, created on first `start`, drag to turn, idle spin), `setOutfit`, `setEquipped`, `start/stop`, `dispose`. Used by the wardrobe (and through it the home explorer) and the inventory.
 - `skillPanel.js` — `SkillPanel`: skill tree dialog (key K), numeric ranks/costs and readable locked states, a viewport-fitted three-branch tree without scrolling, aggregate tier spending/progress, with optimistic buys reverted after a timeout. All three branches and tiers fit the viewport without tree scrolling; selected skill explanations remain in the footer. Locked tiles remain keyboard-inspectable; purchase rules stay in the shared model.
 - `skillModel.js` — pure, DOM-free view-model of the skill panel (`buildSkillView`, `previewBuy`, `nearCamp`, ...).
 - `skillIcons.js` — 24x24 stroke SVG icons per skill and tree, plus lock/tick/close glyphs.
@@ -36,7 +37,7 @@
 - Overlays: death, downed, mission complete, damage flash/source, toasts and alerts.
 - Fruit buffs running (`setBuffs`), the swamp tag (`setSwamp`), hot ground (`setHeat`), the ash rain (`setAsh`: sheltered, a countdown, choking).
 - Selected equipment readout identifies the weapon/item and separates durability, arrow wear, loaded/reserve rounds, reload status and available item counts; numeric hotbar slots retain their keyboard shortcuts.
-- Inventory groups equipment/supplies, consumables, carried materials and shared hut storage; keyboard-selectable items show `ITEM_INFO` details and explicit whole-stack Drop/Deposit actions through existing callbacks. Dragging remains supported; server validates deposit proximity. The mission board (`shared/missions.js` contracts, relics) and XP gain popups.
+- Inventory (Tab, never scrolls): pockets 1-6 (the six tools in the player's order from `inv.pockets`; locked/unowned tools keep their pocket, greyed with a lock; drag a pocket onto another, or select one and press 1-6, to swap: `onPocketSwap`) and the 2x3 backpack (non-zero material stacks only, `inv.slots` cells, empty cells shown as empty slots, load/speed line). The right side shows the explorer (`CharacterPreview`, imported lazily on first open, running only while visible, outfit from `setOutfit`, holding the tool in hand); selecting a cell swaps it for the item's `itemStats` and `ITEM_INFO` with Drop (and Deposit for materials) through `onInventoryDrop`; Back, clicking the cell again or Esc (`inventoryBack()`, asked first by core/game.js) return to the explorer. Dragging a stack/tool out of the panel or onto the drop zone drops it; server validates deposit proximity. The mission board (`shared/missions.js` contracts, relics) and XP gain popups.
 - Panel manager: `addPanel/togglePanel/isPanelOpen` host dialogs owned by other modules (wardrobe, boat, crafting, base, skills, grove), so only one panel is open at a time.
 
 ## Entry points
@@ -52,7 +53,7 @@
 - Dynamic text is HTML-escaped (`esc`) before going into `innerHTML`.
 - Settings can scroll vertically by wheel/keyboard, but never display native scrollbar tracks or thumbs (including nested audio credits).
 - `skillModel.js` stays DOM-free so it can be tested headlessly.
-- `new Hud(root)` clears the root element, so each island builds a fresh HUD in the same `#hud` element.
+- `new Hud(root)` clears the root element, so each island builds a fresh HUD in the same `#hud` element; `dispose()` frees the inventory's preview WebGL context.
 
 ## Not here
 - Network calls and action wiring: `client/core/game.js` and `client/net/`.

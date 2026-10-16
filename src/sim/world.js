@@ -296,6 +296,7 @@ export class ServerWorld {
       fruit: CONFIG.fruit.maxCarried + b.fruit,
       carry: P.maxCarryWeight + b.carry,
       traps: W.trap.startCount + b.traps + u.traps,
+      slots: P.backpackSlots,
     };
   }
 
@@ -311,9 +312,13 @@ export class ServerWorld {
     this.send(p.id, { t: MSG.EV, e: EV.FULL, text, icon });
   }
 
-  /** Put loot into a player's pack: false (and a "pack full" alert) when it is too heavy. */
+  /** Put loot into a player's pack: false (and a "pack full" alert) when it is too heavy or a new kind finds no free backpack slot. */
   addLoot(p, kind, n) {
     const caps = this.caps();
+    if (!(p.inv.loot[kind] > 0) && this.lootStacks(p) >= caps.slots) {
+      this.fullAlert(p, `Your backpack is full – ${caps.slots} kinds at most, drop or deposit one`, 'weight');
+      return false;
+    }
     if (this.carryWeight(p) + CONFIG.loot[kind].weight * n > caps.carry + 1e-6) {
       this.fullAlert(p, `Your pack is full (${this.carryWeight(p)}/${caps.carry}) – drop off loot at the hut`, 'weight');
       return false;
@@ -321,6 +326,13 @@ export class ServerWorld {
     p.inv.loot[kind] += n;
     this.toast(`${CONFIG.loot[kind].name} +${n}`, kind, p.id);
     return true;
+  }
+
+  /** Backpack slots in use: one per material kind the player carries. */
+  lootStacks(p) {
+    let n = 0;
+    for (const k of LOOT_KEYS) if (p.inv.loot[k] > 0) n++;
+    return n;
   }
 
   carryWeight(p) {

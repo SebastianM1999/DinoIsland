@@ -13,24 +13,34 @@ export const ITEM_INFO = {
   spear: {
     name: 'Spear', kind: 'Tool',
     text: `Stab or throw, then recover it. Each successful stab or throw removes ${W.spear.useWear}% health; it breaks at zero. Recovery keeps its current health.`,
-    use: 'Slot 1 · left click to stab · right click to throw · replace a broken spear at the hut',
+    use: 'left click to stab · right click to throw · replace a broken spear at the hut',
   },
   torch: {
     name: 'Torch', kind: 'Tool',
     text: 'A pitch-soaked torch for dark places. It lives in your off hand, so your weapon stays ready – bow, trap and rifle need both hands and lower it while you use them. A lit torch tells everyone, including dinosaurs, where you are.',
     use: 'L to light or put out · picked up at the boat landing, keep it across respawns',
   },
-  pistol: { name: 'P-19 pistol', kind: 'Firearm', text: `Semi-automatic pistol. ${W.pistol.damage} base damage, ${W.pistol.magazine} rounds per magazine.`, use: 'Slot 5 - click to fire - right click to aim - R to reload - refill at hut workbench' },
-  rifle: { name: 'M4A1 assault rifle', kind: 'Firearm', text: `Automatic rifle. ${W.rifle.damage} base damage, ${W.rifle.magazine} rounds per magazine.`, use: 'Slot 6 - hold left click to fire - right click to aim - R to reload - refill at hut workbench' },
+  pistol: { name: 'P-19 pistol', kind: 'Firearm', text: `Semi-automatic pistol. ${W.pistol.damage} base damage, ${W.pistol.magazine} rounds per magazine.`, use: 'click to fire - right click to aim - R to reload - refill at hut workbench' },
+  rifle: { name: 'M4A1 assault rifle', kind: 'Firearm', text: `Automatic rifle. ${W.rifle.damage} base damage, ${W.rifle.magazine} rounds per magazine.`, use: 'hold left click to fire - right click to aim - R to reload - refill at hut workbench' },
+  bow: {
+    name: 'Bow', kind: 'Weapon',
+    text: `A hunting bow. Arrows deal ${W.bow.damage} base damage at full draw (${W.bow.maxDrawTime} s) and fly further the longer you draw.`,
+    use: 'Hold left click to draw, release to shoot · arrows are crafted at the hut workbench',
+  },
+  fruit: {
+    name: 'Fruit', kind: 'Food',
+    text: `The fruit pouch: up to ${CONFIG.fruit.maxCarried} fruit gathered on the island (more with contract rewards). Each kind heals and some give a buff.`,
+    use: 'F to eat the best fruit · G to give one to a teammate',
+  },
   arrow: {
     name: 'Arrows', kind: 'Ammunition',
     text: `Arrows deal ${W.bow.damage} base damage and can be recovered from the ground or a dinosaur. Each arrow lasts ${W.bow.uses} shots, then breaks. Worn arrows are fired first.`,
-    use: 'Slot 2 · hold left click to draw, release to shoot · craft more at the hut workbench',
+    use: 'hold left click to draw, release to shoot · craft more at the hut workbench',
   },
   trap: {
     name: 'Trap', kind: 'Tool',
     text: `A spiked wooden frame. A dinosaur that steps in is stuck for ${W.trap.holdTime} s and takes ${W.trap.damage} damage – perfect for a team ambush.`,
-    use: 'Slot 3 · left click to place · craft more at the hut workbench',
+    use: 'left click to place · craft more at the hut workbench',
   },
   berry: {
     name: F.berry.name, kind: 'Fruit',
@@ -113,3 +123,31 @@ export const ITEM_INFO = {
     use: 'Picked up automatically · drop off at the hut crates',
   },
 };
+
+/**
+ * Structured stats for the inventory's detail view: [label, value] rows from
+ * CONFIG (weapons, fruit, loot weight); an empty list for unknown kinds.
+ * `count` (a material stack's size) adds the stack's weight.
+ */
+export function itemStats(kind, count = 0) {
+  if (kind === 'spear') return [['Stab damage', W.spear.damage], ['Throw damage', W.spear.throwDamage], ['Reach', `${W.spear.range} m`], ['Wear per hit', `${W.spear.useWear} %`]];
+  if (kind === 'bow' || kind === 'arrow') return [['Damage', W.bow.damage], ['Full draw', `${W.bow.maxDrawTime} s`], ['Arrow lasts', `${W.bow.uses} shots`], ['Quiver', W.bow.maxArrows]];
+  if (kind === 'trap') return [['Damage', W.trap.damage], ['Holds for', `${W.trap.holdTime} s`], ['Trigger radius', `${W.trap.triggerRadius} m`]];
+  if (kind === 'pistol' || kind === 'rifle') {
+    const g = W[kind];
+    return [['Damage', g.damage], ['Range', `${g.range} m`], ['Magazine', g.magazine], ['Fire rate', `${Math.round(60 / g.cooldown)} / min`], ['Reload', `${g.reloadTime} s`]];
+  }
+  if (F[kind]) {
+    const f = F[kind];
+    const rows = [['Heals', `${f.heal} HP`]];
+    if (f.hot) rows.push(['Over time', `${f.hot} HP / ${f.hotTime} s`]);
+    if (f.buff && B[f.buff]) rows.push([B[f.buff].name, `${B[f.buff].time} s`]);
+    return rows;
+  }
+  if (L[kind]) {
+    const rows = [['Weight', `${L[kind].weight} each`]];
+    if (count > 0) rows.push(['Stack weight', Math.round(L[kind].weight * count * 10) / 10]);
+    return rows;
+  }
+  return [];
+}
