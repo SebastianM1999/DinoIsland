@@ -6,15 +6,12 @@ import {
   addHandguard,
   addRail,
   addPistolGrip,
-  addFrontSight,
-  addRearSight,
   addQdSocket,
   addSlingLoop,
   addPin,
   addScrew,
   addForeGrip,
   buildMagazine,
-  buildOptic,
   selectorPart,
   triggerPart,
   cartridge,
@@ -25,12 +22,44 @@ import {
  * The submachine gun — an MPX/MP5-flavoured 9 mm roller: slim tubular
  * receiver, side-mounted non-reciprocating charging handle in a cocking tube,
  * short M-LOK handguard with a vertical foregrip, tri-lug flash hider, folding
- * skeleton stock and a low-mounted compact red dot.
+ * skeleton stock and paired folding-style iron sights.
  *
  * A submachine gun is *smaller* than a carbine in every dimension, and that is
  * the whole point of building it separately: 9 mm ammunition means a 26 mm
  * receiver and a 190 mm magazine, and the silhouette has to read that way.
  */
+// Dinosaur Island iron-sight variant, shaped after the owner's reference photo.
+// Build the aperture as a real through-hole; no solid leaf may sit behind it.
+function addMpxIronSights(body, railTop, frontZ, rearZ) {
+  const put = (geo, key, transform) => { body.add(geo, key, transform); geo.dispose(); };
+  for (const z of [frontZ, rearZ]) {
+    put(box(0.028, 0.006, 0.028, 0.001, 2), 'alu', { y: railTop + 0.003, z });
+    put(box(0.023, 0.006, 0.017, 0.0008, 2), 'steel', { y: railTop + 0.009, z });
+    put(rodZ(0.0045, 0.0045, 0.03, 24, 0.0006), 'steel', { y: railTop + 0.009, z: z + 0.004, ry: Math.PI / 2 });
+    // Side adjustment drum and clamp screw, kept below the sight line.
+    put(rodZ(0.004, 0.004, 0.005, 24, 0.0005), 'steel', { x: 0.017, y: railTop + 0.009, z: z + 0.004, ry: Math.PI / 2 });
+    addScrew(body, 'steel', -0.015, railTop + 0.009, z + 0.004, 0.0028, 'x');
+  }
+  // Tall protective ears frame the front post, with inward-sloping shoulders.
+  for (const side of [-1, 1]) {
+    const ear = [[0.0075,0.011],[0.013,0.011],[0.013,0.035],[0.0115,0.037],[0.0085,0.026]];
+    put(extrude(ear.map(([x,y]) => [x * side,y]), 0.010, { bevel: 0.0005, bevelSegments: 2 }), 'steel', { y: railTop, z: frontZ });
+    put(box(0.0045, 0.027, 0.012, 0.0008, 2), 'steel', { x: side * 0.011, y: railTop + 0.0235, z: rearZ });
+  }
+  put(extrude([[-0.002,0.011],[0.002,0.011],[0.0007,0.024],[-0.0007,0.024]], 0.003, { bevel: 0.0002 }), 'steel', { y: railTop, z: frontZ });
+  // Rounded rear aperture on a narrow stem, separated from both side guards.
+  const outline = [[-0.006,0.011],[0.006,0.011],[0.006,0.024]];
+  for (let i = 1; i <= 24; i++) {
+    const a = i / 24 * Math.PI;
+    outline.push([0.006 * Math.cos(a), 0.024 + 0.006 * Math.sin(a)]);
+  }
+  const hole = Array.from({ length: 32 }, (_, i) => {
+    const a = -i / 32 * Math.PI * 2;
+    return [0.0025 * Math.cos(a), 0.024 + 0.0025 * Math.sin(a)];
+  });
+  put(extrude(outline, 0.0035, { holes: [hole], bevel: 0.0003, bevelSegments: 2 }), 'steel', { y: railTop, z: rearZ });
+}
+
 export function buildSmg() {
   const bore = 0.068;
   const rRec = 0.0158;
@@ -44,8 +73,6 @@ export function buildSmg() {
   const hgZ1 = -0.268;
   const hgR = 0.019;
   const zBarrelEnd = -0.3;
-  const opticY = bore + 0.055;
-  const opticZ = -0.008;
 
   const body = new Assembly('smg-body');
 
@@ -218,23 +245,8 @@ export function buildSmg() {
   addSlingLoop(body, 'steel', 0.0165, bore - 0.022, zRecRear + 0.026, 0.007, { ry: Math.PI / 2 });
 
   /* ---- sights -------------------------------------------------------- */
-  const optic = buildOptic(body, {
-    rTube: 0.0138,
-    // Same aperture-budget argument as the rifle (see buildOptic): a shorter tube
-    // is what makes the sight picture fill the housing in ADS.
-    len: 0.044,
-    hood: 0.006,
-    y: opticY,
-    z: opticZ,
-    railTop,
-    matBody: 'alu_fine',
-    matSteel: 'steel',
-  });
-  addFrontSight(body, 'polymer', 'alu', 0, railTop, -0.248, false);
-  // Same ADS composition fix as the rifle (see there): a folded BUIS at the back
-  // of the receiver sits inside the eye's near field and fills the bottom of the
-  // sight frame with a pale slab.
-  addRearSight(body, 'polymer', 'alu', 0, railTop, -0.09, false);
+  // Dinosaur Island MPX variant: plain raised iron sights, no mounted optic.
+  addMpxIronSights(body, railTop, -0.248, 0.028);
 
   /* ---- moving parts -------------------------------------------------- */
   const magazine = new Assembly('smg-mag');
@@ -323,9 +335,10 @@ export function buildSmg() {
       chamber: [0, bore, portZ],
       eject: [rRec + 0.006, bore + 0.002, portZ],
       ejectDir: [0.9, 0.4, 0.18],
-      sight: [0, opticY, optic.lensZ],
+      sight: [0, railTop + 0.024, 0.028],
       sightAxis: [0, 0, -1],
-      ironSight: [0, railTop + 0.024, 0.042],
+      ironSight: [0, railTop + 0.024, 0.028],
+      ironFront: [0, railTop + 0.024, -0.248],
       // Wrist targets, derived the same way as the rifle's (see models/rifle.js):
       // knuckle/grip contact point minus the palm offset along the hand axis.
       gripR: {
@@ -349,7 +362,6 @@ export function buildSmg() {
       triggerPivot: { pos: [0, bore - 0.026, -0.001], rot: [0, 0, 0] },
       triggerPull: -0.36,
       selectorPivot: { pos: [0, bore - 0.019, 0.022], rot: [0, 0, 0] },
-      opticGlass: optic,
     },
     shell: { caseLen: 0.0192, rimR: 0.00478 },
     magSize: { len: mag.len, w: mag.w, d: mag.d },
