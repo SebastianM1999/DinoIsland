@@ -95,6 +95,7 @@ export const CONFIG = {
     carrySlowPerUnit: 0.018,
     minCarrySpeed: 0.6,
     maxCarryWeight: 20,      // loot weight a player can carry (contracts raise it)
+    backpackSlots: 6,        // different material kinds carried at once (one backpack stack each)
     autoLootRadius: 2.2,     // items inside this radius are picked up automatically
   },
 

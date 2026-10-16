@@ -17,6 +17,7 @@ import { upgradeMods } from '../../shared/crafting.js';
 import { GunEffects } from '../entities/gunEffects.js';
 import { spearLaunch } from './spearThrow.js';
 import { Viewmodel } from './viewmodel.js';
+import { loadPocketOrder, savePocketOrder, swapPockets, pocketOf, nextPocket } from './pockets.js';
 import { mesh } from '../models/kit.js';
 import { trapGeometry } from '../models/weapons.js';
 
@@ -68,6 +69,7 @@ export class PlayerActions {
     this.lastFullText = '';
     this.lastLoot = 0;
     this.promptAction = null;
+    this.pockets = loadPocketOrder();   // pocket -> EQUIP index (keys 1-6, hotbar, inventory)
 
     // placement ghosts
     const ghostMat = new THREE.MeshBasicMaterial({ color: '#ffe07a', transparent: true, opacity: 0.45, depthWrite: false });
@@ -77,7 +79,11 @@ export class PlayerActions {
 
     const net = game.net;
     game.hud.onInventoryDrop = (kind, store) => net.act(store ? ACT.DEPOSIT : ACT.DROP, { kind });
-    game.hud.onInventoryWheel = (step) => this.select((game.eq + step + EQUIP.length) % EQUIP.length);
+    game.hud.onInventoryWheel = (step) => this.cycle(step);
+    game.hud.onPocketSwap = (a, b) => {
+      this.pockets = swapPockets(this.pockets, a, b);
+      savePocketOrder(this.pockets);
+    };
     net.on(`ev:${EV.EAT}`, (m) => {
       if (m.id !== game.me.id) return;
       this.eatingT = CONFIG.fruit.eatTime;
@@ -170,9 +176,9 @@ export class PlayerActions {
     const panel = g.hud.isPanelOpen();
 
     // --- slot selection
-    for (let i = 0; i < EQUIP.length; i++) if (input.wasPressed(`slot${i + 1}`)) this.select(i);
+    for (let i = 0; i < EQUIP.length; i++) if (input.wasPressed(`slot${i + 1}`)) this.select(this.pockets[i]);
     const wheel = g.lastWheel || 0;
-    if (wheel) this.select((g.eq + (wheel > 0 ? 1 : EQUIP.length - 1)) % EQUIP.length);
+    if (wheel) this.cycle(wheel > 0 ? 1 : -1);
 
     // --- carry slowdown (and eating makes you slow and vulnerable)
     const w = this.carryWeight();
@@ -273,11 +279,23 @@ export class PlayerActions {
     this.updateHud(dt, fruitType, w);
   }
 
+  /** Can EQUIP index `i` be taken in hand? (island 1: no bow until the hunter's camp; the demo: no firearms) */
+  canSelect(i) {
+    if (EQUIP[i] === 'bow' && this.inv.bow === false) return false;
+    if ((EQUIP[i] === 'pistol' || EQUIP[i] === 'rifle') && !this.inv.guns?.[EQUIP[i]]) return false;
+    return i >= 0 && i < EQUIP.length;
+  }
+
+  /** The mouse wheel: the next usable tool in pocket order. */
+  cycle(step) {
+    this.select(nextPocket(this.pockets, this.game.eq, step, (i) => this.canSelect(i)));
+  }
+
   select(i) {
     if (i === this.game.eq) return;
     // (island 1: no bow in hand until you found yours at the hunter's camp)
     if (EQUIP[i] === 'bow' && this.inv.bow === false) return this.fullAlert("No bow yet – find it at the hunter's camp before the mountain", 'bow');
-    if ((EQUIP[i] === 'pistol' || EQUIP[i] === 'rifle') && !this.inv.guns?.[EQUIP[i]]) return;   // (no firearms: the demo)
+    if (!this.canSelect(i)) return;   // (no firearms: the demo)
     this.game.eq = i;
     this.drawing = false;
     this.drawT = 0;
@@ -585,6 +603,7 @@ export class PlayerActions {
     if (res) {
       const loot = CONFIG.loot[res.type];
       if (this.carryWeight() + loot.weight > this.caps.carry + 1e-6) return { text: `Pack full – drop off loot at the hut`, run: null };
+      if (this.backpackFull(res.type)) return { text: `Backpack full – ${this.slots} kinds at most`, run: null };
       return { text: `Gather ${loot.name}`, run: () => net.act(ACT.GATHER, { spot: res.id }) };
     }
     // 2. a carcass to butcher with the knife (hold V)
@@ -645,8 +664,16 @@ export class PlayerActions {
   get caps() {
     return this.inv.caps || {
       arrows: W.bow.maxArrows, fruit: CONFIG.fruit.maxCarried, carry: P.maxCarryWeight,
-      traps: W.trap.startCount,
+      traps: W.trap.startCount, slots: P.backpackSlots,
     };
+  }
+
+  /** Backpack stacks: one slot per material kind carried (the server enforces the same limit). */
+  get slots() { return this.caps.slots ?? P.backpackSlots; }
+  lootKinds() { return LOOT_KEYS.filter((k) => this.inv.loot[k] > 0); }
+  /** Would `kind` need a new backpack slot when none is free? */
+  backpackFull(kind, kinds = this.lootKinds()) {
+    return !kinds.includes(kind) && kinds.length >= this.slots;
   }
 
   /**
@@ -661,6 +688,7 @@ export class PlayerActions {
     const now = g.time;
     const caps = this.caps;
     let weight = this.carryWeight();
+    const kinds = this.lootKinds();
     for (const { data: it } of g.items.items.values()) {
       if (it.droppedBy === g.me.id) continue; // retrieve deliberately with E, never undo a drop automatically
       if ((it.dino || it.pose) && Math.abs(it.y - (pos.y + P.eyeHeight)) > 3.5) continue;
@@ -682,7 +710,8 @@ export class PlayerActions {
       } else if (CONFIG.loot[it.kind]) {
         const w = CONFIG.loot[it.kind].weight * it.n;
         if (weight + w > caps.carry + 1e-6) full = [`Your pack is full (${Math.round(weight * 10) / 10}/${caps.carry}) – drop off loot at the hut`, 'weight'];
-        else weight += w;
+        else if (this.backpackFull(it.kind, kinds)) full = [`Your backpack is full – ${this.slots} kinds at most, drop or deposit one`, 'weight'];
+        else { weight += w; if (!kinds.includes(it.kind)) kinds.push(it.kind); }
       }
       if (full) {
         this.fullAlert(full[0], full[1]);
@@ -711,16 +740,17 @@ export class PlayerActions {
     const g = this.game;
     const hud = g.hud;
     const inv = this.inv;
-    hud.setHotbar([
+    const rows = [
       { id: 'spear', label: `${SLOT_LABEL.spear} health`, count: inv.spear ? `${inv.spearHealth ?? 100}%` : null, enabled: inv.spear },
       // (island 1: no bow until you find it at the hunter's camp)
       inv.bow === false ? { id: 'bow', label: `${SLOT_LABEL.bow} – not found yet`, count: null, enabled: false }
         : { id: 'bow', label: SLOT_LABEL.bow, count: inv.arrows, enabled: inv.arrows > 0 },
       { id: 'trap', label: SLOT_LABEL.trap, count: inv.traps, enabled: inv.traps > 0 },
       { id: 'fruit', label: SLOT_LABEL.fruit, count: inv.fruit.length, enabled: inv.fruit.length > 0, sub: fruitType || undefined },
-      // (no firearms in the pack – the demo: no slots for them)
-      ...['pistol', 'rifle'].filter(id => inv.guns?.[id]).map(id => ({ id, label: `${SLOT_LABEL[id]} - R reload`, count: inv.guns[id].loaded ?? 0, enabled: (inv.guns[id].loaded ?? 0) > 0 })),
-    ], g.eq);
+      // (no firearms in the pack – the demo: their pockets stay empty)
+      ...['pistol', 'rifle'].map(id => inv.guns?.[id] ? { id, label: `${SLOT_LABEL[id]} - R reload`, count: inv.guns[id].loaded ?? 0, enabled: (inv.guns[id].loaded ?? 0) > 0 } : null),
+    ];
+    hud.setHotbar(this.pockets.map((eq) => rows[eq]), pocketOf(this.pockets, g.eq));
     const caps = this.caps;
     hud.setInventory({
       guns: inv.guns, reloading: inv.reloading, weapon: this.tool,
@@ -735,8 +765,9 @@ export class PlayerActions {
       loot: inv.loot,
       carryWeight: weight,
       speedFactor: g.player.speedFactor,
-      store: g.store,
       traps: inv.traps,
+      pockets: this.pockets.map((eq) => this.pocketState(eq)),
+      slots: this.slots,
     });
     hud.setTorch(!!inv.torch, !!g.torchLit);
     const tool = this.tool;
@@ -747,6 +778,18 @@ export class PlayerActions {
     hud.eatProgress(this.knifeProgress()
       ?? (this.eatingT > 0 ? 1 - this.eatingT / CONFIG.fruit.eatTime : null));
     this.updateHint();
+  }
+
+  /** What the inventory shows for the tool in one pocket (locked tools keep their pocket, greyed). */
+  pocketState(eq) {
+    const inv = this.inv, id = EQUIP[eq];
+    const state = { eq, id, locked: !this.canSelect(eq), selected: eq === this.game.eq };
+    if (id === 'spear') return { ...state, owned: !!inv.spear, count: inv.spear ? `${inv.spearHealth ?? 100}%` : 0 };
+    if (id === 'bow') return { ...state, owned: inv.bow !== false, count: `${inv.arrows ?? 0}/${this.caps.arrows}` };
+    if (id === 'trap') return { ...state, owned: inv.traps > 0, count: inv.traps ?? 0 };
+    if (id === 'fruit') return { ...state, owned: inv.fruit.length > 0, count: `${inv.fruit.length}/${this.caps.fruit}` };
+    const gun = inv.guns?.[id];
+    return { ...state, owned: !!gun && gun.owned !== false, count: gun ? `${gun.loaded ?? 0}/${gun.reserve ?? 0}` : null };
   }
 
   /**

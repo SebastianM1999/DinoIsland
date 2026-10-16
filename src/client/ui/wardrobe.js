@@ -2,9 +2,8 @@
 // rotatable 3D preview of your explorer. "Wear outfit" sends the choice to
 // the server (which shares it with the team) and remembers it locally.
 
-import * as THREE from 'three';
 import { OUTFIT_SLOTS, sanitizeOutfit, sameOutfit } from '../../shared/outfits.js';
-import { PlayerModel } from '../models/playerModel.js';
+import { CharacterPreview } from './characterPreview.js';
 import { storageKey } from '../../shared/brand.js';
 
 const STORE_KEY = storageKey('outfit');
@@ -31,9 +30,6 @@ export class Wardrobe {
     this.draft = { ...this.worn };
     this.onWear = onWear;
     this.onClose = onClose;
-    this.yaw = 0.35;
-    this.spin = true;
-    this.raf = 0;
 
     const el = document.createElement('section');
     el.className = 'hud-panel hud-wardrobe brush';
@@ -60,10 +56,14 @@ export class Wardrobe {
     this.$wear = el.querySelector('[data-act="wear"]');
     this.canvas = el.querySelector('canvas');
 
+    this.preview = new CharacterPreview(this.canvas, { slot, outfit: this.draft });
+
     this.#buildSlots();
     el.addEventListener('click', (e) => this.#onClick(e));
-    this.#bindDrag();
   }
+
+  /** The preview's scene (null until first opened): its player model shares cached geometry with the island. */
+  get scene() { return this.preview.scene ?? null; }
 
   #buildSlots() {
     this.$slots.innerHTML = OUTFIT_SLOTS.map((s) => `
@@ -138,94 +138,22 @@ export class Wardrobe {
     const changed = !sameOutfit(this.draft, this.worn);
     this.$wear.textContent = changed ? 'Wear outfit' : 'Looking good!';
     this.$wear.classList.toggle('is-idle', !changed);
-    this.model?.setOutfit(this.draft);
+    this.preview.setOutfit(this.draft);
   }
-
-  // ------------------------------------------------------------------ preview
-
-  #initPreview() {
-    if (this.renderer) return;
-    this.renderer = new THREE.WebGLRenderer({ canvas: this.canvas, antialias: true, alpha: true });
-    this.renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
-    this.renderer.outputColorSpace = THREE.SRGBColorSpace;
-    this.scene = new THREE.Scene();
-    this.camera = new THREE.PerspectiveCamera(30, 1, 0.1, 20);
-    this.camera.position.set(0, 1.25, -4.9);
-    this.camera.lookAt(0, 0.9, 0);
-    this.scene.add(new THREE.HemisphereLight(0xfff4dd, 0x4a5a7a, 1.6));
-    const sun = new THREE.DirectionalLight(0xffffff, 2.2);
-    sun.position.set(-2, 4, -3);
-    this.scene.add(sun);
-    const rim = new THREE.DirectionalLight(0x9fd0ff, 1.2);
-    rim.position.set(2, 2, 3);
-    this.scene.add(rim);
-    // little wooden platform
-    const disc = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.75, 0.8, 0.08, 24),
-      new THREE.MeshStandardMaterial({ color: 0x9b6636, roughness: 0.9 }),
-    );
-    disc.position.y = -0.04;
-    this.scene.add(disc);
-    this.model = new PlayerModel(this.slot, this.draft);
-    this.model.setEquipped('none');
-    this.scene.add(this.model.root);
-  }
-
-  #bindDrag() {
-    let dragging = false, lastX = 0;
-    this.canvas.addEventListener('pointerdown', (e) => {
-      dragging = true;
-      lastX = e.clientX;
-      this.spin = false;
-      this.canvas.setPointerCapture(e.pointerId);
-    });
-    this.canvas.addEventListener('pointermove', (e) => {
-      if (!dragging) return;
-      this.yaw += (e.clientX - lastX) * 0.012;
-      lastX = e.clientX;
-    });
-    const end = () => { dragging = false; };
-    this.canvas.addEventListener('pointerup', end);
-    this.canvas.addEventListener('pointercancel', end);
-  }
-
-  #loop = (t) => {
-    this.raf = requestAnimationFrame(this.#loop);
-    const dt = Math.min(0.05, (t - (this.lastT || t)) / 1000);
-    this.lastT = t;
-    const w = this.canvas.clientWidth, h = this.canvas.clientHeight;
-    if (w && h && (this.canvas.width !== Math.round(w * this.renderer.getPixelRatio()) || this.canvas.height !== Math.round(h * this.renderer.getPixelRatio()))) {
-      this.renderer.setSize(w, h, false);
-      this.camera.aspect = w / h;
-      this.camera.updateProjectionMatrix();
-    }
-    if (this.spin) this.yaw += dt * 0.5;
-    this.model.root.rotation.y = this.yaw;
-    this.model.animate(dt, { spd: 0, pitch: 0, eq: 'none', drawing: false, eating: false, attacking: false, carry: 0, alive: true, grounded: true });
-    this.renderer.render(this.scene, this.camera);
-  };
 
   onOpen() {
     this.draft = { ...this.worn };
-    this.spin = true;
-    this.#initPreview();
+    this.preview.start();
     this.#refresh();
-    this.lastT = 0;
-    cancelAnimationFrame(this.raf);
-    this.raf = requestAnimationFrame(this.#loop);
     this.el.querySelector('.wd-swatch[aria-checked="true"]')?.focus({ preventScroll: true });
   }
 
   onClosed() {
-    cancelAnimationFrame(this.raf);
-    this.raf = 0;
+    this.preview.stop();
   }
 
   /** Free the preview's WebGL context (a new island builds a new wardrobe). */
   dispose() {
-    this.onClosed();
-    this.renderer?.dispose();
-    this.renderer?.forceContextLoss();
-    this.renderer = null;
+    this.preview.dispose();
   }
 }

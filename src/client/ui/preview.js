@@ -27,7 +27,16 @@ hud.setMission({
 const inv = {
   arrows: 8, maxArrows: 12, fruit: ['berry', 'mango', 'dragon'], maxFruit: 5,
   loot: { meat: 2, hide: 1, teeth: 0, plates: 0, claws: 0 }, carryWeight: 8, speedFactor: 0.86,
-  store: { meat: 1, hide: 0, teeth: 2, plates: 0, claws: 0 }, traps: 2,
+  traps: 2, slots: CONFIG.player.backpackSlots, maxCarry: CONFIG.player.maxCarryWeight,
+  // pockets 1-6 as PlayerActions sends them (a custom order: fruit in pocket 1)
+  pockets: [
+    { eq: 3, id: 'fruit', owned: true, locked: false, count: '3/5', selected: false },
+    { eq: 0, id: 'spear', owned: true, locked: false, count: '80%', selected: true },
+    { eq: 1, id: 'bow', owned: true, locked: false, count: '8/12', selected: false },
+    { eq: 2, id: 'trap', owned: true, locked: false, count: 2, selected: false },
+    { eq: 4, id: 'pistol', owned: false, locked: true, count: null, selected: false },
+    { eq: 5, id: 'rifle', owned: true, locked: false, count: '12/90', selected: false },
+  ],
 };
 hud.setInventory(inv);
 let selected = 0;

@@ -23,7 +23,7 @@
 
 ### Areas inside `world.js` (~1500 lines, find by the `// ----- <area>` banners)
 - constructor / `#loadLevel` / `nextLevel`: builds terrain + layout from `shared/` (`planIsland`, `buildLayout`), resets per-island state; `worldEpoch` bumps per island.
-- players: `join`, `leave`, `freshInventory` (`inv.bow`: false on an island with a hunter's camp – no arrows, no arrow shots, no arrow refills until found; `nextLevel` to a camp-less island hands it out), `caps`, `carryWeight`, `hurtPlayer`.
+- players: `join`, `leave`, `freshInventory` (`inv.bow`: false on an island with a hunter's camp – no arrows, no arrow shots, no arrow refills until found; `nextLevel` to a camp-less island hands it out), `caps` (`slots`: backpack size), `addLoot` (the only way loot comes in: refused with a FULL alert when too heavy or when a new kind finds none of the `CONFIG.player.backpackSlots` free; more of a carried kind always fits by slots), `lootStacks`, `carryWeight`, `hurtPlayer`.
 - knife: butchering carcasses (`startButcher`/`updateButcher`): one player per carcass, 3 / 5 / 10 s by rank, the carcass's whole loot (`carcassLoot`); successful completion emits `EV.BUTCHER` with `done: true`, cancellation (moving off, getting hurt, letting go) omits it.
 - camp: `buildCampBench` (`ACT.BASE` op `bench`) puts up island 1's camp table; `craft` refuses tier 2+ at it.
 - downed/revive/death: `killPlayer`, `downPlayer`, `defeatPlayer`, `startRevive`/`updateRevive`, `updateDowned`, `respawnPlayer`.

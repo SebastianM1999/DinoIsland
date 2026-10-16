@@ -369,10 +369,67 @@ test('without firearms in the pack (the demo) there are no gun slots and the gun
   const { game, actions, frame } = fixture(t);
   game.me.inv.guns = {};
   frame();
-  assert.deepEqual(game.hotbar.map((s) => s.id), ['spear', 'bow', 'trap', 'fruit']);
+  assert.deepEqual(game.hotbar.map((s) => s?.id ?? null), ['spear', 'bow', 'trap', 'fruit', null, null], 'the gun pockets stay empty');
+  assert.deepEqual(game.inventoryHud.pockets.filter((s) => s.locked).map((s) => s.id), ['pistol', 'rifle']);
   actions.select(EQUIP.indexOf('pistol'));
   actions.select(EQUIP.indexOf('rifle'));
   assert.equal(EQUIP[game.eq], 'spear');
   actions.select(EQUIP.indexOf('bow'));
   assert.equal(EQUIP[game.eq], 'bow', 'the other slots still work');
+});
+
+test('number keys, the wheel, the hotbar and the inventory follow the pocket order the player arranged, and it is remembered', t => {
+  const data = new Map();
+  const had = Object.getOwnPropertyDescriptor(globalThis, 'localStorage');
+  Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: { getItem: (k) => data.get(k) ?? null, setItem: (k, v) => data.set(k, v) } });
+  t.after(() => { if (had) Object.defineProperty(globalThis, 'localStorage', had); else delete globalThis.localStorage; });
+
+  const { game, actions, pressed, frame } = fixture(t);
+  game.hud.onPocketSwap(0, 3);                       // spear to pocket 4, fruit to pocket 1
+  pressed.add('slot4'); frame();
+  assert.equal(actions.tool, 'spear');
+  game.me.inv.fruit = ['berry'];
+  pressed.add('slot1'); frame();
+  assert.equal(actions.tool, 'fruit');
+  assert.deepEqual(game.hotbar.map((s) => s?.id), ['fruit', 'bow', 'trap', 'spear', 'pistol', 'rifle']);
+  assert.deepEqual(game.inventoryHud.pockets.map((s) => s.id), ['fruit', 'bow', 'trap', 'spear', 'pistol', 'rifle']);
+  assert.equal(game.inventoryHud.pockets[0].selected, true);
+  assert.equal(game.inventoryHud.slots, CONFIG.player.backpackSlots);
+  game.lastWheel = 1; frame(); game.lastWheel = 0;
+  assert.equal(actions.tool, 'bow', 'the wheel goes on to pocket 2');
+
+  // a new island (a new PlayerActions) keeps the arrangement
+  const again = fixture(t);
+  again.pressed.add('slot4'); again.frame();
+  assert.equal(again.actions.tool, 'spear');
+});
+
+test('a locked bow keeps its pocket: its key and the wheel pass it by', t => {
+  const { game, actions, pressed, frame, alerts } = fixture(t);
+  game.me.inv.bow = false;
+  game.me.inv.guns = {};
+  pressed.add('slot2'); frame();
+  assert.equal(actions.tool, 'spear');
+  assert.match(alerts.at(-1)[0], /No bow yet/);
+  game.lastWheel = 1; frame(); game.lastWheel = 0;
+  assert.equal(actions.tool, 'trap', 'spear -> trap, the bow skipped');
+  game.lastWheel = 1; frame(); game.lastWheel = 0;
+  assert.equal(actions.tool, 'fruit');
+  game.lastWheel = 1; frame(); game.lastWheel = 0;
+  assert.equal(actions.tool, 'spear', 'past the empty gun pockets back to the spear');
+  assert.equal(game.inventoryHud.pockets[1].locked, true);
+});
+
+test('auto-loot leaves a new material kind on the ground when every backpack slot is taken', t => {
+  const { game, actions, frame, requests, alerts, item } = fixture(t);
+  const kinds = Object.keys(CONFIG.loot);
+  for (const k of kinds.slice(0, CONFIG.player.backpackSlots)) game.me.inv.loot[k] = 1;
+  for (const k of kinds) game.me.inv.loot[k] ??= 0;
+  game.me.inv.caps = { ...actions.caps, carry: 1000 };
+  item({ id: 41, kind: kinds[CONFIG.player.backpackSlots] });
+  item({ id: 42, kind: kinds[0] });
+  actions.autoLoot();
+  assert.deepEqual(requests.filter((r) => r.a === ACT.PICKUP).map((r) => r.item), [42]);
+  assert.match(alerts.at(-1)[0], /backpack is full/);
+  frame();
 });
