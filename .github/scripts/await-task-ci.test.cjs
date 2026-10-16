@@ -76,14 +76,14 @@ test('pending timeout holds PR without repeated dispatch or exceeding deadline',
   assert.match(f.comments[0].body, /manually run integration.yml/);
 });
 
-test('the default deadline allows long CI and still holds the PR at exactly 27 minutes', async () => {
+test('the default deadline allows long CI and still holds the PR at exactly 42 minutes', async () => {
   const f = fixture({ frames: [{ runs: [{}] }], useDefaultBudget: true, pollMs: 17 * 60000 });
   assert.match(await f.start(), /timed out/);
-  assert.equal(f.clock(), 27 * 60000);
+  assert.equal(f.clock(), 42 * 60000);
   assert.equal(f.dispatches.length, 0);
   assert.equal(f.holds.length, 1);
   assert.equal(f.comments.length, 1);
-  assert.match(f.comments[0].body, /within 27 minutes/);
+  assert.match(f.comments[0].body, /within 42 minutes/);
 });
 
 test('CI completes within the helper budget and every metadata job leaves time for a timeout hold', async () => {

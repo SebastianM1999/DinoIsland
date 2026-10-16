@@ -155,7 +155,7 @@ jobs:
     needs: repair
     if: needs.repair.result == 'success' && needs.repair.outputs.published_head != '' && vars.AUTOMERGE_ENABLED == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     permissions:
       contents: read
       pull-requests: read
