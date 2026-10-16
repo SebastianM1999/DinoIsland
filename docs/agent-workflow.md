@@ -124,8 +124,8 @@ main advancing between validation and merge.
 After a bot rebase or repair, or dispatching fallback candidate CI, a metadata-only job waits for the newly published
 head's CI (the current combined candidate for fallback runs) and explicitly wakes integration on completion. This avoids relying on
 chained workflow completion events, which GitHub may suppress. It uses no AI and
-does not execute feature code. CI has a 40-minute budget for complete-source
-coverage, including live cave mesh and collision checks. The metadata wait stops
+does not execute feature code. CI runs four parallel test shards (20 minutes each) and then merges their
+complete-source coverage (10 minutes), including live cave mesh and collision checks. The metadata wait stops
 after 42 minutes (inside a 45-minute job) and holds the PR
 with an explanatory comment if CI never finishes; it does not poll while idle.
 A new rebase/repair reservation stops the previous CI wait so the queued replacement

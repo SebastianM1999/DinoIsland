@@ -100,7 +100,8 @@ test('CI completes within the helper budget and every metadata job leaves time f
     assert.ok(match, `${file} ${job} declares a bounded timeout`);
     return Number(match[1]);
   };
-  assert.ok(timeout('ci.yml', 'test') + 2 <= waitMinutes, 'helper outlasts the CI job with a startup margin');
+  // CI runs the parallel shards, then the coverage merge job: its longest path is both budgets in a row.
+  assert.ok(timeout('ci.yml', 'shard') + timeout('ci.yml', 'test') + 2 <= waitMinutes, 'helper outlasts the CI jobs with a startup margin');
   for (const [file, job] of [['integration.yml', 'await-candidate-ci'], ['integration-rebase.yml', 'await-ci'], ['integration-repair.yml', 'await-ci']]) {
     assert.ok(timeout(file, job) >= waitMinutes + 3, `${file} leaves setup and timeout reporting time`);
   }

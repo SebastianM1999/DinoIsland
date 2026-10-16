@@ -17,14 +17,56 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  test:
-    name: Node 22 tests
+  # The suite runs in four parallel shards (node --test --test-shard, split by file). Each shard
+  # writes raw V8 coverage; the `test` job merges it into one complete-source report.
+  shard:
+    name: Node 22 tests (shard ${{ matrix.shard }}/4)
     runs-on: ubuntu-latest
     # Complete-source coverage includes live cave meshing and collision sweeps.
-    timeout-minutes: 40
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
     env:
       ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
     steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Run test shard with raw coverage
+        env:
+          NODE_V8_COVERAGE: raw-coverage
+        run: node --test --test-shard=${{ matrix.shard }}/4
+      - uses: actions/upload-artifact@v4
+        with:
+          name: raw-coverage-${{ github.sha }}-${{ matrix.shard }}
+          path: raw-coverage/
+          if-no-files-found: error
+          retention-days: 1
+
+  # The required check: it passes only when every shard passed and the merged coverage meets the floors.
+  test:
+    name: Node 22 tests
+    needs: shard
+    # A skipped required check would count as passing, so this job always runs and fails for a failed shard.
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+    steps:
+      - name: Require every test shard
+        if: ${{ needs.shard.result != 'success' }}
+        run: |
+          echo "Test shards finished with '${{ needs.shard.result }}'."
+          exit 1
       - uses: actions/checkout@v6
         with:
           fetch-depth: 0
@@ -44,8 +86,22 @@ jobs:
           git diff --check "$BASE_SHA" HEAD
       - name: Install locked dependencies
         run: npm ci
-      - name: Run automated tests with complete-source coverage
-        run: npm run test:coverage
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: raw-coverage-${{ github.sha }}-*
+          path: raw-shards
+      - name: Merge shard coverage
+        shell: bash
+        # Each shard keeps its own prefix, so equal V8 file names from different runners cannot overwrite each other.
+        run: |
+          mkdir -p coverage/tmp
+          for dir in raw-shards/*/; do
+            shard=$(basename "$dir")
+            for file in "$dir"*.json; do cp "$file" "coverage/tmp/$shard-$(basename "$file")"; done
+          done
+          test "$(ls raw-shards | wc -l)" -eq 4
+      - name: Report complete-source coverage against the floors
+        run: npx c8 report
       - name: Verify complete source coverage report
         run: node scripts/coverage-gaps.mjs > coverage/gaps.txt
       - name: Upload coverage diagnostics
@@ -53,7 +109,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: coverage-${{ github.sha }}
-          path: coverage/
+          path: |
+            coverage/
+            !coverage/tmp/
           if-no-files-found: ignore
           retention-days: 7
       - name: Test integration safety rules
