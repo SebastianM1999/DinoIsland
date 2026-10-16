@@ -369,7 +369,7 @@ export class GameAudio {
 
   /**
    * @param {string} name
-   * @param {{pos?:{x:number,y:number,z:number}, vol?:number, surface?:string, movement?:string, species?:string, size?:number, entityId?:string}} [o]
+   * @param {{pos?:{x:number,y:number,z:number}, vol?:number, surface?:string, movement?:string, species?:string, size?:number, entityId?:string, duration?:number}} [o]
    */
   play(name, o = {}) {
     if (!this.ok || this.ctx.state !== 'running') return;
@@ -382,6 +382,7 @@ export class GameAudio {
     const t = now + 0.005;
     if (this.#recorded(name, o, t)) return;
     const out = this.#out(o.pos, o.vol ?? 1);
+    if (name === 'mpx' || name === 'mpxReload') return this.#mpx(name, t, out, o.duration);
     switch (name) {
       case 'sarco_lunge':
         this.#voice(t, out, { pitch: [45, 76, 52], dur: .7, vol: .9, formants: [220, 650], lowpass: 1000, breath: .3 });
@@ -579,6 +580,59 @@ export class GameAudio {
         this.#osc('triangle', 1175, 1175, t + 0.12, 0.25, out, 0.3);
         break;
     }
+  }
+
+  /** Reference SMG's short body/crack/action layers, using this game's mixer.
+   * Returns a cancellation function so interrupted reloads leave no delayed cues.
+   */
+  #mpx(name, t, out, duration = 1.8) {
+    const active = new Set();
+    const releaseOutput = () => { out.disconnect(); out.samplePanner?.disconnect(); };
+    const layer = (offset, length, frequency, endFrequency, volume, noise = false, q = 1) => {
+      const source = noise ? this.ctx.createBufferSource() : this.ctx.createOscillator();
+      const envelope = this.ctx.createGain();
+      let filter;
+      if (noise) {
+        source.buffer = this.noiseBuf; source.loop = true;
+        filter = this.ctx.createBiquadFilter();
+        filter.type = 'bandpass'; filter.Q.value = q;
+        filter.frequency.setValueAtTime(frequency, t + offset);
+        filter.frequency.exponentialRampToValueAtTime(endFrequency, t + offset + length);
+        source.connect(filter).connect(envelope);
+      } else {
+        source.type = 'sine';
+        source.frequency.setValueAtTime(frequency, t + offset);
+        source.frequency.exponentialRampToValueAtTime(endFrequency, t + offset + length);
+        source.connect(envelope);
+      }
+      this.#env(envelope, t + offset, .001, length, volume);
+      envelope.connect(out);
+      active.add(source);
+      source.onended = () => {
+        if (!active.delete(source)) return;
+        source.disconnect(); envelope.disconnect(); filter?.disconnect();
+        if (!active.size) releaseOutput();
+      };
+      source.start(t + offset);
+      source.stop(t + offset + length + .01);
+    };
+    if (name === 'mpx') {
+      const variation = .97 + Math.random() * .06;
+      layer(0, .06, 172 * variation, 72, .42);
+      layer(0, .04, 3050 * variation, 1700, .26, true, 1.05);
+      layer(0, .12, 900, 300, .11, true, .7);
+      layer(.021, .025, 3900, 2200, .075, true, 2);
+    } else {
+      const scale = (Number.isFinite(duration) ? Math.max(.1, Math.min(5, duration)) : 1.8) / 1.8;
+      // Magazine release, magazine seating and bolt return follow the hand motion.
+      layer(.12 * scale, .055, 2100, 900, .12, true, 2);
+      layer(.98 * scale, .08, 1200, 420, .18, true, 1.4);
+      layer(1.43 * scale, .065, 3400, 1700, .14, true, 2.4);
+      layer(1.49 * scale, .035, 1900, 700, .1, true, 2);
+    }
+    return () => {
+      for (const source of [...active]) { source.stop(); source.onended(); }
+    };
   }
 
   /** One positional output per layer, cleaned up when its source ends. */
