@@ -123,13 +123,60 @@ function effectContext() {
   ctx.createGain = () => node({ gain: param(1) });
   ctx.createBuffer = (_, length) => ({ getChannelData: () => new Float32Array(length) });
   ctx.decodeAudioData = async bytes => ({ bytes });
-  ctx.createBufferSource = () => { const s = node({ playbackRate: param(1), start(t) { this.started = t; }, stop() {} }); ctx.sources.push(s); return s; };
+  ctx.createBufferSource = () => { const s = node({ playbackRate: param(1), start(t) { this.started = t; }, stop(t) { this.stopped = t; this.stopCount = (this.stopCount || 0) + 1; } }); ctx.sources.push(s); return s; };
   ctx.createPanner = () => { const p = node({ positionX: param(0), positionY: param(0), positionZ: param(0) }); ctx.panners.push(p); return p; };
   ctx.createConvolver = () => node({ buffer: null });
   ctx.createBiquadFilter = () => { const f = node({ frequency: param(0), Q: param(0) }); ctx.filters.push(f); return f; };
-  ctx.createOscillator = () => { const o = node({ frequency: param(0), start() {}, stop() {} }); ctx.oscillators.push(o); return o; };
+  ctx.createOscillator = () => { const o = node({ frequency: param(0), start(t) { this.started = t; }, stop(t) { this.stopped = t; } }); ctx.oscillators.push(o); return o; };
   return ctx;
 }
+
+test('MPX automatic reports play at weapon cadence, preserve positional mute and release every layer', async () => {
+  const oldWindow = globalThis.window, oldFetch = globalThis.fetch, previousSfx = settings.sfx;
+  const ctx = effectContext();
+  globalThis.window = { AudioContext: class { constructor() { return ctx; } } };
+  globalThis.fetch = async () => ({ ok: true, arrayBuffer: async () => new ArrayBuffer(4) });
+  try {
+    const audio = new GameAudio();
+    await audio.samples.preload(SAMPLE_GROUPS);
+    const pos = { x: 3, y: 4, z: -5 };
+    for (let i = 0; i < 10; i++) { audio.play('mpx', { pos }); ctx.currentTime += .075; }
+    assert.equal(ctx.oscillators.length, 10, 'every automatic round has a body');
+    assert.equal(ctx.sources.length, 30, 'every round has crack, tail and action');
+    assert.equal(ctx.panners.length, 10, 'layers share a single positioned output per round');
+    assert.equal(ctx.panners[0].positionZ.value, -5);
+    const output = ctx.sources[0].output.output.output;
+    setSetting('sfx', 0);
+    assert.equal(output.output.output, audio.sfx);
+    assert.equal(audio.sfx.gain.value, 0);
+    for (const source of [...ctx.sources, ...ctx.oscillators]) source.onended();
+    assert.ok(ctx.sources.every(source => source.disconnected && source.output.disconnected && source.output.output.disconnected));
+    assert.ok(ctx.oscillators.every(source => source.disconnected && source.output.disconnected));
+    assert.ok(ctx.panners.every(panner => panner.disconnected));
+    assert.ok(output.disconnected);
+  } finally { setSetting('sfx', previousSfx); globalThis.window = oldWindow; globalThis.fetch = oldFetch; }
+});
+
+test('MPX reload cues follow the actual reload duration and cancellation silences future cues', async () => {
+  const oldWindow = globalThis.window, oldFetch = globalThis.fetch;
+  const ctx = effectContext();
+  globalThis.window = { AudioContext: class { constructor() { return ctx; } } };
+  globalThis.fetch = async () => ({ ok: true, arrayBuffer: async () => new ArrayBuffer(4) });
+  try {
+    const audio = new GameAudio();
+    await audio.samples.preload(SAMPLE_GROUPS);
+    const initialFilters = ctx.filters.length;
+    const cancel = audio.play('mpxReload', { duration: .9 });
+    assert.equal(ctx.sources.length, 4);
+    assert.ok(ctx.sources[0].started < ctx.sources[1].started);
+    assert.ok(ctx.sources[1].started < ctx.sources[2].started);
+    assert.ok(ctx.sources[3].stopped < ctx.currentTime + .9, 'all reload cues finish inside the shortened reload');
+    cancel(); cancel();
+    assert.ok(ctx.sources.every(source => source.stopCount === 2 && source.disconnected));
+    assert.ok(ctx.filters.slice(initialFilters).every(filter => filter.disconnected));
+    assert.ok(ctx.sources[0].output.output.output.disconnected);
+  } finally { globalThis.window = oldWindow; globalThis.fetch = oldFetch; }
+});
 
 test('recorded creature steps layer weight positionally, preserve mute, release nodes and retain loading fallback', async () => {
   const oldWindow = globalThis.window, oldFetch = globalThis.fetch;

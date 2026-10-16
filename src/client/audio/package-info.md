@@ -12,6 +12,7 @@
 - `region.js` — `inBossMusicArea()`: whether the player is in a boss arena (jungle lava islet or swamp kettle) or on the jungle causeway, with an exit margin.
 
 ## Entry points
+- `play('mpx', options)` synthesizes the reference SMG's body, crack and action layers; `play('mpxReload', { duration })` schedules magazine/bolt cues, scaled to the actual reload time (default 1.8 s). Both return an idempotent cancellation function and release all nodes on completion; cancel a reload on switch/death.
 - `main.js` creates a `GameAudio` for the menu (unlocked on a user gesture) and passes it to `Game` for reuse; `core/game.js` creates one if none is given and calls `play`, `setIsland`, `setListener`, `update(dt, { coast, water, danger, bossArea })`, `startMusic`/`stopMusic`, `resume`.
 - `core/game.js` also uses `StepCadence`, `footstepSurface`, `woodSupports` and `inBossMusicArea`.
 - `entities/gunEffects.js` plays shot sounds through `game.audio.play(kind, { pos })`.
