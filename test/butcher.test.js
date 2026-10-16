@@ -6,6 +6,7 @@ import { MSG, ACT, EV } from '../src/shared/protocol.js';
 import { PlayerActions } from '../src/client/player/actions.js';
 import { butcherTime, BUTCHER_TIME, ALPHA } from '../src/shared/dinoRank.js';
 import { Hud } from '../src/client/ui/hud.js';
+import { Net } from '../src/client/net/net.js';
 
 /** A world with one player standing next to a freshly killed raptor (no other dinosaurs). */
 function setup() {
@@ -78,7 +79,7 @@ test('a kill drops nothing but the stuck arrows; holding V butchers the carcass 
   const { world, d, act, run, events } = setup();
   assert.deepEqual(kinds(world), [], 'the kill dropped no loot');
   act({ a: ACT.BUTCHER, dino: d.id });
-  assert.ok(events.some((m) => m.e === EV.BUTCHER && m.dino === d.id && m.t === 3));
+  assert.ok(events.some((m) => m.e === EV.BUTCHER && m.dino === d.id && m.secs === 3));
   run(3 - 0.3);
   assert.ok(!d.butchered, 'not done before the butcher time');
   run(0.5);
@@ -152,7 +153,7 @@ test('butchering takes 3 s for an ordinary animal, 5 s for an alpha and 10 s for
     p.x = d.x; p.z = d.z; p.y = d.y;   // right at the carcass
     world.dinos.kill(d, p.id);
     world.receive(p.id, { t: MSG.ACT, a: ACT.BUTCHER, dino: d.id });
-    assert.equal(events.findLast((m) => m.e === EV.BUTCHER)?.t, seconds, `${type} ${alpha ? 'alpha' : ''}`);
+    assert.equal(events.findLast((m) => m.e === EV.BUTCHER)?.secs, seconds, `${type} ${alpha ? 'alpha' : ''}`);
     for (let t = 0; t < seconds - 0.3; t += 0.05) world.step(0.05);
     assert.ok(!d.butchered, `${type}: not before ${seconds} s`);
     for (let t = 0; t < 0.5; t += 0.05) world.step(0.05);
@@ -213,4 +214,29 @@ test('the knife never starts over by itself: after a butchering ends V must be r
   actions.updateKnife(0.05, true, false, 102);
   actions.updateKnife(0.05, true, true, 102.05);
   assert.equal(requests, 2, 'a fresh press starts again');
+});
+
+test('the butcher, downed and revive events reach the client over the wire with their durations', () => {
+  const { world, p, d, act, run } = setup();
+  // a real client session (net.js) behind a cloning transport, like the worker or a socket
+  const transport = { onMessage: null, send() {}, close() {} };
+  const net = new Net(transport, 'test');
+  const got = [];
+  for (const e of [EV.BUTCHER, EV.DOWN, EV.REVIVE]) net.on(`ev:${e}`, (m) => got.push(m));
+  world.host.send = (_, m) => transport.onMessage(structuredClone(m));
+  try {
+    act({ a: ACT.BUTCHER, dino: d.id });
+    run(BUTCHER_TIME.normal + 0.3);
+    assert.deepEqual(got.filter((m) => m.e === EV.BUTCHER).map((m) => [m.t, m.dino, m.secs, !!m.done]),
+      [[MSG.EV, d.id, BUTCHER_TIME.normal, false], [MSG.EV, null, 0, true]], 'start with its duration, then done');
+    // a teammate goes down and is revived: the client hears both, with their durations
+    const q = world.players.get(world.join('Mate').id);
+    Object.assign(q, { x: p.x + 1, y: p.y, z: p.z });
+    world.hurtPlayer(q, q.hp + 50);
+    const down = got.find((m) => m.e === EV.DOWN);
+    assert.ok(down && down.t === MSG.EV && down.id === q.id && down.secs > 0, 'downed with its bleed-out time');
+    act({ a: ACT.REVIVE, to: q.id });
+    const revive = got.find((m) => m.e === EV.REVIVE);
+    assert.ok(revive && revive.id === q.id && revive.by === p.id && revive.secs > 0, 'the downed teammate and the helper, with the duration');
+  } finally { net.close(); }
 });

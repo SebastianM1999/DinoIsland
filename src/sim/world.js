@@ -151,7 +151,9 @@ export class ServerWorld {
 
   send(to, msg) { this.host.send(to, { ...msg, w: this.worldEpoch }); }
   broadcast(msg, except) { this.host.send('*', { ...msg, w: this.worldEpoch }, except); }
-  event(e, data, except) { this.broadcast({ t: MSG.EV, e, ...data }, except); }
+  // (the message type and event name come last: a payload field called `t` or `e` would turn the
+  // event into a message nobody listens to - durations travel as `secs`)
+  event(e, data, except) { this.broadcast({ ...data, t: MSG.EV, e }, except); }
   toast(text, icon = 'info', to = '*') { this.send(to, { t: MSG.EV, e: EV.TOAST, text, icon }); }
 
   // ------------------------------------------------------------------ players
@@ -414,7 +416,7 @@ export class ServerWorld {
     p.butcher = { dino: d.id, until: this.now + time, x: p.x, z: p.z };
     d.butcherBy = p.id;
     d.deadT = Math.max(d.deadT, time + 2);   // the carcass stays until it is done
-    this.event(EV.BUTCHER, { id: p.id, dino: d.id, t: time });
+    this.event(EV.BUTCHER, { id: p.id, dino: d.id, secs: time });
   }
 
   stopButcher(p) {
@@ -422,7 +424,7 @@ export class ServerWorld {
     const d = this.dinos.get(p.butcher.dino);
     if (d?.butcherBy === p.id) d.butcherBy = null;
     p.butcher = null;
-    this.event(EV.BUTCHER, { id: p.id, dino: null, t: 0 });
+    this.event(EV.BUTCHER, { id: p.id, dino: null, secs: 0 });
   }
 
   updateButcher(p) {
@@ -436,7 +438,7 @@ export class ServerWorld {
     d.deadT = Math.min(d.deadT, W.knife.sinkTime);
     const loot = carcassLoot(d);
     this.dropLoot(d.x, d.z, loot);
-    this.event(EV.BUTCHER, { id: p.id, dino: null, t: 0, done: true });
+    this.event(EV.BUTCHER, { id: p.id, dino: null, secs: 0, done: true });
     this.event(EV.BUTCHERED, { id: d.id });
     const parts = Object.entries(loot).map(([k, n]) => `${n} ${CONFIG.loot[k].name.toLowerCase()}`).join(', ');
     this.toast(`${p.name} butchered the ${CONFIG.dinos[d.type].name}: ${parts}`, 'bones');
@@ -466,7 +468,7 @@ export class ServerWorld {
     p.spd = 0;
     p.reviving = null;
     if (p.inv.reloading) { p.inv.reloading = null; this.sendInv(p); }
-    this.event(EV.DOWN, { id: p.id, t: P.bleedOutTime, by: src });
+    this.event(EV.DOWN, { id: p.id, secs: P.bleedOutTime, by: src });
     this.toast(`${p.name} is down! Revive them before they bleed out`, 'skull');
   }
 
@@ -499,14 +501,14 @@ export class ServerWorld {
     this.stopRevive(p);
     const t = P.reviveTime * p.mods.reviveTimeMul;
     p.reviving = { to: q.id, until: this.now + t };
-    this.event(EV.REVIVE, { id: p.id, by: p.id, to: q.id, t: r2(t) });
+    this.event(EV.REVIVE, { id: q.id, by: p.id, to: q.id, secs: r2(t) });
   }
 
   stopRevive(p) {
     if (!p.reviving) return;
     const to = p.reviving.to;
     p.reviving = null;
-    this.event(EV.REVIVE, { id: p.id, by: p.id, to, t: 0 });
+    this.event(EV.REVIVE, { id: to, by: p.id, to, secs: 0 });
   }
 
   updateRevive(p) {

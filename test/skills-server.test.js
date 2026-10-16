@@ -319,8 +319,8 @@ test('a teammate revives a downed player; Rescuer shortens it; they stand where 
   out.length = 0;
   act(b, { a: ACT.REVIVE, to: a.id });
   const start = evs(EV.REVIVE).at(-1);
-  assert.equal(start.id, b.id); assert.equal(start.to, a.id);
-  assert.ok(Math.abs(start.t - P.reviveTime * 0.3) < 0.011);
+  assert.equal(start.id, a.id); assert.equal(start.by, b.id); assert.equal(start.to, a.id);
+  assert.ok(Math.abs(start.secs - P.reviveTime * 0.3) < 0.011);
   run(P.reviveTime * 0.3 - 0.2);
   assert.ok(a.downed, 'not yet');
   run(0.4);
@@ -345,7 +345,7 @@ test('reviving without Rescuer takes the full time, and is cancelled by stop, di
   run(P.reviveTime - 0.3);
   assert.ok(a.downed);
   act(b, { a: ACT.REVIVE, stop: true });
-  assert.equal(evs(EV.REVIVE).at(-1).t, 0);
+  assert.equal(evs(EV.REVIVE).at(-1).secs, 0);
   run(1);
   assert.ok(a.downed, 'stopped');
   act(b, { a: ACT.REVIVE, to: a.id });

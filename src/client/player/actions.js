@@ -93,7 +93,7 @@ export class PlayerActions {
     net.on(`ev:${EV.BUTCHER}`, (m) => this.onButcher(m));
     net.on(`ev:${EV.REVIVE}`, (m) => {
       if (m.by !== game.me.id || !this.reviving || this.reviving.id !== m.id) return;
-      if (m.t > 0) { this.reviving.t = m.t; this.reviving.start = game.time; }
+      if (m.secs > 0) { this.reviving.t = m.secs; this.reviving.start = game.time; }
       else { this.reviving = null; this.reviveRetry = 1; }          // the server stopped or refused it
     });
     net.on(`ev:${EV.REVIVED}`, (m) => { if (this.reviving?.id === m.id) this.reviving = null; });   // done: nothing to stop
@@ -455,7 +455,7 @@ export class PlayerActions {
     } else if (this.butcher?.dino === m.dino && !this.butcher.confirmed) {
       // the server's channel (3 / 5 / 10 s by rank, shared/dinoRank.js): the ring fills once over it
       this.butcher.confirmed = true;
-      this.butcher.time = m.t;
+      this.butcher.time = m.secs;
     }
   }
 
