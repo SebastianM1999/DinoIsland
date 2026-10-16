@@ -625,8 +625,8 @@ export class GameAudio {
     } else {
       const scale = (Number.isFinite(duration) ? Math.max(.1, Math.min(5, duration)) : 1.8) / 1.8;
       // Magazine release, magazine seating and bolt return follow the hand motion.
-      layer(.12 * scale, .055, 2100, 900, .12, true, 2);
-      layer(.98 * scale, .08, 1200, 420, .18, true, 1.4);
+      layer(.32 * scale, .055, 2100, 900, .12, true, 2);
+      layer(1.20 * scale, .08, 1200, 420, .18, true, 1.4);
       layer(1.43 * scale, .065, 3400, 1700, .14, true, 2.4);
       layer(1.49 * scale, .035, 1900, 700, .1, true, 2);
     }

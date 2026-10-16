@@ -1,4 +1,4 @@
-// Pocket order: which tool sits in which numbered pocket (keys 1-6, hotbar,
+// Pocket order: which tool sits in which numbered pocket (keys 1-7, hotbar,
 // inventory). A client-side preference: `order[pocket]` is an EQUIP index, so
 // `game.eq` and everything sent to the server keep meaning the EQUIP index.
 // DOM-free apart from the guarded localStorage access.
@@ -25,7 +25,10 @@ export function validPocketOrder(order) {
 /** The remembered order, or the default one when nothing (valid) is stored or storage is blocked. */
 export function loadPocketOrder(storage = globalThis.localStorage) {
   try {
-    const order = JSON.parse(storage?.getItem(STORE_KEY) || 'null');
+    let order = JSON.parse(storage?.getItem(STORE_KEY) || 'null');
+    // Extend valid pre-MPX saves without losing the player's pocket arrangement.
+    if (Array.isArray(order) && order.length === 6 && new Set(order).size === 6
+      && order.every(i => Number.isInteger(i) && i >= 0 && i < 6)) order = [...order, 6];
     return validPocketOrder(order) ? order : identityOrder();
   } catch {
     return identityOrder();

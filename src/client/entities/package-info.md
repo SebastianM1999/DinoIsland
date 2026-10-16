@@ -12,6 +12,8 @@
 - `remotePlayers.js` — `RemotePlayers`: other co-op players, interpolated, with nameplates, outfits and equipment.
 - `tracks.js` — `Tracks`: instanced, fading dinosaur footprint decals from `EV.TRACK` events; nearest-track query and minimap markers.
 
+- MPX ground items use the cached firearm adapter and prewarm with the other guns; remote shot sounds use the event kind.
+
 ## Entry points
 - `core/game.js` constructs `DinoViews`, `Tracks`, `Items`, `Projectiles`, `Relics` (each takes `game`) and `RemotePlayers(scene, camera, overlay)`; most are updated each frame through `game.systems`, and receive the world state via `onWelcome(world)` / `onSnapshot`.
 - `GunEffects` is created by `player/actions.js` and `player/weapon-preview.js`.

@@ -12,7 +12,7 @@
 
 ## Actions
 - Movement: `forward`, `back`, `left`, `right` (WASD/arrows), `jump` (Space), `sprint` (Shift), `dash` (Q).
-- Interaction: `interact` (E), `eat` (F), `give` (G), `knife` (V, hold at a carcass), `unstuck` (U), `reloadHint` (R), `slot1`..`slot6` (1-6), `primary` / `secondary` (mouse buttons).
+- Interaction: `interact` (E), `eat` (F), `give` (G), `knife` (V, hold at a carcass), `unstuck` (U), `reloadHint` (R), `slot1`..`slot7` (1-7), `primary` / `secondary` (mouse buttons).
 - Panels: `inventory` (Tab), `map` (M), `skills` (K), `quests` (X, live tracker expansion); E and Escape first go to `onPanelToggle('interact' | 'close')`.
 - `team` (T) is bound but currently not read anywhere in `src/client/`.
 - Debug: `stats` (F2), `debug` (F3).

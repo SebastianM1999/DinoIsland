@@ -21,6 +21,7 @@ export const ITEM_INFO = {
     use: 'L to light or put out · picked up at the boat landing, keep it across respawns',
   },
   pistol: { name: 'P-19 pistol', kind: 'Firearm', text: `Semi-automatic pistol. ${W.pistol.damage} base damage, ${W.pistol.magazine} rounds per magazine.`, use: 'click to fire - right click to aim - R to reload - refill at hut workbench' },
+  mpx: { name: 'MPX-9 submachine gun', kind: 'Firearm', text: `Close-range automatic SMG. ${W.mpx.damage} base damage, ${W.mpx.magazine} rounds per magazine. Wide bullet spread reduces accuracy at distance and while moving.`, use: 'hold left click to fire - R to reload - refill at hut workbench' },
   rifle: { name: 'M4A1 assault rifle', kind: 'Firearm', text: `Automatic rifle. ${W.rifle.damage} base damage, ${W.rifle.magazine} rounds per magazine.`, use: 'hold left click to fire - right click to aim - R to reload - refill at hut workbench' },
   bow: {
     name: 'Bow', kind: 'Weapon',
@@ -133,7 +134,7 @@ export function itemStats(kind, count = 0) {
   if (kind === 'spear') return [['Stab damage', W.spear.damage], ['Throw damage', W.spear.throwDamage], ['Reach', `${W.spear.range} m`], ['Wear per hit', `${W.spear.useWear} %`]];
   if (kind === 'bow' || kind === 'arrow') return [['Damage', W.bow.damage], ['Full draw', `${W.bow.maxDrawTime} s`], ['Arrow lasts', `${W.bow.uses} shots`], ['Quiver', W.bow.maxArrows]];
   if (kind === 'trap') return [['Damage', W.trap.damage], ['Holds for', `${W.trap.holdTime} s`], ['Trigger radius', `${W.trap.triggerRadius} m`]];
-  if (kind === 'pistol' || kind === 'rifle') {
+  if (kind === 'pistol' || kind === 'rifle' || kind === 'mpx') {
     const g = W[kind];
     return [['Damage', g.damage], ['Range', `${g.range} m`], ['Magazine', g.magazine], ['Fire rate', `${Math.round(60 / g.cooldown)} / min`], ['Reload', `${g.reloadTime} s`]];
   }

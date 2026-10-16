@@ -5,7 +5,7 @@ import { ACT, EV, EQUIP } from '../shared/protocol.js';
 import { shotEnd } from '../shared/gunshots.js';
 import { nearDino, plausibleZone } from './hitCheck.js';
 
-export const GUNS = ['pistol', 'rifle'];
+export const GUNS = ['pistol', 'rifle', 'mpx'];
 export function gunInventory() {
   return Object.fromEntries(GUNS.map(k => [k, { loaded: CONFIG.weapons[k].magazine, reserve: CONFIG.weapons[k].reserve }]));
 }

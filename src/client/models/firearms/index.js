@@ -3,6 +3,7 @@ import { retainResource } from '../../core/resources.js';
 // Preserve the original assemblies; use lightweight materials for this renderer.
 import * as THREE from 'three';
 import { buildPistol } from './reference/models/pistol.js';
+import { buildSmg } from './reference/models/smg.js';
 import { buildRifle } from './reference/models/rifle.js';
 
 const cache = new Map();
@@ -57,14 +58,14 @@ function adaptHands(kind, nodes) {
     nodes.gripL = supportGrip(nodes.gripL, nodes.handguard);
     // the locked-back carrier would leave the receiver (its tail is 14 mm above the buffer tube behind it): shorter, and sinking into the tube
     nodes.boltTravel = RIFLE_BOLT_TRAVEL;
-  } else {
+  } else if (kind === 'pistol') {
     shiftNode(nodes.gripR, PISTOL_HANDS_SHIFT); shiftNode(nodes.gripL, PISTOL_HANDS_SHIFT);
     nodes.gripL = { ...nodes.gripL, ...PISTOL_CUP_ORIENTATION };
   }
 }
 function data(kind) {
   if (!cache.has(kind)) {
-    const model = (kind === 'pistol' ? buildPistol : buildRifle)();
+    const model = (kind === 'pistol' ? buildPistol : kind === 'mpx' ? buildSmg : buildRifle)();
     adaptHands(kind, model.nodes);
     cache.set(kind, { nodes: model.nodes, body: model.body.build(),
       moving: Object.fromEntries(Object.entries(model.moving).map(([k, assembly]) => [k, assembly.build()])) });
@@ -74,7 +75,7 @@ function data(kind) {
 export function makeFirearm(kind) {
   const model = data(kind);
   const root = new THREE.Group();
-  root.name = kind === 'pistol' ? 'P-19' : 'M4A1';
+  root.name = kind === 'pistol' ? 'P-19' : kind === 'mpx' ? 'MPX-9' : 'M4A1';
   const add = (geometries, parent) => {
     for (const [key, geometry] of geometries) {
       const m = new THREE.Mesh(retainResource(geometry), material(key)); m.castShadow = true; parent.add(m);

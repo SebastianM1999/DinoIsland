@@ -50,6 +50,13 @@ export const RELOAD_TUNING = {
     fetch: { s: 1.5, off: [-0.02, 0, 0.05], finger: [0.35, 0.5, -0.8], back: [-0.9, 0.3, 0.1] },
     out: 1.25,
   },
+  mpx: {
+    spin: 0.6,
+    lift: { p: [-0.08, 0.14, -0.06], r: [0.3, 0.5, -0.3] },
+    racking: { p: [-0.06, 0.12, -0.06], r: [0.25, 0.4, -0.1] },
+    fetch: { s: 2.0, off: [-0.03, 0, 0.06], finger: [0.35, 0.5, -0.8], back: [-0.9, 0.3, 0.1] },
+    out: 1.2,
+  },
   rifle: {
     spin: 0.6,
     lift: { p: [-0.1, 0.15, -0.08], r: [0.38, 0.5, -0.3] },
@@ -136,6 +143,13 @@ export function buildReloadClips(nodes, def, kind, gunScale, duration) {
   });
   const norm = (v) => { const l = Math.hypot(...v); return v.map((x) => x / l); };
   const slapAt = tune.release && reach(tune.release.point, norm(tune.release.finger), norm(tune.release.back), tune.release.len);
+  // MPX uses its side charging handle after seating a fresh magazine.
+  const charging = kind === 'mpx';
+  const chargeHand = (pull) => {
+    const finger = [0.6, 0.5, -0.6], back = [-0.7, 0.4, 0.2];
+    const point = nodes.chargeRest.pos.map((v, i) => v + nodes.chargePull[i] * pull + (i === 0 ? -0.02 : 0));
+    return { ...reach(point, norm(finger), norm(back), 0.07), pose: 'pinch' };
+  };
   const slapAway = slapAt && { ...slapAt, p: [slapAt.p[0] - 0.035, slapAt.p[1] - 0.03, slapAt.p[2] + 0.01] };
 
   /** Keys are written in fractions of the reload; this makes a clip of `duration` seconds out of them. */
@@ -199,7 +213,11 @@ export function buildReloadClips(nodes, def, kind, gunScale, duration) {
       { t: 0.54, ...hold(0, [0, 0, 0], 'pinch', 'linear') },
       { t: 0.60, ...hold(-0.12, [0, 0, 0], 'open', 'out') },
       { t: 0.66, ...hold(0.6, [0, 0, 0], 'open') },
-      ...(slapAt ? [
+      ...(charging ? [
+        { t: 0.70, ...chargeHand(0), ease: 'out' },
+        { t: 0.765, ...chargeHand(1), ease: 'linear' },
+        { t: 0.82, ...chargeHand(0), ease: 'out' },
+      ] : slapAt ? [
         { t: 0.70, ...slapAway, pose: 'open', ease: 'out' },           // up to the bolt catch ...
         { t: 0.765, ...slapAt, pose: 'open', ease: 'linear' },         // ... and a palm slap on it
         { t: 0.82, ...slapAway, pose: 'open', ease: 'out' },
@@ -217,13 +235,14 @@ export function buildReloadClips(nodes, def, kind, gunScale, duration) {
       { t: 0.34, mag: 1, magVisible: 1, bolt: 1 },                      // new magazine in hand
       { t: 0.535, mag: 1, magVisible: 1, bolt: 1, ease: 'linear' },
       { t: 0.54, mag: 0, magVisible: 1, bolt: 1 },
-      { t: 0.75, mag: 0, magVisible: 1, bolt: 1, charge: 0 },
-      { t: slapAt ? 0.765 : 0.78, mag: 0, magVisible: 1, bolt: 1, charge: 0 },
-      { t: slapAt ? 0.785 : 0.80, mag: 0, magVisible: 1, bolt: 0, charge: 0, ease: 'back' },
+      { t: 0.70, mag: 0, magVisible: 1, bolt: 1, charge: 0 },
+      { t: 0.765, mag: 0, magVisible: 1, bolt: 1, charge: charging ? 1 : 0 },
+      { t: charging ? 0.765 : slapAt ? 0.765 : 0.78, mag: 0, magVisible: 1, bolt: 1, charge: 0 },
+      { t: charging ? 0.82 : slapAt ? 0.785 : 0.80, mag: 0, magVisible: 1, bolt: 0, charge: 0, ease: 'back' },
       { t: 1, mag: 0, magVisible: 1, bolt: 0, charge: 0 },
     ],
     events: [[0.02, 'start'], [0.17, 'magout'], [0.315, 'magdrop'], [0.34, 'fetch'], [0.54, 'magin'], [0.58, 'slap'],
-      [slapAt ? 0.785 : 0.80, 'boltrelease'], [0.995, 'end']],
+      [charging ? 0.82 : slapAt ? 0.785 : 0.80, 'boltrelease'], [0.995, 'end']],
   }, [0.17, 0.34], [0.315, 0.34]);
 
   return { reloadTac, reloadEmpty };

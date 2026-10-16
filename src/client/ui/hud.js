@@ -257,7 +257,7 @@ export class Hud {
     this.$downedCount = this.$downed.querySelector('.hud-downed-count');
     this.$downedKey = this.$downed.querySelector('.hud-downed-key');
 
-    // Inventory (Tab): pockets 1-6 and the 2x3 backpack on the left, the explorer (or the selected
+    // Inventory (Tab): pockets 1-7 and the 2x3 backpack on the left, the explorer (or the selected
     // item's stats) on the right. The frame is built once so the 3D preview's canvas survives the
     // item column re-rendering; only `.hud-inv-items` and the stats view are rebuilt.
     this.$invPanel = el('section', 'hud-panel hud-inv brush');
@@ -297,7 +297,7 @@ export class Hud {
     });
     this.$invPanel.addEventListener('keydown', e => {
       // Tab is the inventory key: it bubbles on to Input, which closes the panel the way it opened
-      // it. The arrow keys move between the cells; 1-6 move the selected pocket there.
+      // it. The arrow keys move between the cells; 1-7 move the selected pocket there.
       if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key)) {
         const controls = [...this.$invPanel.querySelectorAll('button:not(:disabled)')];
         const i = controls.indexOf(document.activeElement);
@@ -305,7 +305,7 @@ export class Hud {
         controls[(i + (['ArrowLeft', 'ArrowUp'].includes(e.key) ? -1 : 1) + controls.length) % controls.length]?.focus();
         return;
       }
-      const to = /^Digit([1-6])$/.exec(e.code)?.[1] - 1;
+      const to = /^Digit([1-7])$/.exec(e.code)?.[1] - 1;
       const from = this._inventoryItems?.get(this._inventorySelection)?.pocket;
       if (Number.isInteger(to) && to < EQUIP.length && from != null) {
         e.preventDefault(); e.stopPropagation();   // the key moves the pocket, it does not pick a tool
@@ -812,7 +812,7 @@ export class Hud {
     const sf = inv.speedFactor ?? 1;
     const w = Math.round((inv.carryWeight || 0) * 10) / 10;
     this.$invItems.innerHTML = `
-      <h3>Pockets <small>drag to rearrange · select one and press 1-6</small></h3>
+      <h3>Pockets <small>drag to rearrange · select one and press 1-7</small></h3>
       <ol class="hud-pockets">${pocketCells}</ol>
       <h3>Backpack <small class="${stacks.length >= slots ? 'is-slow' : ''}">${stacks.length} / ${slots} stacks</small></h3>
       <ol class="hud-backpack">${backpack}</ol>
@@ -854,7 +854,7 @@ export class Hud {
     const material = !!CONFIG.loot[item.kind];
     const rows = itemStats(item.icon, material ? item.count : 0);
     const count = item.locked ? 'Locked' : item.kind === 'spear' ? `Durability ${item.count || 0}`
-      : ['pistol', 'rifle'].includes(item.kind) ? (item.count ? `Loaded / reserve ${item.count}` : 'Not carried')
+      : ['pistol', 'rifle', 'mpx'].includes(item.kind) ? (item.count ? `Loaded / reserve ${item.count}` : 'Not carried')
       : item.kind === 'bow' ? `Arrows ${item.count ?? 0}` : `Carried ${item.count ?? 0}`;
     this.$invStats.innerHTML = `<div class="hud-inv-detail-icon">${icon(item.icon)}</div>
       <p class="hud-inv-kind">${esc(item.pocket != null ? `Pocket ${item.pocket + 1} · ${info.kind || 'Equipment'}` : info.kind || 'Material')}</p><h3>${esc(info.name || item.name)}</h3>
@@ -862,7 +862,7 @@ export class Hud {
       ${rows.length ? `<dl class="hud-inv-statrows">${rows.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('')}</dl>` : ''}
       <p>${esc(info.text || 'Equipment for your expedition.')}</p>${info.use ? `<p class="hud-inv-note">${esc(info.use)}</p>` : ''}
       <div class="hud-inv-actions"><button type="button" class="wd-btn" data-inventory-action="back">Back</button>
-      <button type="button" class="wd-btn" data-inventory-action="drop" ${item.drop ? '' : 'disabled'}>Drop ${material ? 'stack' : ['spear', 'pistol', 'rifle'].includes(item.kind) ? 'equipment' : 'one stack'}</button>
+      <button type="button" class="wd-btn" data-inventory-action="drop" ${item.drop ? '' : 'disabled'}>Drop ${material ? 'stack' : ['spear', 'pistol', 'rifle', 'mpx'].includes(item.kind) ? 'equipment' : 'one stack'}</button>
       ${material ? '<button type="button" class="wd-btn wd-primary" data-inventory-action="deposit">Deposit at hut</button>' : ''}</div>
       ${material ? '<p class="hud-inv-note">Move close to the hut drop-off to deposit. Actions affect the full stack.</p>' : ''}`;
   }

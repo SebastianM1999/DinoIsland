@@ -103,7 +103,7 @@ test('no XP or skills in the demo: a saved profile is neither used nor overwritt
   const full = new ServerWorld({ send() {} });
   const q = full.players.get(full.join('Hunter', undefined, undefined, skilled).id);
   assert.equal(q.prof.skills.thickSkin, 1);
-  assert.equal(Object.keys(q.inv.guns).length, 2);
+  assert.equal(Object.keys(q.inv.guns).length, 3);
 });
 
 test('the boat ends the demo: a win on island 1, then island 1 starts over', () => {

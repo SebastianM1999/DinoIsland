@@ -9,7 +9,7 @@
 - `fabric.js` — `fabric(top)`: plain/plaid/striped fabric colour function, shared by the player model and the first-person sleeves.
 - `fruit.js` — fruit geometry/material per type (`berry`, `mango`, `dragon`; swamp `marshberry`, `swampfig`, `glowlotus`; volcano `emberchili`, `ashplum`, `obsidianfig`), `FRUIT_GLOW`, `makeFruitMesh`.
 - `dino/` — dinosaur models and animation (own `package-info.md`).
-- `firearms/` — pistol and rifle models (own `package-info.md`).
+- `firearms/` — pistol, rifle and MPX models (own `package-info.md`).
 - `arms/` — first-person cartoon arms on the Claude-of-Duty rig and grip maths (own `package-info.md`).
 
 ### props/
