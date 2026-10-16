@@ -18,9 +18,53 @@ function material(key) {
   }
   return retainResource(materials.get(key));
 }
+/**
+ * Hand adjustments for this game's bigger cartoon hands (on the nodes themselves, so the reload clips, which start
+ * and end on `gripL`, follow). Claude-of-Duty's rifle support grip sits mid-handguard (knuckles at z -0.238) and the
+ * rifle is seen almost end-on, which pushed the hand to the muzzle end: it moves 40 mm back so the palm lies under the
+ * REAR third of the handguard (z -0.225 .. -0.145). Its pistol hands sit so low that the index finger passes under the
+ * trigger guard: both hands move up and back until the index can reach the trigger.
+ */
+export const SUPPORT_HAND_SHIFT = 0.04;
+export const PISTOL_HANDS_SHIFT = [0, 0.015, 0.022];
+/**
+ * The support hand's orientation is re-derived too. Claude-of-Duty's fingers run straight ACROSS the handguard, and with
+ * our shoulders the forearm arrives from behind, so the wrist bent ~70 degrees (a twisted wrist on screen). Here the palm
+ * holds the lower far side of the tube (clock angle 325 degrees, thumb over the near side) and the fingers are rolled
+ * toward the muzzle, so the metacarpals run diagonally along the tube in line with the forearm (bend ~4 degrees).
+ */
+export const SUPPORT_GRIP = { clock: 325 * Math.PI / 180, roll: 0.75, tilt: 0.3 };
+export const PISTOL_CUP_ORIENTATION = { finger: [0.34, 0.1, -0.93], back: [0.12, 0.97, 0.2] };
+/** Bolt carrier travel (gun units): short and dipping, so the tail stays inside the receiver / buffer tube instead of floating behind it. */
+export const RIFLE_BOLT_TRAVEL = [0, -0.014, 0.045];
+function shiftNode(node, d) { node.pos = node.pos.map((v, i) => v + d[i]); }
+function supportGrip(node, hg) {
+  const norm = (v) => { const l = Math.hypot(...v); return v.map(x => x / l); };
+  const f0 = norm(node.finger);
+  const contact = node.pos.map((v, i) => v + f0[i] * 0.098);       // the knuckle contact this wrist target was derived from
+  const off = Math.hypot(contact[0] - hg.axis[0], contact[1] - hg.axis[1]);
+  const { clock, roll, tilt } = SUPPORT_GRIP;
+  const n = [Math.cos(clock), Math.sin(clock), 0];
+  const finger = norm([-Math.sin(clock) * Math.cos(roll), Math.cos(clock) * Math.cos(roll), -Math.sin(roll)]);   // wraps up the far side, rolled forward
+  const back = norm([n[0] * Math.cos(tilt), n[1] * Math.cos(tilt), Math.sin(tilt)]);
+  const knuckle = [hg.axis[0] + n[0] * off, hg.axis[1] + n[1] * off, contact[2]];
+  return { pos: knuckle.map((v, i) => v - finger[i] * 0.098), finger, back };
+}
+function adaptHands(kind, nodes) {
+  if (kind === 'rifle') {
+    shiftNode(nodes.gripL, [0, 0, SUPPORT_HAND_SHIFT]);
+    nodes.gripL = supportGrip(nodes.gripL, nodes.handguard);
+    // the locked-back carrier would leave the receiver (its tail is 14 mm above the buffer tube behind it): shorter, and sinking into the tube
+    nodes.boltTravel = RIFLE_BOLT_TRAVEL;
+  } else {
+    shiftNode(nodes.gripR, PISTOL_HANDS_SHIFT); shiftNode(nodes.gripL, PISTOL_HANDS_SHIFT);
+    nodes.gripL = { ...nodes.gripL, ...PISTOL_CUP_ORIENTATION };
+  }
+}
 function data(kind) {
   if (!cache.has(kind)) {
     const model = (kind === 'pistol' ? buildPistol : buildRifle)();
+    adaptHands(kind, model.nodes);
     cache.set(kind, { nodes: model.nodes, body: model.body.build(),
       moving: Object.fromEntries(Object.entries(model.moving).map(([k, assembly]) => [k, assembly.build()])) });
   }
@@ -48,9 +92,5 @@ export function makeFirearm(kind) {
   }
   root.userData.parts = parts;
   root.userData.nodes = model.nodes;
-  // Palm contacts for Dinosaur Island's grip-centered, shorter hands.
-  root.userData.gripR = new THREE.Vector3(0, -0.045, 0.03);
-  root.userData.gripL = kind === 'pistol' ? new THREE.Vector3(-0.035, -0.035, 0.015)
-    : new THREE.Vector3(0, 0.075, -0.235);
   return root;
 }

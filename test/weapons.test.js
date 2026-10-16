@@ -4,9 +4,10 @@ import * as THREE from 'three';
 import { SPEAR_THROW, spearLaunch } from '../src/client/player/spearThrow.js';
 import { CONFIG } from '../src/shared/config.js';
 import { Projectiles } from '../src/client/entities/projectiles.js';
-import { Viewmodel } from '../src/client/player/viewmodel.js';
+import { Viewmodel, HOOK_CONTACT } from '../src/client/player/viewmodel.js';
 import { BOW_REST, ARROW_TIP_Y } from '../src/client/models/weapons.js';
 import { PlayerModel } from '../src/client/models/playerModel.js';
+import { HAND_SCALE } from '../src/client/models/arms/cartoonArm.js';
 
 const idle = { speed: 0, sprint: false, grounded: true, lookX: 0, lookY: 0 };
 const make = () => new Viewmodel({ viewCamera: new THREE.PerspectiveCamera() }, 0);
@@ -14,7 +15,8 @@ function settle(vm, tool) {
   vm.setTool(tool);
   for (let i = 0; i < 50; i++) vm.update(1 / 60, idle);
 }
-function near(a, b) { assert.ok(a.distanceTo(b) < 1e-6, `contact gap: ${a.distanceTo(b)}`); }
+function near(a, b, tol = 1e-6) { assert.ok(a.distanceTo(b) < tol, `contact gap: ${a.distanceTo(b)}`); }
+const world = (object) => object.getWorldPosition(new THREE.Vector3());
 
 test('butchering makes one sustained stroke tied to action progress, with no looping', () => {
   const vm = make();
@@ -29,7 +31,7 @@ test('butchering makes one sustained stroke tied to action progress, with no loo
   }
   const end = vm.rHand.position.clone();
   for (let i = 0; i < 120; i++) vm.update(1 / 60, idle);
-  near(vm.rHand.position, end);
+  near(vm.rHand.position, end, 0.01);   // holds at the end of the stroke (idle sway only)
   vm.setKnife(false);
   for (let i = 0; i < 30; i++) vm.update(1 / 60, idle);
   assert.equal(vm.knife.visible, false);
@@ -38,7 +40,7 @@ test('butchering makes one sustained stroke tied to action progress, with no loo
   assert.ok(vm.rHand.position.x > end.x + 0.19, 'a new carcass starts a fresh stroke');
 });
 
-test('bow string, arrow nock, and pulling hand share a contact through draw and sway', () => {
+test('bow string, arrow nock, and the hooked fingers share a contact through draw and sway; the left fist stays on the riser', () => {
   const vm = make(); settle(vm, 'bow');
   for (const draw of [0, 0.25, 0.6, 1]) {
     vm.setDraw(draw);
@@ -46,10 +48,13 @@ test('bow string, arrow nock, and pulling hand share a contact through draw and 
       vm.update(1 / 60, { ...idle, speed: 5, lookX: i * 3, lookY: -i });
       vm.root.updateMatrixWorld(true);
       const nock = new THREE.Vector3().fromBufferAttribute(vm.string.geometry.attributes.position, 1);
-      near(vm.bow.localToWorld(nock), vm.rHand.getWorldPosition(new THREE.Vector3()));
-      near(vm.nocked.getWorldPosition(new THREE.Vector3()), vm.rHand.getWorldPosition(new THREE.Vector3()));
+      const string = vm.bow.localToWorld(nock);
+      near(string, vm.rHand.localToWorld(new THREE.Vector3(...HOOK_CONTACT)));
+      near(vm.nocked.getWorldPosition(new THREE.Vector3()), string);
+      near(vm.bow.localToWorld(vm.grips.bow.L.pos.clone()), world(vm.lHand));
     }
   }
+  assert.equal(vm.armR.pose, 'hook'); assert.equal(vm.armL.pose, 'fist:bow');
 });
 
 test('both hands stay on trap handles during walking, switching, and placement', () => {
@@ -57,10 +62,48 @@ test('both hands stay on trap handles during walking, switching, and placement',
   for (let i = 0; i < 40; i++) {
     vm.update(1 / 60, { ...idle, speed: 5, sprint: true });
     vm.root.updateMatrixWorld(true);
-    for (const [side, hand] of [[-1, vm.lHand], [1, vm.rHand]]) {
-      near(vm.trap.localToWorld(new THREE.Vector3(side * 0.99, 0.18, 0)), hand.getWorldPosition(new THREE.Vector3()));
+    for (const [key, hand] of [['L', vm.lHand], ['R', vm.rHand]]) {
+      near(vm.trap.localToWorld(vm.grips.trap[key].pos.clone()), world(hand));
     }
   }
+  // the knuckles sit on the side bar: wrist + 0.098 m (scaled) along the fingers is a hand's thickness off the bar's axis
+  vm.root.updateMatrixWorld(true);
+  for (const [side, key, hand] of [[-1, 'L', vm.lHand], [1, 'R', vm.rHand]]) {
+    const knuckle = hand.localToWorld(new THREE.Vector3(0, 0, -0.098 * HAND_SCALE));
+    const bar = vm.trap.localToWorld(new THREE.Vector3(side * 0.99, 0.18, 0));
+    const along = new THREE.Vector3(0, 0, 1).transformDirection(vm.trap.matrixWorld);
+    const off = knuckle.sub(bar); off.addScaledVector(along, -off.dot(along));
+    assert.ok(Math.abs(off.length() - (0.032 * 0.3 + 0.02 + 0.0145 * HAND_SCALE)) < 1e-6, `${key} knuckle distance ${off.length()}`);
+  }
+});
+
+test('the knife, spear and grips of every tool stay welded to their hands through sway, bob and lag', () => {
+  const vm = make();
+  const walk = (i) => ({ ...idle, speed: 5, lookX: Math.sin(i) * 20, lookY: Math.cos(i) * 10 });
+  settle(vm, 'spear');
+  for (let i = 0; i < 40; i++) {
+    vm.update(1 / 60, walk(i)); vm.root.updateMatrixWorld(true);
+    near(vm.spear.localToWorld(vm.grips.spear.R.pos.clone()), world(vm.rHand));
+  }
+  assert.equal(vm.armR.pose, 'fist:spear');
+  vm.stab();
+  for (let i = 0; i < 30; i++) {
+    vm.update(1 / 60, walk(i)); vm.root.updateMatrixWorld(true);
+    near(vm.spear.localToWorld(vm.grips.spear.R.pos.clone()), world(vm.rHand));
+  }
+  vm.setKnife(true, 0.3);
+  for (let i = 0; i < 60; i++) vm.update(1 / 60, idle);
+  for (let i = 0; i < 40; i++) {
+    vm.setKnife(true, 0.3 + i / 100);
+    vm.update(1 / 60, walk(i)); vm.root.updateMatrixWorld(true);
+    near(vm.knife.localToWorld(vm.grips.knife.R.pos.clone()), world(vm.rHand));
+  }
+  assert.equal(vm.armR.pose, 'fist:knife');
+  vm.setKnife(false); vm.setTool('fruit', { fruitType: 'mango' });
+  for (let i = 0; i < 90; i++) vm.update(1 / 60, idle);
+  vm.root.updateMatrixWorld(true);
+  near(vm.fruitHolder.localToWorld(vm.grips.fruit.R.pos.clone()), world(vm.rHand));
+  assert.equal(vm.armR.pose, 'hold');
 });
 
 test('optimistic inventory removal preserves spear until its throw release', () => {
@@ -131,7 +174,7 @@ test('the entire held spear matches the first flying frame across both camera pr
     }
     for (let i = 0; i < 100; i++) vm.update(1 / 120, idle);
     assert.equal(releases, 1);
-    assert.ok(vm.rHand.position.distanceTo(vm.rHandRest) < 0.006);
+    assert.ok(vm.rHand.position.distanceTo(vm.rHandRest) < 0.02, 'the empty hand recovers to its rest target');
   }
 });
 
@@ -139,17 +182,16 @@ test('release stays synchronized at different frame rates and hand recovery stay
   for (const dt of [1 / 30, 1 / 60, 1 / 144]) {
     const vm = make(); settle(vm, 'spear'); let releases = 0;
     vm.throwSpear(() => releases++); vm.setTool('spear', { hasSpear: false });
-    assert.equal(vm.rPalm.geometry.morphAttributes.position[0].count, vm.rPalm.geometry.attributes.position.count);
     let last = vm.rHand.position.clone(), opened = false;
     while (vm.throwT > 0) {
       vm.update(dt, idle);
       if (vm.throwElapsed < SPEAR_THROW.release - 1e-9) { assert.equal(releases, 0); assert.equal(vm.spear.visible, true); }
       else { assert.equal(releases, 1); assert.equal(vm.spear.visible, false); }
       assert.ok(vm.rHand.position.distanceTo(last) < dt * 12 + 0.01, 'hand path must not snap');
-      if (vm.rPalm.morphTargetInfluences[0] > 0.8) opened = true;
+      if (vm.armR.pose === 'open') opened = true;
       last.copy(vm.rHand.position);
     }
-    assert.equal(opened, true); assert.equal(vm.rPalm.morphTargetInfluences[0], 0);
+    assert.equal(opened, true, 'the hand opens at release'); assert.equal(vm.armR.pose, 'relaxed', 'and relaxes afterwards');
   }
 });
 

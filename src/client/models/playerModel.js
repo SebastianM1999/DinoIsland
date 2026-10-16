@@ -10,6 +10,7 @@ import { makeFirearm } from './firearms/index.js';
 import { CONFIG } from '../../shared/config.js';
 import { HATS, TOPS, PANTS, defaultOutfit, sanitizeOutfit } from '../../shared/outfits.js';
 import { MAT, deform, paint, place, part, merge, mesh, blob, jitter } from './kit.js';
+import { fabric } from './fabric.js';
 import { makeTorch, torchFlicker } from './torch.js';
 import { TORCH, leftHandBusy } from '../../shared/torch.js';
 import { spearGeometry, bowGeometry, trapGeometry, meatGeometry, arrowGeometry, makeBowString, BOW_REST } from './weapons.js';
@@ -35,28 +36,17 @@ const cached = (key, build) => {
   return retainResource(geoCache.get(key));
 };
 
+// Third-person palm contacts in each gun's local space. The first-person wrist
+// targets are the model's own nodes.gripR / gripL (see firearms/package-info.md).
+export const GUN_GRIPS_3P = {
+  pistol: { r: new THREE.Vector3(0, -0.045, 0.03), l: new THREE.Vector3(-0.035, -0.035, 0.015) },
+  rifle: { r: new THREE.Vector3(0, -0.045, 0.03), l: new THREE.Vector3(0, 0.075, -0.235) },
+};
+
 const col = (hex) => new THREE.Color(hex);
 const shade = (hex, k) => col(hex).multiplyScalar(k);
 const mix = (a, b, t) => col(a).lerp(col(b), t);
 const clamp01 = (v) => Math.max(0, Math.min(1, v));
-
-/** Fabric color function for a top: plain, plaid or stripes. */
-function fabric(top) {
-  const base = col(top.color);
-  if (top.pattern === 'plaid') {
-    const dark = col(top.accent);
-    const mid = mix(top.color, top.accent, 0.45);
-    return (c) => {
-      const a = Math.floor((c.x + 1) * 11) % 2, b = Math.floor((c.y + 1) * 11) % 2;
-      return a && b ? dark : a || b ? mid : base;
-    };
-  }
-  if (top.pattern === 'stripes') {
-    const stripe = col(top.accent);
-    return (c) => (Math.floor((c.y + 1) * 14) % 2 ? stripe : base);
-  }
-  return base;
-}
 
 // ------------------------------------------------------------------ head
 
@@ -622,9 +612,9 @@ export class PlayerModel {
       this.toolRig.position.set(0.12, 0.24, -0.24);
       this.toolRig.rotation.set(-s.pitch - this.attackT * 0.15, 0, 0);
       this.toolRig.updateMatrix();
-      this.gripTarget.copy(held.userData.gripR).applyMatrix4(this.toolRig.matrix);
+      this.gripTarget.copy(GUN_GRIPS_3P[s.eq].r).applyMatrix4(this.toolRig.matrix);
       this.fitArm(this.armR, this.gripTarget);
-      this.gripTarget.copy(held.userData.gripL).applyMatrix4(this.toolRig.matrix);
+      this.gripTarget.copy(GUN_GRIPS_3P[s.eq].l).applyMatrix4(this.toolRig.matrix);
       this.fitArm(this.armL, this.gripTarget);
     }
     if (held && (s.eq === 'bow' || s.eq === 'trap')) {

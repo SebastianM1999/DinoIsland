@@ -19,6 +19,21 @@ const ground = new THREE.Mesh(new THREE.PlaneGeometry(30, 30).rotateX(-Math.PI /
 gfx.scene.add(ground);
 const tool = document.querySelector('#tool');
 const outfit = document.querySelector('#outfit');
+// ?tool=<name> starts on that tool, ?zoom=<fov> narrows the view camera for close inspection of the hands (workshop only).
+const query = new URLSearchParams(location.search);
+if ([...tool.options].some((o) => o.value === query.get('tool'))) tool.value = query.get('tool');
+const zoom = +query.get('zoom');
+const ZOOM_FOCUS = new THREE.Vector3(0.06, -0.17, -0.5);   // viewmodel-space point the zoom keeps centred (the hands)
+function applyZoom() {
+  const cam = gfx.viewCamera;
+  cam.fov = zoom;
+  cam.updateProjectionMatrix();
+  // off-axis shear: the focus point lands on the screen centre instead of drifting out of the narrow frame
+  const k = 1 / (-ZOOM_FOCUS.z * Math.tan(THREE.MathUtils.degToRad(zoom / 2)));
+  cam.projectionMatrix.elements[8] = ZOOM_FOCUS.x * k / cam.aspect;
+  cam.projectionMatrix.elements[9] = ZOOM_FOCUS.y * k;
+  cam.projectionMatrixInverse.copy(cam.projectionMatrix).invert();
+}
 TOPS.forEach((top, i) => outfit.add(new Option(top.name || top.id, i)));
 outfit.addEventListener('change', () => { const o = { top: +outfit.value, hat: 0, pants: 0 }; vm.setOutfit(o); model.setOutfit(o); });
 const effects = new GunEffects({ gfx, net: { on() {} } });
@@ -69,6 +84,7 @@ function reload() {
   reloading = { kind: k, elapsed: 0 };
 }
 document.querySelector('#reload').addEventListener('click', reload);
+document.querySelector('#inspect').addEventListener('click', () => vm.inspect());
 document.addEventListener('keydown', e => { if (e.code === 'KeyR') reload(); });
 document.addEventListener('pointermove', (e) => { mouseX += e.movementX; mouseY += e.movementY; });
 function frame(now) {
@@ -84,7 +100,8 @@ function frame(now) {
       a.loaded += rounds; a.reserve -= rounds; reloading = null;
     }
   }
-  vm.setGunPose(document.querySelector('#aim').checked, reloading?.kind === tool.value ? reloading.elapsed / CONFIG.weapons[tool.value].reloadTime : 0);
+  vm.setGunPose(false, reloading?.kind === tool.value ? reloading.elapsed / CONFIG.weapons[tool.value].reloadTime : 0, ammo[tool.value]?.loaded <= 0);
+  vm.setTorch(true, document.querySelector('#torch').checked);
   vm.setKnife(document.querySelector('#knife').checked);
   effects.update(dt);
   if (flyingSpear && !flyingSpear.landed) {
@@ -105,7 +122,9 @@ function frame(now) {
   vm.root.visible = !remote;
   model.root.visible = remote;
   model.animate(dt, { spd: walk ? 5 : 0, pitch: 0, eq: tool.value, drawing, eating: false, attacking: vm.stabT > 0.7, carry: 0, alive: true, grounded: true });
+  if (zoom >= 5 && zoom < 62) applyZoom();
   gfx.render();
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
+window.workshop = { vm, gfx };   // console/automation access (side views: move gfx.viewCamera, the viewmodel rides on it)

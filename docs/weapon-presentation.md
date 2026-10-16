@@ -16,7 +16,7 @@ The server checks equipment, origin, aim, ammunition, fire interval, reload dura
 
 ## Inspect locally
 
-Run `npm start` from this worktree, then open `/src/client/player/weapon-preview.html` on that server. The workshop includes tool switching, stab/throw, bow draw/release, placement, movement, all shirt options, and a co-op model toggle. It uses the production models and viewmodel. Thrown spears now launch into the preview scene and remain there until Reset spear is clicked. The preview includes firearm firing, aiming, ammunition and reload controls. It is a developer preview, not a new game menu.
+Run `npm start` from this worktree, then open `/src/client/player/weapon-preview.html` on that server. The workshop includes tool switching, stab/throw, bow draw/release, placement, movement, all shirt options, and a co-op model toggle. It uses the production models and viewmodel. Thrown spears now launch into the preview scene and remain there until Reset spear is clicked. The preview includes firearm firing, ammunition, reload and inspect controls and an off-hand torch toggle (no aiming: guns are fired from the hip). It is a developer preview, not a new game menu.
 
 `node --test test/weapons.test.js test/firearms.test.js` verifies contact positions through movement and draw, throw visibility with optimistic inventory removal, and co-op grip alignment. The existing game suite checks combat authority and outfit compatibility. Browser checks should also cover the actual solo game, including firing the bow and placing a trap.
 

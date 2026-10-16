@@ -7,7 +7,7 @@
   <title>Weapon workshop — Dinosaur Island</title>
   <style>
     body { margin:0; background:#294037; color:#f3ead6; font:14px system-ui; overflow:hidden }
-    canvas { display:block }
+    canvas { display:block; width:100vw; height:100vh }
     nav { position:absolute; top:18px; left:18px; display:flex; flex-wrap:wrap; gap:8px; max-width:calc(100% - 36px) }
     button, select, label { border:1px solid #b8aa83; border-radius:5px; padding:9px 12px; background:#24382f; color:#f3ead6; font:inherit }
     button { cursor:pointer } button:focus-visible, select:focus-visible { outline:2px solid #f3ead6; outline-offset:3px }
@@ -19,7 +19,7 @@
 <body>
   <nav aria-label="Weapon preview controls">
     <select id="tool" aria-label="Weapon"><option>spear</option><option>bow</option><option>trap</option><option>fruit</option><option>pistol</option><option>rifle</option></select>
-    <button id="primary">Use / hold to draw</button><button id="throw">Throw spear</button><button id="reset-spear">Reset spear</button><button id="reload">Reload</button><label><input id="aim" type="checkbox"> Aim</label><label><input id="knife" type="checkbox"> Knife (V)</label>
+    <button id="primary">Use / hold to draw</button><button id="throw">Throw spear</button><button id="reset-spear">Reset spear</button><button id="reload">Reload</button><button id="inspect">Inspect</button><label><input id="knife" type="checkbox"> Knife (V)</label><label><input id="torch" type="checkbox"> Torch</label>
     <label><input id="walk" type="checkbox"> Walk</label><label><input id="sprint" type="checkbox"> Sprint</label>
     <select id="outfit" aria-label="Outfit"></select><label><input id="remote" type="checkbox"> Co-op model</label>
   </nav>
