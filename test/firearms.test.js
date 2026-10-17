@@ -202,3 +202,40 @@ test('MPX rear iron sight has an open aperture with a solid rim and an aligned f
   assert.equal(front[1], y);
   assert.ok(cast(front[0], front[1]-0.0005, front[2]).length > 0, 'front post meets the sight line');
 });
+
+
+test('SR7 model instances share retained geometry but keep their moving parts independent', () => {
+  const a = makeFirearm('sniper'), b = makeFirearm('sniper');
+  assert.equal(a.name, 'SR7 Longbow');
+  assert.notEqual(a, b);
+  assert.equal(a.children[0].geometry, b.children[0].geometry);
+  for (const name of ['magazine', 'charging', 'bolt', 'trigger', 'selector']) {
+    const first = a.userData.parts[name], second = b.userData.parts[name];
+    assert.notEqual(first, second, name + ' is independently animated');
+    const original = second.position.clone();
+    first.position.addScalar(0.1);
+    assert.ok(second.position.equals(original), name + ' motion cannot affect another player');
+    assert.equal(first.children[0].geometry, second.children[0].geometry);
+  }
+  // The sniper reuses the fitted receiver and support cylinder, rather than
+  // silently changing the contact surface beneath the thick cartoon fingers.
+  const rifle = makeFirearm('rifle');
+  assert.deepEqual(a.userData.nodes.gripL, rifle.userData.nodes.gripL);
+  assert.deepEqual(a.userData.nodes.gripR, rifle.userData.nodes.gripR);
+  assert.deepEqual(a.userData.nodes.handguard, rifle.userData.nodes.handguard);
+});
+
+test('SR7 scope has a clear centered sight line and a muzzle at the end of its heavy barrel', () => {
+  const gun = makeFirearm('sniper'), n = gun.userData.nodes;
+  gun.updateMatrixWorld(true);
+  const axis = new THREE.Vector3(...n.scopeAxis);
+  const ray = new THREE.Raycaster(new THREE.Vector3(...n.scopeEye).addScaledVector(axis, -0.01), axis, 0, 0.45);
+  assert.equal(ray.intersectObject(gun, true).length, 0, 'no opaque lens disk or mount blocks the scope');
+  assert.deepEqual(n.scopeAxis, [0, 0, -1]);
+  assert.equal(n.scopeEye[0], n.sight[0]);
+  assert.equal(n.scopeEye[1], n.sight[1]);
+  assert.ok(n.scopeEye[2] > n.sight[2], 'eye alignment node lies behind the ocular');
+  const bounds = new THREE.Box3().setFromObject(gun);
+  assert.ok(bounds.min.z < -0.7, 'the heavy barrel extends beyond a carbine');
+  assert.ok(Math.abs(n.muzzle[2] - bounds.min.z) < 0.001, 'effects emerge from the actual muzzle crown');
+});
