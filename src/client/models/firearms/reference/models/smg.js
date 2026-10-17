@@ -216,7 +216,7 @@ export function buildSmg() {
     braces: 2,
   });
   addRail(body, 'alu', hgZ1 + 0.004, hgZ0 - 0.002, railTop);
-  addForeGrip(body, 'polymer', 'rubber', { y: bore - hgR - 0.004, z: -0.208, angle: 0.2, len: 0.058 });
+  addForeGrip(body, 'polymer', 'rubber', { y: bore - hgR - 0.004, z: -0.208, angle: 0.2, len: 0.09 });
   addQdSocket(body, 'alu', 'steel', -hgR + 0.001, bore - 0.006, hgZ0 - 0.022, 'x', 0.0045);
 
   /* ---- folding skeleton stock ---------------------------------------- */

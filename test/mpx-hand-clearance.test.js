@@ -10,6 +10,18 @@ test('MPX finger and thumb surfaces clear the weapon while holding, moving and p
   vm.setTool('mpx');
   for (let i = 0; i < 200; i++) vm.update(1 / 60, idle);
   const gun = vm.guns.mpx;
+  vm.root.updateMatrixWorld(true);
+  const toGun = gun.matrixWorld.clone().invert();
+  const roots = vm.armL.fingers.map(f => f.root.getWorldPosition(new THREE.Vector3()).applyMatrix4(toGun));
+  // The four knuckles stack DOWN the tilted vertical post. The old spread pose
+  // rotated this row diagonally and left the fingers running up the weapon.
+  const postAxis = new THREE.Vector3(0, -0.09, 0.008).applyAxisAngle(new THREE.Vector3(1, 0, 0), 0.2).normalize();
+  const row = roots[3].clone().sub(roots[0]).normalize();
+  assert.ok(row.dot(postAxis) > 0.98, 'all four fingers form one fist aligned with the foregrip');
+  const thumb = vm.armL.thumb;
+  const thumbBase = thumb.root.getWorldPosition(new THREE.Vector3()).applyMatrix4(toGun);
+  const thumbTip = thumb.joints[1].localToWorld(new THREE.Vector3(0, 0, -0.025)).applyMatrix4(toGun);
+  assert.ok(thumbTip.sub(thumbBase).dot(postAxis) > 0.01, 'thumb folds down over the fingers instead of pointing up');
   // Test the actual closed model surfaces, including receiver, grip, guard and foregrip.
   // An octree keeps this build-time regression out of the gameplay hot path.
   const solid = gun.clone();

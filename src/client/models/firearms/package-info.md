@@ -26,7 +26,7 @@
 - `index.js` is the only importer of `reference/models/*`; the reference files only import each other and `three` / `three/addons`.
 
 ## Rules
-- Files under `reference/` (incl. `hands.js`, `clips.js`, `mathx.js`, `rng.js`) carry the header "From Claude-of-Duty ... MIT; see LICENSE". Keep the header and `LICENSE` with them; preserve the original assemblies except requested variants (MPX small iron sights replace the optic), with hand/material adaptation in `index.js` and `player/viewmodel.js`.
+- Files under `reference/` (incl. `hands.js`, `clips.js`, `mathx.js`, `rng.js`) carry the header "From Claude-of-Duty ... MIT; see LICENSE". Keep the header and `LICENSE` with them; preserve the original assemblies except requested variants (MPX small iron sights replace the optic), with hand/material adaptation in `index.js` and `player/viewmodel.js`. The MPX vertical foregrip is 90 mm long to fit all four cartoon fingers.
 - Returned group contract (relied on by viewmodel/player model): `root.userData.parts` holds movable groups (`magazine`, `slide`, `charging`, `bolt`, `trigger`, `selector`) positioned at their rest nodes with `userData.rest`; `root.userData.nodes` exposes the model's named nodes; the CoD wrist targets `nodes.gripR` / `nodes.gripL` (`pos`, `finger`, `back`) and `nodes.handguard` are turned into this game's hands by `arms/cartoonArm.js` (`scaledGrip`), see `player/viewmodel.js`.
 - Geometry and materials are cached per kind/key and marked with `retainResource`, so island disposal never frees them; every call returns a new group sharing them.
 - Materials are plain `MeshStandardMaterial` chosen by part-key keywords (brass, glass, polymer, rubber, cavity, ...); no textures.
