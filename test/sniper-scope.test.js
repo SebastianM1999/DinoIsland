@@ -27,7 +27,12 @@ test('scope reaches magnification in 200 ms at different frame rates and reverse
 test('quickscope accuracy arrives during the transition while hipfire keeps its wide moving cone', () => {
   const scope = new SniperScope(), spec = CONFIG.weapons.sniper;
   assert.equal(scope.spread(1), spec.spread + spec.spreadMove);
-  scope.update(.13, true);
+  scope.update(.09, true);
+  assert.equal(scope.opacity, 0);
+  assert.equal(scope.spread(1), spec.spread + spec.spreadMove, 'an invisible scope cannot improve accuracy');
+  scope.update(.02, true);
+  assert.ok(scope.opacity > 0 && scope.spread(1) < spec.spread + spec.spreadMove && scope.spread(1) > spec.scopeSpread, 'visible transition progressively tightens the cone');
+  scope.update(.02, true);
   assert.equal(scope.spread(1), spec.scopeSpread);
   assert.ok(scope.progress < 1 && scope.opacity < 1);
   const fov = scope.fov(90);

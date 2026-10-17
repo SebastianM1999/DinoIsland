@@ -30,7 +30,8 @@ test('supplied heavy shot retains its full audible tail and a stronger opening r
       assert.equal(bytes.readInt16LE(data[0] + data[1] - 2), 0, 'tail fades without a cutoff click');
     }
   }
-  assert.ok(levels.sniper > levels.pistol * 2 && levels.sniper > levels.rifle * 2);
+  assert.ok(EFFECTS.sniper.gain <= 1.3, 'shot stays below the rejected over-loud mix');
+  assert.ok(levels.sniper > levels.pistol && levels.sniper > levels.rifle);
 });
 
 function fixture() {

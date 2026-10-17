@@ -132,8 +132,8 @@ export const CONFIG = {
     mpx: { damage: 12, range: 85, cooldown: 0.075, magazine: 32, reserve: 96, reloadTime: 1.8, spread: 0.045, spreadMove: 0.035 },
     rifle: { damage: 19, range: 140, cooldown: 0.12, magazine: 30, reserve: 90, reloadTime: 1.65, spread: 0.02, spreadMove: 0.025 },
     // Full scoped accuracy arrives before the animation ends, so a deliberate quickscope can land.
-    sniper: { damage: 95, range: 300, cooldown: 1.1, magazine: 5, reserve: 25, reloadTime: 2.7, spread: 0.065, spreadMove: 0.035,
-      scopeSpread: 0.0005, adsIn: 0.20, adsOut: 0.16, scopeFov: 18, scopeReady: 0.65 },
+    sniper: { damage: 95, range: 300, cooldown: 1.1, magazine: 5, reserve: 25, reloadTime: 2.7, spread: 0.28, spreadMove: 0.06,
+      scopeSpread: 0.0005, adsIn: 0.20, adsOut: 0.16, scopeFov: 18, scopeReady: 0.65, scopeAccuracyStart: 0.48 },
     trap: {
       startCount: 2,
       maxCount: 3,

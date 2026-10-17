@@ -19,7 +19,8 @@ export class SniperScope {
   spread(move) {
     const spec = CONFIG.weapons.sniper;
     // Accurate before the overlay finishes: firing is never gated by ADS completion.
-    const accuracy = smooth(this.progress / spec.scopeReady);
+    // Hip-fire stays fully scattered until the scope lens starts appearing.
+    const accuracy = smooth((this.progress - spec.scopeAccuracyStart) / (spec.scopeReady - spec.scopeAccuracyStart));
     return (spec.spread + spec.spreadMove * move) * (1 - accuracy) + spec.scopeSpread * accuracy;
   }
 }
