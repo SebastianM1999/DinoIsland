@@ -18,7 +18,7 @@ function fixture(kind) {
   const shot = { a: ACT.SHOT, kind, o: [0, CONFIG.player.eyeHeight, 0], dir: [0, 0, -1], dino: d.id, p: [0, CONFIG.player.eyeHeight, -10], zone: 'body' };
   return { w, p, d, shot };
 }
-for (const kind of ['pistol', 'rifle', 'mpx']) {
+for (const kind of ['pistol', 'rifle', 'mpx', 'sniper']) {
   test(`${kind} consumes rounds, damages only on a valid ray, and enforces cooldown and empty magazine`, () => {
     const { w, p, d, shot } = fixture(kind);
     gunAction(w, p, shot);
