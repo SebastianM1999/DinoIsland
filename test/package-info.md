@@ -117,6 +117,10 @@ Grouped by the module area they mainly cover. Many simulation tests also check t
 - `internet-host.test.js` — internet relay admits only token WebSockets, control endpoint origin checks, startup failure and stop handling.
 - `steam-coop.test.js` — `SteamSession` with a modelled Steam API: two players through the real game host, lobby caps, demo host restrictions and demo/full separation, invalid lobbies, invites, renderer transport (`connectSteam`).
 
+- sniper-scope.test.js: reversible optical transitions, quickscope accuracy before full opacity, interruption reset and overlay disposal. player-actions.test.js drives partial ADS shots, single-click trigger and scope blockers.
+- sniper-audio.test.js: distinct report layers, timed tactical/empty reload and bolt cues, speed scaling and idempotent cancellation cleanup. SR7 firearm model tests verify cached geometry, independent moving parts and unobstructed optical bore; fp-hands includes sniper support-finger visibility.
+- sniper-viewmodel.test.js: optical-axis alignment and hip return; bolt handle motion, support-hand anchoring and firing-hand return. Sniper input tests also cover ADS held through the knife override.
+
 ## Entry points
 - `npm test` runs `node --test`, which discovers every `*.test.js` file here. A single file runs with `node --test test/<name>.test.js`.
 - Cave test budget (CI cancels `npm run test:coverage` at 25 min; c8 makes the Terrain/volume builds ~6x slower): rules that only read the maze or plan sweep every variant through `planIsland` alone; geometric rules (Terrain, layout, volume mesh) run on the fixed map plus 3 variants and share one build per variant per file. Never build a Terrain/mesh twice in a file when one build and a comparison does it.

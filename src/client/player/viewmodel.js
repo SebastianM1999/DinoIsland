@@ -54,7 +54,7 @@ const SWITCH_UP = 5;          // 1/s: raising it
 
 const SCALE = { bow: 0.7, trap: 0.3, torch: 0.75 };
 /** Guns are drawn bigger than Claude-of-Duty's metres (the old viewmodel did too); their grips are scaled with them. */
-export const GUN_SCALE = { pistol: 1.2, rifle: 1.15, mpx: 1.2 };
+export const GUN_SCALE = { pistol: 1.2, rifle: 1.15, mpx: 1.2, sniper: 1.15 };
 
 /**
  * Every gun's bore axis (from `nodes.muzzle` along the gun's -Z) is solved each frame to pass through the camera-space
@@ -92,6 +92,9 @@ export const GUN_DEFS = {
     recoil: { pitch: 0.0085, yaw: 0.0022, kickBack: 0.019, kickUp: 0.0072, roll: 0.032, freq: 8.5, damping: 0.42 },
   },
 };
+GUN_DEFS.sniper = { ...GUN_DEFS.rifle, hipPos: [0.14, -0.22, -0.42], magLen: 0.120,
+  drawTime: 0.55, holsterTime: 0.35, reloadTac: 2.7, reloadEmpty: 2.7,
+  recoil: { pitch: 0.025, yaw: 0.003, kickBack: 0.045, kickUp: 0.018, roll: 0.025, freq: 8, damping: 0.5 } };
 for (const def of Object.values(GUN_DEFS)) {
   def.hipP = V3(...def.hipPos);
   def.shoulderL = def.shoulderL ? V3(...def.shoulderL) : SHOULDER_L;
@@ -194,7 +197,7 @@ let gripTable = null;
 export function toolGrips() {
   if (gripTable) return gripTable;
   const nodes = {};
-  for (const kind of ['pistol', 'rifle', 'mpx']) nodes[kind] = makeFirearm(kind).userData.nodes;
+  for (const kind of ['pistol', 'rifle', 'mpx', 'sniper']) nodes[kind] = makeFirearm(kind).userData.nodes;
   const gunGrip = (n, kind) => toGrip(scaledGrip(n, HAND_SCALE, GUN_SCALE[kind]));
   const fruitFinger = V3(0, 0.15, -0.99).normalize().toArray();
   const fruitBack = [0, -1, 0];
@@ -217,13 +220,17 @@ export function toolGrips() {
     torch: { L: null },
     fruit: { R: toGrip({ pos: palm.toArray(), finger: fruitFinger, back: fruitBack }) },
   };
-  for (const kind of ['pistol', 'rifle', 'mpx']) {
+  g.sniper = { R: gunGrip(nodes.sniper.gripR, 'sniper'), L: gunGrip(nodes.sniper.gripL, 'sniper'),
+    rPose: 'grip:sniper', lPose: 'clamp:sniper', nodes: nodes.sniper };
+  for (const kind of ['pistol', 'rifle', 'mpx', 'sniper']) {
     const w = FIRING_GRIP[kind];
     g[kind].R.fit = { name: g[kind].rPose, base: 'grip', point: w.point, axis: w.axis, radius: w.radius, scale: GUN_SCALE[kind], trigger: w.trigger, keepThumb: true, thumb: w.thumb, thumbBase: w.thumbBase,
       grip: scaledGrip(nodes[kind].gripR, HAND_SCALE, GUN_SCALE[kind]) };
   }
   g.rifle.L.fit = { name: 'clamp:rifle', base: 'clamp', point: rifleHg.axis, axis: rifleHg.dir, radius: rifleHg.r, scale: GUN_SCALE.rifle, grip: scaledGrip(nodes.rifle.gripL, HAND_SCALE, GUN_SCALE.rifle),
     tuck: SUPPORT_TUCK };
+  g.sniper.L.fit = { ...g.rifle.L.fit, name: 'clamp:sniper', scale: GUN_SCALE.sniper,
+    grip: scaledGrip(nodes.sniper.gripL, HAND_SCALE, GUN_SCALE.sniper), point: nodes.sniper.handguard.axis, axis: nodes.sniper.handguard.dir, radius: nodes.sniper.handguard.r };
   const cylGrip = (scale, name, base, o) => {
     const raw = cyl(scale, o);
     return toGrip(raw, { fit: { name, base, point: o.point, axis: o.axis, radius: o.fitRadius ?? o.radius, scale, grip: raw } });
@@ -260,6 +267,7 @@ const FIRING_GRIP = {
  * middle joints): the fit hugs the tube surface and the rear fingers then lay over the top of the handguard in plain
  * view; folded, their tips end inside the far side of it.
  */
+FIRING_GRIP.sniper = { ...FIRING_GRIP.rifle };
 export const SUPPORT_TUCK = { knuckle: 0.525, middle: 1.6 };
 
 /** Fit `arm`'s fingers for `grip.fit` (arm-root space = item space scaled to the world). */
@@ -313,7 +321,7 @@ function eatClip(d) {
   });
 }
 
-const isGun = (t) => t === 'pistol' || t === 'rifle' || t === 'mpx';
+const isGun = (t) => t === 'pistol' || t === 'rifle' || t === 'mpx' || t === 'sniper';
 
 export class Viewmodel {
   constructor(gfx, slot) {
@@ -346,6 +354,8 @@ export class Viewmodel {
     fitGrip(this.armR, g.pistol.R);
     fitGrip(this.armR, g.rifle.R);
     fitGrip(this.armT, g.torch.L);
+    fitGrip(this.armR, g.sniper.R);
+    fitGrip(this.armL, g.sniper.L);
     // Full-surface clearance tuning for the thick cartoon fingers: a point-contact
     // cylinder fit alone can let the thumb or a finger's middle cross the receiver.
     Object.assign(this.armR.poses['grip:mpx'], {
@@ -376,7 +386,7 @@ export class Viewmodel {
     this.knife = mesh(knifeGeometry(), MAT.standard, { cast: false });
     this.fruitHolder = new THREE.Group();
     this.fruitMeshes = {};
-    this.guns = { pistol: makeFirearm('pistol'), rifle: makeFirearm('rifle'), mpx: makeFirearm('mpx') };
+    this.guns = { pistol: makeFirearm('pistol'), rifle: makeFirearm('rifle'), mpx: makeFirearm('mpx'), sniper: makeFirearm('sniper') };
     this.clips = {};
     for (const [kind, gun] of Object.entries(this.guns)) {
       gun.traverse((o) => { o.castShadow = false; });
@@ -395,7 +405,7 @@ export class Viewmodel {
     this.torch = makeTorch();
     this.torch.scale.setScalar(SCALE.torch);
     this.torch.traverse((o) => { o.castShadow = false; });
-    this.root.add(this.spear, this.bow, this.trap, this.knife, this.fruitHolder, this.guns.pistol, this.guns.rifle, this.guns.mpx, this.torch);
+    this.root.add(this.spear, this.bow, this.trap, this.knife, this.fruitHolder, this.guns.pistol, this.guns.rifle, this.guns.mpx, this.guns.sniper, this.torch);
 
     // ---- state ----
     this.tool = 'spear';
@@ -427,6 +437,7 @@ export class Viewmodel {
 
     // gun state
     this.flashT = 0;
+    this.scopeBlend = 0;
     this.reload = 0; this.empty = false;
     this.reloading = false; this.reloadEmpty = false;
     this.boltCycle = 0; this.sinceShot = 9; this.triggerPulse = 0; this.triggerT = 0;
@@ -598,11 +609,11 @@ export class Viewmodel {
   }
 
   /**
-   * @param {boolean} aim ignored (guns are fired from the hip)
+   * @param {number} aim eased sniper scope alignment, 0..1
    * @param {number} reload 0 = none, else the 0..1 fraction of the running reload
    * @param {boolean} empty the magazine is empty (the slide is locked back; a reload that starts empty plays the long clip)
    */
-  setGunPose(aim, reload = 0, empty = false) { this.reload = reload; this.empty = !!empty; }
+  setGunPose(aim, reload = 0, empty = false) { this.scopeBlend = Number(aim) || 0; this.reload = reload; this.empty = !!empty; }
 
   /** Play the inspect clip of the gun in hand (when nothing else is going on). */
   inspect() {
@@ -1030,7 +1041,14 @@ export class Viewmodel {
     if (this.sprintT > 1e-3) _p.lerp(def.sprintP, this.sprintT);
     solveBoreQuat(_q2, _p, nodes.muzzle, GUN_SCALE[kind], def.cant);
     if (this.sprintT > 1e-3) _q2.slerp(def.sprintQ, this.sprintT);
+    const ads = kind === 'sniper' && !this.reloading && this.phase === 'hold' ? this.scopeBlend : 0;
+    if (ads > 0) {
+      _q2.slerp(new THREE.Quaternion(), ads);
+      const eye = nodes.scopeEye;
+      _p.lerp(_d.set(-eye[0] * GUN_SCALE[kind], -eye[1] * GUN_SCALE[kind], -0.12 - eye[2] * GUN_SCALE[kind]), ads);
+    }
     const m = this.flat ? this.mixed.fill(0) : this.#mix(def.swayScale * lerp(1, 1.5, this.sprintT), def.bobScale, 1, 1);
+    for (let i = 0; i < 6; i++) m[i] *= 1 - ads * 0.97;
     gun.scale.setScalar(GUN_SCALE[kind]);
     gun.position.set(_p.x + m[0] + res.pos[0], _p.y + m[1] + res.pos[1], _p.z + m[2] + res.pos[2]);
     _e.set(m[3] + res.rot[0], m[4] + res.rot[1], m[5] + res.rot[2], 'XYZ');
@@ -1043,6 +1061,14 @@ export class Viewmodel {
     this.armR.setTrigger(this.triggerT);
     _p.copy(grips.R.pos).applyMatrix4(gun.matrix);
     _hq.copy(gun.quaternion).multiply(grips.R.quat);
+    if (kind === 'sniper' && !this.reloading && this.sinceShot < CONFIG.weapons.sniper.cooldown) {
+      const t = this.sinceShot / CONFIG.weapons.sniper.cooldown;
+      const weight = smooth01((t - 0.08) / 0.12) * (1 - smooth01((t - 0.70) / 0.23));
+      const rest = nodes.chargeRest.pos, travel = nodes.chargePull, stroke = this.sniperBoltStroke();
+      _p2.set(rest[0] + travel[0] * stroke + 0.085, rest[1] + travel[1] * stroke - 0.055, rest[2] + travel[2] * stroke + 0.045).applyMatrix4(gun.matrix);
+      _p.lerp(_p2, weight);
+      if (weight > 0.5) this.#setPose(this.armR, 'pinch');
+    }
     this.#solveArm(this.armR, SHOULDER_R, _p, _hq);
 
     const pose = grips.lPose;
@@ -1069,6 +1095,11 @@ export class Viewmodel {
     this.#updateParts(gun, nodes, def, kind, dt, res);
   }
 
+  sniperBoltStroke() {
+    const t = this.sinceShot / CONFIG.weapons.sniper.cooldown;
+    return t < 0.17 ? 0 : t < 0.4 ? smooth01((t - 0.17) / 0.23) : 1 - smooth01((t - 0.4) / 0.26);
+  }
+
   /** Slide/bolt cycle, charging handle, trigger, and the magazine (seated, in the left hand, or gone). */
   #updateParts(gun, nodes, def, kind, dt, res) {
     const parts = gun.userData.parts;
@@ -1077,15 +1108,17 @@ export class Viewmodel {
       this.boltCycle = Math.max(0, this.boltCycle - dt / cycle);
     }
     const cyc = this.boltCycle;
-    const stroke = cyc > 0.55 ? (1 - cyc) / 0.45 : cyc / 0.55;   // out fast, back with a small bounce
+    const stroke = kind === 'sniper'
+      ? this.sniperBoltStroke()
+      : cyc > 0.55 ? (1 - cyc) / 0.45 : cyc / 0.55;   // out fast, back with a small bounce
     // Locked back while the magazine is empty; an empty reload follows the clip's bolt until the release.
-    let locked = this.empty && !this.reloading ? 1 : 0;
+    let locked = this.empty && !this.reloading && kind !== 'sniper' ? 1 : 0;
     if (this.reloading) locked = this.reloadEmpty ? res.parts.bolt : 0;
     const off = Math.max(stroke, locked);
     if (parts.bolt) parts.bolt.position.set(parts.bolt.userData.rest.x + nodes.boltTravel[0] * off, parts.bolt.userData.rest.y + nodes.boltTravel[1] * off, parts.bolt.userData.rest.z + nodes.boltTravel[2] * off);
     if (parts.slide) parts.slide.position.set(parts.slide.userData.rest.x + nodes.slideTravel[0] * off, parts.slide.userData.rest.y + nodes.slideTravel[1] * off, parts.slide.userData.rest.z + nodes.slideTravel[2] * off);
     if (parts.charging) {
-      const pull = res.active ? res.parts.charge : 0;
+      const pull = kind === 'sniper' && !this.reloading ? stroke : res.active ? res.parts.charge : 0;
       const rest = parts.charging.userData.rest;
       parts.charging.position.set(rest.x + nodes.chargePull[0] * pull, rest.y + nodes.chargePull[1] * pull, rest.z + nodes.chargePull[2] * pull);
     }

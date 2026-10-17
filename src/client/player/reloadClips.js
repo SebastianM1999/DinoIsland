@@ -67,6 +67,7 @@ export const RELOAD_TUNING = {
   },
 };
 
+RELOAD_TUNING.sniper = { ...RELOAD_TUNING.rifle, release: null };
 const v3 = (x, y, z) => [x, y, z];
 const _a = new THREE.Vector3(), _p = new THREE.Vector3(), _o = new THREE.Vector3();
 const _outQ = new THREE.Quaternion(), _hq = new THREE.Quaternion();
@@ -144,7 +145,7 @@ export function buildReloadClips(nodes, def, kind, gunScale, duration) {
   const norm = (v) => { const l = Math.hypot(...v); return v.map((x) => x / l); };
   const slapAt = tune.release && reach(tune.release.point, norm(tune.release.finger), norm(tune.release.back), tune.release.len);
   // MPX uses its side charging handle after seating a fresh magazine.
-  const charging = kind === 'mpx';
+  const charging = kind === 'mpx' || kind === 'sniper';
   const chargeHand = (pull) => {
     const finger = [0.6, 0.5, -0.6], back = [-0.7, 0.4, 0.2];
     const point = nodes.chargeRest.pos.map((v, i) => v + nodes.chargePull[i] * pull + (i === 0 ? -0.02 : 0));

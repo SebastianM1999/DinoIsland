@@ -14,6 +14,7 @@ export const ICONS = {
     <path d="M8 15h6l-3 13H5z" fill="#354150" stroke="${OUT}" stroke-width="1.4" stroke-linejoin="round"/>
     <path d="M14 15h5v4h-6M7 10.5h16" fill="none" stroke="#bdcbd5" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
     <path d="M6 7h3M22 7h3" stroke="${OUT}" stroke-width="1.6" stroke-linecap="round"/>`),
+  sniper: svg(`<path d="M2 15h8l2-2h12v3h6v2H14l-3 6H7l1-7H2z" fill="#a78d60" stroke="${OUT}" stroke-width="1.4"/><path d="M14 10h10v3H14zM16 13v3M22 13v3" fill="#39434a" stroke="${OUT}"/>`),
   mpx: svg(`<path d="M3 12h6v3h14v-3h5v5h-6v6h-3v-6h-4l1 11h-4l-1-11H9l-3 6H3z" fill="#596573" stroke="${OUT}" stroke-width="1.4" stroke-linejoin="round"/><path d="M12 12V9h7v3M10 15h11" fill="none" stroke="#b5bec5" stroke-width="1.5"/>`),
   rifle: svg(`<g transform="rotate(-18 16 16)"><path d="M3 11h6l2 3h10v5H11l-3 5H3z" fill="#596573" stroke="${OUT}" stroke-width="1.4" stroke-linejoin="round"/>
     <path d="M21 14h9v3h-9M13 19h5l-1 8h-5z" fill="#354150" stroke="${OUT}" stroke-width="1.4" stroke-linejoin="round"/>

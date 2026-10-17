@@ -40,6 +40,7 @@ const cached = (key, build) => {
 // targets are the model's own nodes.gripR / gripL (see firearms/package-info.md).
 export const GUN_GRIPS_3P = {
   pistol: { r: new THREE.Vector3(0, -0.045, 0.03), l: new THREE.Vector3(-0.035, -0.035, 0.015) },
+  sniper: { r: new THREE.Vector3(0, -0.045, 0.03), l: new THREE.Vector3(0, 0.075, -0.235) },
   mpx: { r: new THREE.Vector3(0, -0.045, 0.03), l: new THREE.Vector3(0, 0.015, -0.208) },
   rifle: { r: new THREE.Vector3(0, -0.045, 0.03), l: new THREE.Vector3(0, 0.075, -0.235) },
 };
@@ -406,6 +407,7 @@ const HELD = {
   pistol: () => makeFirearm('pistol'),
   rifle: () => makeFirearm('rifle'),
   mpx: () => makeFirearm('mpx'),
+  sniper: () => makeFirearm('sniper'),
   spear: () => mesh(spearGeometry()),
   bow: () => {
     const g = new THREE.Group();
@@ -535,7 +537,7 @@ export class PlayerModel {
     if (!this.held[name]) {
       const m = HELD[name]();
       if (name === 'spear') m.rotation.set(-Math.PI / 2, 0, 0);
-      if (name === 'bow' || name === 'trap' || name === 'pistol' || name === 'rifle' || name === 'mpx') this.toolRig.add(m);
+      if (name === 'bow' || name === 'trap' || name === 'pistol' || name === 'rifle' || name === 'mpx' || name === 'sniper') this.toolRig.add(m);
       else this.hand.add(m);
       this.held[name] = m;
     }
@@ -610,7 +612,7 @@ export class PlayerModel {
     this.armR.rotation.z = rz;
     // Shared grip targets keep both hands on the bow/trap in co-op views.
     const held = this.held[s.eq];
-    if (held && (s.eq === 'pistol' || s.eq === 'rifle' || s.eq === 'mpx')) {
+    if (held && (s.eq === 'pistol' || s.eq === 'rifle' || s.eq === 'mpx' || s.eq === 'sniper')) {
       this.toolRig.position.set(0.12, 0.24, -0.24);
       this.toolRig.rotation.set(-s.pitch - this.attackT * 0.15, 0, 0);
       this.toolRig.updateMatrix();

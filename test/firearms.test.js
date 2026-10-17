@@ -90,7 +90,7 @@ test('first-person gun hands stay welded to their grips through sway, bob, lag, 
 
 test('third-person gun grips follow the weapon in co-op, including pitch and recoil', () => {
   const model = new PlayerModel(0);
-  for (const kind of ['pistol', 'rifle', 'mpx']) {
+  for (const kind of ['pistol', 'rifle', 'mpx', 'sniper']) {
     model.animate(1 / 60, { eq: kind, spd: 0, pitch: 0.2, alive: true, grounded: true }); model.root.updateMatrixWorld(true);
     for (const [contact, arm] of [['r', model.armR], ['l', model.armL]]) {
       assert.ok(model.toolRig.localToWorld(GUN_GRIPS_3P[kind][contact].clone()).distanceTo(arm.localToWorld(new THREE.Vector3(0, -0.46, 0))) < 1e-6);

@@ -18,7 +18,7 @@ function fixture(t) {
     me: { id: 1, slot: 0, alive: true, hp: 70, inv: {
       spear: true, spearHealth: 67, arrows: 3, arrowUses: [2, 2, 2], traps: 1,
       fruit: [], loot: {}, upgrades: [], reloading: null,
-      guns: { pistol: { owned: true, loaded: 2, reserve: 10 }, rifle: { owned: true, loaded: 2, reserve: 10 }, mpx: { owned: true, loaded: 32, reserve: 96 } },
+      guns: { sniper: { owned: true, loaded: 5, reserve: 25 }, pistol: { owned: true, loaded: 2, reserve: 10 }, rifle: { owned: true, loaded: 2, reserve: 10 }, mpx: { owned: true, loaded: 32, reserve: 96 } },
     } },
     player: { pos: new THREE.Vector3(), yaw: 0, moveSpeed: 0, onGround: true, sprinting: false },
     terrain: { heightAt: () => 0, waterLevelAt: () => null },
@@ -369,8 +369,8 @@ test('without firearms in the pack (the demo) there are no gun slots and the gun
   const { game, actions, frame } = fixture(t);
   game.me.inv.guns = {};
   frame();
-  assert.deepEqual(game.hotbar.map((s) => s?.id ?? null), ['spear', 'bow', 'trap', 'fruit', null, null, null], 'the gun pockets stay empty');
-  assert.deepEqual(game.inventoryHud.pockets.filter((s) => s.locked).map((s) => s.id), ['pistol', 'rifle', 'mpx']);
+  assert.deepEqual(game.hotbar.map((s) => s?.id ?? null), ['spear', 'bow', 'trap', 'fruit', null, null, null, null], 'the gun pockets stay empty');
+  assert.deepEqual(game.inventoryHud.pockets.filter((s) => s.locked).map((s) => s.id), ['pistol', 'rifle', 'mpx', 'sniper']);
   actions.select(EQUIP.indexOf('pistol'));
   actions.select(EQUIP.indexOf('rifle'));
   assert.equal(EQUIP[game.eq], 'spear');
@@ -391,8 +391,8 @@ test('number keys, the wheel, the hotbar and the inventory follow the pocket ord
   game.me.inv.fruit = ['berry'];
   pressed.add('slot1'); frame();
   assert.equal(actions.tool, 'fruit');
-  assert.deepEqual(game.hotbar.map((s) => s?.id), ['fruit', 'bow', 'trap', 'spear', 'pistol', 'rifle', 'mpx']);
-  assert.deepEqual(game.inventoryHud.pockets.map((s) => s.id), ['fruit', 'bow', 'trap', 'spear', 'pistol', 'rifle', 'mpx']);
+  assert.deepEqual(game.hotbar.map((s) => s?.id), ['fruit', 'bow', 'trap', 'spear', 'pistol', 'rifle', 'mpx', 'sniper']);
+  assert.deepEqual(game.inventoryHud.pockets.map((s) => s.id), ['fruit', 'bow', 'trap', 'spear', 'pistol', 'rifle', 'mpx', 'sniper']);
   assert.equal(game.inventoryHud.pockets[0].selected, true);
   assert.equal(game.inventoryHud.slots, CONFIG.player.backpackSlots);
   game.lastWheel = 1; frame(); game.lastWheel = 0;
@@ -468,4 +468,52 @@ test('MPX reload sound waits for acceptance and cancels on switch or death', t =
   actions.select(EQUIP.indexOf('rifle')); frame(); assert.equal(cancels, 1);
   game.me.inv.reloading = null; equip('mpx'); game.me.inv.reloading = 'mpx'; frame();
   game.me.alive = false; frame(); assert.equal(cancels, 2);
+});
+
+
+test('sniper quickscope fires during ADS, requires separate clicks and cancels scope on interruptions', t => {
+  t.mock.method(Math, 'random', () => .5);
+  const { game, actions, equip, held, pressed, frame, requests } = fixture(t);
+  equip('sniper'); held.add('secondary'); frame(.13);
+  assert.ok(actions.scope.progress > .6 && actions.scope.progress < 1);
+  assert.equal(actions.scope.spread(0), CONFIG.weapons.sniper.scopeSpread);
+  pressed.add('primary'); frame(.001);
+  assert.equal(requests.filter(m => m.a === ACT.SHOT).length, 1);
+  assert.equal(game.me.inv.guns.sniper.loaded, 4);
+  held.add('primary'); frame(1.2);
+  assert.equal(requests.filter(m => m.a === ACT.SHOT).length, 1, 'holding fire cannot repeat a bolt-action shot');
+  pressed.add('primary'); frame();
+  assert.equal(requests.filter(m => m.a === ACT.SHOT).length, 2);
+  for (const blocker of ['panel', 'downed', 'unlocked', 'dead', 'reload', 'switch']) {
+    game.panel = false; game.downed = false; game.me.alive = true; game.input.locked = true;
+    game.me.inv.reloading = null; game.eq = EQUIP.indexOf('sniper');
+    actions.scope.update(.2, true);
+    if (blocker === 'panel') game.panel = true;
+    if (blocker === 'downed') game.downed = true;
+    if (blocker === 'unlocked') game.input.locked = false;
+    if (blocker === 'dead') game.me.alive = false;
+    if (blocker === 'reload') game.me.inv.reloading = 'sniper';
+    if (blocker === 'switch') actions.select(EQUIP.indexOf('rifle'));
+    frame(.001);
+    assert.equal(actions.scope.progress, 0, blocker);
+    assert.equal(actions.scope.opacity, 0, blocker);
+  }
+});
+
+
+test('holding sniper ADS through butchering cannot hide the knife or fire the overridden gun', t => {
+  const { game, actions, equip, held, pressed, frame, requests, emit } = fixture(t);
+  equip('sniper'); held.add('secondary'); frame(.2);
+  assert.equal(actions.scope.progress, 1);
+  game.dinos.map.set(7, { id: 7, type: 'raptor', alive: false, butchered: false, scale: 1, yaw: 0,
+    pos: new THREE.Vector3(0, 0, -1.5), grounded: () => true });
+  held.add('knife'); frame();
+  emit(EV.BUTCHER, { id: 1, dino: 7, secs: 3 });
+  for (let i = 0; i < 25; i++) frame(.05);
+  assert.equal(actions.vm.shown, 'knife');
+  assert.equal(actions.scope.progress, 0);
+  assert.equal(actions.vm.root.visible, true);
+  pressed.add('primary'); frame();
+  assert.ok(!requests.some(m => m.a === ACT.SHOT));
+  assert.equal(game.me.inv.guns.sniper.loaded, 5);
 });
