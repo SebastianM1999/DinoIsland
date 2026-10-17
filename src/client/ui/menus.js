@@ -87,6 +87,7 @@ export function initSettings({ onClose } = {}) {
     <p>Pistol/rifle shots, terrain footsteps and creature calls use recorded or performed
     <a href="https://creativecommons.org/publicdomain/zero/1.0/" target="_blank" rel="noopener">CC0 sounds</a>.
     See the credits above for creators, sources and edits.</p>
+    <p>Sniper shot: <a href="https://soundbible.com/1388-M-82-Barrett-50-Cal.html" target="_blank" rel="noopener">M 82 Barrett 50 Cal — JKirsch</a>, <a href="https://creativecommons.org/licenses/by/3.0/" target="_blank" rel="noopener">CC BY 3.0</a>. Trimmed, mixed to mono and level balanced.</p>
     <p>Spear throw, bow release and weapon impact generated with
     <a href="https://elevenlabs.io/sound-effects" target="_blank" rel="noopener">ElevenLabs Sound Effects</a>,
     under the generating account's <a href="https://elevenlabs.io/terms-of-use" target="_blank" rel="noopener">ElevenLabs terms</a>.</p>`;

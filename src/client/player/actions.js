@@ -16,6 +16,7 @@ import { stakePoint } from '../world/base.js';
 import { upgradeMods } from '../../shared/crafting.js';
 import { GunEffects } from '../entities/gunEffects.js';
 import { spearLaunch } from './spearThrow.js';
+import { SniperRecoil } from './sniperRecoil.js';
 import { SniperScope, ScopeOverlay } from './scope.js';
 import { Viewmodel } from './viewmodel.js';
 import { loadPocketOrder, savePocketOrder, swapPockets, pocketOf, nextPocket } from './pockets.js';
@@ -58,6 +59,7 @@ export class PlayerActions {
     this.reloadEmpty = false;   // the running reload started on an empty magazine
     this.cooldown = 0;
     this.scope = new SniperScope();
+    this.recoil = new SniperRecoil();
     this.scopeOverlay = globalThis.document?.body?.appendChild ? new ScopeOverlay() : null;
     this.drawT = 0;
     this.drawing = false;
@@ -185,6 +187,7 @@ export class PlayerActions {
     this.eatingT = Math.max(0, this.eatingT - dt);
     const eating = this.eatingT > 0;
     const panel = g.hud.isPanelOpen();
+    this.recoil.update(dt, alive && input.locked && !panel);
 
     // --- slot selection
     for (let i = 0; i < EQUIP.length; i++) if (input.wasPressed(`slot${i + 1}`)) this.select(this.pockets[i]);
@@ -417,7 +420,10 @@ export class PlayerActions {
     this.inv.guns[tool].loaded--;
     this.cooldown = W[tool].cooldown;
     g.flags |= PF.ATTACK; g.audio?.play(tool);
-    if (tool === 'sniper') this.boltSound = g.audio?.play('sniperBolt', { duration: W.sniper.cooldown });
+    if (tool === 'sniper') {
+      this.recoil.fire(this.scope.blend > 0.4);
+      this.boltSound = g.audio?.play('sniperBolt', { duration: W.sniper.cooldown });
+    }
   }
 
   eat() {

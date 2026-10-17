@@ -480,6 +480,9 @@ test('sniper quickscope fires during ADS, requires separate clicks and cancels s
   pressed.add('primary'); frame(.001);
   assert.equal(requests.filter(m => m.a === ACT.SHOT).length, 1);
   assert.equal(game.me.inv.guns.sniper.loaded, 4);
+  assert.equal(actions.recoil.age, 0, 'accepted sniper fire kicks the camera');
+  actions.recoil.update(.025);
+  assert.ok(actions.recoil.pose.pitch > .04);
   held.add('primary'); frame(1.2);
   assert.equal(requests.filter(m => m.a === ACT.SHOT).length, 1, 'holding fire cannot repeat a bolt-action shot');
   pressed.add('primary'); frame();

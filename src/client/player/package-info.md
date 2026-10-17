@@ -17,6 +17,8 @@
 
 - Sniper: SR-7 in pocket 8, one-shot-per-click trigger routing with a 1.1s bolt cycle. Hold secondary for a reversible 0.20s scope raise / 0.16s lower. `scope.js` owns the shared optics clock, screen overlay, FOV/sensitivity and quickscope spread; firing stays available during the transition. Panels, reloads, switching, death/downing and pointer-lock loss clear optics. `PlayerActions.dispose()` removes the overlay and cancels scheduled gun cues. `Viewmodel` aligns `nodes.scopeEye` to the camera, preserves fitted rifle-sized hand contacts, and moves the firing hand to the bolt handle after each shot. Weapon workshop exposes the same scope clock.
 
+- `sniperRecoil.js` — analytic shoulder kick and brief camera vibration, independent of the gun mesh, visible through the scope; reset on death, panels and pointer-lock loss. Applied after the base camera pose, with no accumulating offsets.
+
 ## Entry points
 - `src/client/core/game.js` creates `PlayerController` (`update(dt, intent)`, `look`, `teleport` on welcome/respawn/revive, `knock` on HURT events, `setMods`, `setCreative`, `barrier`, `onDash`) and `StuckDetector` (`update`, `manual`, `onCorrect`, `reset`), and registers `PlayerActions` as one of its systems (`update`, `compassMarkers`, `fullAlert`, `vm`).
 - `PlayerActions` creates the `Viewmodel` and `GunEffects` (`src/client/entities/gunEffects.js`) and subscribes to EAT, BUTCHER, REVIVE, REVIVED, HURT, DINO_HIT, DEATH events.
