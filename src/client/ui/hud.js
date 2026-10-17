@@ -257,7 +257,7 @@ export class Hud {
     this.$downedCount = this.$downed.querySelector('.hud-downed-count');
     this.$downedKey = this.$downed.querySelector('.hud-downed-key');
 
-    // Inventory (Tab): pockets 1-7 and the 2x3 backpack on the left, the explorer (or the selected
+    // Inventory (Tab): pockets 1-8 and the 2x3 backpack on the left, the explorer (or the selected
     // item's stats) on the right. The frame is built once so the 3D preview's canvas survives the
     // item column re-rendering; only `.hud-inv-items` and the stats view are rebuilt.
     this.$invPanel = el('section', 'hud-panel hud-inv brush');
@@ -297,7 +297,7 @@ export class Hud {
     });
     this.$invPanel.addEventListener('keydown', e => {
       // Tab is the inventory key: it bubbles on to Input, which closes the panel the way it opened
-      // it. The arrow keys move between the cells; 1-7 move the selected pocket there.
+      // it. The arrow keys move between the cells; 1-8 move the selected pocket there.
       if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key)) {
         const controls = [...this.$invPanel.querySelectorAll('button:not(:disabled)')];
         const i = controls.indexOf(document.activeElement);
@@ -305,7 +305,7 @@ export class Hud {
         controls[(i + (['ArrowLeft', 'ArrowUp'].includes(e.key) ? -1 : 1) + controls.length) % controls.length]?.focus();
         return;
       }
-      const to = /^Digit([1-7])$/.exec(e.code)?.[1] - 1;
+      const to = /^Digit([1-8])$/.exec(e.code)?.[1] - 1;
       const from = this._inventoryItems?.get(this._inventorySelection)?.pocket;
       if (Number.isInteger(to) && to < EQUIP.length && from != null) {
         e.preventDefault(); e.stopPropagation();   // the key moves the pocket, it does not pick a tool
@@ -812,7 +812,7 @@ export class Hud {
     const sf = inv.speedFactor ?? 1;
     const w = Math.round((inv.carryWeight || 0) * 10) / 10;
     this.$invItems.innerHTML = `
-      <h3>Pockets <small>drag to rearrange · select one and press 1-7</small></h3>
+      <h3>Pockets <small>drag to rearrange · select one and press 1-8</small></h3>
       <ol class="hud-pockets">${pocketCells}</ol>
       <h3>Backpack <small class="${stacks.length >= slots ? 'is-slow' : ''}">${stacks.length} / ${slots} stacks</small></h3>
       <ol class="hud-backpack">${backpack}</ol>
