@@ -75,7 +75,7 @@ export const GUN_DEFS = {
   },
   mpx: {
     hipPos: [0.111, -0.163, -0.288], cant: -0.08,
-    shoulderL: [-0.12, -0.26, 0.03], reloadShoulderL: [-0.14, -0.30, 0.40],
+    shoulderL: [-0.18, -0.08, 0.03], reloadShoulderL: [-0.14, -0.30, 0.40],
     sprintPos: [0.088, -0.24, -0.262], sprintRot: [-0.38, 0.58, 0.19],
     swayScale: 0.92, bobScale: 0.95, magLen: 0.192,
     reloadTac: 1.8, reloadEmpty: 1.8, inspectTime: 2.8, drawTime: 0.5, holsterTime: 0.35,
@@ -228,7 +228,7 @@ export function toolGrips() {
     const raw = cyl(scale, o);
     return toGrip(raw, { fit: { name, base, point: o.point, axis: o.axis, radius: o.fitRadius ?? o.radius, scale, grip: raw } });
   };
-  g.mpx.L = cylGrip(GUN_SCALE.mpx, 'foregrip:mpx', 'fist', { point: [0, -0.018, -0.212], axis: [0, -0.998, -0.064], radius: 0.018, normal: [-1, 0, 0], wrap: 1, roll: -0.9, tilt: 0.2 });
+  g.mpx.L = cylGrip(GUN_SCALE.mpx, 'foregrip:mpx', 'fist', { point: [0, 0, -0.213], axis: [0, -0.994, -0.111], radius: 0.019, normal: [-1, 0, 0], wrap: 1, roll: 0, tilt: 0.1 });
   // Keep clip home keys and fitted idle wrists on the same foregrip contact.
   const rawMpx = { pos: [0, 0, 0], finger: g.mpx.L.finger, back: g.mpx.L.back };
   const offset = scaledGrip(rawMpx, HAND_SCALE, GUN_SCALE.mpx).pos;
@@ -354,8 +354,8 @@ export class Viewmodel {
       thumb: [0.5, 0.34], thumbBase: [1.2, 0, -0.62],
     });
     Object.assign(this.armL.poses['foregrip:mpx'], {
-      fingers: [[2.4, 1.75, 1.95], [-0.048333, 0.85625, 1.564583], [0.06, 1.5375, 1.795833], [1.43125, 0.935417, 0.523958]],
-      thumb: [0.794583, 1.309375], thumbBase: [-1.2, -0.61, -0.957143],
+      fingers: [[0.05, 1.333333, 0.85], [0.10, 1.383333, 0.85], [0.10, 1.383333, 0.85], [0.05, 1.333333, 0.85]],
+      thumb: [0.55, 0.5], thumbBase: [-0.5, 0.8, -0.2],
     });
 
     // ---- items: each a direct child of root, posed by `update` ----
