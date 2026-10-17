@@ -20,12 +20,13 @@ import { trexBrain } from './ai/trex.js';
 import { sarcosuchusBrain } from './ai/sarcosuchus.js';
 import { sumpLurkerBrain } from './ai/sumpLurker.js';
 import { crystalPlodderBrain } from './ai/crystalPlodder.js';
+import { TEST_BRAINS } from './ai/testDinos.js';
 import { aquaticGroundHeight, carcassSurface } from './ai/aquatic.js';
 import { raiderStep } from './raids.js';
 import { ALPHA, canBeAlpha, alphaTitle } from '../shared/dinoRank.js';
 import { findPath, canWalkSegment } from './pathfind.js';
 
-const BRAINS = { brachio: brachioBrain, stego: stegoBrain, raptor: raptorBrain, 'gloom-raptor': gloomRaptorBrain, ptera: pteraBrain, trex: trexBrain, 'alpha-sarcosuchus': sarcosuchusBrain, 'sump-lurker': sumpLurkerBrain, 'crystal-plodder': crystalPlodderBrain };
+const BRAINS = { brachio: brachioBrain, stego: stegoBrain, raptor: raptorBrain, 'gloom-raptor': gloomRaptorBrain, ptera: pteraBrain, trex: trexBrain, 'alpha-sarcosuchus': sarcosuchusBrain, 'sump-lurker': sumpLurkerBrain, 'crystal-plodder': crystalPlodderBrain, ...TEST_BRAINS };
 const r2 = (v) => Math.round(v * 100) / 100;
 const r3 = (v) => Math.round(v * 1000) / 1000;
 const TRACK_SPACING = { brachio: 1.3, stego: 1, raptor: 2.2, 'gloom-raptor': 2.4, trex: 1.5, 'crystal-plodder': 1.1 };

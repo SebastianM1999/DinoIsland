@@ -62,6 +62,41 @@
       "source": "Project-authored Alpha Sarcosuchus; art/sources/alpha-sarcosuchus/alpha-sarcosuchus.blend (rebuildable scripts in text blocks)",
       "license": "Project source",
       "triangles": 58752
+    },
+    {
+      "id": "dino-triceratops",
+      "file": "assets/models/dinos/triceratops.glb",
+      "source": "Project-authored Triceratops; art/sources/triceratops/triceratops.blend (build scripts in its text blocks)",
+      "license": "Project source",
+      "triangles": 57766
+    },
+    {
+      "id": "dino-ankylosaurus",
+      "file": "assets/models/dinos/ankylosaurus.glb",
+      "source": "Project-authored Ankylosaurus; art/sources/ankylosaurus/ankylosaurus.blend (build scripts in its text blocks)",
+      "license": "Project source",
+      "triangles": 51616
+    },
+    {
+      "id": "dino-pachycephalosaurus",
+      "file": "assets/models/dinos/pachycephalosaurus.glb",
+      "source": "Project-authored Pachycephalosaurus; art/sources/pachycephalosaurus/pachycephalosaurus.blend (build scripts in its text blocks)",
+      "license": "Project source",
+      "triangles": 39429
+    },
+    {
+      "id": "dino-dilophosaurus",
+      "file": "assets/models/dinos/dilophosaurus.glb",
+      "source": "Project-authored Dilophosaurus; art/sources/dilophosaurus/dilophosaurus.blend (build scripts in its text blocks)",
+      "license": "Project source",
+      "triangles": 48616
+    },
+    {
+      "id": "dino-spinosaurus",
+      "file": "assets/models/dinos/spinosaurus.glb",
+      "source": "Project-authored Spinosaurus; art/sources/spinosaurus/spinosaurus.blend (build scripts in its text blocks)",
+      "license": "Project source",
+      "triangles": 51563
     }
   ]
 }
