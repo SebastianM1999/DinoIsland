@@ -442,7 +442,7 @@ test('MPX holds automatic fire, reloads with its sound and keeps a wider movemen
   frame(0.075); frame(0.075);
   const shots = requests.filter(m => m.a === ACT.SHOT);
   assert.equal(shots.length, 2); assert.equal(game.me.inv.guns.mpx.loaded, 30);
-  assert.ok(sounds.includes('mpx')); assert.equal(actions.vm.ads, 0);
+  assert.ok(sounds.includes('mpx')); assert.equal(game.gfx.viewCamera.fov, 50, 'secondary fire does not change the camera FOV');
   const radius = d => Math.hypot(d[0],d[1]) / -d[2];
   const still = radius(shots[0].dir);
   assert.ok(still > CONFIG.weapons.rifle.spread);

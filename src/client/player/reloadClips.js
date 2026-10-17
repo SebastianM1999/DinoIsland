@@ -216,7 +216,8 @@ export function buildReloadClips(nodes, def, kind, gunScale, duration) {
       ...(charging ? [
         { t: 0.70, ...chargeHand(0), ease: 'out' },
         { t: 0.765, ...chargeHand(1), ease: 'linear' },
-        { t: 0.82, ...chargeHand(0), ease: 'out' },
+        { t: 0.80, ...chargeHand(0.35), ease: 'linear' },
+        { t: 0.82, ...chargeHand(0), ease: 'linear' },
       ] : slapAt ? [
         { t: 0.70, ...slapAway, pose: 'open', ease: 'out' },           // up to the bolt catch ...
         { t: 0.765, ...slapAt, pose: 'open', ease: 'linear' },         // ... and a palm slap on it
@@ -235,10 +236,16 @@ export function buildReloadClips(nodes, def, kind, gunScale, duration) {
       { t: 0.34, mag: 1, magVisible: 1, bolt: 1 },                      // new magazine in hand
       { t: 0.535, mag: 1, magVisible: 1, bolt: 1, ease: 'linear' },
       { t: 0.54, mag: 0, magVisible: 1, bolt: 1 },
-      { t: 0.70, mag: 0, magVisible: 1, bolt: 1, charge: 0 },
-      { t: 0.765, mag: 0, magVisible: 1, bolt: 1, charge: charging ? 1 : 0 },
-      { t: charging ? 0.765 : slapAt ? 0.765 : 0.78, mag: 0, magVisible: 1, bolt: 1, charge: 0 },
-      { t: charging ? 0.82 : slapAt ? 0.785 : 0.80, mag: 0, magVisible: 1, bolt: 0, charge: 0, ease: 'back' },
+      ...(charging ? [
+        { t: 0.70, mag: 0, magVisible: 1, bolt: 1, charge: 0 },
+        { t: 0.765, mag: 0, magVisible: 1, bolt: 1, charge: 1, ease: 'linear' },
+        { t: 0.80, mag: 0, magVisible: 1, bolt: 1, charge: 0.35, ease: 'linear' },
+        { t: 0.82, mag: 0, magVisible: 1, bolt: 0, charge: 0, ease: 'linear' },
+      ] : [
+        { t: 0.75, mag: 0, magVisible: 1, bolt: 1, charge: 0 },
+        { t: slapAt ? 0.765 : 0.78, mag: 0, magVisible: 1, bolt: 1, charge: 0 },
+        { t: slapAt ? 0.785 : 0.80, mag: 0, magVisible: 1, bolt: 0, charge: 0, ease: 'back' },
+      ]),
       { t: 1, mag: 0, magVisible: 1, bolt: 0, charge: 0 },
     ],
     events: [[0.02, 'start'], [0.17, 'magout'], [0.315, 'magdrop'], [0.34, 'fetch'], [0.54, 'magin'], [0.58, 'slap'],
