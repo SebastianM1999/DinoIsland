@@ -2,7 +2,7 @@
 > Pure, deterministic data and rules imported by both the client (`src/client/`) and the authoritative simulation (`src/sim/`), plus the network protocol and tunables used by `server/` and `desktop/`.
 
 ## Files
-- Sniper (`CONFIG.weapons.sniper`): five-round bolt-action firearm, long-range hitscan, smooth scope timings/FOV and quickscope accuracy threshold. `EQUIP` appends it at index 7; existing equipment indices stay stable. The scoped rifle occupies both hands and lowers the torch.
+- Sniper (`CONFIG.weapons.sniper`): five-round bolt-action firearm, long-range hitscan, smooth scope timings/FOV and quickscope accuracy threshold. Hip-fire scatter is 0.28 standing / 0.34 at full movement; narrowing starts only when the scope is visible. `EQUIP` appends it at index 7; existing equipment indices stay stable. The scoped rifle occupies both hands and lowers the torch.
 - `torch.js` — `LIGHT_CAP` / `softCapIrradiance` / `pointIrradiance` (the close-up cap the cave shaders apply to every point light: a wall a metre from the torch stays below white after ACES, the same formula as `caveSky.js` `caveSoftCap`), hand-held torch: `TORCH` (respawn time, light colour/range/intensity (soft decay 1.35 so a wall a metre away keeps its texture while the light still reaches ~12 m), 4 light slots), `carriesLight(player|fl)` (reads `PF.TORCH`; for dinosaur brains), `leftHandBusy(tool, eating)` (bow/trap/rifle/MPX/eating lower the torch). `PF.TORCH` (256) lives in `protocol.js`; `layout.torchSpots` (`[{x,z,y?}]`, set by the level) is optional.
 
 ### Island generation & terrain

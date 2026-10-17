@@ -520,3 +520,27 @@ test('holding sniper ADS through butchering cannot hide the knife or fire the ov
   assert.ok(!requests.some(m => m.a === ACT.SHOT));
   assert.equal(game.me.inv.guns.sniper.loaded, 5);
 });
+
+
+test('sniper hip-fire scatters across a wide cone while visible quickscoping restores precision', t => {
+  let seed = 7941;
+  t.mock.method(Math, 'random', () => ((seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0) / 4294967296));
+  const { game, actions, equip, held, pressed, frame, requests } = fixture(t);
+  equip('sniper'); game.me.inv.guns.sniper.loaded = 100;
+  seed = 7941; // model construction allocates random UUIDs; only seed the shot sequence.
+  const fire = () => { actions.cooldown = 0; pressed.add('primary'); frame(.01); return requests.at(-1).dir; };
+  const radius = dir => Math.hypot(dir[0], dir[1]) / -dir[2];
+  const hip = Array.from({ length: 64 }, fire);
+  assert.ok(hip.filter(d => radius(d) > .12).length >= 45, 'most shots miss a 3m radius at 25m (' + hip.filter(d => radius(d) > .12).length + '/64)' );
+  assert.ok(hip.every(d => radius(d) <= .281 && -d[2] >= .94), 'scatter remains inside the server aim-validation cone');
+  assert.ok(new Set(hip.map(d => d.slice(0, 2).join(','))).size > 60, 'shots do not reuse a predictable direction');
+  assert.ok(Math.abs(hip.reduce((n, d) => n + d[0], 0) / hip.length) < .05);
+  assert.ok(Math.abs(hip.reduce((n, d) => n + d[1], 0) / hip.length) < .05);
+  game.player.moveSpeed = CONFIG.player.sprintSpeed;
+  const moving = Array.from({ length: 16 }, fire);
+  assert.ok(moving.some(d => radius(d) > .30), 'movement widens the scattered shots further');
+  assert.ok(moving.every(d => -d[2] >= .94));
+  game.player.moveSpeed = 0; held.add('secondary'); actions.scope.progress = .65;
+  const scoped = Array.from({ length: 16 }, fire);
+  assert.ok(scoped.every(d => radius(d) < .00051), 'scope restores precise shooting during the visible transition');
+});
