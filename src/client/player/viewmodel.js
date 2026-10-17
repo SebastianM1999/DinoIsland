@@ -94,7 +94,7 @@ export const GUN_DEFS = {
 };
 GUN_DEFS.sniper = { ...GUN_DEFS.rifle, hipPos: [0.14, -0.22, -0.42], magLen: 0.120,
   drawTime: 0.55, holsterTime: 0.35, reloadTac: 2.7, reloadEmpty: 2.7,
-  recoil: { pitch: 0.025, yaw: 0.003, kickBack: 0.045, kickUp: 0.018, roll: 0.025, freq: 8, damping: 0.5 } };
+  recoil: { pitch: 0.045, yaw: 0.005, kickBack: 0.075, kickUp: 0.032, roll: 0.045, freq: 7.5, damping: 0.48 } };
 for (const def of Object.values(GUN_DEFS)) {
   def.hipP = V3(...def.hipPos);
   def.shoulderL = def.shoulderL ? V3(...def.shoulderL) : SHOULDER_L;

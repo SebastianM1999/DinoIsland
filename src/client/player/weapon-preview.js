@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { Renderer } from '../core/renderer.js';
 import { spearLaunch } from './spearThrow.js';
+import { SniperRecoil } from './sniperRecoil.js';
 import { SniperScope, ScopeOverlay } from './scope.js';
 import { Viewmodel } from './viewmodel.js';
 import { PlayerModel } from '../models/playerModel.js';
@@ -12,11 +13,13 @@ import { TOPS } from '../../shared/outfits.js';
 const gfx = new Renderer(document.querySelector('canvas'));
 gfx.scene.background = new THREE.Color('#709582');
 const vm = new Viewmodel(gfx, 0);
-const scope = new SniperScope(), scopeOverlay = new ScopeOverlay();
+const scope = new SniperScope(), scopeOverlay = new ScopeOverlay(), recoil = new SniperRecoil();
+const cameraRest = { position: new THREE.Vector3(), quaternion: new THREE.Quaternion() };
 const model = new PlayerModel(0);
 gfx.scene.add(model.root);
 gfx.camera.position.set(2, 1.3, -3);
 gfx.camera.lookAt(0, 0.9, 0);
+cameraRest.position.copy(gfx.camera.position); cameraRest.quaternion.copy(gfx.camera.quaternion);
 const ground = new THREE.Mesh(new THREE.PlaneGeometry(30, 30).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ color: '#496a50', roughness: 1 }));
 gfx.scene.add(ground);
 const tool = document.querySelector('#tool');
@@ -76,6 +79,7 @@ function fireGun() {
   const k = tool.value, a = ammo[k];
   if (!a || reloading || shotCooldown > 0 || a.loaded <= 0 || vm.tool !== k || vm.switchT > 0.05) return;
   a.loaded--; shotCooldown = CONFIG.weapons[k].cooldown; vm.fireGun();
+  if (k === 'sniper') recoil.fire(scope.blend > .4);
   const muzzle = vm.muzzlePosition(new THREE.Vector3());
   gfx.viewCamera.worldToLocal(muzzle); gfx.camera.localToWorld(muzzle);
   effects.fire(muzzle, gfx.camera.getWorldDirection(new THREE.Vector3()).multiplyScalar(30).add(gfx.camera.position));
@@ -97,6 +101,9 @@ document.addEventListener('keydown', e => { if (e.code === 'KeyR') reload(); });
 document.addEventListener('pointermove', (e) => { mouseX += e.movementX; mouseY += e.movementY; });
 function frame(now) {
   const dt = Math.min(0.05, (now - last) / 1000); last = now;
+  recoil.update(dt);
+  gfx.camera.position.copy(cameraRest.position); gfx.camera.quaternion.copy(cameraRest.quaternion);
+  recoil.apply(gfx.camera);
   const sprint = document.querySelector('#sprint').checked;
   const walk = document.querySelector('#walk').checked || sprint;
   shotCooldown = Math.max(0, shotCooldown - dt);
@@ -139,4 +146,4 @@ function frame(now) {
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
-window.workshop = { vm, gfx, scope, ammo };   // console/automation access (side views: move gfx.viewCamera, the viewmodel rides on it)
+window.workshop = { vm, gfx, scope, ammo, recoil };   // console/automation access (side views: move gfx.viewCamera, the viewmodel rides on it)

@@ -969,6 +969,8 @@ export class Game {
     for (const u of this.worldUpdaters) u.update?.(dt, this.time, cam);
     this.#underwaterView(dt);
     for (const sys of this.systems) sys.update?.(dt, renderTime);
+    this.actions.recoil.apply(this.gfx.camera);
+    this.gfx.viewSun.position.copy(this.gfx.sunDir).applyQuaternion(this.gfx.camera.quaternion.clone().invert());
     this.gfx.camera.fov = this.actions.scope.fov(this.hipFov);
     this.gfx.camera.updateProjectionMatrix();
     if (!this.me.alive) this.me.deathT = Math.max(0, this.me.deathT - dt);
@@ -1302,7 +1304,5 @@ export class Game {
     cam.fov = this.hipFov;
     cam.updateProjectionMatrix();
     this.gfx.followSun(p.pos.x, p.pos.y, p.pos.z);
-    // light the viewmodel from the same sun direction, in camera space
-    this.gfx.viewSun.position.copy(this.gfx.sunDir).applyQuaternion(cam.quaternion.clone().invert());
   }
 }
