@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import { buildPistol } from './reference/models/pistol.js';
 import { buildSmg } from './reference/models/smg.js';
 import { buildRifle } from './reference/models/rifle.js';
+import { buildSniper } from './reference/models/sniper.js';
 
 const cache = new Map();
 const materials = new Map();
@@ -12,7 +13,7 @@ function material(key) {
   if (!materials.has(key)) {
     const bright = /bright|brass|bullet/.test(key);
     const plastic = /polymer|rubber|cavity/.test(key);
-    const color = /brass|bullet/.test(key) ? '#b8a06e' : /glass/.test(key) ? '#6aabb0'
+    const color = key === 'polymer_tan' ? '#8c7859' : /brass|bullet/.test(key) ? '#b8a06e' : /glass/.test(key) ? '#6aabb0'
       : key === 'cavity' ? '#121819' : bright ? '#8a939a' : plastic ? '#46433a' : '#35414a';
     materials.set(key, new THREE.MeshStandardMaterial({ color, roughness: plastic ? 0.88 : bright ? 0.38 : 0.68,
       metalness: plastic ? 0 : 0.45, transparent: /glass/.test(key), opacity: /glass/.test(key) ? 0.35 : 1 }));
@@ -53,7 +54,7 @@ function supportGrip(node, hg) {
   return { pos: knuckle.map((v, i) => v - finger[i] * 0.098), finger, back };
 }
 function adaptHands(kind, nodes) {
-  if (kind === 'rifle') {
+  if (kind === 'rifle' || kind === 'sniper') {
     shiftNode(nodes.gripL, [0, 0, SUPPORT_HAND_SHIFT]);
     nodes.gripL = supportGrip(nodes.gripL, nodes.handguard);
     // the locked-back carrier would leave the receiver (its tail is 14 mm above the buffer tube behind it): shorter, and sinking into the tube
@@ -67,7 +68,7 @@ function adaptHands(kind, nodes) {
 }
 function data(kind) {
   if (!cache.has(kind)) {
-    const model = (kind === 'pistol' ? buildPistol : kind === 'mpx' ? buildSmg : buildRifle)();
+    const model = (kind === 'pistol' ? buildPistol : kind === 'mpx' ? buildSmg : kind === 'sniper' ? buildSniper : buildRifle)();
     adaptHands(kind, model.nodes);
     cache.set(kind, { nodes: model.nodes, body: model.body.build(),
       moving: Object.fromEntries(Object.entries(model.moving).map(([k, assembly]) => [k, assembly.build()])) });
@@ -77,7 +78,7 @@ function data(kind) {
 export function makeFirearm(kind) {
   const model = data(kind);
   const root = new THREE.Group();
-  root.name = kind === 'pistol' ? 'P-19' : kind === 'mpx' ? 'MPX-9' : 'M4A1';
+  root.name = kind === 'pistol' ? 'P-19' : kind === 'mpx' ? 'MPX-9' : kind === 'sniper' ? 'SR7 Longbow' : 'M4A1';
   const add = (geometries, parent) => {
     for (const [key, geometry] of geometries) {
       const m = new THREE.Mesh(retainResource(geometry), material(key)); m.castShadow = true; parent.add(m);
