@@ -372,6 +372,16 @@
       "verified": "2026-10-08",
       "originalSha256": "983396c808eb658ed3bd223ffaf9ea7f756dba7bc45ecc3fde117083026a4556",
       "notes": "Finished filtered creature vocalization; creator says most sounds were performed with their mouth. Extracted unchanged from the CC0 creature ZIP."
+    },
+    "barrett-JKirsch": {
+      "author": "JKirsch",
+      "title": "M 82 Barrett 50 Cal",
+      "license": "CC-BY-3.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by/3.0/",
+      "page": "https://soundbible.com/1388-M-82-Barrett-50-Cal.html",
+      "download": "https://soundbible.com/grab.php?id=1388&type=wav",
+      "originalSha256": "ff47ba575286b321cc8f0583d0e074478520abc55ef810dded62272af1885e5b",
+      "verified": "2026-10-17"
     }
   },
   "assets": [
@@ -2081,6 +2091,19 @@
       "duration": 0.4584,
       "sampleRate": 48000,
       "peakLimit": 0.7
+    },
+    {
+      "file": "sfx/recorded-sniper-barrett-1.wav",
+      "source": "barrett-JKirsch",
+      "original": "M 82 Barrett 50 Cal-SoundBible.com-1062134043.wav",
+      "segment": [
+        0,
+        1.9
+      ],
+      "edits": "First 1.90 seconds only; stereo averaged to mono, DC removed, peak balanced to 0.90, 0.5ms attack and 150ms tail fades, PCM16 WAV; unchanged source pitch.",
+      "duration": 1.9,
+      "sampleRate": 44100,
+      "peakLimit": 0.9
     }
   ]
 }

@@ -47,7 +47,7 @@ test('every selected asset is bundled with provenance and the expected audio hea
     const asset = documented.get(url);
     assert.ok(asset, `missing provenance: ${url}`);
     assert.ok(registry.sources[asset.source].page.startsWith('https://'));
-    assert.equal(registry.sources[asset.source].license, url.includes('/music/') ? 'CC-BY-4.0' : url.includes('/el-') ? 'ElevenLabs-terms' : 'CC0-1.0');
+    assert.equal(registry.sources[asset.source].license, url.includes('/music/') ? 'CC-BY-4.0' : url.includes('/recorded-sniper-barrett-') ? 'CC-BY-3.0' : url.includes('/el-') ? 'ElevenLabs-terms' : 'CC0-1.0');
     if (url.includes('/el-')) {
       assert.equal(registry.sources[asset.source].model, 'eleven_text_to_sound_v2');
       assert.ok(registry.sources[asset.source].prompt);
@@ -155,6 +155,33 @@ test('MPX automatic reports play at weapon cadence, preserve positional mute and
     assert.ok(ctx.panners.every(panner => panner.disconnected));
     assert.ok(output.disconnected);
   } finally { setSetting('sfx', previousSfx); globalThis.window = oldWindow; globalThis.fetch = oldFetch; }
+});
+
+test('sniper uses the loud recorded Barrett through the positional effects bus and retains its loading fallback', async () => {
+  const oldWindow = globalThis.window, oldFetch = globalThis.fetch;
+  const ctx = effectContext();
+  globalThis.window = { AudioContext: class { constructor() { return ctx; } } };
+  globalThis.fetch = async () => ({ ok: true, arrayBuffer: async () => new ArrayBuffer(4) });
+  try {
+    const audio = new GameAudio();
+    audio.play('sniper');
+    assert.ok(ctx.oscillators.length > 0, 'unavailable sample keeps synthesized body');
+    for (const source of [...ctx.sources, ...ctx.oscillators]) source.onended();
+    await audio.samples.preload(SAMPLE_GROUPS);
+    const before = ctx.sources.length, oscillatorCount = ctx.oscillators.length;
+    ctx.currentTime += 2;
+    audio.play('sniper', { pos: { x: 9, y: 2, z: -4 } });
+    assert.equal(ctx.sources.length, before + 1);
+    assert.equal(ctx.oscillators.length, oscillatorCount, 'recorded report replaces synth layers');
+    const source = ctx.sources.at(-1), out = source.output;
+    assert.equal(source.buffer, audio.samples.buffers.get(EFFECTS.sniper.files[0]));
+    assert.equal(out.gain.value, 2.2);
+    assert.ok(out.gain.value > EFFECTS.rifle.gain && out.gain.value > EFFECTS.pistol.gain);
+    assert.equal(out.samplePanner.positionX.value, 9);
+    assert.equal(out.samplePanner.output, audio.sfx);
+    source.onended();
+    assert.ok(source.disconnected && out.disconnected && out.samplePanner.disconnected);
+  } finally { globalThis.window = oldWindow; globalThis.fetch = oldFetch; }
 });
 
 test('MPX reload cues follow the actual reload duration and cancellation silences future cues', async () => {
