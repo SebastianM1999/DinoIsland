@@ -181,4 +181,5 @@ export const DS = {
   AMBUSH: 24,
 };
 
-export const DINO_TYPES = ['brachio', 'stego', 'raptor', 'gloom-raptor', 'ptera', 'trex', 'alpha-sarcosuchus', 'sump-lurker', 'crystal-plodder'];
+export const DINO_TYPES = ['brachio', 'stego', 'raptor', 'gloom-raptor', 'ptera', 'trex', 'alpha-sarcosuchus', 'sump-lurker', 'crystal-plodder',
+  'triceratops', 'ankylosaurus', 'pachycephalosaurus', 'dilophosaurus', 'spinosaurus'];

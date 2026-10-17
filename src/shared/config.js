@@ -450,6 +450,44 @@ export const CONFIG = {
       butcher: { loot: { bones: 6, skull: 1, teeth: 2 } },
       respawn: 300,
     },
+    // Test species (docs/newDinos): the Blender models shown in the game before their own AI exists. They reuse the
+    // raptor's pack brain (sim/ai/testDinos.js); `peaceful` ones only fight back after a hit. Spawned on islands whose
+    // `level.dinos` names them (island 1). Footprints are rough estimates from the fitted model length.
+    triceratops: {
+      name: 'Triceratops', peaceful: true, health: 320, groupSize: 1,
+      walkSpeed: 1.6, runSpeed: 7.5, turnRate: 1.6, sightRadius: 0,
+      attackRange: 3.6, attackDamage: 24, attackCooldown: 2.4, giveUpRadius: 40,
+      radius: 2.0, body: [[0, 1.2], [1.6, 1.0], [3.0, 0.6], [-1.6, 0.9], [-3.0, 0.4]],
+      loot: { meat: 3, hide: 2 }, butcher: { loot: { bones: 4, skull: 1 } }, respawn: 150,
+    },
+    ankylosaurus: {
+      name: 'Ankylosaurus', peaceful: true, health: 380, groupSize: 1,
+      walkSpeed: 1.2, runSpeed: 5.0, turnRate: 1.4, sightRadius: 0,
+      attackRange: 3.8, attackDamage: 30, attackCooldown: 2.8, giveUpRadius: 40,
+      radius: 1.7, body: [[0, 1.2], [1.3, 0.9], [2.4, 0.4], [-1.3, 0.9], [-2.6, 0.4]],
+      loot: { meat: 3, hide: 2 }, butcher: { loot: { bones: 4, skull: 1 } }, respawn: 150,
+    },
+    pachycephalosaurus: {
+      name: 'Pachycephalosaurus', peaceful: true, health: 140, groupSize: 1,
+      walkSpeed: 2.2, runSpeed: 7.8, turnRate: 2.6, sightRadius: 0,
+      attackRange: 2.4, attackDamage: 18, attackCooldown: 2.0, giveUpRadius: 45,
+      radius: 0.9, body: [[0, 0.55], [0.9, 0.4], [1.7, 0.3], [-1.0, 0.35]],
+      loot: { meat: 2, hide: 1 }, butcher: { loot: { bones: 3, skull: 1 } }, respawn: 120,
+    },
+    dilophosaurus: {
+      name: 'Dilophosaurus', health: 110, groupSize: 1,
+      walkSpeed: 2.8, runSpeed: 9.4, turnRate: 3.8, sightRadius: 28,
+      attackRange: 2.6, attackDamage: 12, attackCooldown: 1.6, giveUpRadius: 55,
+      radius: 0.9, body: [[0, 0.5], [1.2, 0.35], [2.4, 0.25], [-1.4, 0.3]],
+      loot: { meat: 2, teeth: 2 }, butcher: { loot: { bones: 3, skull: 1 } }, respawn: 120,
+    },
+    spinosaurus: {
+      name: 'Spinosaurus', health: 800, groupSize: 1,
+      walkSpeed: 2.4, runSpeed: 7.2, turnRate: 1.4, sightRadius: 34,
+      attackRange: 4.6, attackDamage: 40, attackCooldown: 2.0, giveUpRadius: 50,
+      radius: 2.6, body: [[0.2, 1.2], [2.0, 0.9], [3.8, 0.6], [5.4, 0.4], [-2.0, 0.9], [-3.8, 0.55], [-5.4, 0.35]],
+      loot: { meat: 6, teeth: 4 }, butcher: { loot: { bones: 6, skull: 1, teeth: 2 } }, respawn: 300,
+    },
   },
 
   tracks: {

@@ -33,6 +33,12 @@ export const GLB_DINOS = {
   brachio: model('brachio', 'Brachiosaurus', 13.007, 18.514, 2.714, 5.333, true),
   // Flyer: strides are unused (GLBDinoAnimator picks flight clips by state, not by ground speed).
   ptera: model('ptera', 'Pteranodon', 1.855, 2.56, 1, 1),
+  // Test species (docs/newDinos, sim/ai/testDinos.js): numbers from each art/sources/<type>/README.md (check_glb.mjs).
+  triceratops: model('triceratops', 'Triceratops', 3.47, 8.2, 1.519, 3.616, true),
+  ankylosaurus: model('ankylosaurus', 'Ankylosaurus', 2.511, 6.9, 1.142, 2.254, true),
+  pachycephalosaurus: model('pachycephalosaurus', 'Pachycephalosaurus', 1.996, 4.5, 1.257, 2.62),
+  dilophosaurus: model('dilophosaurus', 'Dilophosaurus', 3.083, 7, 1.995, 4.014),
+  spinosaurus: model('spinosaurus', 'Spinosaurus', 6.262, 14, 3.518, 6.491),
 };
 // Project brachio (art/sources/brachio/brachio.blend).
 GLB_DINOS.brachio.bones = { ...GLB_DINOS.brachio.bones,
@@ -225,3 +231,17 @@ GLB_DINOS.trex.maxCadence = 1.25;
 GLB_DINOS.stego.maxCadence = 2.6;
 GLB_DINOS['crystal-plodder'].maxCadence = 1.9;
 GLB_DINOS.brachio.maxCadence = 1.25;
+// Test species rigs: quadrupeds like the stego (6-bone tail), bipeds like the raptor (toes planted).
+const tail6 = Array.from({ length: 6 }, (_, i) => `Tail${i + 1}`);
+for (const type of ['triceratops', 'ankylosaurus']) GLB_DINOS[type].bones = { ...GLB_DINOS.stego.bones, tail: tail6 };
+GLB_DINOS.pachycephalosaurus.bones = { ...GLB_DINOS.raptor.bones, tail: tail6 };
+for (const type of ['dilophosaurus', 'spinosaurus']) GLB_DINOS[type].bones = { ...GLB_DINOS.raptor.bones, neck: ['Neck1', 'Neck2', 'Neck3'], tail: tail6 };
+GLB_DINOS.pachycephalosaurus.clips.roar = 'Pachycephalosaurus_Roar';
+GLB_DINOS.dilophosaurus.clips.roar = 'Dilophosaurus_Roar';
+GLB_DINOS.dilophosaurus.clips.hurt = 'Dilophosaurus_Hurt';
+GLB_DINOS.spinosaurus.clips.roar = 'Spinosaurus_Roar';
+GLB_DINOS.triceratops.maxCadence = 2.6;
+GLB_DINOS.ankylosaurus.maxCadence = 2.2;
+GLB_DINOS.pachycephalosaurus.maxCadence = 3.0;
+GLB_DINOS.dilophosaurus.maxCadence = 2.6;
+GLB_DINOS.spinosaurus.maxCadence = 1.6;

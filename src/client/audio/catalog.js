@@ -42,6 +42,12 @@ export const EFFECTS = {
   roar_stego: selected(['recorded-grunt-1', 'recorded-grunt-2'], .52, .85),
   roar_brachio: selected(['recorded-roar-2', 'recorded-roar-3'], .6, .68),
   'roar_alpha-sarcosuchus': group('recorded-sarco-growl', 3, .6, .85),
+  // test species (sim/ai/testDinos.js): borrowed calls until they get their own
+  roar_triceratops: selected(['recorded-grunt-1', 'recorded-grunt-2'], .55, .75),
+  roar_ankylosaurus: selected(['recorded-grunt-1', 'recorded-grunt-2'], .5, .68),
+  roar_pachycephalosaurus: selected(['recorded-grunt-1', 'recorded-grunt-2'], .45, 1.05),
+  roar_dilophosaurus: selected(['recorded-trill', 'recorded-roar-1'], .45, .9),
+  roar_spinosaurus: group('recorded-trex-roar', 3, 0.65, .85, 0.025),
   sarco_enrage: group('recorded-sarco-growl', 3, .7, .75),
   bigStep: DINO_WEIGHT.ground,
 };

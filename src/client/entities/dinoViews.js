@@ -35,6 +35,12 @@ export const SPECIES = {
   'gloom-raptor': { build: buildGloomRaptor, anim: RAPTOR_ANIM, extraUpdate: raptorExtraUpdate, barHeight: 2.3 },
   ptera: { build: buildPtera, anim: PTERA_ANIM, extraUpdate: pteraExtraUpdate, barHeight: 2.3 },
   trex: { build: buildTrex, anim: TREX_ANIM, extraUpdate: trexExtraUpdate, barHeight: 6.4, heavy: true },
+  // Test species (sim/ai/testDinos.js): GLB only; the fallback is the nearest older procedural model.
+  triceratops: { build: buildStego, anim: STEGO_ANIM, extraUpdate: stegoExtraUpdate, barHeight: 4.2, heavy: true },
+  ankylosaurus: { build: buildStego, anim: STEGO_ANIM, extraUpdate: stegoExtraUpdate, barHeight: 3.2, heavy: true },
+  pachycephalosaurus: { build: buildRaptor, anim: RAPTOR_ANIM, extraUpdate: raptorExtraUpdate, barHeight: 2.6 },
+  dilophosaurus: { build: buildRaptor, anim: RAPTOR_ANIM, extraUpdate: raptorExtraUpdate, barHeight: 3.7 },
+  spinosaurus: { build: buildTrex, anim: TREX_ANIM, extraUpdate: trexExtraUpdate, barHeight: 7.0, heavy: true },
 };
 
 const X = 0, Y = 1, Z = 2, YAW = 3, SPD = 4;
