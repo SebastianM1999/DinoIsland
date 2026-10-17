@@ -17,7 +17,7 @@
 - `reference/models/pistol.js` — `buildPistol()`: the P-19 pistol assembly.
 - `reference/models/rifle.js` — `buildRifle()`: the M4A1 rifle assembly.
 
-- The adapter moves the CoD hand nodes for the bigger cartoon hands (`adaptHands`: rifle support hand 40 mm back under the rear third of the handguard and re-oriented by `SUPPORT_GRIP` (palm on the lower far side, fingers rolled toward the muzzle, so the wrist stays straight with the forearm), pistol hands up/back so the index reaches the trigger, and the pistol support hand's fingers raised 20 degrees (`PISTOL_CUP_ORIENTATION`) so the forearm and hand line up, rifle bolt travel shortened and dipping (`RIFLE_BOLT_TRAVEL`) so a locked-back carrier stays in the receiver instead of floating behind it); clips follow because they read the nodes.
+- The adapter moves the CoD hand nodes for the bigger cartoon hands (`adaptHands`: rifle support hand 40 mm back under the rear third of the handguard and re-oriented by `SUPPORT_GRIP` (palm on the lower far side at clock 305 degrees, fingers rolled toward the muzzle, so the wrist stays nearly in line with the forearm and the fingers stay below the top of the handguard), pistol hands up/back so the index reaches the trigger, and the pistol support hand's fingers raised 20 degrees (`PISTOL_CUP_ORIENTATION`) so the forearm and hand line up, rifle bolt travel shortened and dipping (`RIFLE_BOLT_TRAVEL`) so a locked-back carrier stays in the receiver instead of floating behind it); clips follow because they read the nodes.
 
 ## Entry points
 - `makeFirearm(kind)` (`'pistol'`, anything else builds the rifle) is called by `models/playerModel.js` (third-person held weapon), `player/viewmodel.js` (first-person) and `entities/items.js` (firearms lying on the ground).

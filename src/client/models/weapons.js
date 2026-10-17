@@ -94,15 +94,19 @@ export function makeBowString() {
   return line;
 }
 
-/** Arrow: ~0.8 m along +Y, tip at +Y end, origin at the nock. */
-export function arrowGeometry() {
-  return cached('arrow', () => {
+/**
+ * Arrow: ~0.8 m along +Y, tip at +Y end (ARROW_TIP_Y), origin at the nock. `headScale` > 1 makes the arrowhead a bigger,
+ * four-sided point without moving the tip: the first-person nocked arrow points almost at the eye, where the flat
+ * blade is seen edge-on and vanishes.
+ */
+export function arrowGeometry(headScale = 1) {
+  return cached(headScale === 1 ? 'arrow' : `arrow-${headScale}`, () => {
     const L = 0.8;
     let head = new THREE.OctahedronGeometry(1, 0);
     head = paint(deform(head, (v) => {
-      v.y = v.y > 0 ? v.y * 0.09 : v.y * 0.03;
-      v.x *= 0.028;
-      v.z *= 0.012;
+      v.y = v.y > 0 ? v.y * 0.09 : v.y * 0.03 * headScale;
+      v.x *= 0.028 * headScale;
+      v.z *= (headScale === 1 ? 0.012 : 0.028) * headScale;
     }), (c, n) => (n.x > 0 ? STONE : STONE_DARK));
     const fl = [];
     for (let i = 0; i < 3; i++) {

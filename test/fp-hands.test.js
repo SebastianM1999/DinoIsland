@@ -435,3 +435,47 @@ test('the rifle support wrist stays nearly straight: the forearm runs in line wi
   const bend = THREE.MathUtils.radToDeg(fore.angleTo(hand));
   assert.ok(bend < 20, `support wrist bent ${bend.toFixed(1)} degrees`);
 });
+
+/** Gun-local positions of every vertex under `roots` (the gun group's own units, its scale undone). */
+function gunLocalVerts(vm, gun, roots) {
+  vm.root.updateMatrixWorld(true);
+  const inv = gun.matrixWorld.clone().invert();
+  const out = [];
+  for (const r of roots) r.traverse((o) => {
+    if (!o.isMesh) return;
+    const p = o.geometry.getAttribute('position');
+    for (let i = 0; i < p.count; i++) out.push(new THREE.Vector3().fromBufferAttribute(p, i).applyMatrix4(o.matrixWorld).applyMatrix4(inv));
+  });
+  return out;
+}
+const walkFrames = (vm, n) => { for (let i = 0; i < n; i++) vm.update(1 / 60, { ...idle, speed: 4, lookX: Math.sin(i / 7) * 20, lookY: Math.cos(i / 9) * 8 }); };
+
+test('the pistol thumb stays inside the slide: nothing of it shows on the near (left) face or over the top', () => {
+  const vm = new Viewmodel({ viewCamera: new THREE.PerspectiveCamera(62, 16 / 9, 0.01, 10) }, 0);
+  vm.setTool('pistol'); run(vm, 200);
+  const gun = vm.guns.pistol;
+  const slide = new THREE.Box3().setFromPoints(gunLocalVerts(vm, gun, [gun.userData.parts.slide]));
+  for (let k = 0; k < 4; k++) {
+    walkFrames(vm, 15);
+    for (const v of gunLocalVerts(vm, gun, [vm.armR.thumb.root])) {
+      assert.ok(v.y < slide.max.y, `thumb over the slide top at y ${v.y.toFixed(4)}`);
+      if (v.y > slide.min.y) assert.ok(v.x > slide.min.x + 0.003, `thumb out of the slide's near face at x ${v.x.toFixed(4)}`);
+    }
+  }
+});
+
+test('the rifle support fingers wrap the far side of the handguard and never lie over its top', () => {
+  const vm = new Viewmodel({ viewCamera: new THREE.PerspectiveCamera(62, 16 / 9, 0.01, 10) }, 0);
+  vm.setTool('rifle'); run(vm, 200);
+  const gun = vm.guns.rifle, hg = gun.userData.nodes.handguard;
+  const top = hg.axis[1] + hg.r;
+  for (let k = 0; k < 4; k++) {
+    walkFrames(vm, 15);
+    let far = 0;
+    for (const v of gunLocalVerts(vm, gun, vm.armL.fingers.map((f) => f.root))) {
+      if (Math.hypot(v.x - hg.axis[0], v.y - hg.axis[1]) > hg.r) assert.ok(v.y < top, `support finger over the handguard at y ${v.y.toFixed(4)}`);
+      if (v.x > hg.r * 0.5 && v.y > hg.axis[1]) far++;
+    }
+    assert.ok(far > 50, 'the fingers still come up the far side');
+  }
+});

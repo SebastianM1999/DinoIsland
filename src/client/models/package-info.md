@@ -5,7 +5,7 @@
 - `torch.js` — `makeTorch()` (grooved shaft, wrapped pitch head, layered additive flame, halo, sparks; `userData.update(time, dt, lit)`, `userData.head`), `torchFlicker(t, seed)` (layered noise, about 0.6-1.3). `PlayerModel` holds the off-hand torch (`torchRaise`, `torchLevel`, `torchHead(out)`).
 - `kit.js` — the model kit: shared materials `MAT` (standard, glossy, glow), `WIND` uniforms + `windMaterial` (keeps a shader patch already on its base material, e.g. surface detail), and shape helpers (`deform`, `paint`, `place`, `part`, `merge`, `mesh`, `tube`, `blob`, `spike`, `limb`, `eye`, `wrap`, `rockGeometry`, `smoothNormals`, `prep`, `jitter`).
 - `playerModel.js` — `PlayerModel`: rigged, procedurally animated co-op explorer with outfit slots (hats, tops, pants from `shared/outfits.js`) and held weapons/tools/firearms.
-- `weapons.js` — cached spear, bow (+ string), arrow, trap (open/sprung), meat and knife geometry; `BOW_REST`, `ARROW_TIP_Y`; `make*` mesh helpers.
+- `weapons.js` — cached spear, bow (+ string), arrow (`arrowGeometry(headScale)`: > 1 is the first-person arrow's bigger four-sided head, tip unchanged), trap (open/sprung), meat and knife geometry; `BOW_REST`, `ARROW_TIP_Y`; `make*` mesh helpers.
 - `fabric.js` — `fabric(top)`: plain/plaid/striped fabric colour function, shared by the player model and the first-person sleeves.
 - `fruit.js` — fruit geometry/material per type (`berry`, `mango`, `dragon`; swamp `marshberry`, `swampfig`, `glowlotus`; volcano `emberchili`, `ashplum`, `obsidianfig`), `FRUIT_GLOW`, `makeFruitMesh`.
 - `dino/` — dinosaur models and animation (own `package-info.md`).
