@@ -46,8 +46,14 @@ test('every selected asset is bundled with provenance and the expected audio hea
   for (const url of expected) {
     const asset = documented.get(url);
     assert.ok(asset, `missing provenance: ${url}`);
-    assert.ok(registry.sources[asset.source].page.startsWith('https://'));
-    assert.equal(registry.sources[asset.source].license, url.includes('/music/') ? 'CC-BY-4.0' : url.includes('/recorded-sniper-barrett-') ? 'CC-BY-3.0' : url.includes('/el-') ? 'ElevenLabs-terms' : 'CC0-1.0');
+    const userSniper = url.includes('/recorded-sniper-heavy-');
+    if (userSniper) {
+      assert.equal(asset.source, 'user-heavy-sniper');
+      assert.equal(registry.sources[asset.source].original, 'heavy-sniper-shot.mp3');
+      assert.equal(registry.sources[asset.source].originalSha256, '087242c4e619bbb4bc76ddb5d8ad4854018e1b551c92ca0bd36396626b478d5a');
+      assert.equal(registry.sources[asset.source].author, 'Not supplied');
+    } else assert.ok(registry.sources[asset.source].page.startsWith('https://'));
+    assert.equal(registry.sources[asset.source].license, userSniper ? 'User-supplied; license not specified' : url.includes('/music/') ? 'CC-BY-4.0' : url.includes('/el-') ? 'ElevenLabs-terms' : 'CC0-1.0');
     if (url.includes('/el-')) {
       assert.equal(registry.sources[asset.source].model, 'eleven_text_to_sound_v2');
       assert.ok(registry.sources[asset.source].prompt);
@@ -157,7 +163,7 @@ test('MPX automatic reports play at weapon cadence, preserve positional mute and
   } finally { setSetting('sfx', previousSfx); globalThis.window = oldWindow; globalThis.fetch = oldFetch; }
 });
 
-test('sniper uses the loud recorded Barrett through the positional effects bus and retains its loading fallback', async () => {
+test('sniper uses the supplied heavy shot through the positional effects bus and retains its loading fallback', async () => {
   const oldWindow = globalThis.window, oldFetch = globalThis.fetch;
   const ctx = effectContext();
   globalThis.window = { AudioContext: class { constructor() { return ctx; } } };

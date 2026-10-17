@@ -4,7 +4,7 @@ import fs from 'node:fs/promises';
 import { sniperAudio } from '../src/client/audio/sniperAudio.js';
 import { EFFECTS } from '../src/client/audio/catalog.js';
 
-test('recorded Barrett retains a substantial tail and a stronger opening report than the other recorded guns', async () => {
+test('supplied heavy shot retains its full audible tail and a stronger opening report than the other recorded guns', async () => {
   const levels = {};
   for (const kind of ['sniper', 'pistol', 'rifle']) {
     const bytes = await fs.readFile(new URL('..' + EFFECTS[kind].files[0], import.meta.url));
@@ -24,7 +24,8 @@ test('recorded Barrett retains a substantial tail and a stronger opening report 
     levels[kind] = Math.sqrt(sum / count) * EFFECTS[kind].gain;
     if (kind === 'sniper') {
       assert.equal(channels, 1);
-      assert.ok(data[1] / 2 / rate >= 1.5, 'retains the body and ringing tail');
+      const duration = data[1] / 2 / rate;
+      assert.ok(duration > 2.49 && duration < 2.50, 'retains the supplied full audible report and tail after silence trimming');
       assert.equal(bytes.readInt16LE(data[0]), 0, 'attack starts with a fade');
       assert.equal(bytes.readInt16LE(data[0] + data[1] - 2), 0, 'tail fades without a cutoff click');
     }
