@@ -373,15 +373,14 @@
       "originalSha256": "983396c808eb658ed3bd223ffaf9ea7f756dba7bc45ecc3fde117083026a4556",
       "notes": "Finished filtered creature vocalization; creator says most sounds were performed with their mouth. Extracted unchanged from the CC0 creature ZIP."
     },
-    "barrett-JKirsch": {
-      "author": "JKirsch",
-      "title": "M 82 Barrett 50 Cal",
-      "license": "CC-BY-3.0",
-      "licenseUrl": "https://creativecommons.org/licenses/by/3.0/",
-      "page": "https://soundbible.com/1388-M-82-Barrett-50-Cal.html",
-      "download": "https://soundbible.com/grab.php?id=1388&type=wav",
-      "originalSha256": "ff47ba575286b321cc8f0583d0e074478520abc55ef810dded62272af1885e5b",
-      "verified": "2026-10-17"
+    "user-heavy-sniper": {
+      "author": "Not supplied",
+      "license": "User-supplied; license not specified",
+      "original": "heavy-sniper-shot.mp3",
+      "originalSha256": "087242c4e619bbb4bc76ddb5d8ad4854018e1b551c92ca0bd36396626b478d5a",
+      "originalBytes": 52320,
+      "provided": "2026-10-17",
+      "notes": "Exact MP3 supplied by the user for the sniper shot. Author and license were not supplied; no third-party attribution or license is inferred."
     }
   },
   "assets": [
@@ -2093,17 +2092,18 @@
       "peakLimit": 0.7
     },
     {
-      "file": "sfx/recorded-sniper-barrett-1.wav",
-      "source": "barrett-JKirsch",
-      "original": "M 82 Barrett 50 Cal-SoundBible.com-1062134043.wav",
+      "file": "sfx/recorded-sniper-heavy-1.wav",
+      "source": "user-heavy-sniper",
+      "original": "heavy-sniper-shot.mp3",
       "segment": [
-        0,
-        1.9
+        0.0560625,
+        2.5520833333333335
       ],
-      "edits": "First 1.90 seconds only; stereo averaged to mono, DC removed, peak balanced to 0.90, 0.5ms attack and 150ms tail fades, PCM16 WAV; unchanged source pitch.",
-      "duration": 1.9,
-      "sampleRate": 44100,
-      "peakLimit": 0.9
+      "edits": "Chromium native MP3 decoding to 48kHz; stereo averaged to mono, leading/trailing silence trimmed while preserving the complete audible report/tail, DC removed, peak normalized to 0.90, 0.5ms attack and 30ms tail fades, PCM16 WAV. No pitch changes or synthesized replacement.",
+      "duration": 2.496020833333333,
+      "sampleRate": 48000,
+      "peakLimit": 0.9,
+      "inputDuration": 2.616
     }
   ]
 }
