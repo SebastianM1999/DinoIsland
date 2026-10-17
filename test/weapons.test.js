@@ -4,8 +4,8 @@ import * as THREE from 'three';
 import { SPEAR_THROW, spearLaunch } from '../src/client/player/spearThrow.js';
 import { CONFIG } from '../src/shared/config.js';
 import { Projectiles } from '../src/client/entities/projectiles.js';
-import { Viewmodel, HOOK_CONTACT } from '../src/client/player/viewmodel.js';
-import { BOW_REST, ARROW_TIP_Y } from '../src/client/models/weapons.js';
+import { Viewmodel, HOOK_CONTACT, BOW_PULL } from '../src/client/player/viewmodel.js';
+import { BOW_REST, ARROW_TIP_Y, arrowGeometry } from '../src/client/models/weapons.js';
 import { PlayerModel } from '../src/client/models/playerModel.js';
 import { HAND_SCALE } from '../src/client/models/arms/cartoonArm.js';
 
@@ -132,11 +132,12 @@ test('remote bow and trap grips follow both arms and spear points forward', () =
 });
 
 
-test('arrow shaft touches its bow rest and arrowhead projects to screen center throughout draw and sway', () => {
+test('arrow shaft touches its bow rest throughout draw and sway, and the arrowhead projects to screen center at full draw', () => {
   const vm = make(); settle(vm, 'bow');
   for (const draw of [0, 0.25, 0.6, 1]) {
     vm.setDraw(draw);
     for (let i = 0; i < 40; i++) {
+      vm.drawVis = draw;   // hold the draw exactly (it is damped toward the target)
       vm.update(1 / 60, { ...idle, speed: 5, lookX: i * 3, lookY: -i });
       vm.root.updateMatrixWorld(true);
       const nock = vm.nocked.getWorldPosition(new THREE.Vector3());
@@ -147,12 +148,46 @@ test('arrow shaft touches its bow rest and arrowhead projects to screen center t
       assert.ok(distance < 1e-6, `arrow misses bow rest by ${distance}`);
       const along = rest.clone().sub(nock).dot(shaft) / shaft.lengthSq();
       assert.ok(along > 0 && along < 1, 'bow rest must touch the shaft between nock and tip');
+      if (draw < 1) continue;
       const projected = tip.clone().project(vm.gfx.viewCamera);
       assert.ok(Math.hypot(projected.x, projected.y) < 1e-6, `arrowhead off center: ${projected.x}, ${projected.y}`);
     }
   }
 });
 
+
+test('drawing pulls the arrow, string and hand back toward the eye while the bow stays put', () => {
+  const vm = make(); settle(vm, 'bow');
+  // both draws on the same frame (dt 0), so the idle motion cannot differ
+  const at = (draw) => {
+    vm.setDraw(draw); vm.drawVis = draw;
+    vm.update(0, idle);
+    vm.root.updateMatrixWorld(true);
+    return { bow: world(vm.bow), bowQ: vm.bow.getWorldQuaternion(new THREE.Quaternion()), nock: world(vm.nocked), hand: world(vm.rHand) };
+  };
+  const rest = at(0), full = at(1);
+  assert.ok(rest.bow.distanceTo(full.bow) < 1e-6 && rest.bowQ.angleTo(full.bowQ) < 1e-6, 'the bow does not move with the draw');
+  const travel = BOW_PULL * vm.bow.scale.x;
+  assert.ok(Math.abs(rest.nock.distanceTo(full.nock) - travel) < 1e-6, 'the nock travels the full pull');
+  assert.ok(full.nock.length() < rest.nock.length() - 0.1, 'the arrow comes back toward the eye');
+  assert.ok(full.hand.distanceTo(rest.hand) > 0.2, 'the string hand comes back with it');
+});
+
+test('the nocked arrow is a thick cartoon arrow with a solid head whose tip stays at ARROW_TIP_Y', () => {
+  const vm = make(); settle(vm, 'bow');
+  const head = (geo) => {
+    const p = geo.getAttribute('position'), box = new THREE.Box3(), v = new THREE.Vector3();
+    for (let i = 0; i < p.count; i++) if (v.fromBufferAttribute(p, i).y > 0.82) box.expandByPoint(v);
+    return box;
+  };
+  const plain = head(arrowGeometry()), big = head(vm.nocked.geometry);
+  assert.ok(Math.abs(big.max.y - ARROW_TIP_Y) < 1e-6 && Math.abs(plain.max.y - ARROW_TIP_Y) < 1e-6, 'the tip does not move');
+  assert.ok(big.max.x - big.min.x > 1.5 * (plain.max.x - plain.min.x), 'a wider head');
+  // flat blades vanish edge-on (the arrow points almost at the eye): the nocked head is as deep as it is wide
+  assert.ok(Math.abs((big.max.z - big.min.z) - (big.max.x - big.min.x)) < 1e-6);
+  assert.ok(plain.max.z - plain.min.z < 0.5 * (plain.max.x - plain.min.x), 'flying and lying arrows keep the flat blade');
+  assert.ok(vm.nocked.scale.x > 2 && vm.nocked.scale.z === vm.nocked.scale.x && vm.nocked.scale.y < vm.nocked.scale.x, 'thicker than it is longer-scaled');
+});
 
 test('the entire held spear matches the first flying frame across both camera projections', () => {
   for (const aspect of [1.6, 0.65]) for (const fov of [74, 85]) {

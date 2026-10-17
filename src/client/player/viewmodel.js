@@ -131,8 +131,10 @@ const SPEAR_Q = aimY(SPEAR_DIR.toArray(), [0.55, 0.83, 0.1]);
 const SPEAR_POS = SPEAR_GRIP_REST.clone().addScaledVector(SPEAR_DIR, -SPEAR_GRIP_Y); // the spear origin is 0.2 m ahead of the hand
 const BOW_Q = new THREE.Quaternion().setFromEuler(new THREE.Euler(0.12, 0.26, -0.12, 'XYZ'));
 const BOW_Z = -0.8;
-const ARROW_SCALE = 1.45;       // the nocked arrow, in bow space
-const BOW_PULL = 0.36;          // string travel at full draw, bow space
+const ARROW_SCALE = 1.45;       // the nocked arrow's length, in bow space
+const ARROW_THICK = 2.2;        // and its girth: a cartoon arrow, its shaft, head and fletching read at arm's length
+const ARROW_HEAD = 1.7;         // arrowhead width on top (arrowGeometry), the tip stays at ARROW_TIP_Y
+export const BOW_PULL = 0.36;   // string travel at full draw, bow space
 const TRAP_POS = V3(0, -0.17, -0.6);
 const TRAP_Q = new THREE.Quaternion().setFromEuler(new THREE.Euler(0.12, 0, 0, 'XYZ'));
 const KNIFE_DIR = [-0.1, -0.45, -0.89];                                         // blade forward and down
@@ -208,10 +210,11 @@ export function toolGrips() {
   };
   for (const kind of ['pistol', 'rifle']) {
     const w = FIRING_GRIP[kind];
-    g[kind].R.fit = { name: g[kind].rPose, base: 'grip', point: w.point, axis: w.axis, radius: w.radius, scale: GUN_SCALE[kind], trigger: w.trigger, keepThumb: true,
+    g[kind].R.fit = { name: g[kind].rPose, base: 'grip', point: w.point, axis: w.axis, radius: w.radius, scale: GUN_SCALE[kind], trigger: w.trigger, keepThumb: true, thumb: w.thumb, thumbBase: w.thumbBase,
       grip: scaledGrip(nodes[kind].gripR, HAND_SCALE, GUN_SCALE[kind]) };
   }
-  g.rifle.L.fit = { name: 'clamp:rifle', base: 'clamp', point: rifleHg.axis, axis: rifleHg.dir, radius: rifleHg.r, scale: GUN_SCALE.rifle, grip: scaledGrip(nodes.rifle.gripL, HAND_SCALE, GUN_SCALE.rifle) };
+  g.rifle.L.fit = { name: 'clamp:rifle', base: 'clamp', point: rifleHg.axis, axis: rifleHg.dir, radius: rifleHg.r, scale: GUN_SCALE.rifle, grip: scaledGrip(nodes.rifle.gripL, HAND_SCALE, GUN_SCALE.rifle),
+    tuck: SUPPORT_TUCK };
   const cylGrip = (scale, name, base, o) => {
     const raw = cyl(scale, o);
     return toGrip(raw, { fit: { name, base, point: o.point, axis: o.axis, radius: o.fitRadius ?? o.radius, scale, grip: raw } });
@@ -231,9 +234,18 @@ export function toolGrips() {
  * radius of the 31 mm section with its rubber) and where the index finger pad meets the trigger blade.
  */
 const FIRING_GRIP = {
-  pistol: { point: [0, 0.022, 0.016], axis: [0, -0.949, 0.314], radius: 0.0165, trigger: [0.004, 0.014, -0.0145] },
+  // the pistol's thumb: CoD's lies along the left of the frame, but the bigger hand sits up at the slide, so it is turned in
+  // and down to stay inside the slide (it poked out of both sides of it)
+  pistol: { point: [0, 0.022, 0.016], axis: [0, -0.949, 0.314], radius: 0.0165, trigger: [0.004, 0.014, -0.0145], thumb: [0.5, 0.34], thumbBase: [0.15, -0.95, -0.95] },
   rifle: { point: [0, 0.035, 0.015], axis: [0, -0.929, 0.371], radius: 0.0165, trigger: [0.004, 0.0345, -0.0035] },
 };
+
+/**
+ * The rifle support hand's fingers fold further than the cylinder fit (knuckles, more toward the little finger, and the
+ * middle joints): the fit hugs the tube surface and the rear fingers then lay over the top of the handguard in plain
+ * view; folded, their tips end inside the far side of it.
+ */
+export const SUPPORT_TUCK = { knuckle: 0.525, middle: 1.6 };
 
 /** Fit `arm`'s fingers for `grip.fit` (arm-root space = item space scaled to the world). */
 function fitGrip(arm, item) {
@@ -242,7 +254,8 @@ function fitGrip(arm, item) {
   const sc = (a) => a.map((v) => v * k);
   const wrist = { pos: sc(f.grip.pos), finger: f.grip.finger, back: f.grip.back };
   const pose = fitCylinderPose(arm, f.name, wrist, sc(f.point), f.axis, f.radius * k, f.base);
-  if (f.keepThumb) { pose.thumb = structuredClone(HAND_POSES.grip.thumb); pose.thumbBase = structuredClone(HAND_POSES.grip.thumbBase); }   // CoD's thumb lies along the left of the frame; the fitted one stands up
+  if (f.keepThumb) { pose.thumb = (f.thumb ?? HAND_POSES.grip.thumb).slice(); pose.thumbBase = (f.thumbBase ?? HAND_POSES.grip.thumbBase).slice(); }   // CoD's thumb lies along the left of the frame; the fitted one stands up
+  if (f.tuck) pose.fingers = pose.fingers.map((c, i) => [c[0] + f.tuck.knuckle * (0.3 + i / 3), c[1] * f.tuck.middle, c[2]]);
   if (f.trigger) fitTriggerFinger(arm, f.name, wrist, sc(f.trigger));
 }
 
@@ -325,8 +338,8 @@ export class Viewmodel {
     this.bow.add(mesh(bowGeometry(), MAT.standard, { cast: false }));
     this.string = makeBowString();
     this.bow.add(this.string);
-    this.nocked = mesh(arrowGeometry(), MAT.standard, { cast: false });
-    this.nocked.scale.setScalar(ARROW_SCALE);
+    this.nocked = mesh(arrowGeometry(ARROW_HEAD), MAT.standard, { cast: false });
+    this.nocked.scale.set(ARROW_THICK, ARROW_SCALE, ARROW_THICK);
     this.nocked.quaternion.setFromUnitVectors(V3(0, 1, 0), V3(0, 0, -1));   // +Y (tip) -> -Z (forward)
     this.bow.add(this.nocked);
     this.bow.scale.setScalar(SCALE.bow);
@@ -841,9 +854,9 @@ export class Viewmodel {
     const low = this.#lowered();
     _e.set(m[3] - 0.5 * low, m[4], m[5], 'XYZ');
     bow.quaternion.copy(_q.setFromEuler(_e)).multiply(BOW_Q);
-    // The arrow passes through BOTH its nock and BOW_REST along bow -Z; place the whole bow so the
-    // arrowhead lands exactly on the camera axis.
-    _d.set(BOW_REST.x, BOW_REST.y, 0.16 + pull - ARROW_SCALE * ARROW_TIP_Y).multiplyScalar(SCALE.bow).applyQuaternion(bow.quaternion);
+    // The arrow passes through BOTH its nock and BOW_REST along bow -Z. The bow stays put while drawing, so the arrow,
+    // string and hand visibly come back; it is placed so the arrowhead lands exactly on the camera axis at FULL draw.
+    _d.set(BOW_REST.x, BOW_REST.y, 0.16 + BOW_PULL - ARROW_SCALE * ARROW_TIP_Y).multiplyScalar(SCALE.bow).applyQuaternion(bow.quaternion);
     bow.position.set(-_d.x, -_d.y - 0.42 * low, BOW_Z + m[2]);
     bow.updateMatrix();
     this.string.userData.setPull(pull);

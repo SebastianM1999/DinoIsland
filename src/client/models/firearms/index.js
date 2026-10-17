@@ -30,10 +30,11 @@ export const PISTOL_HANDS_SHIFT = [0, 0.015, 0.022];
 /**
  * The support hand's orientation is re-derived too. Claude-of-Duty's fingers run straight ACROSS the handguard, and with
  * our shoulders the forearm arrives from behind, so the wrist bent ~70 degrees (a twisted wrist on screen). Here the palm
- * holds the lower far side of the tube (clock angle 325 degrees, thumb over the near side) and the fingers are rolled
- * toward the muzzle, so the metacarpals run diagonally along the tube in line with the forearm (bend ~4 degrees).
+ * holds the lower far side of the tube (clock angle 305 degrees, thumb over the near side) and the fingers are rolled
+ * toward the muzzle, so the metacarpals run diagonally along the tube nearly in line with the forearm (bend ~17 degrees).
+ * At 325 degrees the wrist was straighter, but the ring and little fingers lay across the top of the handguard in plain view.
  */
-export const SUPPORT_GRIP = { clock: 325 * Math.PI / 180, roll: 0.75, tilt: 0.3 };
+export const SUPPORT_GRIP = { clock: 305 * Math.PI / 180, roll: 0.75, tilt: 0.3 };
 export const PISTOL_CUP_ORIENTATION = { finger: [0.34, 0.1, -0.93], back: [0.12, 0.97, 0.2] };
 /** Bolt carrier travel (gun units): short and dipping, so the tail stays inside the receiver / buffer tube instead of floating behind it. */
 export const RIFLE_BOLT_TRAVEL = [0, -0.014, 0.045];
