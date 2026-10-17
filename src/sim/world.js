@@ -9,7 +9,7 @@
 //   snapshot()          at CONFIG.net.snapshotRate (the host broadcasts it)
 // and provides send(to, msg) where `to` is a player id or '*' (everyone).
 
-import { gunInventory, gunAction, updateGunReload } from './firearms.js';
+import { GUNS, gunInventory, gunAction, updateGunReload } from './firearms.js';
 import { CONFIG } from '../shared/config.js';
 import { Terrain } from '../shared/terrain.js';
 import { buildLayout } from '../shared/layout.js';
@@ -609,7 +609,7 @@ export class ServerWorld {
   damageMul(p, d, weapon) {
     if (weapon === 'trap' || weapon === 'tower') return 1;
     const m = p.mods;
-    let mul = weapon === 'spear' ? m.meleeMul : weapon === 'pistol' || weapon === 'rifle' || weapon === 'mpx' ? m.gunMul : 1;
+    let mul = weapon === 'spear' ? m.meleeMul : GUNS.includes(weapon) ? m.gunMul : 1;
     if (m.executionerBonus && d.hp <= m.executionerBelow * d.maxHp) mul *= 1 + m.executionerBonus;
     if (m.sprintStrike && p.sprintArmed && this.now - p.lastSprintAt <= SPRINT_STRIKE_WINDOW) { mul *= 2; p.sprintArmed = false; }
     if (this.now < p.bloodlustUntil) mul *= 1 + m.bloodlustDmg;
@@ -1167,7 +1167,7 @@ export class ServerWorld {
           if (inv.spear) return;
           inv.spear = true;
           inv.spearHealth = it.health ?? W.spear.durability;
-        } else if (it.kind === 'pistol' || it.kind === 'rifle' || it.kind === 'mpx') {
+        } else if (GUNS.includes(it.kind)) {
           if (!inv.guns[it.kind] || inv.guns[it.kind].owned !== false) return;
           inv.guns[it.kind] = { ...it.ammo, owned: true };
         } else if (it.kind === 'torch') {
@@ -1284,7 +1284,7 @@ export class ServerWorld {
         else if (Object.hasOwn(CONFIG.fruit.types, kind)) {
           n = inv.fruit.filter(f => f === kind).length;
           inv.fruit = inv.fruit.filter(f => f !== kind);
-        } else if (kind === 'pistol' || kind === 'rifle' || kind === 'mpx') {
+        } else if (GUNS.includes(kind)) {
           if (!inv.guns[kind] || inv.guns[kind].owned === false) return;
           const ammo = { loaded: inv.guns[kind].loaded, reserve: inv.guns[kind].reserve };
           inv.guns[kind] = { owned: false, loaded: 0, reserve: 0 };

@@ -11,7 +11,7 @@
 - `ai/` — one behaviour "brain" per species (see `ai/package-info.md`).
 - `pathfind.js` — `findPath`: coarse A* over walkable ground (4 m cells, cached directed segment checks between centers to avoid narrow water channels and ridges, bog cells weighted by their slower going, hot ground on the volcano avoided) for detours and raiders. `canWalkSegment` is the directed terrain check shared with detour following: preserve the reachable entry center, and skip a nearby waypoint only when the next segment from the animal's actual position is legal.
 - `hitCheck.js` — `nearDino`, `plausibleZone`: plausibility checks for client-reported dinosaur hits.
-- `firearms.js` — pistol/rifle: `gunInventory`, `gunAction` (validated hitscan shot and reload), `updateGunReload`.
+- `firearms.js` — pistol/rifle/MPX/sniper: `GUNS`, `gunInventory`, `gunAction` (validated hitscan shot and reload), `updateGunReload`. All firearms share the player's shot cooldown so switching cannot bypass cycling time; scope visuals are client-side and never bypass hit validation.
 - `mission.js` — `Mission`: boat-parts main quest per island (search -> repaired -> sailing; a player at the boat sets sail with `ACT.SAIL` once every living teammate is there, never automatically) and the team contracts from the mission board; in the demo island 1 is the last one (`won`, `demo` in its state).
 - `raids.js` — `Raids` (scheduling, announcing, spawning, ending raids on the team base), `raidGroup`, `raiderStep` (raider movement/siege).
 - `towers.js` — `updateTowers`, `hostile`: base defence towers pick and shoot hostile dinosaurs.

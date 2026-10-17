@@ -50,6 +50,7 @@ Grouped by the module area they mainly cover. Many simulation tests also check t
 - `dino-water.test.js` — land dinosaurs swim across island 1's river on the way, never into the sea, never spawn in water.
 
 ### Simulation: dinosaurs and combat (src/sim)
+- `sniper.test.js` — real `ServerWorld` sniper actions: distant damage and gun skill bonus, cycling shared across equipment switches, reload completion/cancellation, malformed/range/obstacle rejections, ammunition-conserving drop/pickup and demo restrictions.
 - `sarcosuchus-boss.test.js` — central island 2 boss spawn, harmless telegraphs, committed lunge dodges and miss recovery, shoulder shove, swept tail knockback, low-health chains, safe-zone exclusion, arena damage boundaries and no respawn; bank targeting across fifteen variants, backwards retreats, floating corpse continuity, late-join phase synchronization, vertical strike avoidance and emergence without shore-height pops.
 - `dino-slopes.test.js` — dinosaurs run down steep slopes to players, climbing stays limited (`findPath`, `climbSlope`) over seeded island variants. Detour steering preserves the reachable entry and does not cut forbidden corners; foot-of-wall recovery uses scoped seeded AI randomness for replayable results.
 - `dino-contact.test.js` — player-vs-dinosaur body contact (`resolveDinoContact`) and contact damage events.

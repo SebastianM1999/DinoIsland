@@ -38,7 +38,7 @@ export function carriesLight(player) {
 }
 
 /** Main tools that need the left hand as well (bow, trap, rifle grip); eating does too. The torch is lowered meanwhile. */
-const TWO_HANDED = new Set(['bow', 'trap', 'rifle', 'mpx']);
+const TWO_HANDED = new Set(['bow', 'trap', 'rifle', 'mpx', 'sniper']);
 export function leftHandBusy(tool, eating = false) {
   return eating || TWO_HANDED.has(tool);
 }
