@@ -1,10 +1,11 @@
 # firearms
-> Detailed pistol (P-19), rifle (M4A1) and SMG (MPX-9) models: third-party MIT-licensed hard-surface geometry plus a small adapter that turns it into cached, animatable Three.js groups for this game.
+> Detailed pistol (P-19), rifle (M4A1) SMG (MPX-9) and sniper (SR7 Longbow) models: third-party MIT-licensed hard-surface geometry plus a small adapter that turns it into cached, animatable Three.js groups for this game.
 
 ## Files
 - `index.js` — adapter: `makeFirearm(kind)` builds (once per kind, cached) the reference assembly, applies lightweight shared materials by part key, and returns a `THREE.Group` with movable parts and grip points.
 
 ### reference/
+- `reference/OPERATION-IRONHOLD-LICENSE` � MIT license for the SR7 Longbow reference silhouette (Operation Ironhold, copyright (c) 2026 StarKnightt).
 - `reference/LICENSE` — MIT license of the original source (Claude-of-Duty, copyright (c) 2026 mshumer).
 - `reference/geometry.js` — procedural hard-surface kit: chamfered boxes, lathes, tubes, extrusions, rails, knurling, screws, `Assembly`, `mergeAll`, `triCount`.
 - `reference/parts.js` — reusable firearm parts on top of the kit (barrels, muzzle devices, receivers, handguards, grips, stocks, magazines, optics, sights, slide, trigger, cartridges).
@@ -16,13 +17,15 @@
 ### reference/models/
 - `reference/models/pistol.js` — `buildPistol()`: the P-19 pistol assembly.
 - `reference/models/smg.js` — `buildSmg()`: the MPX-9 assembly, licensed with the other reference models; Dinosaur Island uses compact photo-referenced front post/protective ears and a rear plate with a true circular through-aperture and side guards, with the optic removed.
-- `reference/models/rifle.js` — `buildRifle()`: the M4A1 rifle assembly.
+- `reference/models/sniper.js` � `buildSniper()`: SR7 Longbow, adapting the Operation Ironhold silhouette to the existing tested rifle grip/receiver layout: heavy barrel, tan skeleton stock, folded bipod and a hollow long scope. `nodes.scopeEye` / `scopeAxis` expose the ocular alignment.
+- `reference/models/rifle.js` — `buildRifle()`: the M4A1 rifle assembly, with optional long-range furniture used by `buildSniper()`. The default assembly remains unchanged.
 
+- The sniper shares the fitted rifle grip nodes and handguard dimensions, with a shorter detachable magazine and a side bolt handle on the `charging` group. Its scope is hollow and has an explicit ocular eye node at `[0, 0.171, 0.13]`; scope magnification and reticle belong to the viewmodel/HUD.
 - MPX firing wrist is shifted slightly out/back/down for the thick cartoon fingers; its support hand uses the actual tilted foregrip axis and full-surface-tested poses in `player/viewmodel.js`.
 - The adapter moves the CoD hand nodes for the bigger cartoon hands (`adaptHands`: rifle support hand 40 mm back under the rear third of the handguard and re-oriented by `SUPPORT_GRIP` (palm on the lower far side at clock 305 degrees, fingers rolled toward the muzzle, so the wrist stays nearly in line with the forearm and the fingers stay below the top of the handguard), pistol hands up/back so the index reaches the trigger, and the pistol support hand's fingers raised 20 degrees (`PISTOL_CUP_ORIENTATION`) so the forearm and hand line up, rifle bolt travel shortened and dipping (`RIFLE_BOLT_TRAVEL`) so a locked-back carrier stays in the receiver instead of floating behind it); clips follow because they read the nodes.
 
 ## Entry points
-- `makeFirearm(kind)` (`'pistol'`, `'mpx'`, otherwise rifle) is called by `models/playerModel.js` (third-person held weapon), `player/viewmodel.js` (first-person) and `entities/items.js` (firearms lying on the ground).
+- `makeFirearm(kind)` (`'pistol'`, `'mpx'`, `'sniper'`, otherwise rifle) is called by `models/playerModel.js` (third-person held weapon), `player/viewmodel.js` (first-person) and `entities/items.js` (firearms lying on the ground).
 - `index.js` is the only importer of `reference/models/*`; the reference files only import each other and `three` / `three/addons`.
 
 ## Rules

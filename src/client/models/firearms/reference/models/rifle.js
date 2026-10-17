@@ -1,5 +1,5 @@
 // From Claude-of-Duty, copyright (c) 2026 mshumer, MIT; see LICENSE.
-import { Assembly, box, blob, dome, extrude, roundRect, latheZ, rodZ, mergeAll } from '../geometry.js';
+import { Assembly, box, blob, dome, extrude, roundRect, latheZ, rodZ, tubeZ, mergeAll } from '../geometry.js';
 import {
   addBarrel,
   addGasBlock,
@@ -40,7 +40,7 @@ import {
  *   muzzle crown     z = -0.502
  *   butt pad         z = +0.245
  */
-export function buildRifle() {
+export function buildRifle({ sniper = false } = {}) {
   const bore = 0.075;
   const rUpper = 0.0192;
   const railTop = bore + 0.0286;
@@ -53,8 +53,8 @@ export function buildRifle() {
   const hgZ1 = -0.385;
   const hgR = 0.0235;
   const zBreech = -0.1;
-  const zBarrelEnd = -0.44;
-  const opticY = bore + 0.067;
+  const zBarrelEnd = sniper ? -0.70 : -0.44;
+  const opticY = bore + (sniper ? 0.096 : 0.067);
   const opticZ = -0.022;
 
   const body = new Assembly('rifle-body');
@@ -137,13 +137,13 @@ export function buildRifle() {
     zBreech,
     zMuzzle: zBarrelEnd,
     rChamber: 0.0112,
-    rBarrel: 0.0077,
+    rBarrel: sniper ? 0.012 : 0.0077,
     rGas: 0.0098,
     gasAt: -0.3,
   });
   // Soot: the gas block vents combustion products by design and the brake is
   // 20 mm from the crown. See `steel_soot` in materials.js.
-  addGasBlock(body, 'steel_soot', {
+  if (!sniper) addGasBlock(body, 'steel_soot', {
     y: bore,
     z: -0.3,
     rBarrel: 0.0077,
@@ -151,7 +151,7 @@ export function buildRifle() {
     w: 0.021,
     h: 0.0195,
   });
-  const muzzle = addMuzzleDevice(body, 'steel_soot', 'cavity', 'brake', zBarrelEnd, 0.0077, bore);
+  const muzzle = addMuzzleDevice(body, 'steel_soot', 'cavity', 'brake', zBarrelEnd, sniper ? 0.012 : 0.0077, bore);
 
   // ---- handguard + rails ---------------------------------------------------
   /**
@@ -172,7 +172,7 @@ export function buildRifle() {
   // recovered. 150 mm of handguard remains ahead of the hand.
   const handZ = -0.235;
   addHandguard(body, 'alu', {
-    matPanel: 'polymer',
+    matPanel: sniper ? 'polymer_tan' : 'polymer',
     y: bore,
     z0: hgZ0,
     z1: hgZ1,
@@ -198,10 +198,11 @@ export function buildRifle() {
   });
 
   // ---- furniture -----------------------------------------------------------
-  addPistolGrip(body, 'polymer', 'rubber', { y: 0.035, z: 0.015, angle: 0.38, len: 0.108, w: 0.031 });
+  addPistolGrip(body, sniper ? 'polymer_tan' : 'polymer', 'rubber', { y: 0.035, z: 0.015, angle: 0.38, len: 0.108, w: 0.031 });
   // Buffer tube stays aluminium (it is a machined extrusion); the cheek riser and
   // butt stock are the polymer class, the pad is rubber. Three classes, one part.
-  addCarbineStock(body, 'alu', 'polymer', 'rubber', {
+  if (sniper) addSniperFurniture(body, bore);
+  else addCarbineStock(body, 'alu', 'polymer', 'rubber', {
     bore,
     zFront: zUpperRear + 0.003,
     zRear: 0.245,
@@ -219,7 +220,7 @@ export function buildRifle() {
    * frame was a quarter-height ring of dark tube wall — "a length of drainpipe",
    * measured. 52 mm plus the flared bore in buildOptic gets it to 69%.
    */
-  const optic = buildOptic(body, {
+  const optic = sniper ? addSniperScope(body, opticY, railTop) : buildOptic(body, {
     rTube: 0.0155,
     len: 0.052,
     hood: 0.007,
@@ -243,7 +244,7 @@ export function buildRifle() {
    * material and a DIELECTRIC, so it takes the 0.13 specular clamp with the rest of
    * the gun and carries the moulding stipple as well.
    */
-  addFrontSight(body, 'polymer', 'alu', 0, railTop, -0.358, false);
+  if (!sniper) addFrontSight(body, 'polymer', 'alu', 0, railTop, -0.358, false);
   /**
    * BACK-UP REAR SIGHT — MOVED, and the move is a composition fix, not a taste one.
    *
@@ -263,28 +264,33 @@ export function buildRifle() {
    * also becomes nitride black rather than bright phosphate, which is what a
    * folding BUIS is actually finished in.
    */
-  addRearSight(body, 'polymer', 'alu', 0, railTop, -0.112, false);
+  if (!sniper) addRearSight(body, 'polymer', 'alu', 0, railTop, -0.112, false);
 
   // ---- moving parts --------------------------------------------------------
   const magazine = new Assembly('rifle-mag');
   const mag = buildMagazine(magazine, null, {
     w: 0.0255,
     d: 0.0655,
-    len: 0.212,
-    curve: 0.03,
+    len: sniper ? 0.12 : 0.212,
+    curve: sniper ? 0 : 0.03,
     segs: 8,
     witness: 4,
     poly: 'polymer',
   });
 
   const charging = new Assembly('rifle-charging');
-  const chG = chargingHandlePart();
+  const chG = sniper ? rodZ(0.0045, 0.0045, 0.037, 24) : chargingHandlePart();
   // An AR charging handle is a black-anodised ALUMINIUM extrusion, not bright
   // steel. Measured as `steel_bright` it was a 30 x 15 px cream plate at L=170-184
   // sitting on the receiver flank in hipfire — one of the "untextured white
   // blocks". As `alu` it is the same class as the receiver it slides in, which is
   // correct, and it picks up the specular clamp and the anodising grain.
-  charging.add(chG, 'alu', {});
+  charging.add(chG, 'alu', sniper ? { x: 0.018, ry: Math.PI / 2 } : {});
+  if (sniper) {
+    const knob = blob(0.019, 0.019, 0.019, 0.008, 4);
+    charging.add(knob, 'steel', { x: 0.041 });
+    knob.dispose();
+  }
   chG.dispose();
 
   const bolt = new Assembly('rifle-bolt');
@@ -313,8 +319,8 @@ export function buildRifle() {
   selR.geo.dispose();
 
   return {
-    id: 'rifle',
-    label: 'M4A1',
+    id: sniper ? 'sniper' : 'rifle',
+    label: sniper ? 'SR7 Longbow' : 'M4A1',
     fxClass: 'carbine',
     body,
     moving: { magazine, charging, bolt, trigger, selector },
@@ -325,6 +331,7 @@ export function buildRifle() {
       ejectDir: [0.86, 0.44, 0.26],
       sight: [0, opticY, optic.lensZ],
       sightAxis: [0, 0, -1],
+      ...(sniper ? { scopeEye: [0, opticY, 0.13], scopeAxis: [0, 0, -1], scopeRadius: 0.025 } : {}),
       ironSight: [0, railTop + 0.026, 0.038],
       /**
        * Hand targets are WRISTS, not palms: the glove is modelled from the
@@ -454,7 +461,7 @@ export function buildRifle() {
       },
       magSeat: { pos: [0, 0.061, magZ], rot: [magTilt, 0, 0] },
       magDrop: [0, -0.4, 0.02],
-      chargeRest: { pos: [0, bore + rUpper - 0.0075, zUpperRear - 0.024], rot: [0, 0, 0] },
+      chargeRest: { pos: sniper ? [0.018, bore + 0.008, 0.025] : [0, bore + rUpper - 0.0075, zUpperRear - 0.024], rot: [0, 0, 0] },
       chargePull: [0, 0, 0.082],
       boltRest: { pos: [0, bore, 0.021], rot: [0, 0, 0] },
       boltTravel: [0, 0, 0.062],
@@ -466,4 +473,55 @@ export function buildRifle() {
     shell: { caseLen: 0.0446, rimR: 0.00495 },
     magSize: { len: mag.len, w: mag.w, d: mag.d },
   };
+}
+
+
+/** Operation Ironhold SR7 Longbow silhouette, adapted to the existing rifle wrist/receiver layout.
+ * Copyright (c) 2026 StarKnightt, MIT; see ../OPERATION-IRONHOLD-LICENSE.
+ * The handguard retains its fitted cylinder, keeping the cartoon hand contact surface identical.
+ */
+function addSniperFurniture(body, bore) {
+  const add = (g, mat, t) => { body.add(g, mat, t); g.dispose(); };
+  // Open skeleton stock with a raised cheek rest and rubber shoulder pad.
+  add(blob(0.038, 0.052, 0.085, 0.005), 'polymer_tan', { y: bore - 0.009, z: 0.096 });
+  add(blob(0.039, 0.024, 0.16, 0.004), 'polymer_tan', { y: bore + 0.024, z: 0.169 });
+  add(blob(0.033, 0.018, 0.17, 0.004), 'polymer_tan', { y: bore - 0.029, z: 0.174 });
+  add(blob(0.045, 0.104, 0.023, 0.005), 'rubber', { y: bore - 0.005, z: 0.252 });
+  for (const x of [-0.011, 0.011])
+    add(rodZ(0.004, 0.004, 0.027, 24), 'steel', { x, y: bore + 0.009, z: 0.15, rx: Math.PI / 2 });
+  // Folded bipod lies forward of the support fingers, tucked alongside the fore-end.
+  add(box(0.03, 0.014, 0.035, 0.002, 2), 'alu', { y: bore - 0.032, z: -0.355 });
+  for (const x of [-0.024, 0.024]) {
+    add(rodZ(0.005, 0.005, 0.12, 24), 'steel', { x, y: bore - 0.034, z: -0.407, rx: -0.05 });
+    add(blob(0.014, 0.012, 0.02, 0.003), 'rubber', { x, y: bore - 0.037, z: -0.465 });
+  }
+  for (let i = 0; i < 5; i++)
+    add(tubeZ(0.014, 0.0115, 0.01, 40), 'steel', { y: bore, z: -0.42 - i * 0.052 });
+}
+
+function addSniperScope(body, y, railTop) {
+  const add = (g, mat, t) => { body.add(g, mat, t); g.dispose(); };
+  // Actual hollow scope: objective bell, main tube and widened ocular housing.
+  add(latheZ([
+    [-0.27, 0.027], [-0.27, 0.033], [-0.22, 0.033], [-0.18, 0.021],
+    [0.01, 0.021], [0.03, 0.029], [0.12, 0.029], [0.12, 0.025],
+    [0.03, 0.025], [0.01, 0.017], [-0.18, 0.017], [-0.22, 0.027], [-0.27, 0.027]
+  ], 80), 'alu_fine', { y });
+  for (const z of [-0.14, -0.025]) {
+    add(box(0.026, y - railTop - 0.014, 0.023, 0.002, 2), 'alu', { y: (y + railTop - 0.014) / 2, z });
+    add(tubeZ(0.025, 0.0207, 0.017, 64), 'steel', { y, z });
+  }
+  add(tubeZ(0.031, 0.0285, 0.025, 80), 'rubber', { y, z: 0.063 });
+  add(rodZ(0.014, 0.014, 0.025, 40), 'steel', { y: y + 0.027, z: -0.075, rx: Math.PI / 2 });
+  add(rodZ(0.013, 0.013, 0.022, 40), 'steel', { x: 0.027, y, z: -0.075, ry: Math.PI / 2 });
+  for (let i = 0; i < 12; i++) {
+    const a = i * Math.PI / 6;
+    add(box(0.003, 0.004, 0.021, 0.0006, 2), 'rubber', {
+      x: Math.sin(a) * 0.031, y: y + Math.cos(a) * 0.031, z: 0.063, rz: -a
+    });
+  }
+  // Narrow glass reflection rings leave the sight line open; scope UI owns the reticle.
+  add(tubeZ(0.0271, 0.0263, 0.001, 80), 'glass', { y, z: -0.269 });
+  add(tubeZ(0.0251, 0.0243, 0.001, 80), 'glass', { y, z: 0.119 });
+  return { lensZ: 0.119, lensR: 0.0243, y, z: 0, rTube: 0.029 };
 }
