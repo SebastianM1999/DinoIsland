@@ -58,6 +58,8 @@ function adaptHands(kind, nodes) {
     nodes.gripL = supportGrip(nodes.gripL, nodes.handguard);
     // the locked-back carrier would leave the receiver (its tail is 14 mm above the buffer tube behind it): shorter, and sinking into the tube
     nodes.boltTravel = RIFLE_BOLT_TRAVEL;
+  } else if (kind === 'mpx') {
+    shiftNode(nodes.gripR, [0.009, -0.008, 0.01]);
   } else if (kind === 'pistol') {
     shiftNode(nodes.gripR, PISTOL_HANDS_SHIFT); shiftNode(nodes.gripL, PISTOL_HANDS_SHIFT);
     nodes.gripL = { ...nodes.gripL, ...PISTOL_CUP_ORIENTATION };

@@ -18,7 +18,7 @@ const makeVm = (kind) => {
   for (let i = 0; i < 200; i++) vm.update(1 / 60, idle);
   return vm;
 };
-const CLIPS = [['pistol', false, 'reloadTac'], ['pistol', true, 'reloadEmpty'], ['rifle', false, 'reloadTac'], ['rifle', true, 'reloadEmpty']];
+const CLIPS = [['pistol', false, 'reloadTac'], ['pistol', true, 'reloadEmpty'], ['rifle', false, 'reloadTac'], ['rifle', true, 'reloadEmpty'], ['mpx', false, 'reloadTac'], ['mpx', true, 'reloadEmpty']];
 /** The new magazine may still be climbing into the frame this long (a fraction of the reload) after the hand has fetched it. */
 const ENTER = 0.13;
 /** The gun is fully lifted from this fraction of the reload until the new magazine is in; then it settles toward the hip pose. */
@@ -91,7 +91,7 @@ test('the old magazine is hidden only once it is off screen, and the new one ent
 });
 
 test('tactical: the hand carries the magazine out and in; empty: the released magazine falls with gravity', () => {
-  for (const kind of ['pistol', 'rifle']) {
+  for (const kind of ['pistol', 'rifle', 'mpx']) {
     const hold = magInHand(GUN_DEFS[kind].magLen * vm0(kind), RELOAD_TUNING[kind].spin);
     // tactical
     let vm = makeVm(kind);
@@ -176,7 +176,7 @@ test('the support wrist never bends more than 45 degrees, in any frame of any re
 });
 
 test('an empty reload keeps the slide / bolt locked back until the release, then it snaps home; a tactical one never moves it', () => {
-  for (const [kind, part] of [['pistol', 'slide'], ['rifle', 'bolt']]) {
+  for (const [kind, part] of [['pistol', 'slide'], ['rifle', 'bolt'], ['mpx', 'bolt']]) {
     for (const empty of [false, true]) {
       const vm = makeVm(kind), p = vm.guns[kind].userData.parts[part], rest = p.userData.rest.z;
       frames(vm, kind, empty, empty ? 'reloadEmpty' : 'reloadTac', ({ f, ev }) => {
@@ -191,7 +191,7 @@ test('an empty reload keeps the slide / bolt locked back until the release, then
 
 test('the right hand stays on the grip and the hand holds the magazine upright across the palm', () => {
   assert.ok(MAG_GRIP.along > 0.5 && MAG_GRIP.along < 1, 'gripped low on the magazine');
-  for (const kind of ['pistol', 'rifle']) {
+  for (const kind of ['pistol', 'rifle', 'mpx']) {
     const vm = makeVm(kind);
     const grip = vm.grips[kind].R;
     frames(vm, kind, true, 'reloadEmpty', ({ f, vm: v, gun }) => {
@@ -199,4 +199,19 @@ test('the right hand stays on the grip and the hand holds the magazine upright a
       assert.ok(v.rHand.getWorldPosition(new THREE.Vector3()).distanceTo(target) < 2e-3, `${kind} ${f}: right hand welded to the grip`);
     });
   }
+});
+
+
+test('MPX support hand stays on the moving charging handle while racking an empty reload', () => {
+  const vm = makeVm('mpx'), gun = vm.guns.mpx, nodes = gun.userData.nodes;
+  const handle = gun.userData.parts.charging;
+  const offsets = [];
+  frames(vm, 'mpx', true, 'reloadEmpty', ({ f, vm: v }) => {
+    if (f < 0.70 || f > 0.82) return;
+    const wrist = gun.worldToLocal(v.lHand.getWorldPosition(new THREE.Vector3()));
+    offsets.push(wrist.sub(handle.position));
+    if (f === 0.76) assert.ok(handle.position.z > nodes.chargeRest.pos[2] + 0.05, 'handle pulled fully back');
+  });
+  for (const offset of offsets) assert.ok(offset.distanceTo(offsets[0]) < 1e-6, 'hand and handle travel together');
+  assert.ok(handle.position.distanceTo(handle.userData.rest) < 1e-9, 'handle returns home');
 });

@@ -244,7 +244,7 @@ test('a rifle reload: the magazine follows the left hand while it is carried, is
 });
 
 test('the reload fraction maps onto the clip: 0.5 samples the clip at half its duration, an empty magazine picks the empty clip', () => {
-  for (const kind of ['pistol', 'rifle']) {
+  for (const kind of ['pistol', 'rifle', 'mpx']) {
     const vm = makeVm(); vm.setTool(kind); run(vm, 200);
     for (const [empty, name] of [[false, 'reloadTac'], [true, 'reloadEmpty']]) {
       const clip = vm.clips[kind][name], expected = makeSampleResult();
@@ -265,7 +265,7 @@ test('the reload fraction maps onto the clip: 0.5 samples the clip at half its d
 });
 
 test('an empty magazine locks the slide or bolt back; the shot cycle moves it and it comes home', () => {
-  for (const [kind, part] of [['pistol', 'slide'], ['rifle', 'bolt']]) {
+  for (const [kind, part] of [['pistol', 'slide'], ['rifle', 'bolt'], ['mpx', 'bolt']]) {
     const vm = makeVm(); vm.setTool(kind); run(vm, 200);
     const p = vm.guns[kind].userData.parts[part], rest = p.userData.rest.z;
     assert.ok(Math.abs(p.position.z - rest) < 1e-9);
@@ -290,7 +290,7 @@ test('arm bones are never stretched: shoulder-elbow = l1 and elbow-hand <= l2 fo
     }
   };
   const move = { speed: 6, sprint: true, grounded: true, lookX: 30, lookY: -20 };
-  for (const tool of ['spear', 'bow', 'trap', 'fruit', 'pistol', 'rifle', 'spear']) {
+  for (const tool of ['spear', 'bow', 'trap', 'fruit', 'pistol', 'rifle', 'mpx', 'spear']) {
     vm.setTool(tool, { fruitType: 'mango' });
     for (let i = 0; i < 100; i++) { vm.update(1 / 60, i % 20 < 10 ? move : { ...move, lookX: -40, sprint: false }); check(`${tool} ${i}`); }
   }
@@ -305,7 +305,7 @@ test('arm bones are never stretched: shoulder-elbow = l1 and elbow-hand <= l2 fo
   vm.setKnife(true, 0); run(vm, 60);
   for (let i = 0; i <= 30; i++) { vm.setKnife(true, i / 30); vm.update(1 / 60, idle); check('knife'); }
   vm.setKnife(false);
-  for (const kind of ['pistol', 'rifle']) {
+  for (const kind of ['pistol', 'rifle', 'mpx']) {
     vm.setTool(kind); run(vm, 200);
     for (const empty of [false, true]) {
       for (let f = 0; f <= 0.98; f += 0.02) { vm.setGunPose(false, f, empty); vm.update(1 / 60, move); check(`${kind} reload ${f}`); }
@@ -317,13 +317,13 @@ test('arm bones are never stretched: shoulder-elbow = l1 and elbow-hand <= l2 fo
 
 test('the torch arm shows only while the left hand is free', () => {
   const vm = makeVm(); vm.setTorch(true, true);
-  const free = { spear: true, fruit: true, pistol: true, bow: false, trap: false, rifle: false };
+  const free = { spear: true, fruit: true, pistol: true, bow: false, trap: false, rifle: false, mpx: false };
   for (const [tool, up] of Object.entries(free)) {
     vm.setTool(tool, { fruitType: 'mango' }); run(vm, 200);
     assert.equal(vm.armT.root.visible, up, `${tool}: torch arm`);
     assert.equal(vm.torch.visible, up, `${tool}: torch`);
     if (up) assert.ok(worldOf(vm.tHand).distanceTo(vm.torch.localToWorld(vm.grips.torch.L.pos.clone())) < 1e-6, `${tool}: fist welded to the torch`);
-    assert.equal(vm.armL.root.visible, tool === 'bow' || tool === 'trap' || tool === 'rifle', `${tool}: left arm`);
+    assert.equal(vm.armL.root.visible, tool === 'bow' || tool === 'trap' || (tool === 'rifle' || tool === 'mpx'), `${tool}: left arm`);
   }
   // eating needs the left hand too, a reload as well; a put-out torch is never shown
   vm.setTool('spear'); run(vm, 200); assert.equal(vm.armT.root.visible, true);

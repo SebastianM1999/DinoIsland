@@ -18,6 +18,7 @@
 - `reference/models/smg.js` — `buildSmg()`: the MPX-9 assembly, licensed with the other reference models; Dinosaur Island uses compact photo-referenced front post/protective ears and a rear plate with a true circular through-aperture and side guards, with the optic removed.
 - `reference/models/rifle.js` — `buildRifle()`: the M4A1 rifle assembly.
 
+- MPX firing wrist is shifted slightly out/back/down for the thick cartoon fingers; its support hand uses the actual tilted foregrip axis and full-surface-tested poses in `player/viewmodel.js`.
 - The adapter moves the CoD hand nodes for the bigger cartoon hands (`adaptHands`: rifle support hand 40 mm back under the rear third of the handguard and re-oriented by `SUPPORT_GRIP` (palm on the lower far side at clock 305 degrees, fingers rolled toward the muzzle, so the wrist stays nearly in line with the forearm and the fingers stay below the top of the handguard), pistol hands up/back so the index reaches the trigger, and the pistol support hand's fingers raised 20 degrees (`PISTOL_CUP_ORIENTATION`) so the forearm and hand line up, rifle bolt travel shortened and dipping (`RIFLE_BOLT_TRAVEL`) so a locked-back carrier stays in the receiver instead of floating behind it); clips follow because they read the nodes.
 
 ## Entry points
@@ -25,7 +26,7 @@
 - `index.js` is the only importer of `reference/models/*`; the reference files only import each other and `three` / `three/addons`.
 
 ## Rules
-- Files under `reference/` (incl. `hands.js`, `clips.js`, `mathx.js`, `rng.js`) carry the header "From Claude-of-Duty ... MIT; see LICENSE". Keep the header and `LICENSE` with them; the adapter comment says to preserve the original assemblies and adapt only materials in `index.js`.
+- Files under `reference/` (incl. `hands.js`, `clips.js`, `mathx.js`, `rng.js`) carry the header "From Claude-of-Duty ... MIT; see LICENSE". Keep the header and `LICENSE` with them; preserve the original assemblies except requested variants (MPX small iron sights replace the optic), with hand/material adaptation in `index.js` and `player/viewmodel.js`.
 - Returned group contract (relied on by viewmodel/player model): `root.userData.parts` holds movable groups (`magazine`, `slide`, `charging`, `bolt`, `trigger`, `selector`) positioned at their rest nodes with `userData.rest`; `root.userData.nodes` exposes the model's named nodes; the CoD wrist targets `nodes.gripR` / `nodes.gripL` (`pos`, `finger`, `back`) and `nodes.handguard` are turned into this game's hands by `arms/cartoonArm.js` (`scaledGrip`), see `player/viewmodel.js`.
 - Geometry and materials are cached per kind/key and marked with `retainResource`, so island disposal never frees them; every call returns a new group sharing them.
 - Materials are plain `MeshStandardMaterial` chosen by part-key keywords (brass, glass, polymer, rubber, cavity, ...); no textures.

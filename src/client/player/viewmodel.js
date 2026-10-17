@@ -228,9 +228,11 @@ export function toolGrips() {
     const raw = cyl(scale, o);
     return toGrip(raw, { fit: { name, base, point: o.point, axis: o.axis, radius: o.fitRadius ?? o.radius, scale, grip: raw } });
   };
-  g.mpx.L = cylGrip(GUN_SCALE.mpx, 'foregrip:mpx', 'fist', { point: [0, 0.015, -0.208], axis: [0, -Math.cos(0.2), Math.sin(0.2)], radius: 0.015, normal: [-1, 0, 0], wrap: -1 });
+  g.mpx.L = cylGrip(GUN_SCALE.mpx, 'foregrip:mpx', 'fist', { point: [0, -0.018, -0.212], axis: [0, -0.998, -0.064], radius: 0.018, normal: [-1, 0, 0], wrap: 1, roll: -0.9, tilt: 0.2 });
   // Keep clip home keys and fitted idle wrists on the same foregrip contact.
-  nodes.mpx.gripL = { pos: g.mpx.L.pos.toArray(), finger: g.mpx.L.finger, back: g.mpx.L.back };
+  const rawMpx = { pos: [0, 0, 0], finger: g.mpx.L.finger, back: g.mpx.L.back };
+  const offset = scaledGrip(rawMpx, HAND_SCALE, GUN_SCALE.mpx).pos;
+  nodes.mpx.gripL = { ...rawMpx, pos: g.mpx.L.pos.toArray().map((v, i) => v - offset[i]) };
   g.spear.R = cylGrip(1, 'fist:spear', 'fist', { point: [0, SPEAR_GRIP_Y, 0], axis: [0, 1, 0], radius: 0.036, normal: [0, 0, 1], wrap: -1 });
   g.bow.L = cylGrip(SCALE.bow, 'fist:bow', 'fist', { point: [0, -0.075, 0], axis: [0, 1, 0], radius: 0.036, normal: [-1, 0, 0.1], wrap: -1 });
   for (const [side, key, name] of [[1, 'R', 'fist:trapR'], [-1, 'L', 'fist:trapL']]) {
@@ -344,6 +346,17 @@ export class Viewmodel {
     fitGrip(this.armR, g.pistol.R);
     fitGrip(this.armR, g.rifle.R);
     fitGrip(this.armT, g.torch.L);
+    // Full-surface clearance tuning for the thick cartoon fingers: a point-contact
+    // cylinder fit alone can let the thumb or a finger's middle cross the receiver.
+    Object.assign(this.armR.poses['grip:mpx'], {
+      fingers: [[0.04375, -0.0375, 0.36875], [1.2625, 1.183333, 1.25625], [1.2625, 1.1125, 1.25625], [1.18125, 1.00625, 1.025]],
+      trigger: [0.04375, -0.0375, 0.36875], triggerPull: [0.06, 0.075, 0.06], indexLift: 0.006,
+      thumb: [0.5, 0.34], thumbBase: [1.2, 0, -0.62],
+    });
+    Object.assign(this.armL.poses['foregrip:mpx'], {
+      fingers: [[2.4, 1.75, 1.95], [-0.048333, 0.85625, 1.564583], [0.06, 1.5375, 1.795833], [1.43125, 0.935417, 0.523958]],
+      thumb: [0.794583, 1.309375], thumbBase: [-1.2, -0.61, -0.957143],
+    });
 
     // ---- items: each a direct child of root, posed by `update` ----
     this.spear = mesh(spearGeometry(), MAT.standard, { cast: false });

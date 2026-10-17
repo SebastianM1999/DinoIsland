@@ -215,11 +215,20 @@ export function makeCartoonArm(side, skin, top, opts = {}) {
   for (const m of Object.values(mats)) m.dispose();
 
   for (const [name, pose] of Object.entries(POSES)) arm.poses[name] = structuredClone(pose);
+  // Small per-grip index-knuckle clearance, reset on every pose change.
+  const indexBaseY = arm.fingers[0].root.position.y;
+  const setPose = arm.setPose.bind(arm);
+  arm.setPose = function(name) {
+    setPose(name);
+    this.fingers[0].root.position.y = indexBaseY + (this.poses[name]?.indexLift ?? 0);
+    return this;
+  };
   // The trigger finger starts from the CURRENT pose's own rest curl (a gun grip fits it onto its trigger, `fitTriggerFinger`).
   arm.setTrigger = function setTrigger(t) {
     const rest = this.poses[this.pose]?.trigger ?? TRIGGER_REST;
+    const pull = this.poses[this.pose]?.triggerPull ?? TRIGGER_PULL;
     const joints = this.fingers[0].joints;
-    for (let j = 0; j < 3; j++) joints[j].rotation.x = -(rest[j] + t * TRIGGER_PULL[j]);
+    for (let j = 0; j < 3; j++) joints[j].rotation.x = -(rest[j] + t * pull[j]);
   };
   return arm.setPose(opts.pose ?? 'relaxed');
 }
