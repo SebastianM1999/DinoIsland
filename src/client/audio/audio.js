@@ -9,6 +9,7 @@ import { SAMPLE_GROUPS, STEP_TEXTURES, DINO_WEIGHT, effectGroup } from './catalo
 import { CREATURE_STEP_PROFILES } from './creatureSteps.js';
 import { SampleBank, SamplePicker } from './samples.js';
 import { IslandMusic } from './music.js';
+import { sniperAudio } from './sniperAudio.js';
 
 const A = CONFIG.audio;
 const REVERB_RELEASE_MS = 5000;   // gain ramp (about 1.6 s to silence) plus the 2.9 s impulse tail
@@ -382,6 +383,8 @@ export class GameAudio {
     const t = now + 0.005;
     if (this.#recorded(name, o, t)) return;
     const out = this.#out(o.pos, o.vol ?? 1);
+    if (name === 'sniper' || name === 'sniperBolt' || name === 'sniperReload')
+      return sniperAudio(this.ctx, this.noiseBuf, out, name, t, o.duration, o.empty);
     if (name === 'mpx' || name === 'mpxReload') return this.#mpx(name, t, out, o.duration);
     switch (name) {
       case 'sarco_lunge':

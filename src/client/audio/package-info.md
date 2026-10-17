@@ -2,6 +2,7 @@
 > All game sound on the client via Web Audio: recorded effects and footsteps, synthesized fallback/UI cues, positional 3D audio (including distinct Sarcosuchus attack wind-up cues), water and shore ambience, and adaptive island/menu/boss music.
 
 ## Files
+- `sniperAudio.js` — SR-7 report and cancellable bolt/reload layers, scheduled on the AudioContext clock. Adapted from Operation Ironhold under `ironhold-LICENSE.txt` (MIT).
 - `audio.js` — `GameAudio`: the audio graph (master, sfx, music, ambience buses), `play(name, opts)` (synthesized fallbacks, and the volcano's own: `rumble`, `eruption`, `bombWhistle`, `bombImpact`, `geyserBubble`, `geyserBlast`, `columnCrack`, `treasure`), listener updates, ambience and water loops (and the ash rain's wind: `update({ ash })`), music control; follows volume settings. Hollow Mountain: `update({ cave, caveWet })` opens a generated-impulse reverb (`ConvolverNode`, created and wired only while the send is open and unwired again 5 s after it closes, so no other island and no cove pays for it: `#reverbLevel`) and cave ambience (tunnel wind, rumble, drips, stone creaks, water lapping) by depth; `setIsland('cave')` darkens the music (low-pass + a slow synthesized drone); effect `caveDrip`.
 - `catalog.js` — sample file catalog: `FOOTSTEPS` / `RUN_FOOTSTEPS` per surface, `STEP_TEXTURES` / `DINO_WEIGHT` for optional recorded layers, `SAMPLE_GROUPS` for complete preload/provenance checks, `EFFECTS` per sound name, `ISLAND_MUSIC` (jungle/volcano calm+danger; the swamp borrows the volcano's), `MENU_MUSIC`, `BOSS_MUSIC`, `musicLoopStart`, `effectGroup()`.
 - `music.js` — `IslandMusic`: owns music sources across Game instances, crossfades calm/danger/boss/menu tracks (`MUSIC_FADE`, `DANGER_HOLD`).
@@ -12,6 +13,7 @@
 - `region.js` — `inBossMusicArea()`: whether the player is in a boss arena (jungle lava islet or swamp kettle) or on the jungle causeway, with an exit margin.
 
 ## Entry points
+- `play('sniper', options)` plays a deep sniper crack and tail; `sniperBolt` / `sniperReload` accept `duration` (defaults 1.1 / 2.7 seconds), return idempotent cancellation handles and disconnect completed/cancelled layers, output and panner. Reload `empty: true` includes bolt pull/lock; tactical reloads seat/slap the magazine without working the bolt.
 - `play('mpx', options)` synthesizes the reference SMG's body, crack and action layers; `play('mpxReload', { duration })` schedules magazine/bolt cues, scaled to the actual reload time (default 1.8 s). Both return an idempotent cancellation function and release all nodes on completion; cancel a reload on switch/death.
 - `main.js` creates a `GameAudio` for the menu (unlocked on a user gesture) and passes it to `Game` for reuse; `core/game.js` creates one if none is given and calls `play`, `setIsland`, `setListener`, `update(dt, { coast, water, danger, bossArea })`, `startMusic`/`stopMusic`, `resume`.
 - `core/game.js` also uses `StepCadence`, `footstepSurface`, `woodSupports` and `inBossMusicArea`.
