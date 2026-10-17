@@ -586,7 +586,7 @@ export class GameAudio {
    * Returns a cancellation function so interrupted reloads leave no delayed cues.
    */
   #mpx(name, t, out, duration = 1.8) {
-    if (name === 'mpx') out.gain.value *= 1.3;
+    if (name === 'mpx') out.gain.value *= 1.95;
     const active = new Set();
     const releaseOutput = () => { out.disconnect(); out.samplePanner?.disconnect(); };
     const layer = (offset, length, frequency, endFrequency, volume, noise = false, q = 1) => {
