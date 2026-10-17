@@ -1,6 +1,36 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs/promises';
 import { sniperAudio } from '../src/client/audio/sniperAudio.js';
+import { EFFECTS } from '../src/client/audio/catalog.js';
+
+test('recorded Barrett retains a substantial tail and a stronger opening report than the other recorded guns', async () => {
+  const levels = {};
+  for (const kind of ['sniper', 'pistol', 'rifle']) {
+    const bytes = await fs.readFile(new URL('..' + EFFECTS[kind].files[0], import.meta.url));
+    let format, data;
+    for (let p = 12; p < bytes.length;) {
+      const id = bytes.toString('ascii', p, p + 4), length = bytes.readUInt32LE(p + 4);
+      if (id === 'fmt ') format = p + 8;
+      if (id === 'data') data = [p + 8, length];
+      p += 8 + length + length % 2;
+    }
+    const channels = bytes.readUInt16LE(format + 2), rate = bytes.readUInt32LE(format + 4);
+    assert.equal(bytes.readUInt16LE(format), 1);
+    assert.equal(bytes.readUInt16LE(format + 14), 16);
+    const count = Math.min(data[1] / 2, Math.round(rate * .1) * channels);
+    let sum = 0;
+    for (let i = 0; i < count; i++) sum += (bytes.readInt16LE(data[0] + i * 2) / 32768) ** 2;
+    levels[kind] = Math.sqrt(sum / count) * EFFECTS[kind].gain;
+    if (kind === 'sniper') {
+      assert.equal(channels, 1);
+      assert.ok(data[1] / 2 / rate >= 1.5, 'retains the body and ringing tail');
+      assert.equal(bytes.readInt16LE(data[0]), 0, 'attack starts with a fade');
+      assert.equal(bytes.readInt16LE(data[0] + data[1] - 2), 0, 'tail fades without a cutoff click');
+    }
+  }
+  assert.ok(levels.sniper > levels.pistol * 2 && levels.sniper > levels.rifle * 2);
+});
 
 function fixture() {
   const nodes = [], sources = [];

@@ -22,6 +22,8 @@ descriptions as requested on his source pages.
 
 ## Sound effects
 
+- **M 82 Barrett 50 Cal** by **JKirsch**, [SoundBible source](https://soundbible.com/1388-M-82-Barrett-50-Cal.html), used under [Creative Commons Attribution 3.0](https://creativecommons.org/licenses/by/3.0/). Sniper report: first 1.90 seconds of the recording, converted to mono, DC removed, peak balanced, 0.5ms attack and 150ms tail fades. This is a modified version; no endorsement implied. See `sources.json` for the exact source download and processing details.
+
 Spear throw, bow release, and weapon impact were
 generated with [ElevenLabs Sound Effects](https://elevenlabs.io/sound-effects)
 (`eleven_text_to_sound_v2`). They are governed by the generating account's
