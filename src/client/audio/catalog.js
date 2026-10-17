@@ -26,7 +26,7 @@ export const DINO_WEIGHT = {
 
 export const EFFECTS = {
   pistol: group('recorded-pistol', 1, 0.8, 1, 0.015), rifle: group('recorded-rifle', 1, 0.85, 1, 0.015),
-  sniper: group('recorded-sniper-heavy', 1, 1.3, 1, 0.008),
+  sniper: group('recorded-sniper-heavy', 1, 1.04, 1, 0.008),
   empty: group('empty', 1, 0.25), reload: group('reload', 2, 0.3),
   bow: group('el-bow', 1, 0.5), bowDraw: group('bow-draw', 2, 0.22),
   swing: group('swish', 3, 0.4, 1.1), throw: group('el-spear', 1, 0.45, 1),
