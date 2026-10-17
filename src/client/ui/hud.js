@@ -854,7 +854,7 @@ export class Hud {
     const material = !!CONFIG.loot[item.kind];
     const rows = itemStats(item.icon, material ? item.count : 0);
     const count = item.locked ? 'Locked' : item.kind === 'spear' ? `Durability ${item.count || 0}`
-      : ['pistol', 'rifle', 'mpx'].includes(item.kind) ? (item.count ? `Loaded / reserve ${item.count}` : 'Not carried')
+      : ['pistol', 'rifle', 'mpx', 'sniper'].includes(item.kind) ? (item.count ? `Loaded / reserve ${item.count}` : 'Not carried')
       : item.kind === 'bow' ? `Arrows ${item.count ?? 0}` : `Carried ${item.count ?? 0}`;
     this.$invStats.innerHTML = `<div class="hud-inv-detail-icon">${icon(item.icon)}</div>
       <p class="hud-inv-kind">${esc(item.pocket != null ? `Pocket ${item.pocket + 1} · ${info.kind || 'Equipment'}` : info.kind || 'Material')}</p><h3>${esc(info.name || item.name)}</h3>
@@ -862,7 +862,7 @@ export class Hud {
       ${rows.length ? `<dl class="hud-inv-statrows">${rows.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('')}</dl>` : ''}
       <p>${esc(info.text || 'Equipment for your expedition.')}</p>${info.use ? `<p class="hud-inv-note">${esc(info.use)}</p>` : ''}
       <div class="hud-inv-actions"><button type="button" class="wd-btn" data-inventory-action="back">Back</button>
-      <button type="button" class="wd-btn" data-inventory-action="drop" ${item.drop ? '' : 'disabled'}>Drop ${material ? 'stack' : ['spear', 'pistol', 'rifle', 'mpx'].includes(item.kind) ? 'equipment' : 'one stack'}</button>
+      <button type="button" class="wd-btn" data-inventory-action="drop" ${item.drop ? '' : 'disabled'}>Drop ${material ? 'stack' : ['spear', 'pistol', 'rifle', 'mpx', 'sniper'].includes(item.kind) ? 'equipment' : 'one stack'}</button>
       ${material ? '<button type="button" class="wd-btn wd-primary" data-inventory-action="deposit">Deposit at hut</button>' : ''}</div>
       ${material ? '<p class="hud-inv-note">Move close to the hut drop-off to deposit. Actions affect the full stack.</p>' : ''}`;
   }

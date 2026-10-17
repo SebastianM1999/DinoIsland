@@ -464,10 +464,10 @@ test('the pistol thumb stays inside the slide: nothing of it shows on the near (
   }
 });
 
-test('the rifle support fingers wrap the far side of the handguard and never lie over its top', () => {
+for (const kind of ['rifle', 'sniper']) test(`the ${kind} support fingers wrap the far side of the handguard and never lie over its top`, () => {
   const vm = new Viewmodel({ viewCamera: new THREE.PerspectiveCamera(62, 16 / 9, 0.01, 10) }, 0);
-  vm.setTool('rifle'); run(vm, 200);
-  const gun = vm.guns.rifle, hg = gun.userData.nodes.handguard;
+  vm.setTool(kind); run(vm, 200);
+  const gun = vm.guns[kind], hg = gun.userData.nodes.handguard;
   const top = hg.axis[1] + hg.r;
   for (let k = 0; k < 4; k++) {
     walkFrames(vm, 15);

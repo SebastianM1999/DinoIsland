@@ -846,6 +846,7 @@ export class Game {
     this.unsubSettings?.();
     this.unsubGraphics?.();
     this.dinos?.dispose();
+    this.actions?.dispose();
     this.terrainView?.release?.();
     disposeIslandScenes(this.gfx?.scene, this.gfx?.viewScene);
     this.terrainView?.clear?.();
@@ -899,7 +900,10 @@ export class Game {
     const p = this.player;
     const mouse = input.takeMouse();
     const looking = input.locked && !this.hud.isPanelOpen();
-    if (looking) p.look(mouse.x, mouse.y);
+    if (looking) {
+      const sensitivity = this.actions.scope.sensitivity(settings.fov);
+      p.look(mouse.x * sensitivity, mouse.y * sensitivity);
+    }
     this.lastMouse = looking ? mouse : { x: 0, y: 0 };
     this.lastWheel = looking ? mouse.wheel : 0;
 
@@ -965,6 +969,8 @@ export class Game {
     for (const u of this.worldUpdaters) u.update?.(dt, this.time, cam);
     this.#underwaterView(dt);
     for (const sys of this.systems) sys.update?.(dt, renderTime);
+    this.gfx.camera.fov = this.actions.scope.fov(this.hipFov);
+    this.gfx.camera.updateProjectionMatrix();
     if (!this.me.alive) this.me.deathT = Math.max(0, this.me.deathT - dt);
     this.hudTimer -= dt;
     if (this.hudTimer <= 0) { this.hudTimer += 1 / 30; this.#updateHud(dt); }
@@ -1267,7 +1273,7 @@ export class Game {
     const p = this.player;
     const cam = this.gfx.camera;
     // Head bob scaled by speed; a small dip on landing; lying down when dead.
-    const bobAmt = p.onGround ? Math.min(1, p.moveSpeed / CONFIG.player.sprintSpeed) : 0;
+    const bobAmt = (p.onGround ? Math.min(1, p.moveSpeed / CONFIG.player.sprintSpeed) : 0) * (1 - this.actions.scope.blend * 0.9);
     const phase = p.distance * (p.sprinting ? 1.25 : 1.6);
     const bobY = Math.abs(Math.sin(phase)) * 0.07 * bobAmt;
     const bobX = Math.cos(phase) * 0.035 * bobAmt;
@@ -1292,7 +1298,8 @@ export class Game {
     if (sh > 0) cam.position.add({ x: Math.sin(this.time * 37) * sh, y: Math.sin(this.time * 53) * sh * 0.6, z: Math.cos(this.time * 41) * sh });
     cam.rotation.set(p.pitch + (sh ? Math.sin(this.time * 29) * sh * 0.08 : 0), p.yaw, roll, 'YXZ');
     const targetFov = settings.fov + (p.sprinting ? 6 : 0) + (p.dash.active ? 5 : 0);
-    cam.fov += (targetFov - cam.fov) * Math.min(1, dt * 6);
+    this.hipFov = (this.hipFov ?? settings.fov) + (targetFov - (this.hipFov ?? settings.fov)) * Math.min(1, dt * 6);
+    cam.fov = this.hipFov;
     cam.updateProjectionMatrix();
     this.gfx.followSun(p.pos.x, p.pos.y, p.pos.z);
     // light the viewmodel from the same sun direction, in camera space

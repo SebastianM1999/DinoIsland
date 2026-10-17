@@ -23,6 +23,8 @@
 - `props/resources.js` — map resource models (resin drops, an ironwood branch, a healing herb): `resourceGeometry`, `resourceMaterial` (own soft glow, `RESOURCE_GLOW`), `makeResourceMesh`; used by `world/resourceNodes.js` and `entities/items.js`.
 - `props/volcano.js` — `buildVolcanoFx(v)`: smoke plume, embers, glow haze and crater light.
 
+- SR-7 sniper shares the rifle-sized third-person hand contacts and independent firearm assembly, including dropped/held views.
+
 ## Entry points
 - `kit.js` is imported almost everywhere in `client/world/`, `client/entities/`, `client/player/` and `models/dino/`; `core/game.js` advances `WIND.uTime` each frame.
 - `PlayerModel`: `entities/remotePlayers.js`, `ui/wardrobe.js`, `player/weapon-preview.js`.

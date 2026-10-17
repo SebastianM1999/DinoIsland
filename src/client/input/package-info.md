@@ -4,6 +4,8 @@
 ## Files
 - `input.js` — `Input`: the key-binding table (`KEY_BINDINGS`), per-frame held/pressed/released sets, accumulated mouse movement and wheel, pointer-lock request/exit with retry, panel-toggle hook; `dispose()` permanently removes DOM listeners and cancels pointer-lock retries when a shell is abandoned.
 
+- Digit8 selects equipment pocket 8 (SR-7 sniper by default); secondary remains the hold-to-scope action.
+
 ## Entry points
 - `Input` is constructed once by `src/client/core/game.js` (`new Input(canvas)`) and handed on to the next island's `Game` through `dispose()` / `reuse`.
 - `Game` uses `isHeld`, `wasPressed`, `wasReleased`, `takeMouse`, `endFrame` (once per frame, after render), `enabled` (set in `start`/`stop`), `requestLock`, `exitLock`, and sets `onPanelToggle`.

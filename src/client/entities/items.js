@@ -98,7 +98,7 @@ export class Items {
   /** The model of one loot kind (the same for every drop of it), or null when the kind has none. */
   #model(kind) {
     const make = LOOT_GEO[kind];
-    if (kind === 'pistol' || kind === 'rifle' || kind === 'mpx') return makeFirearm(kind);
+    if (kind === 'pistol' || kind === 'rifle' || kind === 'mpx' || kind === 'sniper') return makeFirearm(kind);
     if (kind === 'torch') return makeTorch();   // burning on the ground: visible from afar in the dark
     if (Object.hasOwn(CONFIG.fruit.types, kind)) return makeFruitMesh(kind);
     if (Object.hasOwn(CONFIG.resources.regrow, kind)) return makeResourceMesh(kind);   // resin, ironwood, herb
@@ -114,7 +114,7 @@ export class Items {
     const group = new THREE.Group();
     group.visible = false;
     group.position.y = -1000;
-    for (const kind of [...Object.keys(LOOT_GEO), 'pistol', 'rifle', 'mpx', 'torch', ...Object.keys(CONFIG.fruit.types), ...Object.keys(CONFIG.resources.regrow)]) {
+    for (const kind of [...Object.keys(LOOT_GEO), 'pistol', 'rifle', 'mpx', 'sniper', 'torch', ...Object.keys(CONFIG.fruit.types), ...Object.keys(CONFIG.resources.regrow)]) {
       const m = this.#model(kind);
       if (m) group.add(m);
       yield;   // (the two firearms are a few hundred ms each: one step per model)

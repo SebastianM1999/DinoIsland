@@ -40,6 +40,8 @@
 - Inventory (Tab, never scrolls): pockets 1-7 (the seven tools, shown in two rows of four in the player's order from `inv.pockets`; locked/unowned tools keep their pocket, greyed with a lock; drag a pocket onto another, or select one and press 1-7, to swap: `onPocketSwap`) and the 2x3 backpack (non-zero material stacks only, `inv.slots` cells, empty cells shown as empty slots, load/speed line). The right side shows the explorer (`CharacterPreview`, imported lazily on first open, running only while visible, outfit from `setOutfit`, holding the tool in hand); selecting a cell swaps it for the item's `itemStats` and `ITEM_INFO` with Drop (and Deposit for materials) through `onInventoryDrop`; Back, clicking the cell again or Esc (`inventoryBack()`, asked first by core/game.js) return to the explorer. Dragging a stack/tool out of the panel or onto the drop zone drops it; server validates deposit proximity. The mission board (`shared/missions.js` contracts, relics) and XP gain popups.
 - Panel manager: `addPanel/togglePanel/isPanelOpen` host dialogs owned by other modules (wardrobe, boat, crafting, base, skills, grove), so only one panel is open at a time.
 
+- SR-7 icon/item information and inventory actions cover the fourth firearm; pocket 8 uses the same equipment rows. Scope overlay belongs to player/scope.js, with the HUD crosshair suppressed while its reticle is visible.
+
 ## Entry points
 - `core/game.js` creates `Hud`, `PerfStats`, `Wardrobe`, `BoatPanel`, `CraftingPanel`, `BasePanel`, `SkillPanel`, `GrovePrompt`, registers the dialogs with `hud.addPanel()`, and uses `nearCamp` from `skillModel.js`.
 - `main.js` uses `ICON_SPRITE`, `initSettings`, `renderPause`, `savedOutfit`, `initSteamLobby`, `initInternetTest`.

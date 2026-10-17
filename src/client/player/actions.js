@@ -16,6 +16,7 @@ import { stakePoint } from '../world/base.js';
 import { upgradeMods } from '../../shared/crafting.js';
 import { GunEffects } from '../entities/gunEffects.js';
 import { spearLaunch } from './spearThrow.js';
+import { SniperScope, ScopeOverlay } from './scope.js';
 import { Viewmodel } from './viewmodel.js';
 import { loadPocketOrder, savePocketOrder, swapPockets, pocketOf, nextPocket } from './pockets.js';
 import { mesh } from '../models/kit.js';
@@ -32,7 +33,7 @@ const P = CONFIG.player;
 /** Warn about dinosaurs (all but the Brachiosaurus) closer than this (m). */
 const DINO_ALERT_RANGE = 50;
 const LOOT_KEYS = Object.keys(CONFIG.loot);
-const SLOT_LABEL = { torch: 'Torch', spear: 'Spear', bow: 'Bow', trap: 'Trap', fruit: 'Fruit', pistol: 'P-19 pistol', rifle: 'M4A1 rifle', mpx: 'MPX-9 SMG' };
+const SLOT_LABEL = { torch: 'Torch', spear: 'Spear', bow: 'Bow', trap: 'Trap', fruit: 'Fruit', pistol: 'P-19 pistol', rifle: 'M4A1 rifle', mpx: 'MPX-9 SMG', sniper: 'SR-7 sniper' };
 const _fwd = new THREE.Vector3();
 const _right = new THREE.Vector3();
 const _up = new THREE.Vector3();
@@ -56,6 +57,8 @@ export class PlayerActions {
     this.reloadT = 0;
     this.reloadEmpty = false;   // the running reload started on an empty magazine
     this.cooldown = 0;
+    this.scope = new SniperScope();
+    this.scopeOverlay = globalThis.document?.body?.appendChild ? new ScopeOverlay() : null;
     this.drawT = 0;
     this.drawing = false;
     this.eatingT = 0;
@@ -70,7 +73,7 @@ export class PlayerActions {
     this.lastFullText = '';
     this.lastLoot = 0;
     this.promptAction = null;
-    this.pockets = loadPocketOrder();   // pocket -> EQUIP index (keys 1-7, hotbar, inventory)
+    this.pockets = loadPocketOrder();   // pocket -> EQUIP index (keys 1-8, hotbar, inventory)
 
     // placement ghosts
     const ghostMat = new THREE.MeshBasicMaterial({ color: '#ffe07a', transparent: true, opacity: 0.45, depthWrite: false });
@@ -117,6 +120,13 @@ export class PlayerActions {
       game.hud.prompt(null);
       game.hud.eatProgress(null);
     });
+  }
+
+  dispose() {
+    this.scopeOverlay?.dispose();
+    if (typeof this.reloadSound === 'function') this.reloadSound();
+    if (typeof this.boltSound === 'function') this.boltSound();
+    while (this.gunEffects.list.length) this.gunEffects.remove(0);
   }
 
   get inv() { return this.game.me.inv; }
@@ -187,6 +197,10 @@ export class PlayerActions {
 
     const tool = this.tool;
     const canAct = alive && !eating && !panel && input.locked;
+    const scopeReady = canAct && tool === 'sniper' && !!this.inv.guns?.sniper && this.inv.guns.sniper.owned !== false
+      && !this.inv.reloading && this.vm.tool === tool && this.vm.shown === tool && this.knifeProgress() == null && !input.isHeld('knife') && !this.vm.pendingTool && this.vm.switchT < 0.05 && !this.vm.timed;
+    this.scope.update(dt, scopeReady && input.isHeld('secondary') && !g.player.sprinting, scopeReady);
+    this.scopeOverlay?.update(this.scope.opacity);
 
     // --- primary / secondary per tool
     if (tool === 'spear') {
@@ -204,11 +218,11 @@ export class PlayerActions {
         this.drawT = 0;
         this.vm.release();
       }
-    } else if (tool === 'pistol' || tool === 'rifle' || tool === 'mpx') {
+    } else if (tool === 'pistol' || tool === 'rifle' || tool === 'mpx' || tool === 'sniper') {
       const ammo = this.inv.guns?.[tool];
-      const ready = canAct && ammo?.owned !== false && this.vm.tool === tool && !this.vm.pendingTool && this.vm.switchT < 0.05;
+      const ready = canAct && ammo?.owned !== false && this.vm.tool === tool && this.vm.shown === tool && this.knifeProgress() == null && !input.isHeld('knife') && !this.vm.pendingTool && this.vm.switchT < 0.05;
       if (ready && input.wasPressed('reloadHint')) this.reloadGun();
-      const trigger = tool !== 'pistol' ? input.isHeld('primary') : input.wasPressed('primary');
+      const trigger = ['rifle', 'mpx'].includes(tool) ? input.isHeld('primary') : input.wasPressed('primary');
       if (ready && trigger && this.cooldown <= 0 && !this.inv.reloading) {
         if (ammo?.loaded > 0) this.shootGun();
         else { g.audio?.play('empty'); this.cooldown = 0.25; }
@@ -218,19 +232,23 @@ export class PlayerActions {
     }
     if (tool !== 'bow' && this.drawing) { this.drawing = false; this.drawT = 0; }
     this.gunEffects.update(dt);
+    if (this.boltSound && (!alive || tool !== 'sniper' || this.inv.reloading || this.cooldown <= 0)) {
+      if (typeof this.boltSound === 'function') this.boltSound();
+      this.boltSound = null;
+    }
     if (this.reloadSound && (!alive || this.inv.reloading !== this.reloadSoundKind || tool !== this.reloadSoundKind)) {
       if (typeof this.reloadSound === 'function') this.reloadSound();
       this.reloadSound = null;
     }
-    if (alive && this.inv.reloading === 'mpx' && tool === 'mpx' && !this.reloadSound) {
+    if (alive && ['mpx', 'sniper'].includes(tool) && this.inv.reloading === tool && !this.reloadSound) {
       this.reloadSoundKind = tool;
-      this.reloadSound = g.audio?.play('mpxReload', { duration: W[tool].reloadTime * g.mods.reloadMul });
+      this.reloadSound = g.audio?.play(`${tool}Reload`, { duration: W[tool].reloadTime * g.mods.reloadMul, empty: this.reloadEmpty });
     }
     this.reloadT = this.inv.reloading ? this.reloadT + dt : 0;
-    // guns are always fired from the hip (no aim-down-sights)
+    // Only the sniper raises a scope; the other guns retain hip-fire handling.
     // a reload started on an empty magazine plays the long clip (latched by reloadGun); otherwise an empty magazine locks the slide back
     const reloading = this.inv.reloading === tool;
-    this.vm.setGunPose(false, reloading ? Math.min(0.98, this.reloadT / (W[tool].reloadTime * this.game.mods.reloadMul)) : 0,
+    this.vm.setGunPose(this.scope.blend, reloading ? Math.min(0.98, this.reloadT / (W[tool].reloadTime * this.game.mods.reloadMul)) : 0,
       reloading ? this.reloadEmpty : this.inv.guns?.[tool]?.loaded === 0);
     this.vm.setDraw(this.drawing ? this.drawT / W.bow.maxDrawTime : 0);
 
@@ -288,13 +306,14 @@ export class PlayerActions {
     this.vm.root.visible = alive && (knifeProgress != null || eating || this.inv.guns?.[tool]?.owned !== false);
     this.vm.update(dt, { speed: g.player.moveSpeed, sprint: g.player.sprinting, grounded: g.player.onGround, lookX: g.lastMouse?.x || 0, lookY: g.lastMouse?.y || 0 });
 
+    if (tool === 'sniper' && this.scope.opacity > 0.98) this.vm.root.visible = false;
     this.updateHud(dt, fruitType, w);
   }
 
   /** Can EQUIP index `i` be taken in hand? (island 1: no bow until the hunter's camp; the demo: no firearms) */
   canSelect(i) {
     if (EQUIP[i] === 'bow' && this.inv.bow === false) return false;
-    if ((EQUIP[i] === 'pistol' || EQUIP[i] === 'rifle' || EQUIP[i] === 'mpx') && !this.inv.guns?.[EQUIP[i]]) return false;
+    if ((EQUIP[i] === 'pistol' || EQUIP[i] === 'rifle' || EQUIP[i] === 'mpx' || EQUIP[i] === 'sniper') && !this.inv.guns?.[EQUIP[i]]) return false;
     return i >= 0 && i < EQUIP.length;
   }
 
@@ -360,7 +379,7 @@ export class PlayerActions {
     this.reloadT = 0;
     this.reloadEmpty = ammo.loaded === 0;
     this.game.net.act(ACT.RELOAD, { kind: tool });
-    if (tool !== 'mpx') this.game.audio?.play('reload');
+    if (!['mpx', 'sniper'].includes(tool)) this.game.audio?.play('reload');
   }
 
   shootGun() {
@@ -370,7 +389,7 @@ export class PlayerActions {
     // bullets spread in a small cone (wider while moving), so a gun is no laser
     const spec = W[tool];
     const move = Math.min(1, g.player.moveSpeed / P.sprintSpeed);
-    const cone = spec.spread + spec.spreadMove * move;
+    const cone = tool === 'sniper' ? this.scope.spread(move) : spec.spread + spec.spreadMove * move;
     const r = cone * Math.sqrt(Math.random()), a = Math.random() * Math.PI * 2;
     const dir = aim.dir.clone().addScaledVector(aim.right, Math.cos(a) * r).addScaledVector(aim.up, Math.sin(a) * r).normalize();
     const blocked = new THREE.Vector3(...shotEnd(g, origin.toArray(), dir.toArray(), W[tool].range));
@@ -398,6 +417,7 @@ export class PlayerActions {
     this.inv.guns[tool].loaded--;
     this.cooldown = W[tool].cooldown;
     g.flags |= PF.ATTACK; g.audio?.play(tool);
+    if (tool === 'sniper') this.boltSound = g.audio?.play('sniperBolt', { duration: W.sniper.cooldown });
   }
 
   eat() {
@@ -714,7 +734,7 @@ export class PlayerActions {
         if (this.inv.torch) continue;   // one torch per player, the spot keeps its own
       } else if (it.kind === 'spear') {
         if (this.inv.spear) continue;
-      } else if (it.kind === 'pistol' || it.kind === 'rifle' || it.kind === 'mpx') {
+      } else if (it.kind === 'pistol' || it.kind === 'rifle' || it.kind === 'mpx' || it.kind === 'sniper') {
         if (this.inv.guns?.[it.kind]?.owned !== false) continue;
       } else if (it.kind === 'trap') {
         if (this.inv.traps >= caps.traps) full = ['You carry as many traps as you can', 'trap'];
@@ -761,7 +781,7 @@ export class PlayerActions {
       { id: 'trap', label: SLOT_LABEL.trap, count: inv.traps, enabled: inv.traps > 0 },
       { id: 'fruit', label: SLOT_LABEL.fruit, count: inv.fruit.length, enabled: inv.fruit.length > 0, sub: fruitType || undefined },
       // (no firearms in the pack – the demo: their pockets stay empty)
-      ...['pistol', 'rifle', 'mpx'].map(id => inv.guns?.[id] ? { id, label: `${SLOT_LABEL[id]} - R reload`, count: inv.guns[id].loaded ?? 0, enabled: (inv.guns[id].loaded ?? 0) > 0 } : null),
+      ...['pistol', 'rifle', 'mpx', 'sniper'].map(id => inv.guns?.[id] ? { id, label: `${SLOT_LABEL[id]} - R reload`, count: inv.guns[id].loaded ?? 0, enabled: (inv.guns[id].loaded ?? 0) > 0 } : null),
     ];
     hud.setHotbar(this.pockets.map((eq) => rows[eq]), pocketOf(this.pockets, g.eq));
     const caps = this.caps;
@@ -786,7 +806,7 @@ export class PlayerActions {
     const tool = this.tool;
     hud.setCrosshair({
       draw: this.drawing ? this.drawT / W.bow.maxDrawTime : 0,
-      mode: !g.me.alive ? 'none' : tool === 'trap' ? 'place' : 'default',
+      mode: !g.me.alive || this.scope.opacity > 0.1 ? 'none' : tool === 'trap' ? 'place' : 'default',
     });
     hud.eatProgress(this.knifeProgress()
       ?? (this.eatingT > 0 ? 1 - this.eatingT / CONFIG.fruit.eatTime : null));
