@@ -181,7 +181,7 @@ test('sniper uses the supplied heavy shot through the positional effects bus and
     assert.equal(ctx.oscillators.length, oscillatorCount, 'recorded report replaces synth layers');
     const source = ctx.sources.at(-1), out = source.output;
     assert.equal(source.buffer, audio.samples.buffers.get(EFFECTS.sniper.files[0]));
-    assert.equal(out.gain.value, 2.2);
+    assert.equal(out.gain.value, EFFECTS.sniper.gain);
     assert.ok(out.gain.value > EFFECTS.rifle.gain && out.gain.value > EFFECTS.pistol.gain);
     assert.equal(out.samplePanner.positionX.value, 9);
     assert.equal(out.samplePanner.output, audio.sfx);
