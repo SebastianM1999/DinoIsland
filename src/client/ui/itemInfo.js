@@ -20,10 +20,10 @@ export const ITEM_INFO = {
     text: 'A pitch-soaked torch for dark places. It lives in your off hand, so your weapon stays ready – bow, trap and rifle need both hands and lower it while you use them. A lit torch tells everyone, including dinosaurs, where you are.',
     use: 'L to light or put out · picked up at the boat landing, keep it across respawns',
   },
-  pistol: { name: 'P-19 pistol', kind: 'Firearm', text: `Semi-automatic pistol. ${W.pistol.damage} base damage, ${W.pistol.magazine} rounds per magazine.`, use: 'click to fire - right click to aim - R to reload - refill at hut workbench' },
+  pistol: { name: 'P-19 pistol', kind: 'Firearm', text: `Semi-automatic pistol. ${W.pistol.damage} base damage, ${W.pistol.magazine} rounds per magazine.`, use: 'click to fire - R to reload - refill at hut workbench' },
   sniper: { name: 'SR-7 Longbow', kind: 'Firearm', text: `Bolt-action sniper. ${W.sniper.damage} base damage, ${W.sniper.magazine} rounds. Accurate quick scopes and powerful long-range shots.`, use: 'left click to fire - hold right click to scope - R to reload' },
   mpx: { name: 'MPX-9 submachine gun', kind: 'Firearm', text: `Close-range automatic SMG. ${W.mpx.damage} base damage, ${W.mpx.magazine} rounds per magazine. Wide bullet spread reduces accuracy at distance and while moving.`, use: 'hold left click to fire - R to reload - refill at hut workbench' },
-  rifle: { name: 'M4A1 assault rifle', kind: 'Firearm', text: `Automatic rifle. ${W.rifle.damage} base damage, ${W.rifle.magazine} rounds per magazine.`, use: 'hold left click to fire - right click to aim - R to reload - refill at hut workbench' },
+  rifle: { name: 'M4A1 assault rifle', kind: 'Firearm', text: `Automatic rifle. ${W.rifle.damage} base damage, ${W.rifle.magazine} rounds per magazine.`, use: 'hold left click to fire - R to reload - refill at hut workbench' },
   bow: {
     name: 'Bow', kind: 'Weapon',
     text: `A hunting bow. Arrows deal ${W.bow.damage} base damage at full draw (${W.bow.maxDrawTime} s) and fly further the longer you draw.`,
