@@ -33,19 +33,8 @@ const DEBUG_BASE = Math.max(0, Math.min(3, Number(DEBUG_QUERY.get('base')) || 0)
 const DEBUG_RAID = Math.max(0, Number(DEBUG_QUERY.get('raid')) || 0);   // ?raid=10: first raid in 10 s (with ?base)
 const DEBUG_DEV = DEBUG_QUERY.has('dev') || DEBUG_QUERY.has('pin');   // ?dev: the dev pin tool (F8, client/core/devPins.js)
 // Any testing aid starts an unsaved solo session straight away instead of the expedition picker.
-const DEBUG_START = ['island', 'variant', 'base', 'raid', 'dev', 'pin', 'demo'].some((k) => DEBUG_QUERY.has(k));
+const DEBUG_START = ['island', 'variant', 'base', 'raid', 'dev', 'pin'].some((k) => DEBUG_QUERY.has(k));
 const expeditions = pickExpeditions();
-// The demo (CONFIG.demo): ?demo=1, or a demo server says so in /status (pollLobby). Solo games then run
-// the demo too; the menu offers neither other islands nor the skill tree.
-let demo = DEBUG_QUERY.get('demo') === '1';
-function applyDemoMenu() {
-  if (!demo) return;
-  document.body.classList.add('is-demo');
-  $('play-island').value = '0';
-  for (const id of ['btn-home-skills', 'tour-next']) { const b = $(id); if (b) b.hidden = true; }
-  const kicker = document.querySelector('.menu-kicker');
-  if (kicker) kicker.textContent = `Co-op dinosaur survival · demo · 1–${CONFIG.demo.maxPlayers} explorers`;
-}
 document.title = BRAND.name;
 
 // SVG filter that gives HUD and menu panels their brush-stroke edges.
@@ -102,7 +91,7 @@ async function startMenuPostcards() {
     const postcards = await createMenuPostcards($('menu-preview'), island => {
       if (request !== postcardRequest) return;
       postcardIsland = island.index;
-      $('play-island').value = String(demo ? 0 : unlockedStartingIsland(island.index));
+      $('play-island').value = String(unlockedStartingIsland(island.index));
       $('tour-next').disabled = false;
     }, { signal: postcardAbort.signal });
     if (request !== postcardRequest || menu.hidden) { postcards.dispose(); return; }
@@ -124,7 +113,7 @@ function stopMenuPostcards() {
 }
 async function selectPreviewIsland(index) {
   postcardIsland = index;
-  $('play-island').value = String(demo ? 0 : unlockedStartingIsland(index));
+  $('play-island').value = String(unlockedStartingIsland(index));
   await menuPostcards?.setIsland(index);
 }
 $('tour-next').addEventListener('click', () => { void selectPreviewIsland((postcardIsland + 1) % (availableStartingIsland() + 1)); });
@@ -202,9 +191,12 @@ async function start(mode, options = {}) {
       // a saved expedition: solo (private) or hosted for friends (open), see net/expeditions.js
       const choice = options.choice.create ? { create: { ...options.choice.create, level: startingIsland } } : { id: options.choice.id };
       const steam = options.purpose === 'steam' ? { bridge: window.dinoSteam, visibility: $('lobby-visibility').value } : null;
-      net = await expeditions.start({ ...choice, lobby: options.purpose === 'solo' ? 'private' : 'open', url: options.url, steam }, { name, outfit });
+      // (lobby 'lan' also opens the desktop host's LAN port, server/lanListener.js; solo and Steam games open none)
+      const lobby = options.purpose === 'solo' ? 'private' : options.purpose === 'lan' ? 'lan' : 'open';
+      net = await expeditions.start({ ...choice, lobby, url: options.url, steam }, { name, outfit });
+      if (lobby === 'lan') void lanAddress.refresh();
     } else net = mode === 'steam' ? await Net.steam(window.dinoSteam, options, name, outfit) :
-      mode === 'online' || mode === 'internet' ? await Net.connect(websocketAddress(options.url ?? serverInput.value), name, outfit) : await Net.local(name, outfit, { level: demo ? 0 : DEBUG_QUERY.has('island') ? DEBUG_ISLAND : unlockedStartingIsland(Number($('play-island').value)), variant: DEBUG_VARIANT, dev: DEBUG_DEV, baseStage: DEBUG_BASE, raidIn: DEBUG_RAID, demo });
+      mode === 'online' || mode === 'internet' ? await Net.connect(websocketAddress(options.url ?? serverInput.value), name, outfit) : await Net.local(name, outfit, { level: DEBUG_QUERY.has('island') ? DEBUG_ISLAND : unlockedStartingIsland(Number($('play-island').value)), variant: DEBUG_VARIANT, dev: DEBUG_DEV, baseStage: DEBUG_BASE, raidIn: DEBUG_RAID });
   } catch (err) {
     if (mode === 'internet' || options.purpose === 'internet') internetTest.stop();
     busy = false;
@@ -469,7 +461,6 @@ leaveBtn.addEventListener('click', async () => {
 nameInput.value = readItem(storageKey('name')) || '';
 nameInput.addEventListener('input', () => { writeItem(storageKey('name'), nameInput.value.slice(0, 14)); });
 serverInput.value = served ? `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}` : `ws://localhost:${CONFIG.net.port}`;
-applyDemoMenu();
 const hashMsg = new URLSearchParams(location.hash.slice(1)).get('msg');
 if (hashMsg) {
   status.textContent = hashMsg;
@@ -482,7 +473,6 @@ async function pollLobby() {
     try {
       const res = await fetch('/status', { cache: 'no-store' });
       const s = await res.json();
-      if (s.demo && !demo) { demo = true; applyDemoMenu(); }
       const list = $('lobby-players');
       list.replaceChildren(...s.players.map((p) => {
         const li = document.createElement('li');
@@ -504,4 +494,4 @@ async function pollLobby() {
   setTimeout(pollLobby, 2000);
 }
 pollLobby();
-void initLanAddress();
+const lanAddress = initLanAddress();

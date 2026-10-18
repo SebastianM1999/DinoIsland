@@ -204,7 +204,7 @@ export class Game {
       else if (action === 'boat') open = this.hud.togglePanel('boat');
       else if (action === 'crafting') open = this.hud.togglePanel('crafting');
       else if (action === 'base') open = this.hud.togglePanel('base');
-      else if (action === 'skills') open = this.demo ? false : this.hud.togglePanel('skills');
+      else if (action === 'skills') open = this.hud.togglePanel('skills');
       else if (action === 'grove') open = this.hud.togglePanel('grove');
       else {
         this.hud.toggleInventory(false);
@@ -243,9 +243,6 @@ export class Game {
 
     const w = net.welcome;
     this.me = { id: w.id, slot: w.slot, name: '', hp: CONFIG.player.maxHealth, alive: true, inv: w.inv, deathT: 0 };
-    // the demo (CONFIG.demo, the host says so): no skill tree, no XP display (css: body.is-demo)
-    this.demo = !!w.world.demo;
-    if (this.demo && typeof document !== 'undefined') document.body?.classList.add('is-demo');
     this.mission = w.world.mission;
     this.store = w.world.store;
     this.flags = 0;           // PF flags for animation sync (attack pulse etc.)
@@ -654,7 +651,7 @@ export class Game {
       this.mission = m.mission;
       this.#showMission();
       this.boatPanel.setMission(m.mission);
-      this.hud.missionComplete(m.mission.complete, { completedIn: m.mission.completedIn, won: m.mission.won, demo: !!m.mission.demo, next: m.mission.level?.number + 1 });
+      this.hud.missionComplete(m.mission.complete, { completedIn: m.mission.completedIn, won: m.mission.won, next: m.mission.level?.number + 1 });
     });
     net.on(`ev:${EV.STORE}`, (m) => { this.store = m.store; this.#syncCrafting(); this.#syncBase(); });
     net.on(`ev:${EV.BASE}`, (m) => this.setBase(m.base));

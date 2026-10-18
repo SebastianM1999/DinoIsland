@@ -2,7 +2,7 @@
 // AI, collision and missions never take time from the render thread.
 // Protocol with Net.local (src/client/net/net.js):
 //   page -> worker  { type: 'start', name, outfit, opts?, save? } | { type: 'msg', msg } | { type: 'save' } | { type: 'stop' }
-//                   opts: { level, variant, dev, baseStage, raidIn } (testing aids), demo (?demo=1) – see Net.local
+//                   opts: { level, variant, dev, baseStage, raidIn } (testing aids) – see Net.local
 //                   save: a saved expedition's world section to restore, `{}` for a new saved expedition,
 //                         null/absent for an unsaved session (testing aids)
 //   worker -> page  a game message (welcome, snap, ev, ...) – copied like a real network
@@ -33,7 +33,7 @@ function capture(reason) {
   postMessage({ type: 'save-capture', world: exportWorld(world), reason });
 }
 
-function start(name, outfit, { level = 0, variant, dev = false, baseStage = 0, raidIn = 0, demo = false } = {}, save = null) {
+function start(name, outfit, { level = 0, variant, dev = false, baseStage = 0, raidIn = 0 } = {}, save = null) {
   const host = {
     send(to, msg, except) {
       if (playerId === null || (to === '*' ? except === playerId : to !== playerId)) return;
@@ -49,7 +49,7 @@ function start(name, outfit, { level = 0, variant, dev = false, baseStage = 0, r
   if (save?.level !== undefined) {
     world = restoreWorld(new ServerWorld(host, { ...worldOptions(save), alphas: true }), save);
   } else {
-    world = new ServerWorld(host, { level, variant: Number.isFinite(variant) && variant > 0 ? variant : undefined, demo: !!demo, alphas: true });   // (?variant=N: a fixed layout, e.g. to revisit a dev pin)
+    world = new ServerWorld(host, { level, variant: Number.isFinite(variant) && variant > 0 ? variant : undefined, alphas: true });   // (?variant=N: a fixed layout, e.g. to revisit a dev pin)
   }
   world.devTools = !!dev;   // (?dev: the dev pin tool may teleport, ACT.DEV_TP)
   // testing aid (?base=1..3): the base already stands on the first plot

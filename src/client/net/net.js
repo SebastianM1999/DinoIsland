@@ -3,7 +3,7 @@
 // in-page host (solo / offline). Gameplay code never knows the difference.
 
 import { CONFIG } from '../../shared/config.js';
-import { MSG, EV } from '../../shared/protocol.js';
+import { MSG, EV, PROTOCOL_VERSION } from '../../shared/protocol.js';
 import { connectSteam } from './steamTransport.js';
 import { sanitizeProfile } from '../../shared/skills.js';
 import { guestCredential, rememberGuestCredential } from '../core/persistence.js';
@@ -58,7 +58,7 @@ export class Net {
     return connectSteam(bridge,
       // (ownerToken: hosting a saved expedition of the host process, see client/net/expeditions.js)
       () => options.host ? bridge.host(options.visibility, options.ownerToken ?? null) : bridge.join(options.lobbyId),
-      { t: MSG.HELLO, name, outfit }, transport => new Net(transport, 'online'));
+      { t: MSG.HELLO, v: PROTOCOL_VERSION, name, outfit }, transport => new Net(transport, 'online'));
   }
 
   static connect(url, name, outfit) {
@@ -81,14 +81,14 @@ export class Net {
       const timer = setTimeout(() => {
         if (!settled) { settled = true; ws.close(); reject(new Error('The server did not answer')); }
       }, 6000);
-      ws.onopen = () => transport.send({ t: MSG.HELLO, name, outfit });
+      ws.onopen = () => transport.send({ t: MSG.HELLO, v: PROTOCOL_VERSION, name, outfit });
       ws.onmessage = (e) => {
         let msg;
         try { msg = JSON.parse(e.data); } catch { return; }
         if (!settled) {
           if (msg.t === MSG.REJECT) { settled = true; clearTimeout(timer); reject(new Error(msg.reason)); return; }
           // a saved expedition asks which guest credential we hold for it (none: null, it issues one)
-          if (msg.t === MSG.IDENT) { transport.send({ t: MSG.HELLO, name, outfit, credential: guestCredential(msg.world) }); return; }
+          if (msg.t === MSG.IDENT) { transport.send({ t: MSG.HELLO, v: PROTOCOL_VERSION, name, outfit, credential: guestCredential(msg.world) }); return; }
           if (msg.t === MSG.WELCOME) { settled = true; clearTimeout(timer); net.welcome = msg; resolve(net); }
         }
         transport.onMessage?.(msg);
@@ -107,7 +107,7 @@ export class Net {
    * Start an authoritative world for solo play. It runs in a Web Worker
    * (src/sim/worker.js), so its ticks never stall a rendered frame.
    * Resolves after the welcome. Testing aids in `opts`: level (0-based start island),
-   * baseStage (base already standing), raidIn (seconds until the first raid); demo (CONFIG.demo).
+   * baseStage (base already standing), raidIn (seconds until the first raid).
    * `save`: an expedition world section to restore (sim/worldSave.js), or `{}` for a new saved
    * expedition. With it the worker reports save captures to `net.onSaveCapture(world, reason)`
    * and answers `net.captureSave()`; without it the session is not saved (testing aids).

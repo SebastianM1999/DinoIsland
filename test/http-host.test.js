@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { WebSocket } from 'ws';
 import { CONFIG } from '../src/shared/config.js';
-import { EQUIP } from '../src/shared/protocol.js';
+import { EQUIP, PROTOCOL_VERSION } from '../src/shared/protocol.js';
 import { createGameServer } from '../server/index.js';
 
 test('HTTP host serves the game and routes firearm shots and reloads between two co-op players', async (t) => {
@@ -29,7 +29,7 @@ test('HTTP host serves the game and routes firearm shots and reloads between two
       });
       ws.once('error', reject);
     });
-    ws.send(JSON.stringify({ t: 'hello', name }));
+    ws.send(JSON.stringify({ t: 'hello', v: PROTOCOL_VERSION, name }));
     return { ws, welcome: await welcome };
   }
   const a = await join('A');
