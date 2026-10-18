@@ -16,6 +16,7 @@ import { serveStatic } from './staticFiles.js';
 import { handleDevPins } from './devPins.js';
 import { SaveCoordinator } from './saveCoordinator.js';
 import { handleSaveRoutes } from './saveRoutes.js';
+import { LanListener } from './lanListener.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -66,14 +67,16 @@ function resolvePath(urlPath) {
 }
 
 /**
- * demo: host the demo (CONFIG.demo) – `npm start -- --demo` or DINO_DEMO=1.
  * saves: keep the owner's expeditions (server/saveCoordinator.js; the desktop host process). The host
  * then starts without a world and hosts the expedition the owner opens; call `saves.useRoot(dir)`.
+ * Such a host is meant to listen on loopback: its `lan` listener (server/lanListener.js) opens the
+ * LAN door only while the open expedition's lobby is 'lan'. `lanPort`: its preferred port.
  */
-export function createGameServer({ demo = false, saves = false } = {}) {
+export function createGameServer({ saves = false, lanPort } = {}) {
   let host;
   let internet;
-  const coordinator = saves ? new SaveCoordinator() : null;
+  let lan = null;
+  const coordinator = saves ? new SaveCoordinator({ onLobby: (lobby) => (lobby === 'lan' ? lan.start() : lan.stop()) }) : null;
   const httpServer = http.createServer((req, res) => {
   if (handleSaveRoutes(req, res, coordinator, httpServer.address()?.port)) return;
   if (req.url === '/internet' || req.url === '/internet/start' || req.url === '/internet/stop') {
@@ -95,9 +98,11 @@ export function createGameServer({ demo = false, saves = false } = {}) {
   }
   if (handleDevPins(req, res, ROOT)) return;   // dev pin tool (F8 in a ?dev game), source checkouts on this machine only
   if (req.url === '/connection') {
-    const port = httpServer.address()?.port;
+    // (a saves host: the LAN door's port, where friends connect once a LAN game is hosted)
+    const door = lan?.status();
+    const port = door ? door.port : httpServer.address()?.port;
     res.writeHead(200, { 'Content-Type': MIME['.json'], 'Cache-Control': 'no-store' });
-    res.end(JSON.stringify({ addresses: lanAddresses(port), port }));
+    res.end(JSON.stringify({ addresses: lanAddresses(port), port, ...(door ? { lan: door } : {}) }));
     return;
   }
   if (req.url === '/status') {
@@ -118,22 +123,22 @@ export function createGameServer({ demo = false, saves = false } = {}) {
   });
   });
   host = startGameHost(httpServer, {
-    onConnection: (ws, req) => internet?.trackHost(ws, req), demo,
+    onConnection: (ws, req) => internet?.trackHost(ws, req),
     ...(coordinator ? { worldless: true, admit: (info) => coordinator.admit(info), onCheckpoint: (reason) => coordinator.checkpoint(reason) } : {}),
   });
   coordinator?.attach(host);
+  if (coordinator) lan = new LanListener(httpServer, lanPort !== undefined ? { port: lanPort } : {});
   internet = new InternetHost(httpServer);
-  httpServer.on('close', () => internet.stop());
-  return { httpServer, host, internet, saves: coordinator };
+  httpServer.on('close', () => { internet.stop(); void lan?.stop(); });
+  return { httpServer, host, internet, saves: coordinator, lan };
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const argPort = process.argv.indexOf('--port');
   const port = Number(process.env.PORT || (argPort > 0 ? process.argv[argPort + 1] : CONFIG.net.port));
-  const demo = process.argv.includes('--demo') || process.env.DINO_DEMO === '1';
-  const { httpServer, host, internet } = createGameServer({ demo });
+  const { httpServer, host, internet } = createGameServer();
   for (const signal of ['SIGINT', 'SIGTERM']) process.once(signal, () => { internet.stop(); host.stop(); httpServer.close(); });
   httpServer.listen(port, () => {
-    console.log(`${BRAND.name} ${demo ? 'demo ' : ''}server running at http://localhost:${port}`);
+    console.log(`${BRAND.name} server running at http://localhost:${port}`);
   });
 }

@@ -5,6 +5,7 @@ import { PassThrough } from 'node:stream';
 import { WebSocket } from 'ws';
 import { createGameServer } from '../server/index.js';
 import { InternetHost } from '../server/internetHost.js';
+import { PROTOCOL_VERSION } from '../src/shared/protocol.js';
 
 test('internet test forwards only admitted WebSockets and closes when its owner leaves', async t => {
   const { httpServer, host } = createGameServer();
@@ -43,7 +44,7 @@ test('internet test forwards only admitted WebSockets and closes when its owner 
   t.after(() => guest.terminate());
   const welcome = await new Promise((resolve, reject) => {
     guest.once('error', reject);
-    guest.once('open', () => guest.send(JSON.stringify({ t: 'hello', name: 'Remote friend' })));
+    guest.once('open', () => guest.send(JSON.stringify({ t: 'hello', v: PROTOCOL_VERSION, name: 'Remote friend' })));
     guest.on('message', raw => { const msg = JSON.parse(raw); if (msg.t === 'welcome') resolve(msg); });
   });
   assert.equal(host.world.players.get(welcome.id).name, 'Remote friend');

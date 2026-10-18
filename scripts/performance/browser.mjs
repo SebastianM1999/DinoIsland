@@ -7,6 +7,7 @@ import { goodSpot, standable } from '../../src/sim/unstuck.js';
 import { PF } from '../../src/shared/protocol.js';
 import { CONFIG } from '../../src/shared/config.js';
 import { levelDef } from '../../src/shared/levels.js';
+import { PROTOCOL_VERSION } from '../../src/shared/protocol.js';
 import { options, number, distribution, environment, report } from './common.mjs';
 
 const opts = options(['seconds', 'warmup-seconds', 'variant', 'max-frame-p95-ms', 'max-frame-p99-ms', 'max-stalls', 'headed', 'software', 'width', 'height', 'target-fps', 'channel', 'output']);
@@ -43,7 +44,7 @@ async function bot(url, name, world) {
   try {
     const welcome = await bounded(new Promise((resolve, reject) => {
       ws.once('error', reject);
-      ws.once('open', () => ws.send(JSON.stringify({ t: 'hello', name })));
+      ws.once('open', () => ws.send(JSON.stringify({ t: 'hello', v: PROTOCOL_VERSION, name })));
       ws.on('message', raw => {
         const message = JSON.parse(raw.toString());
         if (message.t === 'welcome') resolve(message);

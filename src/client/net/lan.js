@@ -22,32 +22,44 @@ export function websocketAddress(input) {
   return url.href;
 }
 
-export async function initLanAddress() {
+/**
+ * The host address panel. Returns `{ refresh }`: fetch the addresses again (the desktop opens its
+ * LAN port only when a LAN game is hosted, and may then use another port than the one shown).
+ */
+export function initLanAddress() {
   const $ = id => document.getElementById(id);
   const input = $('host-address');
   const copy = $('btn-copy-address');
   const network = $('host-network');
   const status = $('lan-status');
-  try {
-    const response = await fetch('/connection', { cache: 'no-store' });
-    if (!response.ok) throw new Error('Host address unavailable.');
-    const { addresses } = await response.json();
-    for (const entry of addresses) {
-      const option = document.createElement('option');
-      option.value = entry.address;
-      option.textContent = `${entry.name} (${new URL(entry.address).hostname})`;
-      network.append(option);
+  async function load() {
+    try {
+      const response = await fetch('/connection', { cache: 'no-store' });
+      if (!response.ok) throw new Error('Host address unavailable.');
+      const { addresses, lan } = await response.json();
+      network.replaceChildren();
+      for (const entry of addresses) {
+        const option = document.createElement('option');
+        option.value = entry.address;
+        option.textContent = `${entry.name} (${new URL(entry.address).hostname})`;
+        network.append(option);
+      }
+      // A remote browser should share the server it visited, not one of that
+      // server's private adapters. Desktop windows always load from loopback.
+      const loopback = ['localhost', '127.0.0.1', '[::1]'].includes(location.hostname);
+      // (a refresh keeps the network the player picked; only the port may have changed)
+      const picked = addresses.find((entry) => input.value && new URL(entry.address).hostname === new URL(input.value).hostname);
+      input.value = loopback ? ((picked ?? addresses[0])?.address ?? '') : `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}`;
+      network.value = input.value;
+      network.hidden = $('host-network-label').hidden = !loopback || addresses.length < 2;
+      copy.disabled = !input.value;
+      if (!input.value) status.textContent = 'No LAN connection found. Connect to Wi-Fi or Ethernet and reload.';
+      else if (lan?.error) status.textContent = lan.error;
+    } catch {
+      status.textContent = 'Host address unavailable. Enter an address below to join a game.';
     }
-    // A remote browser should share the server it visited, not one of that
-    // server's private adapters. Desktop windows always load from loopback.
-    const loopback = ['localhost', '127.0.0.1', '[::1]'].includes(location.hostname);
-    input.value = loopback ? (addresses[0]?.address ?? '') : `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}`;
-    network.hidden = $('host-network-label').hidden = !loopback || addresses.length < 2;
-    copy.disabled = !input.value;
-    if (!input.value) status.textContent = 'No LAN connection found. Connect to Wi-Fi or Ethernet and reload.';
-  } catch {
-    status.textContent = 'Host address unavailable. Enter an address below to join a game.';
   }
+  const ready = load();
   network.addEventListener('change', () => { input.value = network.value; status.textContent = ''; });
   copy.addEventListener('click', async () => {
     if (!input.value) return;
@@ -63,4 +75,5 @@ export async function initLanAddress() {
       status.textContent = 'Press Ctrl+C to copy the selected address.';
     }
   });
+  return { ready, refresh: () => load() };
 }

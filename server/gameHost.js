@@ -8,7 +8,7 @@
 
 import { WebSocketServer } from 'ws';
 import { CONFIG } from '../src/shared/config.js';
-import { MSG } from '../src/shared/protocol.js';
+import { MSG, PROTOCOL_VERSION, versionMismatch } from '../src/shared/protocol.js';
 import { ServerWorld } from '../src/sim/world.js';
 import { installCaveBakes } from './caveBake.js';
 
@@ -16,12 +16,11 @@ const NET = CONFIG.net;
 const MAX_MSG_BYTES = 8 * 1024;
 
 /**
- * demo: host the demo (CONFIG.demo: island 1 only, two explorers, no firearms or skills).
  * worldless: start with no world (joins are refused until `load`).
  * admit({ addr, url }) -> { ok:true, key? } | { ok:false, reason }: who may join, and as whom.
  * onCheckpoint(reason): the world reached a moment worth saving.
  */
-export function startGameHost(httpServer = null, { onConnection, demo = false, worldless = false, admit = null, onCheckpoint = null } = {}) {
+export function startGameHost(httpServer = null, { onConnection, worldless = false, admit = null, onCheckpoint = null } = {}) {
   installCaveBakes();   // (the Hollow Mountain's baked walk grid: assets/cave, see src/shared/caveBake.js)
   const wss = httpServer ? new WebSocketServer({ server: httpServer, maxPayload: MAX_MSG_BYTES }) : null;
   /** @type {Map<number, import('ws').WebSocket>} */
@@ -54,7 +53,7 @@ export function startGameHost(httpServer = null, { onConnection, demo = false, w
     checkpoint: (reason) => onCheckpoint?.(reason),
   };
 
-  let world = worldless ? null : new ServerWorld(io, { demo, alphas: true });
+  let world = worldless ? null : new ServerWorld(io, { alphas: true });
 
   function attachConnection(ws, addr = 'local', info = {}) {
     let playerId = null;
@@ -78,7 +77,9 @@ export function startGameHost(httpServer = null, { onConnection, demo = false, w
       if (!msg || typeof msg !== 'object' || Array.isArray(msg)) return;
       if (playerId === null) {
         if (msg.t !== MSG.HELLO) return;
-        const gate = !world ? { ok: false, reason: 'No expedition is open on this host.' } : admit ? admit({ addr, ...info, credential: msg.credential }) : { ok: true };
+        // (a different build: refuse it before it can touch the world or the expedition's roster)
+        const outdated = versionMismatch(msg.v);
+        const gate = outdated ? { ok: false, reason: outdated } : !world ? { ok: false, reason: 'No expedition is open on this host.' } : admit ? admit({ addr, ...info, credential: msg.credential }) : { ok: true };
         // a saved expedition asks a guest which credential it holds for it, then waits for the next hello
         if (gate.ident) { ws.send(JSON.stringify({ t: MSG.IDENT, world: gate.ident })); return; }
         // (progression belongs to the expedition: a client-sent profile is never used)
@@ -183,9 +184,9 @@ export function startGameHost(httpServer = null, { onConnection, demo = false, w
     },
     status() {
       return {
-        demo,
+        version: PROTOCOL_VERSION,
         open: !!world,
-        maxPlayers: demo ? CONFIG.demo.maxPlayers : NET.maxPlayers,
+        maxPlayers: NET.maxPlayers,
         players: world ? [...world.players.values()].map((p) => ({ name: p.name, slot: p.slot, alive: p.alive })) : [],
         mission: world ? world.mission.state().title : null,
       };

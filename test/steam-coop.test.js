@@ -4,6 +4,7 @@ import { SteamSession, STEAM_PROTOCOL } from '../desktop/steam-session.js';
 import { connectSteam } from '../src/client/net/steamTransport.js';
 import { Net } from '../src/client/net/net.js';
 import { SteamHub } from './helpers/fakeSteam.js';
+import { PROTOCOL_VERSION } from '../src/shared/protocol.js';
 
 function setup(t, count = 2, options = {}) {
   const hub = new SteamHub();
@@ -13,39 +14,12 @@ function setup(t, count = 2, options = {}) {
   return { hub, sessions, events, async pump() { sessions.forEach(session => session.tick()); await new Promise(resolve => setImmediate(resolve)); } };
 }
 
-test('Steam demo hosting keeps its two-player cap and authoritative weapon and profile restrictions', async t => {
-  const { sessions: [host, guest, extra], hub, events: [he, ge], pump } = setup(t, 3, { demo: true });
-  const h = await host.hostGame();
-  host.send(h.sessionId, { t: 'hello', name: 'Host', profile: { xp: 5000, skills: { thickSkin: 1 } } });
-  const g = await guest.joinGame(h.lobbyId);
-  guest.send(g.sessionId, { t: 'hello', name: 'Guest' });
-  await pump(); await pump(); await pump();
-  assert.equal(hub.lobbies.get(h.lobbyId).max, 2);
-  assert.equal(host.host.world.players.size, 2);
-  for (const events of [he, ge]) {
-    const welcome = events.find(e => e.message?.t === 'welcome').message;
-    assert.equal(welcome.world.demo, true);
-    assert.equal(welcome.world.level.index, 0);
-    assert.deepEqual(welcome.inv.guns, {});
-    assert.equal(welcome.inv.bow, false);
-    assert.equal(welcome.inv.arrows, 0);
-  }
-  assert.ok([...host.host.world.players.values()].every(p => p.prof.xp === 0 && !Object.keys(p.prof.skills).length));
-  await assert.rejects(extra.joinGame(h.lobbyId), /full/);
-  const full = new SteamSession(hub.createUser(4));
-  t.after(() => full.dispose());
-  guest.leave();
-  await assert.rejects(full.joinGame(h.lobbyId), /demo and full game/);
-  const ordinary = await full.hostGame();
-  await assert.rejects(extra.joinGame(ordinary.lobbyId), /demo and full game/);
-});
-
 test('Steam co-op routes two real players through the authoritative world and handles host loss', async t => {
   const { sessions: [host, guest], events: [he, ge], pump } = setup(t);
   const h = await host.hostGame();
-  host.send(h.sessionId, { t: 'hello', name: 'Host' });
+  host.send(h.sessionId, { t: 'hello', v: PROTOCOL_VERSION, name: 'Host' });
   const g = await guest.joinGame(h.lobbyId);
-  guest.send(g.sessionId, { t: 'hello', name: 'Guest' });
+  guest.send(g.sessionId, { t: 'hello', v: PROTOCOL_VERSION, name: 'Guest' });
   await pump(); await pump(); await pump();
   const hw = he.find(e => e.message?.t === 'welcome').message;
   const gw = ge.find(e => e.message?.t === 'welcome').message;
@@ -67,10 +41,10 @@ test('Steam co-op routes two real players through the authoritative world and ha
 test('Steam lobbies cap players at four and reject connections from nonmembers', async t => {
   const { sessions, pump } = setup(t, 5);
   const h = await sessions[0].hostGame('private');
-  sessions[0].send(h.sessionId, { t: 'hello', name: 'Host' });
+  sessions[0].send(h.sessionId, { t: 'hello', v: PROTOCOL_VERSION, name: 'Host' });
   for (const guest of sessions.slice(1, 4)) {
     const g = await guest.joinGame(h.lobbyId);
-    guest.send(g.sessionId, { t: 'hello', name: 'Guest' });
+    guest.send(g.sessionId, { t: 'hello', v: PROTOCOL_VERSION, name: 'Guest' });
     await pump(); await pump();
   }
   assert.equal(sessions[0].host.world.players.size, 4);
@@ -90,9 +64,9 @@ test('reject incompatible or abandoned lobbies, clean up failed joins, and ignor
   assert(!hub.lobbies.get(first.lobbyId).members.has(guest.steam.getStatus().steamId));
   host.leave();
   const second = await host.hostGame();
-  host.send(first.sessionId, { t: 'hello', name: 'Stale' });
+  host.send(first.sessionId, { t: 'hello', v: PROTOCOL_VERSION, name: 'Stale' });
   assert.equal(host.host.world.players.size, 0);
-  host.send(second.sessionId, { t: 'hello', name: 'Current' });
+  host.send(second.sessionId, { t: 'hello', v: PROTOCOL_VERSION, name: 'Current' });
   assert.equal(host.host.world.players.size, 1);
   hub.lobbies.get(second.lobbyId).owner = guest.steam.getStatus().steamId;
   await assert.rejects(guest.joinGame(second.lobbyId), /host has left/);

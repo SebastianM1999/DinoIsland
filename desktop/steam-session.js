@@ -5,8 +5,10 @@ import { randomUUID } from 'node:crypto';
 import { startGameHost } from '../server/gameHost.js';
 import { CONFIG } from '../src/shared/config.js';
 import { BRAND } from '../src/shared/brand.js';
+import { PROTOCOL_VERSION } from '../src/shared/protocol.js';
 
-export const STEAM_PROTOCOL = `${BRAND.slug}-1`;
+// (other versions' lobbies are filtered out of the list; an invite to one is refused when joining)
+export const STEAM_PROTOCOL = `${BRAND.slug}-${PROTOCOL_VERSION}`;
 const MAX_INPUT_BYTES = 8192;
 const MAX_WORLD_BYTES = 512 * 1024;
 const CONNECTION_TIMEOUT = 30000;
@@ -32,13 +34,12 @@ class Peer extends EventEmitter {
 }
 
 export class SteamSession {
-  constructor(steam, { emit = () => {}, createHost = startGameHost, now = Date.now, demo = false } = {}) {
+  constructor(steam, { emit = () => {}, createHost = startGameHost, now = Date.now } = {}) {
     this.steam = steam;
     this.emit = emit;
     this.createHost = createHost;
     this.now = now;
-    this.demo = !!demo;
-    this.maxPlayers = this.demo ? CONFIG.demo.maxPlayers : CONFIG.net.maxPlayers;
+    this.maxPlayers = CONFIG.net.maxPlayers;
     this.peers = new Map();
     this.sessionId = null;
     this.generation = 0;
@@ -75,7 +76,6 @@ export class SteamSession {
     const mm = this.steam.matchmaking;
     mm.addRequestLobbyListStringFilter('game', BRAND.slug, 0);
     mm.addRequestLobbyListStringFilter('protocol', STEAM_PROTOCOL, 0);
-    mm.addRequestLobbyListStringFilter('demo', this.demo ? '1' : '0', 0);
     mm.addRequestLobbyListStringFilter('ready', '1', 0);
     mm.addRequestLobbyListFilterSlotsAvailable(1);
     mm.addRequestLobbyListResultCountFilter(30);
@@ -119,10 +119,10 @@ export class SteamSession {
       this.checkOperation(generation, result.lobbyId);
       this.lobbyId = result.lobbyId;
       this.hostId = this.steam.getStatus().steamId;
-      const metadata = { game: BRAND.slug, protocol: STEAM_PROTOCOL, demo: this.demo ? '1' : '0', host: this.hostId, ready: '1' };
+      const metadata = { game: BRAND.slug, protocol: STEAM_PROTOCOL, host: this.hostId, ready: '1' };
       this.listenSocket = this.steam.networkingSockets.createListenSocketP2P(0);
       if (!this.listenSocket) throw new Error('Steam could not open a host connection.');
-      this.host = this.createHost(null, { demo: this.demo });
+      this.host = this.createHost(null);
       for (const [key, value] of Object.entries(metadata)) {
         if (!this.steam.matchmaking.setLobbyData(this.lobbyId, key, value)) throw new Error('Steam could not publish the lobby.');
       }
@@ -152,7 +152,6 @@ export class SteamSession {
       if (mm.getLobbyData(lobbyId, 'game') !== BRAND.slug || mm.getLobbyData(lobbyId, 'protocol') !== STEAM_PROTOCOL) {
         throw new Error('This lobby uses a different game version. Update both games and try again.');
       }
-      if ((mm.getLobbyData(lobbyId, 'demo') === '1') !== this.demo) throw new Error('The demo and full game use separate expeditions.');
       this.hostId = mm.getLobbyData(lobbyId, 'host');
       if (!validSteamId(this.hostId) || mm.getLobbyOwner(lobbyId) !== this.hostId || mm.getLobbyData(lobbyId, 'ready') !== '1') {
         throw new Error('The host has left this game.');

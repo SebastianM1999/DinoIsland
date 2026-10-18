@@ -1,58 +1,44 @@
 const { ipcMain } = require('electron');
 const path = require('node:path');
-const fs = require('node:fs');
+const { startSteam } = require('./steamStart.cjs');
+const { fromGamePage } = require('./trust.cjs');
 
-/** createHost: the game host Steam lobbies feed (desktop/hostBridge.js: the saved expedition in the host process). */
-async function installSteam(app, win, localUrl, { demo = false, createHost } = {}) {
+/** Start the Steam API before any window exists (desktop/steamStart.cjs). */
+function startSteamForApp(app, log = console) {
+  return startSteam({
+    sdkPath: process.env.DINO_STEAM_SDK_PATH || path.join(app.isPackaged ? process.resourcesPath : app.getAppPath(), 'steamworks_sdk'),
+    packaged: app.isPackaged,
+    config: require('./steam-config.json'),
+    log,
+  });
+}
+
+/**
+ * Wire the started Steam API (`started`, from startSteamForApp) to the game window: Steam lobbies,
+ * friends and invites for the trusted game page. createHost: the game host Steam lobbies feed
+ * (desktop/hostBridge.js: the saved expedition in the host process).
+ */
+async function installSteam(win, localUrl, started, { createHost } = {}) {
   let session = null;
-  let sdk = null;
   let pump = null;
-  let configured = false;   // a real App ID is set: this is the Steam build
-  let steamId = null;       // the signed-in account (its expeditions live under this identity)
-  let failure = 'Steam co-op needs the Steam desktop build. Use an internet test or play solo.';
+  const { sdk, failure } = started;
   const emit = event => { if (!win.isDestroyed()) win.webContents.send('dino:steam:event', event); };
-  try {
-    const config = require('./steam-config.json');
-    const appId = Number(process.env.DINO_STEAM_APP_ID || process.env.SteamAppId || config.appId);
-    if (!Number.isSafeInteger(appId) || appId < 1 || appId > 0xffffffff) {
-      failure = 'Steam co-op is not configured yet. Use an internet test or play solo.';
-    } else {
-      configured = true;
-      const sdkPath = process.env.DINO_STEAM_SDK_PATH || path.join(app.isPackaged ? process.resourcesPath : app.getAppPath(), 'steamworks_sdk');
-      const library = path.join(sdkPath, 'redistributable_bin', 'win64', 'steam_api64.dll');
-      if (process.platform === 'win32' && !fs.existsSync(library)) {
-        failure = 'Steam co-op is missing its runtime files. Install a complete Steam build.';
-      } else {
-        const { SteamworksSDK } = require('steamworks-ffi-node');
-        sdk = SteamworksSDK.getInstance();
-        sdk.setSdkPath(sdkPath);
-        if (!sdk.init({ appId })) throw new Error('Start Steam, sign in, and restart the game to use Steam co-op.');
-        const { SteamSession, validSteamId } = await import('./steam-session.js');
-        session = new SteamSession(sdk, { emit, demo, ...(createHost ? { createHost } : {}) });
-        const id = String(sdk.getStatus().steamId ?? '');
-        steamId = validSteamId(id) ? id : null;
-        const lobbyId = sdk.matchmaking.getConnectLobbyIdFromCommandLine();
-        if (lobbyId) session.requestJoin(lobbyId);
-        pump = setInterval(() => {
-          try { session.tick(); } catch (error) {
-            console.error('[Steam] Networking failed:', error);
-            session.endFromHost('Steam connection failed. Restart Steam and try again.');
-          }
-        }, 4);   // every pump receives and flushes; this bounds the added latency per hop
+  if (sdk) {
+    const { SteamSession } = await import('./steam-session.js');
+    session = new SteamSession(sdk, { emit, ...(createHost ? { createHost } : {}) });
+    // (started from a Steam invite: the lobby is on our command line)
+    const lobbyId = sdk.matchmaking.getConnectLobbyIdFromCommandLine();
+    if (lobbyId) session.requestJoin(lobbyId);
+    pump = setInterval(() => {
+      try { session.tick(); } catch (error) {
+        console.error('[Steam] Networking failed:', error);
+        session.endFromHost('Steam connection failed. Restart Steam and try again.');
       }
-    }
-  } catch (error) {
-    console.error('[Steam] Initialization failed:', error);
-    failure = 'Start Steam, sign in, and restart the game to use Steam co-op.';
-    try { sdk?.shutdown(); } catch { /* initialization may be incomplete */ }
-    sdk = null;
+    }, 4);   // every pump receives and flushes; this bounds the added latency per hop
   }
 
   // Only the trusted game document can call these narrow APIs.
-  function trusted(event) {
-    return event.sender === win.webContents && event.senderFrame === win.webContents.mainFrame &&
-      new URL(event.senderFrame.url).origin === new URL(localUrl).origin;
-  }
+  const trusted = (event) => fromGamePage(event, win, localUrl);
   const handlers = {
     status: () => session ? session.status() : { available: false, reason: failure },
     friends: () => session.friends(),
@@ -96,7 +82,7 @@ async function installSteam(app, win, localUrl, { demo = false, createHost } = {
     for (const name of Object.keys(handlers)) ipcMain.removeHandler(`dino:steam:${name}`);
     ipcMain.removeListener('dino:steam:send', onSend);
   };
-  return { stop, steamId, configured, handleArgs };
+  return { stop, handleArgs };
 }
 
-module.exports = { installSteam };
+module.exports = { startSteamForApp, installSteam };

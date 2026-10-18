@@ -1,6 +1,6 @@
 // The desktop game's host, in its own Electron utility process (desktop/main.cjs forks it):
-// serves the game page, hosts the owner's saved expeditions (solo with a private lobby, LAN /
-// internet with an open one) and writes their saves. Running here, world ticks and save
+// serves the game page, hosts the owner's saved expeditions (solo with a private lobby; Steam,
+// internet and LAN friends with an open one) and writes their saves. Running here, world ticks and save
 // captures never block the window, IPC or the Steam pump of the main process.
 //
 // main -> host  { type: 'identity', root } | { type: 'identity', root: null, reason }
@@ -13,14 +13,14 @@ import { createGameServer } from '../server/index.js';
 import { createBridgeEndpoint } from './hostBridge.js';
 
 const parent = process.parentPort;
-const demo = process.argv.includes('--demo');
 
 try {
-  const { httpServer, host, internet, saves } = createGameServer({ demo, saves: true });
+  const { httpServer, host, internet, saves } = createGameServer({ saves: true, lanPort: Number(process.env.DINO_LAN_PORT) || undefined });
   const port = await new Promise((resolve, reject) => {
     httpServer.once('error', reject);
-    // (all interfaces: LAN co-op; the save and internet controls accept only this machine)
-    httpServer.listen(Number(process.env.DINO_DESKTOP_PORT) || 0, '0.0.0.0', () => {
+    // (this machine only: the game window, Steam through the bridge, the internet tunnel; a hosted LAN
+    // game opens its own LAN port, server/lanListener.js, so solo and Steam games open none)
+    httpServer.listen(Number(process.env.DINO_DESKTOP_PORT) || 0, '127.0.0.1', () => {
       httpServer.off('error', reject);
       resolve(httpServer.address().port);
     });

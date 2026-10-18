@@ -1176,15 +1176,7 @@ export class Hud {
     const sig = JSON.stringify(info || {});
     if (this._c.win === sig && !this.$win.hidden) return;
     this._c.win = sig;
-    this.$win.innerHTML = info.won && info.demo
-      ? `<div class="hud-win-card brush">
-      <span class="hud-win-ic">${icon('trophy')}</span>
-      <h2>That was the demo!</h2>
-      <p>The boat is repaired and the whole team is aboard. Thanks for playing ${esc(BRAND.name)}!</p>
-      ${info.completedIn != null ? `<p class="hud-win-time">${icon('clock')} ${fmtTime(info.completedIn)}</p>` : ''}
-      <p>The island starts over in a moment…</p>
-    </div>`
-      : info.won
+    this.$win.innerHTML = info.won
       ? `<div class="hud-win-card brush">
       <span class="hud-win-ic">${icon('trophy')}</span>
       <h2>You escaped ${esc(BRAND.name)}!</h2>
