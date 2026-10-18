@@ -497,7 +497,7 @@ export class ServerWorld {
     this.toast(`${p.name} is down! Revive them before they bleed out`, 'skull');
   }
 
-  /** True death: the carried loot is lost and the player respawns after the delay. */
+  /** True death: the carried loot falls where the player died and they respawn after the delay. */
   defeatPlayer(p, src, respawnIn = P.respawnDelay) {
     p.butcher = null;
     p.alive = false;
@@ -507,13 +507,32 @@ export class ServerWorld {
     p.eating = null;
     p.hot = null;
     p.buffs = {};
-    // Carried loot and fruit are lost.
-    const lostMeat = p.inv.loot.meat;
-    for (const k of LOOT_KEYS) p.inv.loot[k] = 0;
-    p.inv.fruit = [];
+    // Carried loot and fruit fall where the player died, to be picked up again.
+    const dropped = this.dropCarried(p);
     this.sendInv(p);
     this.event(EV.DEATH, { id: p.id, by: src });
-    this.toast(`${p.name} was defeated${lostMeat ? ' – the carried loot is lost' : ''}!`, 'skull');
+    this.toast(`${p.name} was defeated${dropped ? ' – the carried loot lies where they fell' : ''}!`, 'skull');
+    if (dropped) this.mission.onLootChanged();
+  }
+
+  /** Empties p's loot and fruit onto the ground around them, one stack per kind; returns how many stacks fell. */
+  dropCarried(p) {
+    const stacks = [];
+    for (const k of LOOT_KEYS) if (p.inv.loot[k] > 0) stacks.push([k, p.inv.loot[k]]);
+    const fruit = new Map();
+    for (const f of p.inv.fruit) fruit.set(f, (fruit.get(f) || 0) + 1);
+    stacks.push(...fruit);
+    for (const k of LOOT_KEYS) p.inv.loot[k] = 0;
+    p.inv.fruit = [];
+    stacks.forEach(([kind, n], i) => {
+      const a = (i / stacks.length) * Math.PI * 2 + p.yaw, r = stacks.length > 1 ? 0.9 : 0;
+      const x = p.x + Math.cos(a) * r, z = p.z + Math.sin(a) * r;
+      // the ground under the body (a cave floor, not the surface above it)
+      // (no droppedBy: walking back over the spot auto-loots it like any other loot)
+      const item = this.spawnItem(kind, x, z, n, this.layout.groundAt(x, z, p.y + P.stepHeight), null, false);
+      this.event(EV.ITEM_ADD, { item });
+    });
+    return stacks.length;
   }
 
   // ------------------------------------------------------------------ revive
