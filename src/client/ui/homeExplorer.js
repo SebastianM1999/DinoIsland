@@ -1,15 +1,11 @@
-// Home-menu outfit customization and a read-only view of the saved explorer.
-import { loadProfile } from '../core/profile.js';
+// Home-menu outfit customization. Explorer level, XP and skills belong to each expedition
+// (saved with it), so this panel only explains where they are and opens the skill tree.
 import { disposeIslandScenes } from '../core/resources.js';
-import { progress, SKILLS } from '../../shared/skills.js';
-
-const esc = value => String(value).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 /** Reuses the camp wardrobe; skill purchases remain in the authoritative game. */
 export function initHomeExplorer() {
   const trigger = document.getElementById('btn-explorer');
-  const savedProgress = progress(loadProfile());
-  document.getElementById('home-progress').textContent = `Level ${savedProgress.level} · ${savedProgress.free} skill ${savedProgress.free === 1 ? 'point' : 'points'} available`;
+  document.getElementById('home-progress').textContent = 'Level and skills are kept per expedition';
   const root = document.createElement('div');
   root.id = 'home-explorer-root';
   root.className = 'home-dialog screen';
@@ -42,19 +38,9 @@ export function initHomeExplorer() {
   }
 
   function renderProfile() {
-    const profile = loadProfile();
-    const p = progress(profile);
-    const learned = Object.entries(profile.skills).filter(([, rank]) => rank > 0);
     summary.innerHTML = `
-      <div class="home-explorer-stats">
-        <span><strong>Level ${p.level}</strong>Explorer rank</span>
-        <span><strong>${p.xp.toLocaleString()} XP</strong>Experience earned</span>
-        <span><strong>${p.free}</strong>Unspent skill points</span>
-      </div>
-      <progress max="${p.need}" value="${p.into}" aria-label="Experience toward next level"></progress>
-      <p class="home-explorer-progress">${p.capped ? 'Maximum explorer level reached.' : `${p.into} / ${p.need} XP to level ${p.level + 1}.`} Read skills and rebuild your allocation before heading out.</p>
-      <button type="button" class="menu-link" data-explorer-skills>Open skill tree</button>
-      ${learned.length ? `<details class="home-explorer-skills"><summary>Learned skills (${learned.length})</summary><ul>${learned.map(([id, rank]) => `<li><strong>${esc(SKILLS[id].name)} · ${rank}/${SKILLS[id].ranks.length}</strong><span>${esc(SKILLS[id].ranks[rank - 1])}</span></li>`).join('')}</ul></details>` : '<p class="home-explorer-progress">Your first expedition begins your skill journey.</p>'}`;
+      <p class="home-explorer-progress">Your outfit and name come with you everywhere. Your explorer level, XP, skills and backpack belong to each expedition: continue one from Play solo to grow that explorer.</p>
+      <button type="button" class="menu-link" data-explorer-skills>Read the skill tree</button>`;
   }
 
   function close() {

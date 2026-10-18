@@ -1,5 +1,10 @@
 // WebSocket host for the authoritative ServerWorld: connection handling,
 // join/lobby, message routing, fixed-rate ticking, snapshots and timeouts.
+//
+// The hosted world can be swapped (`load`) or closed (`unload`): a host that serves saved
+// expeditions (server/saveCoordinator.js) starts without one (`worldless`) and opens the
+// expedition the owner picks. `admit` decides at hello time who may join and under which
+// persistent roster key (sim/worldSave.js); without it everyone joins without a key.
 
 import { WebSocketServer } from 'ws';
 import { CONFIG } from '../src/shared/config.js';
@@ -10,13 +15,20 @@ import { installCaveBakes } from './caveBake.js';
 const NET = CONFIG.net;
 const MAX_MSG_BYTES = 8 * 1024;
 
-/** demo: host the demo (CONFIG.demo: island 1 only, two explorers, no firearms or skills). */
-export function startGameHost(httpServer = null, { onConnection, demo = false } = {}) {
+/**
+ * demo: host the demo (CONFIG.demo: island 1 only, two explorers, no firearms or skills).
+ * worldless: start with no world (joins are refused until `load`).
+ * admit({ addr, url }) -> { ok:true, key? } | { ok:false, reason }: who may join, and as whom.
+ * onCheckpoint(reason): the world reached a moment worth saving.
+ */
+export function startGameHost(httpServer = null, { onConnection, demo = false, worldless = false, admit = null, onCheckpoint = null } = {}) {
   installCaveBakes();   // (the Hollow Mountain's baked walk grid: assets/cave, see src/shared/caveBake.js)
   const wss = httpServer ? new WebSocketServer({ server: httpServer, maxPayload: MAX_MSG_BYTES }) : null;
   /** @type {Map<number, import('ws').WebSocket>} */
   const sockets = new Map();
   const reliableSeq = new Map();
+  /** every attached connection, joined or not (closed when the world changes): ws -> forget() */
+  const connections = new Map();
 
   function sendTo(id, ws, msg) {
     if (!ws || ws.readyState !== ws.OPEN) return;
@@ -28,7 +40,8 @@ export function startGameHost(httpServer = null, { onConnection, demo = false } 
     ws.send(JSON.stringify({ ...msg, r }));
   }
 
-  const world = new ServerWorld({
+  /** What a world talks to: the sockets of this host. */
+  const io = {
     send(to, msg, except) {
       if (to === '*') {
         for (const [id, ws] of sockets) if (id !== except) sendTo(id, ws, msg);
@@ -38,11 +51,22 @@ export function startGameHost(httpServer = null, { onConnection, demo = false } 
       }
     },
     log: (...a) => console.log('[world]', ...a),
-  }, { demo, alphas: true });
+    checkpoint: (reason) => onCheckpoint?.(reason),
+  };
 
-  function attachConnection(ws, addr = 'local') {
+  let world = worldless ? null : new ServerWorld(io, { demo, alphas: true });
+
+  function attachConnection(ws, addr = 'local', info = {}) {
     let playerId = null;
     let joined = false;
+    let joinedWorld = null;
+    // (the world changed under this connection: it no longer owns a player id of the new world)
+    const forget = () => {
+      if (joined && sockets.get(playerId) === ws) { sockets.delete(playerId); reliableSeq.delete(playerId); }
+      joined = false;
+      joinedWorld = null;
+    };
+    connections.set(ws, forget);
     ws.on('message', (raw) => {
       if (Buffer.byteLength(raw) > MAX_MSG_BYTES) { ws.close(4002, 'Message too large'); return; }
       let msg;
@@ -54,11 +78,14 @@ export function startGameHost(httpServer = null, { onConnection, demo = false } 
       if (!msg || typeof msg !== 'object' || Array.isArray(msg)) return;
       if (playerId === null) {
         if (msg.t !== MSG.HELLO) return;
-        const res = world.join(msg.name, (id) => {
+        const gate = !world ? { ok: false, reason: 'No expedition is open on this host.' } : admit ? admit({ addr, ...info }) : { ok: true };
+        // (progression belongs to the expedition: a client-sent profile is never used)
+        const res = gate.ok ? world.join(msg.name, (id) => {
           playerId = id;
           joined = true;
+          joinedWorld = world;
           sockets.set(id, ws);
-        }, msg.outfit, msg.profile);
+        }, msg.outfit, null, gate.key ?? null) : gate;
         if (!res.ok) {
           ws.send(JSON.stringify({ t: MSG.REJECT, reason: res.reason }));
           ws.close(4000, 'full');
@@ -67,23 +94,33 @@ export function startGameHost(httpServer = null, { onConnection, demo = false } 
         console.log(`[net] player #${playerId} connected from ${addr}`);
         return;
       }
-      world.receive(playerId, msg);
+      if (joined && joinedWorld === world) world.receive(playerId, msg);
     });
     ws.on('close', () => {
+      connections.delete(ws);
       if (playerId !== null && joined) {
         joined = false;
         sockets.delete(playerId);
         reliableSeq.delete(playerId);
-        world.leave(playerId);
+        if (joinedWorld === world) world?.leave(playerId);
         console.log(`[net] player #${playerId} disconnected`);
       }
     });
     ws.on('error', () => {});
   }
   wss?.on('connection', (ws, req) => {
-    attachConnection(ws, req.socket.remoteAddress);
+    attachConnection(ws, req.socket.remoteAddress, { url: req.url });
     onConnection?.(ws, req);
   });
+
+  /** Close every connection (they see `reason`); their players leave the current world first. */
+  function dropAll(reason) {
+    for (const [ws, forget] of [...connections]) {
+      forget();
+      connections.delete(ws);
+      try { ws.close(4001, reason); } catch { /* already gone */ }
+    }
+  }
 
   // Fixed-rate simulation + snapshot broadcast.
   const tickMs = 1000 / NET.tickRate;
@@ -93,6 +130,7 @@ export function startGameHost(httpServer = null, { onConnection, demo = false } 
     const now = performance.now();
     acc += Math.min(250, now - last);
     last = now;
+    if (!world) { acc = 0; return; }
     let snapshotDue = false;
     const tickStart = performance.now();
     while (acc >= tickMs) {
@@ -116,8 +154,24 @@ export function startGameHost(httpServer = null, { onConnection, demo = false } 
   }, tickMs / 2);
 
   return {
-    world,
+    get world() { return world; },
     attachConnection,
+    /** Host another world: `build(io)` returns a ServerWorld wired to this host. Everyone connected is dropped first. */
+    load(build, reason = 'The host opened another expedition.') {
+      dropAll(reason);
+      world = build(io);
+      return world;
+    },
+    /** Stop hosting a world; everyone connected is dropped. */
+    unload(reason = 'The host closed the expedition.') {
+      dropAll(reason);
+      world = null;
+    },
+    /** The connected player that joined with roster key `key`, if any. */
+    playerByKey(key) {
+      for (const p of world?.players.values() ?? []) if (p.key === key) return p;
+      return null;
+    },
     stop() {
       clearInterval(interval);
       for (const ws of sockets.values()) ws.terminate();
@@ -126,9 +180,10 @@ export function startGameHost(httpServer = null, { onConnection, demo = false } 
     status() {
       return {
         demo,
+        open: !!world,
         maxPlayers: demo ? CONFIG.demo.maxPlayers : NET.maxPlayers,
-        players: [...world.players.values()].map((p) => ({ name: p.name, slot: p.slot, alive: p.alive })),
-        mission: world.mission.state().title,
+        players: world ? [...world.players.values()].map((p) => ({ name: p.name, slot: p.slot, alive: p.alive })) : [],
+        mission: world ? world.mission.state().title : null,
       };
     },
   };

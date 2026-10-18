@@ -75,8 +75,13 @@ Grouped by the module area they mainly cover. Many simulation tests also check t
 - `skills.test.js` — skill tree data, XP/level math, buying, `sanitizeProfile`, `skillMods` (pure shared/skills.js).
 - `skills-server.test.js` — server-side profile, XP awards, skill effects, downed and revive.
 - `skills-movement.test.js` — skill effects on local movement: stamina, jumps, dash (PlayerController).
-- `skills-ui.test.js` — profile persistence, profile in `hello`/`MSG.PROF`, skill panel view model (`src/client/core/profile.js`, `src/client/ui/skillModel.js`).
-- `island-progress.test.js` — starting-island unlock persistence, monotonic completion, catalog bounds, corrupt/blocked storage, and locked-start restriction.
+- `skills-ui.test.js` — no profile in `hello`, solo worker start with a save and its captures, `MSG.PROF` receipt, `EV.SAVED` save status, skill panel view model (`src/client/net/net.js`, `src/client/ui/skillModel.js`).
+- `island-progress.test.js` — which island a new expedition may start on (playtest access on/off, catalog bounds).
+- `world-save.test.js` — `sim/worldSave.js` + `shared/saveSchema.js`: export, JSON, check and restore of island, clock, ids, team progress, items, roster by key (never by name, exactly once), normalized reloads/eating/downed/dead, bosses and carcasses, raids, base colliders, creative marker, checkpoints, inventory limits, refused damaged/newer/mismatched saves, save size and capture time.
+- `save-store.test.js` — `server/saveStore.js`: generations and pruning, torn newest generation recovered from the previous one, damaged and newer saves listed, independent delete, id-only paths, crashed temp files, failed writes, the folder lock, size limit.
+- `save-host.test.js` — a host with saves (`createGameServer({ saves: true })`, coordinator, `/saves` routes, real WebSockets): nothing open until chosen, solo private lobby with owner token, save/quit/resume with the same character, open lobby for guests, new expeditions never replacing one, rename/delete, origin/loopback rules, failed saves staying open with retry, checkpoint coalescing, the second-instance lock and shutdown.
+- `solo-worker.test.js` — `sim/worker.js` with fake worker globals: a saved expedition restored with its owner's character, captures on start and request, unsaved testing sessions, a refused save.
+- `expeditions-client.test.js` — `client/net/expeditions.js` (browser backend over a memory store: new/continue/capture/Save & quit, honest storage errors, damaged/newer/missing saves, fallback to the previous save, rename/export/import; desktop backend over a fake `/saves` and WebSocket), `core/persistence.js`, `desktop/personal-store.cjs` (per-device/per-player files, backup recovery, validation), picker labels.
 - `creative.test.js` — creative mode: all skills, free crafting, full supplies, boat repair without parts.
 - `crafting.test.js` — workbench recipes, upgrades and their effects on the server.
 - `base.test.js` — base building stages, costs, colliders, camp stations, towers.

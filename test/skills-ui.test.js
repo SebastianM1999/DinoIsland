@@ -1,69 +1,15 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { loadProfile, saveProfile, PROFILE_KEY } from '../src/client/core/profile.js';
 import { Net } from '../src/client/net/net.js';
-import { MSG } from '../src/shared/protocol.js';
+import { MSG, EV } from '../src/shared/protocol.js';
 import { SKILL_IDS, SKILLS, TIER_GATE, freshProfile, progress, skillMods, MAX_XP, sanitizeProfile } from '../src/shared/skills.js';
 import { buildSkillView, skillView, tierLabel, tierGateText, previewBuy, refundOf, xpTableText, nearCamp, campStationPoints } from '../src/client/ui/skillModel.js';
 
-const fakeStorage = (initial = {}) => {
-  const data = { ...initial };
-  return { data, getItem: (k) => (k in data ? data[k] : null), setItem: (k, v) => { data[k] = String(v); } };
-};
+// ------------------------------------------------------------------ progression belongs to the expedition
 
-/** Run `fn` with a fake global localStorage (Net saves through the default storage). */
-async function withStorage(storage, fn) {
-  const old = Object.getOwnPropertyDescriptor(globalThis, 'localStorage');
-  Object.defineProperty(globalThis, 'localStorage', { value: storage, configurable: true, writable: true });
-  try { return await fn(); } finally {
-    if (old) Object.defineProperty(globalThis, 'localStorage', old); else delete globalThis.localStorage;
-  }
-}
-
-// ------------------------------------------------------------------ persistence
-
-test('profile: empty storage gives a fresh profile, a saved one round-trips', () => {
-  const st = fakeStorage();
-  assert.deepEqual(loadProfile(st), freshProfile());
-  const prof = { xp: 450, bonus: 1, skills: { bruteForce: 2, marksman: 1 } };
-  assert.equal(saveProfile(prof, st), true);
-  assert.deepEqual(loadProfile(st), prof);
-  assert.ok(PROFILE_KEY in st.data);
-});
-
-test('profile: a tampered or corrupt save is repaired, never thrown on', () => {
-  // over budget (level 1 = 1 point), tier 3 without gate, unknown skill, absurd xp type
-  const st = fakeStorage({ [PROFILE_KEY]: JSON.stringify({ xp: 'lots', bonus: 99, skills: { bruteForce: 3, bloodlust: 1, nope: 5 } }) });
-  const p = loadProfile(st);
-  assert.equal(p.xp, 0);
-  assert.ok(p.bonus <= 12);
-  assert.equal(p.skills.bloodlust, undefined, 'capstone needs its gate');
-  assert.equal(p.skills.nope, undefined);
-  assert.ok(progress(p).free >= 0, 'never overspent');
-  assert.deepEqual(loadProfile(fakeStorage({ [PROFILE_KEY]: '{not json' })), freshProfile());
-  assert.deepEqual(loadProfile(fakeStorage({ [PROFILE_KEY]: 'null' })), freshProfile());
-});
-
-test('profile: blocked storage is tolerated', () => {
-  const throwing = { getItem() { throw new Error('denied'); }, setItem() { throw new Error('denied'); } };
-  assert.deepEqual(loadProfile(throwing), freshProfile());
-  assert.equal(saveProfile(freshProfile(), throwing), false);
-  assert.deepEqual(loadProfile(null), freshProfile());
-  assert.equal(saveProfile(freshProfile(), null), false);
-});
-
-test('profile: saving sanitizes (an over-budget profile cannot be persisted)', () => {
-  const st = fakeStorage();
-  saveProfile({ xp: 0, bonus: 0, skills: { bruteForce: 3 } }, st);
-  assert.deepEqual(JSON.parse(st.data[PROFILE_KEY]).skills, { bruteForce: 1 });
-});
-
-// ------------------------------------------------------------------ hello carries the profile
-
-const PROFILE = { xp: 300, bonus: 0, skills: { thickSkin: 1 } };
 const WELCOME = { t: MSG.WELCOME, id: 1, slot: 0, now: 1, k: 0, world: { level: { index: 0, variant: 1 } } };
 
-test('hello: the websocket join sends the profile', async () => {
+test('hello: the websocket join carries no profile (the expedition keeps it)', async () => {
   const sent = [];
   const old = globalThis.WebSocket;
   let ws;
@@ -73,18 +19,18 @@ test('hello: the websocket join sends the profile', async () => {
     close() {}
   };
   try {
-    const promise = Net.connect('ws://x', 'Ann', { hat: 1 }, PROFILE);
+    const promise = Net.connect('ws://x', 'Ann', { hat: 1 });
     ws.onopen();
     ws.onmessage({ data: JSON.stringify(WELCOME) });
     const net = await promise;
     const hello = sent.find((m) => m.t === MSG.HELLO);
-    assert.deepEqual(hello.profile, PROFILE);
+    assert.equal(hello.profile, undefined);
     assert.equal(hello.name, 'Ann');
     net.close();
   } finally { globalThis.WebSocket = old; }
 });
 
-test('hello: the steam join sends the profile', async () => {
+test('hello: the steam join carries no profile', async () => {
   const sent = [];
   let listener;
   const bridge = {
@@ -96,63 +42,103 @@ test('hello: the steam join sends the profile', async () => {
     },
     leave: async () => {},
   };
-  const net = await Net.steam(bridge, { host: true }, 'Bo', null, PROFILE);
-  assert.deepEqual(sent.find((m) => m.t === MSG.HELLO).profile, PROFILE);
+  const net = await Net.steam(bridge, { host: true }, 'Bo', null);
+  assert.equal(sent.find((m) => m.t === MSG.HELLO).profile, undefined);
   net.close();
 });
 
-test('hello: the solo worker is started with the profile', async () => {
-  const posted = [];
-  const old = globalThis.Worker;
-  globalThis.Worker = class {
+/** A fake solo worker: answers start with a welcome, `save` with a capture. */
+function fakeWorker(posted) {
+  return class {
     postMessage(m) {
       posted.push(m);
       if (m.type === 'start') queueMicrotask(() => this.onmessage({ data: WELCOME }));
+      if (m.type === 'save') queueMicrotask(() => this.onmessage({ data: { type: 'save-capture', world: { now: 5 }, reason: 'manual' } }));
     }
+    terminate() { this.terminated = true; }
+  };
+}
+
+test('solo: the worker gets the expedition to restore, and its captures reach the page', async () => {
+  const posted = [];
+  const old = globalThis.Worker;
+  globalThis.Worker = fakeWorker(posted);
+  try {
+    const net = await Net.local('Cy', null, { level: 0 }, { level: 2 });
+    assert.deepEqual(posted.find((m) => m.type === 'start').save, { level: 2 });
+    assert.equal(posted.find((m) => m.type === 'start').profile, undefined);
+    const auto = [];
+    net.onSaveCapture = (world, reason) => auto.push(reason);
+    net.transport.onMessage = null;
+    assert.deepEqual(await net.captureSave(), { now: 5 });
+    net.close();
+  } finally { globalThis.Worker = old; }
+});
+
+test('solo: a save the worker cannot load rejects the start with its reason', async () => {
+  const old = globalThis.Worker;
+  globalThis.Worker = class {
+    postMessage(m) { if (m.type === 'start') queueMicrotask(() => this.onmessage({ data: { t: MSG.REJECT, reason: 'This expedition could not be loaded (x).' } })); }
+    terminate() {}
   };
   try {
-    const net = await Net.local('Cy', null, { level: 0 }, PROFILE);
-    assert.deepEqual(posted.find((m) => m.type === 'start').profile, PROFILE);
-    net.close();
+    await assert.rejects(Net.local('Cy', null, {}, { level: 0 }), /could not be loaded/);
   } finally { globalThis.Worker = old; }
 });
 
 // ------------------------------------------------------------------ MSG.PROF
 
-test('prof: the net layer sanitizes, keeps and saves the server profile, and handlers see the clean one', async () => {
-  const st = fakeStorage();
-  await withStorage(st, () => {
-    let transport;
-    const net = new Net({ send() {}, close() {}, set onMessage(f) { transport = f; }, set onClose(f) {} }, 'local');
-    let seen = null;
-    net.on(MSG.PROF, (m) => { seen = m.prof; });
-    // the server's profile: level 3 (240 xp) = 3 points, so 4 requested ranks are one too many
-    transport({ t: MSG.PROF, prof: { xp: 240, bonus: 0, skills: { thickSkin: 3, marksman: 1 } } });
-    assert.deepEqual(net.prof, seen);
-    assert.equal(progress(net.prof).spent, 3);
-    assert.equal(skillMods(net.prof.skills).maxHpAdd, 20, 'the mods the game derives from it');
-    assert.deepEqual(JSON.parse(st.data[PROFILE_KEY]), net.prof);
-    // a later, bigger profile replaces it
-    transport({ t: MSG.PROF, prof: { xp: MAX_XP * 5, bonus: 50, skills: {} } });
-    assert.equal(net.prof.xp, MAX_XP);
-    assert.equal(net.prof.bonus, 12);
-    net.close();
-  });
+test('prof: the net layer sanitizes and keeps the server profile, and handlers see the clean one', () => {
+  let transport;
+  const net = new Net({ send() {}, close() {}, set onMessage(f) { transport = f; }, set onClose(f) {} }, 'local');
+  let seen = null;
+  net.on(MSG.PROF, (m) => { seen = m.prof; });
+  // the server's profile: level 3 (240 xp) = 3 points, so 4 requested ranks are one too many
+  transport({ t: MSG.PROF, prof: { xp: 240, bonus: 0, skills: { thickSkin: 3, marksman: 1 } } });
+  assert.deepEqual(net.prof, seen);
+  assert.equal(progress(net.prof).spent, 3);
+  assert.equal(skillMods(net.prof.skills).maxHpAdd, 20, 'the mods the game derives from it');
+  // a later, bigger profile replaces it
+  transport({ t: MSG.PROF, prof: { xp: MAX_XP * 5, bonus: 50, skills: {} } });
+  assert.equal(net.prof.xp, MAX_XP);
+  assert.equal(net.prof.bonus, 12);
+  // creative mode's every-skill profile is shown only, never kept
+  transport({ t: MSG.PROF, prof: { ...freshProfile(), creative: true } });
+  assert.equal(net.prof.xp, MAX_XP);
+  net.close();
 });
 
-test('prof: it is delivered in reliable order (held snapshots wait for it)', async () => {
-  await withStorage(fakeStorage(), () => {
-    let transport;
-    const net = new Net({ send() {}, close() {}, set onMessage(f) { transport = f; }, set onClose(f) {} }, 'local');
-    transport({ ...WELCOME, r: 0 });
-    const order = [];
-    net.on(MSG.PROF, () => order.push('prof'));
-    net.on(MSG.SNAP, () => order.push('snap'));
-    transport({ t: MSG.SNAP, now: 2, r: 1, p: [], d: [] });       // overtakes the profile: held back
-    transport({ t: MSG.PROF, r: 1, prof: freshProfile() });
-    assert.deepEqual(order, ['prof', 'snap']);
-    net.close();
-  });
+test('saved: host save results reach the save listeners and the expedition', () => {
+  let transport;
+  const net = new Net({ send() {}, close() {}, set onMessage(f) { transport = f; }, set onClose(f) {} }, 'online');
+  net.expedition = { name: 'x', savedAt: 0 };
+  const heard = [];
+  const off = net.onSave((s) => heard.push(s));
+  transport({ ...WELCOME, r: 0 });
+  transport({ t: MSG.EV, e: EV.SAVED, ok: true, at: 1234, reason: 'auto', r: 1 });
+  assert.equal(net.expedition.savedAt, 1234);
+  transport({ t: MSG.EV, e: EV.SAVED, ok: false, at: 1300, reason: 'auto', error: 'disk full', r: 2 });
+  assert.equal(net.saveStatus.error, 'disk full');
+  assert.equal(net.expedition.savedAt, 1234, 'a failed save never looks saved');
+  off();
+  net.reportSave({ ok: true, at: 2000 });
+  assert.equal(heard.length, 2);
+  net.clearHandlers();
+  assert.equal(net.saveListeners.size, 0);
+  net.close();
+});
+
+test('prof: it is delivered in reliable order (held snapshots wait for it)', () => {
+  let transport;
+  const net = new Net({ send() {}, close() {}, set onMessage(f) { transport = f; }, set onClose(f) {} }, 'local');
+  transport({ ...WELCOME, r: 0 });
+  const order = [];
+  net.on(MSG.PROF, () => order.push('prof'));
+  net.on(MSG.SNAP, () => order.push('snap'));
+  transport({ t: MSG.SNAP, now: 2, r: 1, p: [], d: [] });       // overtakes the profile: held back
+  transport({ t: MSG.PROF, r: 1, prof: freshProfile() });
+  assert.deepEqual(order, ['prof', 'snap']);
+  net.close();
 });
 
 // ------------------------------------------------------------------ skill panel view-model

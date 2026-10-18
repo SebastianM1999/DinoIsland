@@ -6,6 +6,7 @@
 
 import { CONFIG } from '../../shared/config.js';
 import { storageKey } from '../../shared/brand.js';
+import { storage as preferences } from './persistence.js';
 
 /**
  * Internal levels, cheapest first. shadowRange is the sun shadow's half
@@ -75,7 +76,7 @@ export function gpuName(gl) {
 
 export class GraphicsAutoTune {
   /** @param {(tier:number)=>void} apply  @param {string} gpu */
-  constructor(apply, gpu, storage = globalThis.localStorage) {
+  constructor(apply, gpu, storage = preferences) {
     this.apply = apply;
     this.gpu = gpu;
     this.storage = storage;

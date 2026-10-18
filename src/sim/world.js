@@ -28,6 +28,7 @@ import { levelDef, LEVEL_COUNT } from '../shared/levels.js';
 import { TORCH, WALL_TORCH } from '../shared/torch.js';
 import { CAVE_WALK_MAX } from '../shared/caveField.js';
 import { findUnstuckSpot, goodSpot } from './unstuck.js';
+import { rosterRecord, applyRosterRecord } from './worldSave.js';
 import { nearDino, plausibleZone } from './hitCheck.js';
 import { freshBase, CAMP_BENCH, campStations, safeZone as baseSafeZone, hasBasePlots, PLOT_REACH, MAX_STAGE, stageCost, BUILD_TIME, BASE_STAGES, applyBaseColliders, baseSpawnPoints, TOWERS, TOWER_SLOTS, towerCost, repairCost } from '../shared/base.js';
 import { updateTowers } from './towers.js';
@@ -76,9 +77,13 @@ export class ServerWorld {
     // (the tests) keeps every animal ordinary unless a spawn asks for an alpha.
     this.alphas = !!opts.alphas;
     this.log = host.log || (() => {});
-    this.now = 0;
+    // (a restored expedition starts its clock and id counter where the save left them, so the
+    // fresh island built here never reuses a saved id: sim/worldSave.js `worldOptions`)
+    this.now = Number.isFinite(opts.now) && opts.now > 0 ? opts.now : 0;
     this.players = new Map();
-    this.nextId = 1;
+    this.nextId = Number.isSafeInteger(opts.firstId) && opts.firstId > 0 ? opts.firstId : 1;
+    this.roster = new Map();            // explorers away from a saved expedition: roster key -> record (sim/worldSave.js)
+    this.creativeUsed = false;          // creative mode was switched on in this expedition (shown on its save)
     this.store = Object.fromEntries(LOOT_KEYS.map((k) => [k, 0]));
     this.upgrades = new Set();          // team upgrades built at the workbench (survive islands)
     this.fruitRng = makeRng((Math.random() * 0xffffffff) >>> 0);
@@ -144,7 +149,11 @@ export class ServerWorld {
       this.send(p.id, { t: MSG.WELCOME, id: p.id, slot: p.slot, now: r3(this.now), k: p.epoch, inv: p.inv, world: this.fullState() });
       this.sendProf(p);
     }
+    this.checkpoint('island');
   }
+
+  /** A moment worth saving (new island, boat part, base stage, boss, someone left): the host may save soon. */
+  checkpoint(reason) { this.host.checkpoint?.(reason); }
 
   id() { return this.nextId++; }
   rollFruitCount() { return 1 + Math.floor(this.fruitRng() * 4); }
@@ -158,10 +167,15 @@ export class ServerWorld {
 
   // ------------------------------------------------------------------ players
 
-  /** @param {(id:number)=>void} [attach] called with the new id before the welcome is sent */
-  join(name, attach, outfit, profile) {
+  /**
+   * @param {(id:number)=>void} [attach] called with the new id before the welcome is sent
+   * @param {object} [profile] starting XP/skills (sanitized); hosts pass none: progression belongs to the expedition
+   * @param {string|null} [key] persistent roster key: a returning explorer gets their saved character back
+   */
+  join(name, attach, outfit, profile, key = null) {
     const max = this.demo ? CONFIG.demo.maxPlayers : CONFIG.net.maxPlayers;
     if (this.players.size >= max) return { ok: false, reason: `The expedition is full (${max} players max${this.demo ? ' in the demo' : ''}).` };
+    if (key && [...this.players.values()].some((q) => q.key === key)) return { ok: false, reason: 'You are already in this expedition.' };
     const used = new Set([...this.players.values()].map((p) => p.slot));
     let slot = 0;
     while (used.has(slot)) slot++;
@@ -208,8 +222,11 @@ export class ServerWorld {
       creative: false,       // invincible, may fly (toggled by the player)
       nextMeleeAt: 0,
       nextFireAt: 0,
+      key: key || null,
     };
     this.players.set(p.id, p);
+    const saved = key ? this.roster.get(key) : null;
+    if (saved) { applyRosterRecord(this, p, saved); this.roster.delete(key); }
     p.inv.caps = this.caps();
     p.inv.upgrades = [...this.upgrades];
     attach?.(p.id);
@@ -231,11 +248,13 @@ export class ServerWorld {
   leave(id) {
     const p = this.players.get(id);
     if (!p) return;
+    if (p.key) this.roster.set(p.key, rosterRecord(this, p));   // the character waits in the expedition
     this.players.delete(id);
     this.event(EV.PLAYER_LEAVE, { id });
     this.toast(`${p.name} left the expedition`, 'team');
     this.dinos.forgetPlayer(id);
     this.log(`leave #${id} "${p.name}" (${this.players.size} players)`);
+    this.checkpoint('leave');
   }
 
   freshInventory() {
@@ -803,6 +822,7 @@ export class ServerWorld {
     }
     this.event(EV.BASE, { base: this.publicBase() });
     this.toast(`The ${S.name.toLowerCase()} is built! ${S.stage === 1 ? 'The campfire heals and dinosaurs keep away.' : ''}`, 'quest');
+    this.checkpoint('base');
   }
 
   respawnPlayer(p) {
@@ -1029,6 +1049,7 @@ export class ServerWorld {
         const on = !!m.on;
         if (on === !!p.creative) return;
         p.creative = on;
+        if (on) this.creativeUsed = true;
         this.refreshMods(p);
         this.sendProf(p);
         if (on && p.alive) { p.hp = p.maxHp; this.creativeSupply(p); }
@@ -1648,6 +1669,7 @@ export class ServerWorld {
         this.event(EV.RELIC, { id: r.id, kind: r.kind, by: p.id });
         this.mission.onRelicFound(r, p);
         this.awardXp(RELIC_XP, 'Boat part', RELIC_POINTS);
+        this.checkpoint('relic');
       }
       // the hunter's camp (island 1): walk up to it to take your own bow, with a full quiver's start
       const camp = this.layout.bowCamp;

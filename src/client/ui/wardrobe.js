@@ -5,13 +5,14 @@
 import { OUTFIT_SLOTS, sanitizeOutfit, sameOutfit } from '../../shared/outfits.js';
 import { CharacterPreview } from './characterPreview.js';
 import { storageKey } from '../../shared/brand.js';
+import { readItem, writeItem } from '../core/persistence.js';
 
 const STORE_KEY = storageKey('outfit');
 
 /** Outfit remembered from the last session (null if none). */
 export function savedOutfit() {
   try {
-    const o = JSON.parse(localStorage.getItem(STORE_KEY) || 'null');
+    const o = JSON.parse(readItem(STORE_KEY) || 'null');
     return o ? sanitizeOutfit(o) : null;
   } catch {
     return null;
@@ -112,7 +113,7 @@ export class Wardrobe {
   wear() {
     if (!sameOutfit(this.draft, this.worn)) {
       this.worn = { ...this.draft };
-      try { localStorage.setItem(STORE_KEY, JSON.stringify(this.worn)); } catch { /* storage may be blocked */ }
+      writeItem(STORE_KEY, JSON.stringify(this.worn));
       this.onWear?.(this.worn);
     }
     this.onClose?.();

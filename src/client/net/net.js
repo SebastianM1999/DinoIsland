@@ -6,13 +6,15 @@ import { CONFIG } from '../../shared/config.js';
 import { MSG, EV } from '../../shared/protocol.js';
 import { connectSteam } from './steamTransport.js';
 import { sanitizeProfile } from '../../shared/skills.js';
-import { saveProfile } from '../core/profile.js';
 
 export class Net {
   constructor(transport, mode) {
     this.transport = transport;
     this.mode = mode;               // 'online' | 'local'
     this.handlers = new Map();
+    this.expedition = null;         // the saved expedition this session plays, if any (client/net/expeditions.js)
+    this.saveStatus = null;         // the newest save result { ok, at, reason, error? }
+    this.saveListeners = new Set();
     this.welcome = null;
     this.rtt = 0;
     this.serverOffset = null;       // serverTime - localTime
@@ -51,13 +53,13 @@ export class Net {
   }
 
   /** Connect to a co-op server and join with `name`. Resolves after the welcome. */
-  static steam(bridge, options, name, outfit, profile) {
+  static steam(bridge, options, name, outfit) {
     return connectSteam(bridge,
       () => options.host ? bridge.host(options.visibility) : bridge.join(options.lobbyId),
-      { t: MSG.HELLO, name, outfit, profile }, transport => new Net(transport, 'online'));
+      { t: MSG.HELLO, name, outfit }, transport => new Net(transport, 'online'));
   }
 
-  static connect(url, name, outfit, profile) {
+  static connect(url, name, outfit) {
     return new Promise((resolve, reject) => {
       let ws;
       try {
@@ -77,7 +79,7 @@ export class Net {
       const timer = setTimeout(() => {
         if (!settled) { settled = true; ws.close(); reject(new Error('The server did not answer')); }
       }, 6000);
-      ws.onopen = () => transport.send({ t: MSG.HELLO, name, outfit, profile });
+      ws.onopen = () => transport.send({ t: MSG.HELLO, name, outfit });
       ws.onmessage = (e) => {
         let msg;
         try { msg = JSON.parse(e.data); } catch { return; }
@@ -102,8 +104,11 @@ export class Net {
    * (src/sim/worker.js), so its ticks never stall a rendered frame.
    * Resolves after the welcome. Testing aids in `opts`: level (0-based start island),
    * baseStage (base already standing), raidIn (seconds until the first raid); demo (CONFIG.demo).
+   * `save`: an expedition world section to restore (sim/worldSave.js), or `{}` for a new saved
+   * expedition. With it the worker reports save captures to `net.onSaveCapture(world, reason)`
+   * and answers `net.captureSave()`; without it the session is not saved (testing aids).
    */
-  static local(name, outfit, opts = {}, profile) {
+  static local(name, outfit, opts = {}, save = null) {
     return new Promise((resolve, reject) => {
       const worker = new Worker(new URL('../../sim/worker.js', import.meta.url), { type: 'module' });
       const transport = {
@@ -114,8 +119,17 @@ export class Net {
         close: () => worker.postMessage({ type: 'stop' }),
       };
       const net = new Net(transport, 'local');
+      let captureWaiters = [];
+      /** Ask the worker for a capture now (Save & Quit); resolves with the world section. */
+      net.captureSave = () => new Promise((done) => { captureWaiters.push(done); worker.postMessage({ type: 'save' }); });
       worker.onmessage = (e) => {
         const msg = e.data;
+        if (msg?.type === 'save-capture') {
+          if (msg.reason === 'manual') { const waiters = captureWaiters; captureWaiters = []; for (const done of waiters) done(msg.world); }
+          else net.onSaveCapture?.(msg.world, msg.reason);
+          return;
+        }
+        if (!net.welcome && msg.t === MSG.REJECT) { worker.terminate(); reject(new Error(msg.reason)); return; }
         if (!net.welcome && msg.t === MSG.WELCOME) { net.welcome = msg; resolve(net); }
         transport.onMessage?.(msg);
       };
@@ -124,13 +138,27 @@ export class Net {
         if (!net.welcome) reject(new Error('The island could not be started'));
         else transport.onClose?.('The island simulation stopped');
       };
-      worker.postMessage({ type: 'start', name, outfit, opts, profile });
+      worker.postMessage({ type: 'start', name, outfit, opts, save });
     });
+  }
+
+  /** A save of this session's expedition finished (from the host's EV.SAVED, or the browser store). */
+  reportSave(status) {
+    this.saveStatus = status;
+    if (this.expedition && status.ok) this.expedition.savedAt = status.at;
+    for (const fn of this.saveListeners) fn(status);
+  }
+
+  /** Hear every save result; returns an unsubscribe function. */
+  onSave(fn) {
+    this.saveListeners.add(fn);
+    return () => this.saveListeners.delete(fn);
   }
 
   /** Forget every handler (the game for the next island registers its own). */
   clearHandlers() {
     this.handlers.clear();
+    this.saveListeners.clear();
     this.onClose = null;
     this.stateProvider = null;
     this.onStateSent = null;
@@ -324,12 +352,10 @@ export class Net {
     } else if (msg.t === MSG.CORRECT || (msg.t === MSG.EV && (msg.e === EV.RESPAWN || msg.e === EV.REVIVED) && msg.id === this.myId)) {
       if (Number.isFinite(msg.k)) this.epoch = msg.k;
     }
-    // The profile can arrive while the island is still loading (no Game yet): validate, keep and save it here.
-    // Creative mode sends every skill at max rank: shown only, never kept or saved.
-    if (msg.t === MSG.PROF && !msg.prof?.creative) {
-      this.prof = msg.prof = sanitizeProfile(msg.prof);
-      saveProfile(this.prof);
-    }
+    // The profile can arrive while the island is still loading (no Game yet): validate and keep it here.
+    // It belongs to the expedition (the host saves it). Creative mode sends every skill at max rank: shown only, never kept.
+    if (msg.t === MSG.PROF && !msg.prof?.creative) this.prof = msg.prof = sanitizeProfile(msg.prof);
+    if (msg.t === MSG.EV && msg.e === EV.SAVED) this.reportSave({ ok: !!msg.ok, at: msg.at, reason: msg.reason, error: msg.error });
     if (msg.t !== MSG.SNAP && Number.isFinite(msg.r)) this.reliableSeq = Math.max(this.reliableSeq, msg.r);
     if ((msg.t === MSG.SNAP || msg.t === MSG.WELCOME || msg.t === MSG.PONG) && Number.isFinite(msg.now)) this.#clock(msg, local);
     this.#deliverOrBuffer(msg);

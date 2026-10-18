@@ -28,6 +28,8 @@ Priorities: **P0** resolve before release-candidate sign-off; **P1** resolve or 
 
 **Acceptance:** earn XP, buy skills, earn an island unlock, change audio/FOV/name/outfit; fully quit and relaunch repeatedly with different HTTP ports and after an update. Retain intended data. Test corrupt files, interrupted writes, forced termination, two Steam accounts on one Windows login and two Windows users. Distinguish persistent profile from intentionally session-only expedition/world state.
 
+**Status (2026-10-18):** fixed in source by the save system ([plan](save-system-plan.md)). Preferences are now files under userData (`desktop/personal-store.cjs`). XP, skills, inventory and island progress belong to saved expeditions, stored per Steam account in the host process. The acceptance runs above on a packaged build are still open.
+
 ### F2 — P0: release configuration/preflight is blocked
 
 **Confirmed:** `desktop/steam-config.json:2` contains `null`; the SDK runtime is absent from this fresh worktree. `node scripts/verify-steam.cjs` exits **1**, requesting the App ID and DLL. `npm run build:steam` includes that gate; `build:win` bypasses it (`package.json:18-20`).
@@ -40,7 +42,7 @@ Priorities: **P0** resolve before release-candidate sign-off; **P1** resolve or 
 
 `src/client/core/islandProgress.js:7-9` explicitly says to disable temporary access for release, yet `TEST_ALL_ISLANDS_UNLOCKED = true`. Lines 46-51 bypass earned starting-island restrictions. Current tests deliberately cover that override; a green test is not proof of the intended release policy.
 
-**Task:** disable it for production or obtain an explicit product decision that all islands should remain selectable. Add a release-configuration guard if separate developer access is retained. **Acceptance:** a clean normal profile starts on the intended island; earned travel persists unlocks; browsing previews/creative/debug entry cannot accidentally grant earned progression; demo restrictions still hold.
+**Task:** disable it for production or obtain an explicit product decision that all islands should remain selectable. Add a release-configuration guard if separate developer access is retained. **Acceptance:** a clean normal profile starts on the intended island; island progress persists in its expedition; browsing previews/creative/debug entry cannot accidentally grant earned progression.
 
 ### F4 — P1: real Steam/overlay/launch behavior is unproved
 
@@ -91,7 +93,6 @@ These tasks often live outside Git. Record screenshots/checklist status without 
 | Distribution configuration | Windows depot, architecture/OS filters, correct executable/working directory, required runtime prerequisites, package ownership and beta branch. Test accounts must own the relevant app AND depot; Dev Comp privileges can hide customer-package mistakes. | [Uploading](https://partner.steamgames.com/doc/sdk/uploading), [testing/package access](https://partner.steamgames.com/doc/store/testing), [common redistributables](https://partner.steamgames.com/doc/features/common_redist) |
 | Valve review | Store and build checklists both need approval. Submit store presence before build review; the reviewed build must launch on every advertised OS and contain advertised features. Typical reviews take 3–5 business days; allow at least 7 business days per review and time for corrections. | [Review process](https://partner.steamgames.com/doc/store/review_process) |
 | Release timing | Public Coming Soon presence for at least two weeks, approvals and the account's wait period complete. Release is a deliberate dashboard action, not automatic on the date. Confirm responsible person and permissions. | [Release process](https://partner.steamgames.com/doc/store/releasing) |
-| Demo, if launching one | Demo is a separate associated App ID with its own depot/build/checklist. Configure its launch arguments/build identity so `--demo` restrictions cannot be omitted accidentally. Test two-player cap, allowed content and full/demo lobby separation through Steam. | [Steam demos](https://partner.steamgames.com/doc/store/application/demos) |
 
 ## Required release test matrix
 
@@ -104,7 +105,7 @@ Run against the **exact Steam-installed release candidate**, with its Git SHA, S
 | T03 | Persistence across quit, crash, restart, update and account changes | F1 acceptance passes, including corrupt/blocked storage; profile and world-persistence expectations documented |
 | T04 | Complete solo expedition through all four islands and ending | Travel, relics/missions, inventory/crafting/upgrades, XP/skills, cave traversal/diving, bosses, death/revive/respawn and victory work without softlocks |
 | T05 | 2, 3 and 4 physical Steam clients/accounts; private/friends/public lobbies | Correct discovery, admission, shared authoritative gameplay, late join and travel; fifth player rejected cleanly |
-| T06 | Friends invitations with game open/closed; second launch; stale lobby; demo/full; incompatible builds | Correct session launch/join or useful rejection; no duplicate hosts or wrong-mode admission |
+| T06 | Friends invitations with game open/closed; second launch; stale lobby; incompatible builds | Correct session launch/join or useful rejection; no duplicate hosts or wrong-mode admission |
 | T07 | Different residential networks, CGNAT/restrictive NAT, relay path, Wi-Fi loss/change, latency/jitter/loss | Successful documented connectivity paths; bounded timeouts; no endless loading, corrupted progression or permanent stuck lobby |
 | T08 | Host quit/crash, guest quit/rejoin, Steam restart/offline, Windows sleep/resume | Clear disconnect/recovery UI; cleanup works; expected session loss explained; subsequent fresh host/join succeeds |
 | T09 | Shift+Tab during movement/firing/dialogs; Alt-Tab, Windows lock, focus loss | Overlay and game remain usable; held actions release, pointer lock recovers, no accidental firing or stuck input |

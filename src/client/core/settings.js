@@ -1,8 +1,9 @@
 // Player preferences (volume, field of view, mouse sensitivity).
-// Tiny, so they live in localStorage; changes notify listeners immediately.
+// Tiny, so they live in the preference storage (core/persistence.js); changes notify listeners immediately.
 
 import { CONFIG } from '../../shared/config.js';
 import { storageKey } from '../../shared/brand.js';
+import { readItem, writeItem } from './persistence.js';
 
 const KEY = storageKey('settings');
 
@@ -29,7 +30,7 @@ const defaults = Object.fromEntries(SETTING_DEFS.map((d) => [d.id, d.def]));
 
 function load() {
   try {
-    const raw = JSON.parse(localStorage.getItem(KEY) || '{}');
+    const raw = JSON.parse(readItem(KEY) || '{}');
     const out = { ...defaults };
     for (const d of SETTING_DEFS) {
       const v = Number(raw[d.id]);
@@ -51,7 +52,7 @@ export function setSetting(id, value) {
   const normalized = def.min + Math.round((clamped-def.min)/def.step)*def.step;
   if (settings[id] === normalized) return;
   settings[id] = normalized;
-  try { localStorage.setItem(KEY, JSON.stringify(settings)); } catch { /* storage may be blocked */ }
+  writeItem(KEY, JSON.stringify(settings));
   for (const fn of listeners) fn(settings);
 }
 

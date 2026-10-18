@@ -20,3 +20,21 @@ contextBridge.exposeInMainWorld('dinoSteam', {
     return () => ipcRenderer.removeListener('dino:steam:event', listener);
   },
 });
+
+// Preferences (name, outfit, settings...) live in files under userData (desktop/personal-store.cjs),
+// not in localStorage, whose origin changes with the local port. The page reads them synchronously
+// at start-up, like localStorage; writes go to the main process.
+let values = {};
+try { values = ipcRenderer.sendSync('dino:store:snapshot') || {}; } catch { values = {}; }
+contextBridge.exposeInMainWorld('dinoStore', {
+  getItem: key => (Object.prototype.hasOwnProperty.call(values, key) ? values[key] : null),
+  setItem: (key, value) => {
+    values[key] = String(value);
+    ipcRenderer.send('dino:store:set', { key, value: values[key] });
+  },
+  removeItem: key => {
+    delete values[key];
+    ipcRenderer.send('dino:store:set', { key, value: null });
+  },
+  keys: () => Object.keys(values),
+});

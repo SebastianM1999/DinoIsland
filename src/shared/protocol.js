@@ -102,6 +102,7 @@ export const EV = {
   DEATH: 'death',           // { id, by }
   RESPAWN: 'respawn',       // { id, x, z, yaw }
   TOAST: 'toast',           // { text, icon }
+  SAVED: 'saved',           // { ok, at (ms epoch), reason, error? } the expedition save finished (owner only)
   MISSION: 'mission',       // { mission }
   STORE: 'store',           // { store }                         hut storage totals
   STEAL: 'steal',           // { dino, player }

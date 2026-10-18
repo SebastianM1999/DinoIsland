@@ -18,8 +18,9 @@ src/shared/ ──▶ src/shared/ only       (no DOM, no three, no Math.random, 
 - `server/`, `desktop/`: hosts. See their `package-info.md`.
 
 ## Hosting
-- **Solo:** `Net.local` (`client/net/net.js`) starts `sim/worker.js` as a Web Worker, so the same `ServerWorld` runs off the render thread.
-- **LAN / online:** `server/gameHost.js` runs `ServerWorld` and talks WebSocket. The Electron app (`desktop/main.cjs`) starts that server in its own process.
+- **Solo (browser):** `Net.local` (`client/net/net.js`) starts `sim/worker.js` as a Web Worker, so the same `ServerWorld` runs off the render thread; saved expeditions live in IndexedDB (`client/net/expeditions.js`).
+- **Solo and hosting (desktop):** the Electron app (`desktop/main.cjs`) runs the server in a utility process (`desktop/host-process.js`) that owns the player's saved expeditions (`server/saveCoordinator.js`); solo is the open expedition with a private lobby, LAN/internet hosting opens the same expedition to friends.
+- **LAN / online:** `server/gameHost.js` runs `ServerWorld` and talks WebSocket.
 - **Steam:** `desktop/steam*.cjs/js` + `client/net/steamTransport.js` carry the same protocol over Steam P2P.
 
 ## Authority model (details at the top of `shared/protocol.js`)
@@ -51,7 +52,7 @@ Where each feature lives in each layer. Paths are relative to `src/` unless they
 | Fruit (per island: `biome.fruit`; buffs) | config.js (fruit), levels.js, layout.js (fruit spots) | world.js (regrowth, eat, `applyFruit`, buffs) | world/fruitPlants.js, models/fruit.js, player/controller.js (buffs), ui/hud.js (`setBuffs`) | discovery-fruit, swamp-fruit, volcano-fruit |
 | Map resources (island 1: resin, ironwood, healing herb; per island: `biome.resources`) | config.js (loot, `resources`), levels.js, layout.js (`resourceSpots`), crafting.js (tier 1 costs), protocol.js (`GATHER`, `RESOURCE`) | world.js (`ACT.GATHER`, `addLoot`, regrowth) | world/resourceNodes.js, models/props/resources.js, player/actions.js (E prompt), entities/items.js (dropped), ui/icons.js | resources, crafting |
 | Crafting | crafting.js | world.js (`craft`) | ui/craftingPanel.js, world/hut/props.js | crafting |
-| Skills, XP, downed/revive | skills.js | world.js (skills, downed sections) | ui/skillPanel.js, skillModel.js, core/profile.js, ui/hud.js | skills, skills-server, skills-movement, skills-ui |
+| Skills, XP, downed/revive | skills.js | world.js (skills, downed sections) | ui/skillPanel.js, skillModel.js, ui/hud.js (the profile belongs to the expedition: `MSG.PROF`) | skills, skills-server, skills-movement, skills-ui |
 | Base, towers, raids; island 1's tent camp and camp table | base.js (`CAMP_BENCH`, `campStations`), layout.js (`hut.kind`) | world.js (base, `buildCampBench`, `craft`), towers.js, raids.js | world/base.js, world/hut.js, world/hut/tent.js, ui/basePanel.js, player/actions.js (E prompt) | base, raids, raptor-fear, crafting |
 | Hollow Mountain (level 4, the last): west cove, tunnel maze (chambers, loops, dead ends, crystal halls, flooded tunnels, false exits), the one exit onto the east beach with the escape boat; walls, floor and roof you collide with are the visible volume (`caveVolume.js` -> `caveWalk.js` -> `Terrain.heightAt/ceilingAt`; the fixed map is baked: `caveBake.js`), torch spots, cave decor, lights, raptors in chambers | caveMaze.js, caveField.js, caveVolume.js, caveWalk.js, caveBake.js, island.js (`planCave`), terrain.js (`heightAt`, `ceilingAt`), layout.js (cave section), levels.js (`cave`), relics.js (bell, compass), visibility.js, gunshots.js | world.js (`onState` caps height at the roof), dinos.js (`walkable`: roof clearance) | player/controller.js (steps and head bump on the same grid), world/caveTerrain.js + caveVolumeMesh.js (the mesh), assets/cave, scripts/bakeCave.mjs | cave-level, levels |
 | Missions, relics, boat | missions.js, relics.js, boatShape.js | mission.js (`sail`), world.js (relic pickup, `ACT.REPAIR`, `ACT.SAIL`) | ui/hud.js (board), ui/boatPanel.js, entities/relics.js, models/props/boat.js | levels, demo, props (no missions test) |
@@ -64,6 +65,7 @@ Where each feature lives in each layer. Paths are relative to `src/` unless they
 | Audio | | | audio/* | audio |
 | Graphics tier, settings | | | core/renderer.js, graphicsTier.js, settings.js, ui/menus.js | graphics-tier |
 | Demo (island 1 only, 1-2 explorers, no firearms, no XP/skills; `?demo=1`, `--demo`, `DINO_DEMO=1`) | config.js (`demo`) | world.js (`demo`: start island, `join` cap, `gunInventory`, profile/XP/skills off, `nextLevel`), mission.js (won after island 1), firearms.js (no gun), worker.js | main.js (`applyDemoMenu`), core/game.js (`demo`), player/actions.js (no gun slots), ui/hud.js (demo win card), css (`body.is-demo`); server/index.js, gameHost.js, desktop/main.cjs | demo, player-actions |
+| Expedition saves (multiple independent expeditions; XP, skills, inventory and island progress per expedition; autosave, checkpoints, Save & quit, backups, desktop files per Steam account, browser IndexedDB) | saveSchema.js | worldSave.js, world.js (`roster`, `checkpoint`, `opts.firstId/now`), worker.js | net/expeditions.js, ui/expeditionPanel.js, core/persistence.js (preferences), main.js (picker, Save & quit); server/saveStore.js, saveCoordinator.js, saveRoutes.js, gameHost.js (`load`/`unload`/`admit`); desktop/host-process.js, personal-store.cjs, main.cjs | world-save, save-store, save-host, solo-worker, expeditions-client |
 | Hosting, LAN, internet, Steam | brand.js | worker.js | net/, ui/steamLobby.js, ui/internetTest.js | http-host, lan-address, internet-host, steam-coop |
 
 ## Known hot spots

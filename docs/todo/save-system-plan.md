@@ -1,6 +1,30 @@
 # Solo and co-op save system — implementation handoff
 
-Prepared 2026-10-17 against `0e9140f654cdcd9626fbc45b996333042c08f98b`. This is a proposed implementation plan, not an implemented save feature. See [Steam readiness audit](steam-release-readiness.md), especially F1.
+Prepared 2026-10-17 against `0e9140f654cdcd9626fbc45b996333042c08f98b`. See [Steam readiness audit](steam-release-readiness.md), especially F1.
+
+## Decisions and status (2026-10-18)
+
+Owner decisions:
+
+- **Where the desktop sim runs:** an Electron `utilityProcess` host (`desktop/host-process.js`) serves solo (private lobby), LAN and internet hosting, and owns the expedition files. The Steam host still runs in the main process (phase 4 moves it).
+- **Progression is per expedition:** XP, skills, island progress, inventory and backpack belong to each expedition's roster. They are not account-wide. Name, outfit and preferences stay personal. A new expedition starts at level 1 on island 1, or on any island while `TEST_ALL_ISLANDS_UNLOCKED` playtest access is on. This replaces the "keep account-wide XP/skills" default below.
+- **No demo:** the product is the full game. The demo items in this plan are dropped. The demo mode code (`CONFIG.demo`, `--demo`) is still in the source and will be removed separately.
+
+Implemented (phases 1-3):
+
+- **Expedition files:** `server/saveStore.js` writes `userData/saves/profiles/<steam-ID | local>/worlds/<uuid>/gen-N.json`. Each generation is a new file (temporary file, flush, rename), the newest 4 are kept, damaged files are renamed `.bad`, a newer game's save is never overwritten, and a lock file protects each folder.
+- **Coordinator:** `server/saveCoordinator.js` handles the owner gate (loopback plus token), autosave every 60 s, debounced checkpoints, Save & quit, retries, and `EV.SAVED`. It is controlled through the loopback-only `/saves` routes in `server/saveRoutes.js`.
+- **Format:** `shared/saveSchema.js` (envelope, checksum, migrations, future refusal) and `sim/worldSave.js` (explicit export and restore, roster).
+- **Desktop:** single-instance lock, Steam identity namespace (a Steam build without Steam gets no expeditions rather than an empty folder), final save on quit (at most 8 s), and preferences as files (`desktop/personal-store.cjs`, `window.dinoStore`). This fixes F1.
+- **Browser:** solo worker captures are stored in IndexedDB, with a previous-save fallback and file export/import.
+- **UI:** expedition picker (new, continue, host, rename, delete), Save & quit, and the last-save line in the pause menu.
+
+Not yet done:
+
+- **Phase 4:** Steam-hosted saves and the Steam host in the utility process, guest roster keys and reconnect credentials. LAN, internet and Steam guests get a fresh character per session.
+- **Phase 5:** packaged Windows fault tests (power loss, antivirus, OneDrive-redirected AppData) and a soak test.
+- **Phase 6:** Steam Cloud.
+- **Packaged runs:** nothing has been run as a packaged Steam build. `utilityProcess` + asar, two accounts on one PC, and invites while closed need real runs.
 
 ## Recommended player experience
 
@@ -30,7 +54,8 @@ These are recommended defaults. Before implementation, record any product decisi
 
 | Data | Durable owner | Rules |
 |---|---|---|
-| XP, bought skills, earned starting islands, name/outfit | Each player's profile | Carry across solo/co-op as today; validated by the authoritative sim; demo/creative must not overwrite earned state |
+| Name/outfit | Each player's profile | Carry across solo/co-op; validated by the authoritative sim |
+| XP, bought skills, island progress | The expedition (per player in its roster) | Decided 2026-10-18: per expedition, not account-wide |
 | Resolution/render/audio/input preferences | Local player/device | Persist independently of the local HTTP port; avoid cloud-syncing hardware calibration |
 | Expedition identity, island/variant, mission, relics, shared store/upgrades/base | Expedition host | All guests see the same committed world state; no guest can replace it with a local save |
 | Inventory, durability/ammo, position, health/death state in that expedition | Host's roster, keyed by persistent player identity | Inventory stays in that world; never import backpack contents from another expedition |
@@ -44,7 +69,7 @@ Only the owner can list/load/delete expedition slots or commit a save. The LAN s
 
 ## Where data lives
 
-On desktop, store versioned files under a dedicated `saves/` subdirectory of Electron `app.getPath('userData')`, outside the install/depot directory and Chromium's origin storage. Namespace by game/demo and player identity. Keep host worlds under the owning identity. Offline data gets a separate local namespace. [Electron application paths and lifecycle](https://www.electronjs.org/docs/latest/api/app).
+On desktop, store versioned files under a dedicated `saves/` subdirectory of Electron `app.getPath('userData')`, outside the install/depot directory and Chromium's origin storage. Namespace by player identity. Keep host worlds under the owning identity. Offline data gets a separate local namespace. [Electron application paths and lifecycle](https://www.electronjs.org/docs/latest/api/app).
 
 Suggested layout (relative to the chosen save root):
 
@@ -123,7 +148,7 @@ Reviewed against `747680d`. The data rules above are sound; these points cover h
 4. **Single instance.** `main.cjs` does not call `app.requestSingleInstanceLock()`. Add it (focus the existing window on a second launch, and forward `+connect_lobby` invite arguments to it) in addition to the per-slot file lock. A second instance with the same userData and Steam account is the most likely way to get two writers on one world.
 5. **Steam identity is the namespace in Steam builds.** The owner of the host's own roster entry and the `profiles/<identity>/` folder must be the local Steam ID from `getStatus().steamId`, for solo too, so a run started solo and later hosted keeps the same owner key. The offline UUID is only for browser/dev/no-Steam runs. Do not mix the two: if a Steam build starts without Steam, either call `SteamAPI_RestartAppIfNecessary` (currently not called in `desktop/steam.cjs`) in packaged builds or show the saves as unavailable, instead of opening an empty offline namespace that looks like lost progress. Keep the explicit association flow from "Ownership and authority".
 6. **Remote players are keyed by Steam ID, shown by persona name.** Store `identityRemote` as the key with a cached display name. Refresh names from Steam when available, because persona names change and are not unique.
-7. **Demo vs full game.** The demo is the same executable with `--demo`, so it shares Electron userData with the full game. Decide whether demo progress carries over on purchase (a common player expectation). If it does, define a one-way import from the demo namespace with the same validation as a normal load. A separate demo App ID has separate Steam Cloud storage, so carry-over can only use local files. Demo limits (island 1, two players, no firearms or skills) must be revalidated on import.
+7. **Demo vs full game.** Dropped: there is no demo (decision 2026-10-18).
 8. **Steam Cloud specifics.** With Auto-Cloud, the root is `WinAppDataRoaming` with a subdirectory such as `Dinosaur Island/saves/profiles/{64BitSteamID}`. Use the `{64BitSteamID}` path token so each account syncs only its own folder, and never match the Chromium files in the same userData. Exclude `backups/`, temp files and locks with patterns. Backups multiply the file count and quota, and syncing them can resurrect deleted slots. Auto-Cloud syncs only at launch and exit, so a mid-session crash on PC 1 followed by play on PC 2 is the normal conflict case. Steam's own conflict dialog chooses whole file sets, so slots must stay self-contained and readable whichever side wins. If Steam Deck/Proton is promised, add a Linux root override that maps to the Proton prefix.
 9. **Steam branches and updates.** Switching to a beta branch and back is the realistic way a newer schema reaches an older build. Show future-schema slots as "needs a newer version" instead of hiding them, and never rewrite their list metadata. Keep the existing `STEAM_PROTOCOL` bump policy linked to save/content versions, so a host never admits guests whose build cannot represent the restored world.
 10. **Invites while a slot is not loaded.** A friend accepting an invite, or launching through `+connect_lobby`, must not create, overwrite or autoload one of the guest's own slots. The host side of an invite always reflects the slot that is currently hosted. Lobby metadata can carry the world UUID and expedition name, so guests see "recently joined" history without any host data being stored as a local slot.
@@ -132,7 +157,7 @@ Reviewed against `747680d`. The data rules above are sound; these points cover h
 
 ## Implementation phases and code ownership
 
-1. **Stable personal storage:** first record the decisions from "Desktop and Steam runtime gaps" (where the sim runs, Steam identity namespace, single instance, demo carry-over); then add desktop save store/IPC and client persistence adapter; migrate profile/settings/unlocks; establish player identity. Pass packaged restart/account-isolation tests before world saves. Suggested modules: `desktop/save-store.cjs`, `desktop/save-ipc.cjs`, `src/client/core/persistence.js`.
+1. **Stable personal storage:** first record the decisions from "Desktop and Steam runtime gaps" (where the sim runs, Steam identity namespace, single instance); then add desktop save store/IPC and client persistence adapter; migrate profile/settings/unlocks; establish player identity. Pass packaged restart/account-isolation tests before world saves. Suggested modules: `desktop/save-store.cjs`, `desktop/save-ipc.cjs`, `src/client/core/persistence.js`.
 2. **Pure schema/export/restore:** suggested `src/shared/saveSchema.js`, `src/sim/worldSave.js`; inventory every field with the owning subsystem, validate documents, restore without reward/spawn side effects. Keep Node/browser I/O out of `src/sim`.
 3. **Solo checkpoints and multiple slots:** integrate Worker/coordinator, IndexedDB/desktop adapters, save-list metadata, independent UUID-based slots, New Solo/New Co-op/Load/Host Saved flows, rename/delete, Save & Quit, dirty tracking and errors. Resume through every island before co-op integration. Rebuild list metadata from valid slot documents if a cached index is corrupt; cache failure must not erase saves.
 4. **Host persistence and reconnect:** suggested `server/saveCoordinator.js`; integrate `server/gameHost.js`, `desktop/steam-session.js` identity binding and dormant roster lifecycle. Resume the same world solo or with friends, with fresh networking epochs/connections.
@@ -152,10 +177,10 @@ Before changes, read each affected `package-info.md`; update it when adding file
 - Continue alone -> host same world -> guest leaves -> close host -> restart -> guest rejoins: team world and correct per-player backpacks survive without a second starter kit.
 - Player joins another host and returns: personal progression follows the stated profile policy; expedition inventory stays with each world. Duplicate names cannot reclaim another player's roster.
 - Crash at every write/replace stage, out-of-order save completion, two simultaneous instances, disk full, read-only path, oversized/malformed saves and corrupted latest generation: retain or recover a valid checkpoint with an honest message.
-- Old schema migrations and future-schema refusal, changed map revision, demo/full separation, creative isolation and legacy profile import without deleting the source.
+- Old schema migrations and future-schema refusal, changed map revision, creative isolation and legacy preference import without deleting the source.
 - Packaged Windows restart on different local ports; clean install/update; browser quota/export/import; one-hour repeated autosave/travel/reconnect soak with measured save latency/size and no growing memory.
 - Steam desktop: Save & Quit through the menu and through the window X both persist the latest checkpoint before Steam/host teardown; a second launch focuses the first instance; a Steam build started without Steam never shows an empty profile as if progress were lost; an invite accepted from a closed game opens the host's world without touching the guest's slots; while hosting, capturing a save causes no visible hitch on host or guests (record the time spent per save).
-- Two Steam accounts on one Windows login and two Windows users: each sees only their own expeditions and profile; demo and full game follow the recorded carry-over decision.
+- Two Steam accounts on one Windows login and two Windows users: each sees only their own expeditions and profile.
 - If Cloud enabled: two PCs/offline conflict, stale backup restore, account switch and deletion. Attach build IDs, actual outcomes and logs; fake Steam tests alone are insufficient.
 
 Definition of done: a player can keep multiple independent solo/friend-group expeditions, create a new run without replacing existing saves, and resume a selected expedition alone or with returning friends, with correct shared progress and personal inventory, durable personal settings/progression, tested recovery, and explicit limits on host absence and crash rollback.
