@@ -64,6 +64,19 @@
     </aside>
   </main>
 
+  <div id="home-expeditions" class="screen home-dialog" hidden>
+    <section class="home-panel expeditions-panel" role="dialog" aria-modal="true" aria-labelledby="home-expeditions-title">
+      <header class="home-panel-head"><div><p class="menu-eyebrow" id="expeditions-eyebrow">Play solo</p><h2 id="home-expeditions-title">Choose an expedition</h2></div><button type="button" class="menu-link" data-home-close aria-label="Close expeditions">×</button></header>
+      <p>Each expedition keeps its own island, team progress, explorer level, skills and backpack. Starting a new one never replaces another.</p>
+      <section class="home-option expedition-new"><h3>New expedition</h3><label for="expedition-name">Name</label><div class="host-address-row"><input id="expedition-name" maxlength="32" spellcheck="false" autocomplete="off" placeholder="Expedition 1"><button type="button" class="btn btn-primary" id="btn-expedition-new">Start</button></div><p class="lobby-note">A new expedition starts with a fresh island and a new explorer at level 1.</p></section>
+      <section class="home-option"><h3>Saved expeditions</h3><ul id="expedition-list" class="expedition-list"></ul>
+        <div class="expedition-tools" id="expedition-tools" hidden><button type="button" class="menu-link" id="btn-expedition-import">Import from file</button><input type="file" id="expedition-import" accept=".json,application/json" hidden><p class="lobby-note">Browsers can clear site data: export expeditions you want to keep.</p></div>
+      </section>
+      <p class="home-feedback lobby-note" id="expedition-status" role="status" aria-live="polite"></p>
+      <footer><button type="button" class="menu-link" data-home-close>Back to menu</button></footer>
+    </section>
+  </div>
+
   <div id="home-host" class="screen home-dialog" hidden>
     <section class="home-panel" role="dialog" aria-modal="true" aria-labelledby="home-host-title">
       <header class="home-panel-head"><div><p class="menu-eyebrow">Gather your crew</p><h2 id="home-host-title">Create an expedition</h2></div><button type="button" class="menu-link" data-home-close aria-label="Close create game">×</button></header>
@@ -112,6 +125,7 @@
         <p class="menu-eyebrow pause-live">LIVE EXPEDITION</p>
         <h2 id="pause-title">Expedition menu</h2>
         <p class="pause-sub">Stay alert. The island keeps moving.</p>
+        <p id="pause-save" class="pause-save lobby-note" role="status" aria-live="polite"></p>
       </header>
       <div class="pause-grid">
         <nav class="pause-actions" aria-label="Pause menu">

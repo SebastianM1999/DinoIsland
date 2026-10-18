@@ -10,8 +10,8 @@
 - `graphicsTier.js` — `TIERS`, `GraphicsAutoTune`, `guessTier`, `decide`, `gpuName`: conservative initial graphics level, measured in-game and stored per GPU with `CALIBRATION_VERSION`; saved calibration is rechecked each session and after sustained slowdown. Visible long frames remain evidence; hidden tabs discard the measurement window. Tiers control world-target MSAA, pixel ratio and foliage shadow policy without overwriting player settings.
 - `gpuTimer.js` — `GpuTimer`: non-blocking GPU frame time via `EXT_disjoint_timer_query_webgl2`.
 - `settings.js` — `settings`, `SETTING_DEFS`, `setSetting`, `resetSettings`, `onSettings`, `audioGains`, `FPS_LIMITS`: player preferences in localStorage with change listeners.
-- `profile.js` — `loadProfile`, `saveProfile`, `PROFILE_KEY`: the XP/skills save carried by the client and sent in `hello`.
-- `islandProgress.js` — saved highest earned starting island; guards corrupt/blocked storage and restricts ordinary solo menu selection. Temporary `TEST_ALL_ISLANDS_UNLOCKED` playtest access exposes all islands without changing earned saves. Unlocks are recorded from completed authoritative expedition missions, never from scenery previews or creative mode.
+- `persistence.js` — `storage` (localStorage-shaped; the desktop's `window.dinoStore`, file-backed, else the browser's localStorage, looked up per call), `readItem` / `writeItem` (blocked storage tolerated), `migrateLocalPreferences` (desktop: carries name/outfit/settings/pockets/calibration from an older build's localStorage once; never XP or skills).
+- `islandProgress.js` — which island a new expedition may start on: the first, or any while the temporary `TEST_ALL_ISLANDS_UNLOCKED` playtest access is on. Island progress itself belongs to each expedition (its save).
 - `resources.js` — `retainResource`, `retainObjectResources`, `disposeIslandScenes`: marks cache-owned GPU resources and disposes everything else when an island is torn down.
 
 ### Areas inside `game.js` (~1000 lines)
@@ -33,7 +33,7 @@
 - `Game` is constructed and started by `src/client/main.js` (`launch`), which also calls `gfx.prepare()`, `dispose()`, `setCreative()` and sets `onLeave`, `onNewIsland`, `onPanelChange`.
 - Systems receive the `Game` instance (`new DinoViews(this)` etc.) and may implement `onWelcome`, `onSnapshot`, `update(dt, renderTime)`, `minimapMarkers`, `compassMarkers`.
 - `Renderer` is also used by `src/client/player/weapon-preview.js`.
-- `settings.js` is used by `audio/audio.js`, `player/controller.js`, `ui/menus.js`; `profile.js` by `main.js` and `net/net.js`; `retainResource*` by model caches in `models/` and `entities/`.
+- `settings.js` is used by `audio/audio.js`, `player/controller.js`, `ui/menus.js`; `persistence.js` by `settings.js`, `graphicsTier.js`, `game.js` (tracked contract), `main.js` (name), `player/pockets.js`, `ui/wardrobe.js`; `retainResource*` by model caches in `models/` and `entities/`.
 
 ## Rules
 - `Game` never mutates authoritative state locally; it sends `net.act(ACT.*)` / `net.sendState` and applies what the server returns (only own movement is predicted).
@@ -42,7 +42,8 @@
 - Geometry/materials/textures owned by a reusable model cache must be marked with `retainResource`/`retainObjectResources`, otherwise `disposeIslandScenes` disposes them at the next island.
 - Frame hitches are almost always shader recompiles: a program is specific to the render target (canvas vs. `WorldPost` target), the shadow setting and the number of visible lights. Never toggle a light's `visible` (keep intensity 0 instead), compile anything that can change these in `Renderer` first (`prepare`, `#compilePath`, `#compileShadowVariant`), and give things that first appear in play a hidden copy that the warm-up frame draws (see `Items`). `prepare` draws hidden objects too (not lights).
 - Graphics tier is never chosen by the player; render scale and contact shading are the only graphics sliders (`SETTING_DEFS`).
-- localStorage access goes through `storageKey()` and is guarded with try/catch (`settings.js`, `profile.js`, `graphicsTier.js`).
+- Preference access goes through `persistence.js` with `storageKey()` keys and tolerates blocked storage. Never read `localStorage` directly: on the desktop its origin includes the random port, so values vanish between launches.
+- XP, skills and inventory are never stored on the client: they belong to the expedition and arrive in `MSG.PROF` / `MSG.INV`. `game.profile` starts fresh until the host's profile arrives.
 - The saved profile is untrusted: the server re-validates it (`sanitizeProfile`).
 
 ## Not here

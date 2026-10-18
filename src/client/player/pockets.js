@@ -1,10 +1,11 @@
 // Pocket order: which tool sits in which numbered pocket (keys 1-8, hotbar,
 // inventory). A client-side preference: `order[pocket]` is an EQUIP index, so
 // `game.eq` and everything sent to the server keep meaning the EQUIP index.
-// DOM-free apart from the guarded localStorage access.
+// DOM-free apart from the guarded preference storage (core/persistence.js).
 
 import { EQUIP } from '../../shared/protocol.js';
 import { storageKey } from '../../shared/brand.js';
+import { storage as preferences } from '../core/persistence.js';
 
 const STORE_KEY = storageKey('pockets');
 
@@ -23,7 +24,7 @@ export function validPocketOrder(order) {
 }
 
 /** The remembered order, or the default one when nothing (valid) is stored or storage is blocked. */
-export function loadPocketOrder(storage = globalThis.localStorage) {
+export function loadPocketOrder(storage = preferences) {
   try {
     let order = JSON.parse(storage?.getItem(STORE_KEY) || 'null');
     // Extend valid older saves without losing the player's pocket arrangement.
@@ -35,7 +36,7 @@ export function loadPocketOrder(storage = globalThis.localStorage) {
   }
 }
 
-export function savePocketOrder(order, storage = globalThis.localStorage) {
+export function savePocketOrder(order, storage = preferences) {
   if (!validPocketOrder(order)) return;
   try { storage?.setItem(STORE_KEY, JSON.stringify(order)); } catch { /* storage may be blocked */ }
 }

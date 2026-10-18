@@ -7,8 +7,9 @@
 //   xp      total experience (the level is derived from it)
 //   bonus   extra skill points earned outside levelling (required items)
 //   skills  { [skillId]: rank } – bought ranks
-// It is saved by the client (localStorage), sent in `hello`, and re-validated by
-// the server with sanitizeProfile() so an edited save can never exceed its budget.
+// It belongs to the expedition: the host keeps it per explorer in the world's roster and
+// its save (sim/worldSave.js), re-validated with sanitizeProfile() on load so an edited
+// save can never exceed its budget.
 
 export const LEVEL_CAP = 30;
 /** Points a freshly spent tier needs in the same tree (spent BEFORE buying the node). */

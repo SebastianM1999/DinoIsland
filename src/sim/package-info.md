@@ -17,7 +17,8 @@
 - `towers.js` — `updateTowers`, `hostile`: base defence towers pick and shoot hostile dinosaurs.
 - `volcano.js` — `Volcano` (island 3, idle elsewhere): hot ground burns players (not with Fireproof), the eruption cycle calm -> rumble -> erupt (lava bombs near players and anywhere, never at the camp, base or boat; they hurt dinosaurs too) -> ash (dinosaurs see less far: `sightMul`), the mountain path's bomb zone (bombs ahead of whoever climbs it, eruption or not), lava geysers (bubble, then spout: they burn and throw back players and dinosaurs; only near players), sinking columns (stood on: down under the lava and up again, their colliders with them), the lava lake treasure (loot and xp, once), and ash rain on the wind between eruptions (the eruption keeps its time); out in the ash a player loses health after a grace time, never below a floor (the camp and the base plots shelter: `ashShelter`); `public()` (phase, what brought the ash) for late joiners.
 - `unstuck.js` — `standable`, `goodSpot`, `findUnstuckSpot`: nearest safe spot for the "get unstuck" action.
-- `worker.js` — Web Worker host for solo play: runs `ServerWorld` on a timer and relays messages to the page.
+- `worker.js` — Web Worker host for solo play: runs `ServerWorld` on a timer and relays messages to the page. With a `save` in `start` it restores (or creates) a saved expedition, joins the explorer under the roster key `owner` and posts `save-capture` messages (`exportWorld`) every 60 s, after checkpoints and on request; testing sessions (no `save`) are not saved.
+- `worldSave.js` — expedition persistence: `exportWorld(world)` (explicit, allowlisted plain data: island, clock, id counter, store/upgrades, mission, relics, base, raid schedule, volcano cycle, fruit/resources/torches, ground items, traps, carcasses, living bosses' health, the roster), `worldOptions(data)` + `restoreWorld(world, data)` (rebuild the island, then fill it in; ordinary dinosaurs respawn fresh, killed bosses stay dead, a raid in progress is called off, both RNGs re-seed), `rosterRecord` / `applyRosterRecord` (a player's profile, inventory, pose, health by roster key; reloads cancelled, a fruit being eaten returned, downed = defeated), `sanitizeInventory`.
 - Fixed maps: `#loadLevel` builds the level's `levelDef(i).variant` (start and `nextLevel`); only the start island takes an `opts.variant` override.
 - Dev tools: the worker passes `?variant=N` through (overrides the fixed map) and sets `world.devTools` for `?dev`; only then does `ACT.DEV_TP` (creative only) teleport, for the dev pin tool. Hosted servers never set it.
 
@@ -38,15 +39,17 @@
 - MPX (`mpx`) shares authoritative firearm ownership, shots, reload, refill, drop/pickup and gun skill multipliers.
 
 ## Entry points
-- `ServerWorld` (`world.js`): constructed by `server/gameHost.js` (online/LAN/Steam host) and by `worker.js` (solo). Hosts call `join`, `leave`, `receive(id, msg)`, `step(dt)` at `CONFIG.net.tickRate`, `snapshotDue(dt)` + `snapshot()`, and supply `host.send(to, msg, except)`.
-- `worker.js`: started by `Net.local` in `src/client/net/net.js` via `new Worker(new URL('../../sim/worker.js', ...))`; page messages `start` / `msg` / `stop`.
+- `ServerWorld` (`world.js`): constructed by `server/gameHost.js` (online/LAN/Steam host), `server/saveCoordinator.js` (saved expeditions) and by `worker.js` (solo). Hosts call `join(name, attach, outfit, profile, key)`, `leave`, `receive(id, msg)`, `step(dt)` at `CONFIG.net.tickRate`, `snapshotDue(dt)` + `snapshot()`, and supply `host.send(to, msg, except)` and optionally `host.checkpoint(reason)` (new island, boat part, base stage, boss, leave). `opts.firstId`/`opts.now` start a restored world's id counter and clock where its save left them.
+- `worker.js`: started by `Net.local` in `src/client/net/net.js` via `new Worker(new URL('../../sim/worker.js', ...))`; page messages `start` / `msg` / `save` / `stop`.
+- `worldSave.js`: used by `world.js` (roster on join/leave), `worker.js`, `server/saveCoordinator.js` and tests (`world-save`, `solo-worker`, `save-host`).
 - Many tests in `test/` import `ServerWorld` and individual modules directly (`findPath`, `climbSlope`, `gunAction`, `nearDino`, `RAID`, `raiderStep`, brains).
 
 ## Rules
 - Imports only from `src/shared/` and within `src/sim/`; never from `src/client/` or `server/`.
 - `world.js` and its dependencies use no Node or browser APIs (header contract). Only `worker.js` touches worker globals (`postMessage`, `onmessage`, `performance`, `setInterval`).
 - The server is authoritative: clients send state and requests (`MSG.STATE`, `MSG.ACT`); the sim validates movement (`onState`), action origin, hit plausibility and costs, and answers with `MSG.CORRECT`, events or nothing.
-- Every outgoing message gets the current `worldEpoch` as `w` (`send`/`broadcast`); a new island bumps it.
+- Every outgoing message gets the current `worldEpoch` as `w` (`send`/`broadcast`); a new island or a restore bumps it.
+- Progression (XP, skills), inventory and island progress belong to the expedition: a player record lives in `world.roster` (by persistent roster key) while that player is away, and in the save. Names are never identity. A new authoritative field that must survive a reload needs an entry in `worldSave.js` export and restore (and a `world-save` test), or an explicit decision that it is rebuilt.
 - Lag compensation is bounded: `hitPose` clamps the client render time to `CONFIG.net.lagCompMax`; `DinoSystem.recordHistory` keeps just that much pose history.
 - Tick and snapshot rates come from `CONFIG.net.tickRate` / `CONFIG.net.snapshotRate`; far dinosaurs are only sent every `CONFIG.net.farSnapshotEvery` snapshots.
 - New species behaviour belongs in an `ai/*.js` brain registered in `BRAINS` in `dinos.js`, not in `DinoSystem.update`.

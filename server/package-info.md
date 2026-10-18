@@ -3,16 +3,19 @@
 
 ## Files
 - `staticFiles.js` — `serveStatic()`: ETag/304, brotli/gzip for text files (compressed once per file version and kept in memory), one-day caching for `/vendor/three/` and the font, and the `<link rel="modulepreload">` hints injected into `index.html` from the static import graph of its module entry (`staticImportGraph()` follows the import map for `three`).
-- `index.js` — HTTP static file server plus local control endpoints (`/connection`, `/status`, `/internet*`); `createGameServer()` wires the game host and the internet relay onto one `http.Server`. Also runnable as a CLI (`node server/index.js [--port N] [--demo]`; `DINO_DEMO=1` too): `createGameServer({ demo })` hosts the demo (CONFIG.demo).
+- `index.js` — HTTP static file server plus local control endpoints (`/connection`, `/status`, `/internet*`, `/saves*` with `saves`); `createGameServer()` wires the game host, the internet relay and (with `saves: true`) the save coordinator onto one `http.Server`. Also runnable as a CLI (`node server/index.js [--port N] [--demo]`; `DINO_DEMO=1` too): `createGameServer({ demo })` hosts the demo (CONFIG.demo).
 - `devPins.js` — `handleDevPins(req, res, root)`: the dev pin tool's endpoint (`POST /__dev/pin`, `GET /__dev/pins`); writes `dev-pins/<id>.json` + `.png` (gitignored) with the git commit/branch. Answers only in a source checkout (a `.git` in the root) and only to this machine; 404 otherwise.
 - `caveBake.js` — Node reader of the Hollow Mountain bakes (`assets/cave/*.bin`, `src/shared/caveBake.js`): `readCaveBake`, `bakePath`, `installCaveBakes()` (the synchronous provider `Terrain` asks; `startGameHost` installs it so the host builds a baked fixed map's walk grid in ~0.1 s instead of ~2 s).
-- `gameHost.js` — `startGameHost()`: WebSocket connection handling, `hello` join/reject, message routing into `ServerWorld`, fixed-rate tick loop, snapshot broadcast and silent-client timeout.
+- `gameHost.js` — `startGameHost()`: WebSocket connection handling, `hello` join/reject, message routing into `ServerWorld`, fixed-rate tick loop, snapshot broadcast and silent-client timeout. The hosted world can be swapped (`load(build)`) or closed (`unload()`); `worldless` starts without one, `admit` gates joins (and hands out persistent roster keys), `onCheckpoint` hears the world's save-worthy moments.
+- `saveStore.js` — `SaveStore`: the owner's expeditions on disk, one folder per world UUID, one immutable `gen-NNNNNNNNN.json` per save (temporary file, flush, rename; newest `KEEP` generations kept), damaged generations renamed `.bad` and skipped, a newer game's save never overwritten, a `.lock` file per root (one writing process). `describeIoError` turns disk errors into player-facing text.
+- `saveCoordinator.js` — `SaveCoordinator`: which expedition the host serves and who may join (owner = loopback + token from `open`/`create`, roster key `OWNER_KEY`; `private` lobby = solo, `open` = LAN/internet friends too), captures between ticks (`sim/worldSave.js` + `shared/saveSchema.js`), serial writes, autosave every 60 s, debounced checkpoint saves, retry with backoff, `EV.SAVED` to the owner, Save & Quit (`close`), rename, delete, `shutdown`.
+- `saveRoutes.js` — `handleSaveRoutes()`: the `/saves*` HTTP API of the coordinator (list, status, new, open, lobby, save, close, rename, delete) for the game page on this machine only.
 - `internetHost.js` — `InternetHost`: development-only remote friend test. Downloads a pinned, SHA-256-checked `cloudflared` (Windows x64 only), opens a Quick Tunnel to a local proxy that admits only WebSocket upgrades carrying a random room token.
 - `lanAddress.js` — `lanAddresses(port)`: lists shareable `ws://<ipv4>:<port>` addresses, physical adapters before VM/VPN ones, de-duplicated.
 
 ## Entry points
-- `createGameServer()` (index.js) — called by `desktop/main.cjs` (Electron launcher) and by tests (`test/http-host.test.js`, `test/internet-host.test.js`, `test/lan-address.test.js`, `test/audio.test.js`). Returns `{ httpServer, host, internet }`; the caller decides the port and calls `listen`.
-- `startGameHost(httpServer?, { onConnection, demo })` (gameHost.js; `status()` reports `demo` and its `maxPlayers`) — called by `index.js` and by `desktop/steam-session.js`, which passes no HTTP server and feeds Steam peers through the returned `attachConnection(ws, addr)`. The returned object also has `world`, `stop()` and `status()`.
+- `createGameServer({ demo, saves })` (index.js) — called by `desktop/host-process.js` (the desktop host, `saves: true`) and by tests (`test/http-host.test.js`, `test/internet-host.test.js`, `test/lan-address.test.js`, `test/audio.test.js`, `test/save-host.test.js`). Returns `{ httpServer, host, internet, saves }`; the caller decides the port and calls `listen`, and gives `saves.useRoot(dir)` the player's expedition folder.
+- `startGameHost(httpServer?, { onConnection, demo, worldless, admit, onCheckpoint })` (gameHost.js; `status()` reports `demo`, `open` and its `maxPlayers`) — called by `index.js` and by `desktop/steam-session.js`, which passes no HTTP server and feeds Steam peers through the returned `attachConnection(ws, addr, info)`. The returned object also has `world` (a getter: it can change), `load`, `unload`, `playerByKey`, `stop()` and `status()`.
 - `InternetHost` — constructed in `index.js`; its constructor takes injectable `getHelper`/`spawnProcess`/`resolveAddress` (used by `test/internet-host.test.js`).
 - `npm start` / `npm run dev` run `server/index.js` directly.
 
@@ -23,13 +26,16 @@
 - The world steps at `CONFIG.net.tickRate` with an accumulator (catch-up capped at 250 ms); snapshots go out only when `world.snapshotDue()` says so. Players silent for longer than `CONFIG.net.timeoutMs` are terminated and removed.
 - Static responses go through `staticFiles.js`; everything revalidates (`no-cache` + ETag) except the vendored Three.js and the font. Dynamic `import()` targets (the game module graph) are deliberately not preloaded.
 - Only `src/`, `css/`, `assets/` and `index.html` are served; `/vendor/three/` maps into `node_modules/three` (or a packaged `three-addons` folder). Every resolved path is checked to stay inside its root.
-- `/internet/start` and `/internet/stop` require a loopback client, `POST`, `application/json` and a localhost `Origin` on the server's own port; `/internet` (status) requires loopback only.
+- `/internet/start` and `/internet/stop` require a loopback client, `POST`, `application/json` and a localhost `Origin` on the server's own port; `/internet` (status) requires loopback only. `/saves*` follows the same rules (reads: loopback; changes: loopback + POST + JSON + own origin; bodies at most 4 KiB).
+- Progression belongs to the expedition: hosts never pass a client's `hello` profile to `world.join`. A saved expedition's owner joins with roster key `owner`; guests join without a persistent key (their characters are not kept yet).
+- Saves are captured on the event loop between ticks, never inside `world.step`; disk writes are asynchronous and one at a time per host. A failed write keeps the previous generation and the world open. Expedition folders and files are named only from validated UUIDs and counters.
 - The internet tunnel exposes only WebSocket gameplay: the proxy answers plain HTTP with 404 and rejects upgrades without the room token. The tunnel stops when the owner's local socket (`?internetOwner=<token>`) closes.
 - Uses `ws` and Node built-ins only; shared data comes from `src/shared/` (`config.js`, `protocol.js`, `brand.js`).
 
 ## Not here
 - Game rules, AI, inventory, missions, snapshots: `src/sim/` (`world.js` and friends).
 - Message formats and tunables: `src/shared/protocol.js`, `src/shared/config.js`.
-- Solo play does not use this server: it runs `ServerWorld` in a Web Worker (`src/sim/worker.js`, started from `src/client/net/net.js`).
+- Browser solo play does not use this server: it runs `ServerWorld` in a Web Worker (`src/sim/worker.js`, started from `src/client/net/net.js`) and keeps its expeditions in IndexedDB (`src/client/net/expeditions.js`). Desktop solo is this server in the host process with a private lobby.
+- The save document format and the world export/restore: `src/shared/saveSchema.js`, `src/sim/worldSave.js`.
 - Steam lobbies and P2P transport: `desktop/steam-session.js` (it reuses `startGameHost`).
 - Client-side networking and join UI: `src/client/net/`.

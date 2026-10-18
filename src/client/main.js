@@ -4,9 +4,10 @@ import { Net } from './net/net.js';
 import { CONFIG } from '../shared/config.js';
 import { ICON_SPRITE, initSettings, renderPause } from './ui/menus.js';
 import { savedOutfit } from './ui/wardrobe.js';
-import { loadProfile } from './core/profile.js';
-import { unlockIsland, unlockedStartingIsland, availableStartingIsland } from './core/islandProgress.js';
-import { EV } from '../shared/protocol.js';
+import { unlockedStartingIsland, availableStartingIsland } from './core/islandProgress.js';
+import { readItem, writeItem, migrateLocalPreferences } from './core/persistence.js';
+import { pickExpeditions } from './net/expeditions.js';
+import { initExpeditionPanel, formatSavedAt } from './ui/expeditionPanel.js';
 import { preloadDinoModels } from './models/dino/glbDino.js';
 import { GameAudio } from './audio/audio.js';
 import { initSteamLobby } from './ui/steamLobby.js';
@@ -22,6 +23,7 @@ import { BRAND, storageKey, migrateStorage } from '../shared/brand.js';
 import { preloadCaveBake } from '../shared/caveBakeLoad.js';
 
 migrateStorage();
+migrateLocalPreferences();   // (desktop: preferences an older build kept in this origin's localStorage)
 // Testing aids (solo only): ?island=2 starts on island 2 (1-based), ?base=1..3
 // with the team's base already standing on the first building plot.
 const DEBUG_QUERY = new URLSearchParams(location.search);
@@ -30,6 +32,9 @@ const DEBUG_VARIANT = Number(DEBUG_QUERY.get('variant')) || undefined;   // ?var
 const DEBUG_BASE = Math.max(0, Math.min(3, Number(DEBUG_QUERY.get('base')) || 0));
 const DEBUG_RAID = Math.max(0, Number(DEBUG_QUERY.get('raid')) || 0);   // ?raid=10: first raid in 10 s (with ?base)
 const DEBUG_DEV = DEBUG_QUERY.has('dev') || DEBUG_QUERY.has('pin');   // ?dev: the dev pin tool (F8, client/core/devPins.js)
+// Any testing aid starts an unsaved solo session straight away instead of the expedition picker.
+const DEBUG_START = ['island', 'variant', 'base', 'raid', 'dev', 'pin', 'demo'].some((k) => DEBUG_QUERY.has(k));
+const expeditions = pickExpeditions();
 // The demo (CONFIG.demo): ?demo=1, or a demo server says so in /status (pollLobby). Solo games then run
 // the demo too; the menu offers neither other islands nor the skill tree.
 let demo = DEBUG_QUERY.get('demo') === '1';
@@ -156,12 +161,13 @@ function setPaused(show) {
     renderPause(game);
     resetLeave();
     syncCreative();
+    renderSaveStatus();
   }
   clearInterval(pauseRefresh);
   pauseRefresh = null;
   paused.hidden = !show;
   if (show) pauseRefresh = setInterval(() => {
-    if (game?.running && !paused.hidden && !document.hidden) renderPause(game);
+    if (game?.running && !paused.hidden && !document.hidden) { renderPause(game); renderSaveStatus(); }
   }, 1000);
   if (show && !settingsUi.isOpen()) $('btn-resume').focus({ preventScroll: true });
   if (!show) settingsUi.close();
@@ -182,21 +188,24 @@ async function start(mode, options = {}) {
   busy = true;
   playMenuMusic();
   const name = nameInput.value.trim() || 'Explorer';
-  try { localStorage.setItem(storageKey('name'), name); } catch { /* storage may be blocked */ }
+  writeItem(storageKey('name'), name);
   setBusy(true, mode === 'online' ? 'Connecting…' : 'Starting…');
-  const startingIsland = unlockedStartingIsland(Number($('play-island').value));
+  const startingIsland = mode === 'expedition' && options.choice.id ? options.choice.island ?? 0 : unlockedStartingIsland(Number($('play-island').value));
   void loadingUi.start({ islandName: LEVELS[startingIsland].name, frames: mapPreviewFrames(startingIsland) });
   // Stop construction before starting the worker/network, not after connecting.
   stopMenuPostcards();
   let net;
   try {
     const outfit = savedOutfit();
-    const profile = loadProfile();   // saved XP and skills; the host re-validates them
-    if (mode === 'internet') options.url = await internetTest.start();
-    net = mode === 'steam' ? await Net.steam(window.dinoSteam, options, name, outfit, profile) :
-      mode === 'online' || mode === 'internet' ? await Net.connect(websocketAddress(options.url ?? serverInput.value), name, outfit, profile) : await Net.local(name, outfit, { level: demo ? 0 : DEBUG_QUERY.has('island') ? DEBUG_ISLAND : unlockedStartingIsland(Number($('play-island').value)), variant: DEBUG_VARIANT, dev: DEBUG_DEV, baseStage: DEBUG_BASE, raidIn: DEBUG_RAID, demo }, profile);
+    if (mode === 'internet' || options.purpose === 'internet') options.url = await internetTest.start();
+    if (mode === 'expedition') {
+      // a saved expedition: solo (private) or hosted for friends (open), see net/expeditions.js
+      const choice = options.choice.create ? { create: { ...options.choice.create, level: startingIsland } } : { id: options.choice.id };
+      net = await expeditions.start({ ...choice, lobby: options.purpose === 'solo' ? 'private' : 'open', url: options.url }, { name, outfit });
+    } else net = mode === 'steam' ? await Net.steam(window.dinoSteam, options, name, outfit) :
+      mode === 'online' || mode === 'internet' ? await Net.connect(websocketAddress(options.url ?? serverInput.value), name, outfit) : await Net.local(name, outfit, { level: demo ? 0 : DEBUG_QUERY.has('island') ? DEBUG_ISLAND : unlockedStartingIsland(Number($('play-island').value)), variant: DEBUG_VARIANT, dev: DEBUG_DEV, baseStage: DEBUG_BASE, raidIn: DEBUG_RAID, demo });
   } catch (err) {
-    if (mode === 'internet') internetTest.stop();
+    if (mode === 'internet' || options.purpose === 'internet') internetTest.stop();
     busy = false;
     loadingUi.stop();
     void startMenuPostcards();
@@ -244,13 +253,6 @@ async function launch(net, reuse = null, { openMenu = false } = {}) {
     await preloadCaveBake(lv.index, lv.variant);
     const { Game } = await loadGameModule();
     game = await Game.create(canvas, net, reuse ?? (menuAudio ? { audio: menuAudio } : null), { signal: buildAbort.signal });
-    net.on(`ev:${EV.MISSION}`, ({ mission }) => {
-      // This comes from the host after parts, repair and sailing are complete.
-      // Creative expeditions and scenery previews do not earn map unlocks.
-      if (mission.complete && mission.objectives.every(objective => objective.done) && !game.player.creative) {
-        unlockIsland(mission.level.index + 1);
-      }
-    });
     if (DEBUG_QUERY.has('debug')) window.dinoGame = game;   // testing aid: inspect the running game
     // Developer photo studio for the menu photographs (scripts/capturePreviews.mjs); never loaded otherwise.
     if (DEBUG_QUERY.has('capturePreviews')) void import('./ui/menuPreviewCapture.js').then(({ installPreviewCapture }) => { window.__previewCapture = installPreviewCapture(game); });
@@ -329,14 +331,28 @@ $('join-form').addEventListener('submit', (e) => {
   if (document.activeElement === $('friend-internet-address')) start('online', { url: $('friend-internet-address').value, openMenu: true });
   else start('online', { openMenu: true });
 });
-$('btn-solo').addEventListener('click', () => start('local'));
-$('btn-host-internet').addEventListener('click', () => start('internet', { url: `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}` }));
+// Solo play and (on the desktop) hosting go through the saved expeditions; testing aids start unsaved.
+const expeditionPanel = initExpeditionPanel({
+  backend: expeditions,
+  open: (name) => homeMenu.open(name),
+  onPlay: (choice, purpose) => { void start('expedition', { choice, purpose, openMenu: purpose !== 'solo' }); },
+});
+const hostsExpeditions = expeditions.kind === 'host';
+$('btn-solo').addEventListener('click', () => { if (DEBUG_START) void start('local'); else void expeditionPanel.open('solo'); });
+$('btn-host-internet').addEventListener('click', () => {
+  if (hostsExpeditions) void expeditionPanel.open('internet');
+  else void start('internet', { url: `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}` });
+});
 $('btn-join-internet').addEventListener('click', () => start('online', { url: $('friend-internet-address').value, openMenu: true }));
-$('btn-host-lan').addEventListener('click', () => start('online', { url: `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}` }));
+const hostLan = () => {
+  if (hostsExpeditions) void expeditionPanel.open('lan');
+  else void start('online', { url: `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}` });
+};
+$('btn-host-lan').addEventListener('click', hostLan);
 $('btn-host').addEventListener('click', async () => {
   await steamLobby.ready;
   if (steamLobby.available) void start('steam', { host: true, visibility: $('lobby-visibility').value });
-  else void start('online', { url: `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}` });
+  else hostLan();
 });
 const steamLobby = initSteamLobby({
   join: lobbyId => start('steam', { lobbyId, openMenu: true }),
@@ -387,10 +403,22 @@ canvas.addEventListener('click', () => {
 // Leaving needs a second click so a stray click can't end the expedition.
 const leaveBtn = $('btn-leave');
 let leaveTimer = 0;
+let forceQuit = false;   // the last Save & quit failed: the next confirmed click quits without saving
 function resetLeave() {
   clearTimeout(leaveTimer);
   delete leaveBtn.dataset.confirm;
-  leaveBtn.lastElementChild.textContent = 'Leave game';
+  leaveBtn.lastElementChild.textContent = forceQuit ? 'Quit without saving' : game?.net.expedition ? 'Save & quit' : 'Leave game';
+}
+/** The pause card's save line: when this expedition was last saved, or why it is not saved. */
+function renderSaveStatus() {
+  const line = $('pause-save');
+  const net = game?.net;
+  if (!net) { line.textContent = ''; return; }
+  const s = net.saveStatus;
+  line.classList.toggle('is-error', !!s && !s.ok);
+  if (s && !s.ok) line.textContent = `Saving failed: ${s.error}`;
+  else if (net.expedition) line.textContent = `${net.expedition.name} · ${formatSavedAt(net.expedition.savedAt)}`;
+  else line.textContent = net.mode === 'local' ? 'Testing session: not saved.' : 'This session is not saved on this computer.';
 }
 // Creative mode toggle (invincible + flying); the label shows the current state.
 const creativeBtn = $('btn-creative');
@@ -404,21 +432,40 @@ creativeBtn.addEventListener('click', () => {
   game.setCreative(!game.player.creative);
   syncCreative();
 });
-leaveBtn.addEventListener('click', () => {
+leaveBtn.addEventListener('click', async () => {
   if (!leaveBtn.dataset.confirm) {
     leaveBtn.dataset.confirm = '1';
-    leaveBtn.lastElementChild.textContent = 'Click again to leave';
+    leaveBtn.lastElementChild.textContent = forceQuit ? 'Click again: progress since the last save is lost' : game?.net.expedition ? 'Click again to save and quit' : 'Click again to leave';
     leaveTimer = setTimeout(resetLeave, 3000);
     return;
   }
-  game?.net.close();
+  const net = game?.net;
+  if (net?.expedition) {
+    // Save & quit: wait for the save before leaving; a failed save keeps the expedition running
+    clearTimeout(leaveTimer);
+    leaveBtn.disabled = true;
+    leaveBtn.lastElementChild.textContent = 'Saving…';
+    game.onLeave = () => {};   // (the host closing the expedition is expected now)
+    const result = await expeditions.saveAndQuit(net, { force: forceQuit });
+    leaveBtn.disabled = false;
+    if (!result.ok) {
+      game.onLeave = (reason) => backToMenu(reason);
+      net.reportSave({ ok: false, at: Date.now(), reason: 'quit', error: result.error });
+      forceQuit = true;
+      resetLeave();
+      renderSaveStatus();
+      return;
+    }
+    net.close();
+    backToMenu(forceQuit ? '' : `"${net.expedition.name}" was saved.`);
+    return;
+  }
+  net?.close();
   backToMenu('');
 });
 
-try { nameInput.value = localStorage.getItem(storageKey('name')) || ''; } catch { /* ignore */ }
-nameInput.addEventListener('input', () => {
-  try { localStorage.setItem(storageKey('name'), nameInput.value.slice(0, 14)); } catch { /* storage may be blocked */ }
-});
+nameInput.value = readItem(storageKey('name')) || '';
+nameInput.addEventListener('input', () => { writeItem(storageKey('name'), nameInput.value.slice(0, 14)); });
 serverInput.value = served ? `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}` : `ws://localhost:${CONFIG.net.port}`;
 applyDemoMenu();
 const hashMsg = new URLSearchParams(location.hash.slice(1)).get('msg');

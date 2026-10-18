@@ -596,6 +596,9 @@ kbd {
 #paused .pause-live { color: var(--green); font-size: .75rem; margin-bottom: 12px; }
 #paused .pause-live::before { content: ''; display: inline-block; width: 7px; height: 7px; margin-right: 8px; border-radius: 50%; background: currentColor; }
 #paused .pause-sub { font-size: .95rem; color: #c7d5c2; margin: 10px 0 0; }
+#paused .pause-save { margin: 6px 0 0; }
+#paused .pause-save:empty { display: none; }
+#paused .pause-save.is-error { color: #ffb4c2; font-weight: 700; }
 #paused .pause-grid { display: flex; flex-direction: column; gap: 20px; }
 #paused .pause-actions { gap: 8px; }
 #paused .pause-actions .btn { min-height: 48px; padding: 10px 16px; background: #274347e6; border: 1px solid #93aaa34d; border-radius: 6px; box-shadow: none; font-size: 1rem; }

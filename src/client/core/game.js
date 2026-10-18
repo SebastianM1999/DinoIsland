@@ -9,8 +9,8 @@ import { buildLayoutSteps } from '../../shared/layout.js';
 import { planIsland } from '../../shared/island.js';
 import { RELICS } from '../../shared/relics.js';
 import { MSG, EV, PF, DS, ACT } from '../../shared/protocol.js';
-import { skillMods, DASH } from '../../shared/skills.js';
-import { loadProfile } from './profile.js';
+import { skillMods, DASH, freshProfile } from '../../shared/skills.js';
+import { readItem, writeItem } from './persistence.js';
 import { SkillPanel } from '../ui/skillPanel.js';
 import { nearCamp } from '../ui/skillModel.js';
 import { CONTRACTS } from '../../shared/missions.js';
@@ -133,8 +133,8 @@ export class Game {
     this.gfx.applyBiome(this.layout.biome.skyOutside ?? this.layout.biome.sky);   // (the Hollow Mountain starts in its daylit cove)
     this.input = reuse?.input ?? new Input(canvas);
     this.player = new PlayerController(this.terrain, this.layout.playerColliders, this.layout.rockSurfaceAt);
-    // progression: the net layer keeps the newest server profile (it can arrive while the island loads), else the saved one
-    this.profile = net.prof ?? loadProfile();
+    // progression: the net layer keeps the newest server profile (it can arrive while the island loads); it belongs to the expedition
+    this.profile = net.prof ?? freshProfile();
     this.mods = skillMods(this.profile.skills);   // skill effects of the local player (the setter feeds the controller)
     this.player.onDash = () => this.net.act(ACT.DASH, {});
     this.downed = null;         // { left, t, canGiveUp, reviveBy?, reviveT? } while the server has us downed (bleeding out)
@@ -180,9 +180,9 @@ export class Game {
     this.hud = new Hud(document.getElementById('hud'));
     yield* this.hud.initMinimapSteps(this.terrain, this.layout);
     this.hud.setXp(this.profile);
-    try { this.hud.trackedContract = localStorage.getItem(storageKey('tracked')) || null; } catch { /* storage blocked */ }
+    this.hud.trackedContract = readItem(storageKey('tracked')) || null;
     this.hud.onTrackContract = (id) => {
-      try { if (id) localStorage.setItem(storageKey('tracked'), id); else localStorage.removeItem(storageKey('tracked')); } catch { /* ignore */ }
+      writeItem(storageKey('tracked'), id || null);
       this.#showMission();
     };
     this.input.onPanelToggle = (action) => {
@@ -641,6 +641,8 @@ export class Game {
       this.audio.play('pickup', c ? { pos: { x: c.x, y: c.y + 0.6, z: c.z } } : {});
     });
     net.on(`ev:${EV.TOAST}`, (m) => this.hud.toast(m.text, m.icon));
+    // expedition saves happen quietly; only a failure is worth interrupting play for (the pause menu shows the details)
+    net.onSave?.((s) => { if (!s.ok) this.hud.toast(`Saving failed: ${s.error}`, 'info'); });
     net.on(`ev:${EV.FULL}`, (m) => this.actions.fullAlert(m.text, m.icon));
     net.on(`ev:${EV.ITEM_REMOVE}`, (m) => { if (m.by === this.me.id) this.audio.play('pickup'); });
     net.on(`ev:${EV.TRAP_SNAP}`, (m) => {

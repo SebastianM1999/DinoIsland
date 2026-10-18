@@ -60,6 +60,7 @@ export function initHomeMenu() {
   });
   addEventListener('pagehide', () => observer.disconnect(), { once: true });
   return {
+    open,
     close,
     feedback(text) {
       for (const root of roots) {

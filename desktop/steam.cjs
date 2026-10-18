@@ -6,6 +6,8 @@ async function installSteam(app, win, localUrl, { demo = false } = {}) {
   let session = null;
   let sdk = null;
   let pump = null;
+  let configured = false;   // a real App ID is set: this is the Steam build
+  let steamId = null;       // the signed-in account (its expeditions live under this identity)
   let failure = 'Steam co-op needs the Steam desktop build. Use an internet test or play solo.';
   const emit = event => { if (!win.isDestroyed()) win.webContents.send('dino:steam:event', event); };
   try {
@@ -14,6 +16,7 @@ async function installSteam(app, win, localUrl, { demo = false } = {}) {
     if (!Number.isSafeInteger(appId) || appId < 1 || appId > 0xffffffff) {
       failure = 'Steam co-op is not configured yet. Use an internet test or play solo.';
     } else {
+      configured = true;
       const sdkPath = process.env.DINO_STEAM_SDK_PATH || path.join(app.isPackaged ? process.resourcesPath : app.getAppPath(), 'steamworks_sdk');
       const library = path.join(sdkPath, 'redistributable_bin', 'win64', 'steam_api64.dll');
       if (process.platform === 'win32' && !fs.existsSync(library)) {
@@ -23,8 +26,10 @@ async function installSteam(app, win, localUrl, { demo = false } = {}) {
         sdk = SteamworksSDK.getInstance();
         sdk.setSdkPath(sdkPath);
         if (!sdk.init({ appId })) throw new Error('Start Steam, sign in, and restart the game to use Steam co-op.');
-        const { SteamSession } = await import('./steam-session.js');
+        const { SteamSession, validSteamId } = await import('./steam-session.js');
         session = new SteamSession(sdk, { emit, demo });
+        const id = String(sdk.getStatus().steamId ?? '');
+        steamId = validSteamId(id) ? id : null;
         const lobbyId = sdk.matchmaking.getConnectLobbyIdFromCommandLine();
         if (lobbyId) session.requestJoin(lobbyId);
         pump = setInterval(() => {
@@ -77,13 +82,20 @@ async function installSteam(app, win, localUrl, { demo = false } = {}) {
   const onNavigation = (_event, _url, inPlace, mainFrame) => { if (mainFrame && !inPlace) session?.leave(); };
   win.webContents.on('did-start-navigation', onNavigation);
   win.webContents.on('render-process-gone', () => session?.leave());
-  return () => {
+  /** A second launch (a Steam invite while the game runs) hands its command line to this instance. */
+  function handleArgs(argv) {
+    const i = argv.indexOf('+connect_lobby');
+    const lobbyId = i >= 0 ? argv[i + 1] : null;
+    if (session && lobbyId) session.requestJoin(lobbyId);
+  }
+  const stop = () => {
     clearInterval(pump);
     session?.dispose();
     sdk?.shutdown();
     for (const name of Object.keys(handlers)) ipcMain.removeHandler(`dino:steam:${name}`);
     ipcMain.removeListener('dino:steam:send', onSend);
   };
+  return { stop, steamId, configured, handleArgs };
 }
 
 module.exports = { installSteam };

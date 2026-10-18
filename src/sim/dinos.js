@@ -658,6 +658,7 @@ export class DinoSystem {
     this.world.awardXp(XP_BY_TYPE[d.type] ?? 0, c.name);   // every player, raid dinos included
     if (killer) this.world.onPlayerKill(killer);
     if (!d.raid && !d.boss) this.respawnQueue.push({ type: d.type, at: this.world.now + c.respawn, group: d.group });
+    if (d.boss) this.world.checkpoint?.('boss');
   }
 
   /**

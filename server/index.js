@@ -14,6 +14,8 @@ import { InternetHost } from './internetHost.js';
 import { BRAND } from '../src/shared/brand.js';
 import { serveStatic } from './staticFiles.js';
 import { handleDevPins } from './devPins.js';
+import { SaveCoordinator } from './saveCoordinator.js';
+import { handleSaveRoutes } from './saveRoutes.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -63,11 +65,17 @@ function resolvePath(urlPath) {
   return relative.startsWith('..') || path.isAbsolute(relative) ? null : file;
 }
 
-/** demo: host the demo (CONFIG.demo) – `npm start -- --demo` or DINO_DEMO=1. */
-export function createGameServer({ demo = false } = {}) {
+/**
+ * demo: host the demo (CONFIG.demo) – `npm start -- --demo` or DINO_DEMO=1.
+ * saves: keep the owner's expeditions (server/saveCoordinator.js; the desktop host process). The host
+ * then starts without a world and hosts the expedition the owner opens; call `saves.useRoot(dir)`.
+ */
+export function createGameServer({ demo = false, saves = false } = {}) {
   let host;
   let internet;
+  const coordinator = saves ? new SaveCoordinator() : null;
   const httpServer = http.createServer((req, res) => {
+  if (handleSaveRoutes(req, res, coordinator, httpServer.address()?.port)) return;
   if (req.url === '/internet' || req.url === '/internet/start' || req.url === '/internet/stop') {
     const local = ['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(req.socket.remoteAddress);
     const changing = req.url !== '/internet';
@@ -109,10 +117,14 @@ export function createGameServer({ demo = false } = {}) {
     resolveUrl: resolvePath,
   });
   });
-  host = startGameHost(httpServer, { onConnection: (ws, req) => internet?.trackHost(ws, req), demo });
+  host = startGameHost(httpServer, {
+    onConnection: (ws, req) => internet?.trackHost(ws, req), demo,
+    ...(coordinator ? { worldless: true, admit: (info) => coordinator.admit(info), onCheckpoint: (reason) => coordinator.checkpoint(reason) } : {}),
+  });
+  coordinator?.attach(host);
   internet = new InternetHost(httpServer);
   httpServer.on('close', () => internet.stop());
-  return { httpServer, host, internet };
+  return { httpServer, host, internet, saves: coordinator };
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
