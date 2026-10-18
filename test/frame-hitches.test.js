@@ -63,6 +63,21 @@ test('WorldPost compiles the AO pass for its own target and the output pass for 
   assert.deepEqual(r.calls, ['target:canvas', 'compile', 'target:canvas']);
 });
 
+test('contact AO reads full-size depth texel centres, never texel borders (striped flat ground)', () => {
+  const src = new WorldPost({}).ao.fragmentShader;
+  const snap = /vec2 vUv = \(floor\(gl_FragCoord\.xy\) \* 2\.0 \+ 0\.5\) \/ sourceSize;/;
+  assert.match(src, snap, 'the AO pass snaps its UV before the first depth read');
+  assert.ok(src.search(snap) < src.indexOf('texture2D(tDepth, vUv)'));
+  // The same mapping in JS: every half-size pixel lands on a texel centre inside the depth texture.
+  for (const size of [720, 721, 1080, 1439]) {
+    for (let i = 0; i < Math.ceil(size / 2); i++) {
+      const texel = (Math.floor(i + 0.5) * 2 + 0.5) / size * size;
+      assert.ok(Math.abs(texel % 1 - 0.5) < 1e-6, `${size}: pixel ${i} reads a texel centre`);
+      assert.ok(texel < size, `${size}: pixel ${i} reads inside the texture`);
+    }
+  }
+});
+
 test('no client code toggles a light\'s visibility (the light count is part of every program)', () => {
   const found = [];
   const walk = (dir) => {

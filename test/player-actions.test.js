@@ -365,7 +365,7 @@ test('without a bow (island 1, before the hunter\'s camp) the bow slot is locked
   assert.equal(shots.length, 1);
 });
 
-test('without firearms in the pack (the demo) there are no gun slots and the gun keys select nothing', t => {
+test('without firearms in the pack there are no gun slots and the gun keys select nothing', t => {
   const { game, actions, frame } = fixture(t);
   game.me.inv.guns = {};
   frame();

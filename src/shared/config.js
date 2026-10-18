@@ -18,19 +18,12 @@ export const CONFIG = {
     timeoutMs: 10000,        // drop silent clients after this long
   },
 
-  // The demo (game design: a 20-30 minute test of controls, look and exploring): only
-  // island 1, 1-2 explorers, spear and bow (no firearms), no XP or skill tree. Switched on
-  // per game – ?demo=1 (solo), `npm start -- --demo` / DINO_DEMO=1 (server, desktop).
-  demo: {
-    maxPlayers: 2,
-  },
-
   world: {
     size: 760,               // terrain square edge length (the oblong island sits inside)
     segments: 280,           // terrain grid resolution (cells per edge)
     seaLevel: 0,
     maxWadeDepth: 1.4,       // players cannot walk into water deeper than this
-    dayLengthSeconds: 0,     // 0 = fixed sunny afternoon (no day/night in the demo)
+    dayLengthSeconds: 0,     // 0 = fixed sunny afternoon (no day/night)
   },
 
   player: {

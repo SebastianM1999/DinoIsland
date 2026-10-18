@@ -313,7 +313,7 @@ export class PlayerActions {
     this.updateHud(dt, fruitType, w);
   }
 
-  /** Can EQUIP index `i` be taken in hand? (island 1: no bow until the hunter's camp; the demo: no firearms) */
+  /** Can EQUIP index `i` be taken in hand? (island 1: no bow until the hunter's camp; a firearm only while carried) */
   canSelect(i) {
     if (EQUIP[i] === 'bow' && this.inv.bow === false) return false;
     if ((EQUIP[i] === 'pistol' || EQUIP[i] === 'rifle' || EQUIP[i] === 'mpx' || EQUIP[i] === 'sniper') && !this.inv.guns?.[EQUIP[i]]) return false;
@@ -329,7 +329,7 @@ export class PlayerActions {
     if (i === this.game.eq) return;
     // (island 1: no bow in hand until you found yours at the hunter's camp)
     if (EQUIP[i] === 'bow' && this.inv.bow === false) return this.fullAlert("No bow yet – find it at the hunter's camp before the mountain", 'bow');
-    if (!this.canSelect(i)) return;   // (no firearms: the demo)
+    if (!this.canSelect(i)) return;   // (a firearm not carried)
     this.game.eq = i;
     this.drawing = false;
     this.drawT = 0;
@@ -786,7 +786,7 @@ export class PlayerActions {
         : { id: 'bow', label: SLOT_LABEL.bow, count: inv.arrows, enabled: inv.arrows > 0 },
       { id: 'trap', label: SLOT_LABEL.trap, count: inv.traps, enabled: inv.traps > 0 },
       { id: 'fruit', label: SLOT_LABEL.fruit, count: inv.fruit.length, enabled: inv.fruit.length > 0, sub: fruitType || undefined },
-      // (no firearms in the pack – the demo: their pockets stay empty)
+      // (a firearm not in the pack: its pocket stays empty)
       ...['pistol', 'rifle', 'mpx', 'sniper'].map(id => inv.guns?.[id] ? { id, label: `${SLOT_LABEL[id]} - R reload`, count: inv.guns[id].loaded ?? 0, enabled: (inv.guns[id].loaded ?? 0) > 0 } : null),
     ];
     hud.setHotbar(this.pockets.map((eq) => rows[eq]), pocketOf(this.pockets, g.eq));

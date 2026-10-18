@@ -74,6 +74,10 @@ vec3 positionAt(vec2 uv) {
   return p.xyz / p.w;
 }
 void main() {
+  // Each half-size AO pixel reads the centre of a full-size depth texel: its own
+  // UV lies exactly on a texel border at even sizes, where nearest sampling flips
+  // between rows and paints horizontal stripes on flat ground.
+  vec2 vUv = (floor(gl_FragCoord.xy) * 2.0 + 0.5) / sourceSize;
   float depth = texture2D(tDepth, vUv).x;
   if (depth >= 0.99999) { gl_FragColor = vec4(0.0); return; }
   vec3 p = positionAt(vUv);

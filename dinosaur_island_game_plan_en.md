@@ -22,7 +22,7 @@ Notes:
 
 ## 1. Goal
 
-A small, polished **1–4 player co-op dinosaur demo** for Steam.
+A small, polished **1–4 player co-op dinosaur game** for Steam.
 
 The core loop:
 
@@ -244,7 +244,7 @@ No huge open world.
 - wanders around
 - small herds
 - flees when in danger
-- the main hunting target of the demo
+- the main hunting target of the first island
 
 Loot:
 
@@ -307,13 +307,13 @@ Loot:
 - can chase players
 - mainly exists to create danger and chaos
 
-The T-Rex is not a regular hunting target in the first demo.
+The T-Rex is not a regular hunting target.
 
 ---
 
 ## 9. Hunting
 
-The demo needs three tools:
+The basic hunt needs three tools:
 
 - **Spear** – melee, high damage, can also be thrown and picked up again
 - **Bow and arrow** – ranged, lower damage per hit, ideal against the Pteranodon and for luring/provoking dinosaurs from a safe distance
@@ -428,7 +428,7 @@ There, players can:
 - start expeditions
 - later receive simple upgrades
 
-For the first demo, a very simple base function is enough.
+For the first version, a very simple base function is enough.
 
 ---
 
@@ -451,7 +451,7 @@ The HUD uses the same colorful, simple cartoon look as the world: dark semi-tran
 
 ---
 
-## 15. Demo Mission
+## 15. First Mission
 
 The first complete mission:
 
@@ -543,7 +543,7 @@ Directly as part of the game:
 - respawn
 - death
 - carry system
-- demo completion
+- mission completion
 
 ### Phase 8 – Polish
 
@@ -564,7 +564,7 @@ Directly as part of the game:
 - Windows build
 - Steam integration/upload
 - testing on target systems
-- final demo builds
+- final release builds
 
 ---
 

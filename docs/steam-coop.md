@@ -1,8 +1,8 @@
 # Steam player-hosted co-op
 
-The host's Electron main process runs `ServerWorld`. Steam provides lobby discovery, invites, authenticated peer identities, and Steam Networking Sockets packet delivery, including Valve relay routing. No developer-operated game backend or port forwarding is needed for Steam sessions. The local HTTP server serves each player's own bundled client; remote players never download the game from the host.
+The host's game host process (an Electron utility process, `desktop/host-process.js`) runs `ServerWorld` and the host's saved expedition; the main process owns the Steam API and bridges Steam connections into it (`desktop/hostBridge.js`). Steam provides lobby discovery, invites, authenticated peer identities, and Steam Networking Sockets packet delivery, including Valve relay routing. No developer-operated game backend or port forwarding is needed for Steam sessions. The local HTTP server serves each player's own bundled client; remote players never download the game from the host.
 
-Snapshots (`snap`) and own-movement updates (`state`) are sent unreliably: a lost one is replaced 50 ms later, while a reliable resend would stall every packet behind it. Movement updates carry a sequence number and correction epoch, so the host drops reordered and pre-correction updates; clients drop snapshots older than the last welcome, so a late packet from the previous island cannot corrupt the new one. Everything else (events, actions, welcome, corrections) stays reliable and ordered. The Steam pump runs every 4 ms and flushes each connection, so Steam's send coalescing adds no extra delay. The Steam host is a fresh world per session and is separate from the optional LAN world.
+Snapshots (`snap`) and own-movement updates (`state`) are sent unreliably: a lost one is replaced 50 ms later, while a reliable resend would stall every packet behind it. Movement updates carry a sequence number and correction epoch, so the host drops reordered and pre-correction updates; clients drop snapshots older than the last welcome, so a late packet from the previous island cannot corrupt the new one. Everything else (events, actions, welcome, corrections) stays reliable and ordered. The Steam pump runs every 4 ms and flushes each connection, so Steam's send coalescing adds no extra delay. Steam, LAN and internet friends all join the same hosted expedition.
 
 ## Configure the Windows build
 
@@ -20,6 +20,8 @@ $env:DINO_STEAM_SDK_PATH = 'C:\path\to\steamworks_sdk'
 npm run desktop
 ```
 
+The Steam API starts before the game creates its window (Valve's requirement for the overlay, `desktop/steamStart.cjs`). A packaged Steam build started directly from its `.exe` quits and lets Steam relaunch it (`restartAppIfNecessary`); `npm run desktop` from a source checkout never does.
+
 480 is Valve's shared Spacewar development app. Lobby metadata filters out other games using that ID, but it cannot establish ownership of this game. Use your real App ID and two authorized test accounts for release validation. Build configuration uses `desktop/steam-config.json`; environment overrides are for running a local build and do not get baked into the release.
 
 ## Player flow
@@ -30,11 +32,12 @@ npm run desktop
 - **Invite friends:** available in the pause menu during a Steam session. Select an online friend to send a Steam lobby invitation. The lobby ID is also displayed there.
 - Accepted invites launch a closed game through `+connect_lobby`, or generate a join request when the game is already running. An invite received during play shows a HUD toast and **Leave and join friend** in the pause menu; it does not end the current session automatically.
 - Quitting, reloading, leaving, or losing the host closes the session and releases its lobby/network resources. Steam may appoint another lobby owner, but the game deliberately ends instead of pretending the new owner has the world state.
-- **Host LAN game** and **LAN / direct connection** remain available without Steam. Share the host's LAN address and displayed port; Steam invites do not apply to these sessions.
+- **Host LAN game** and **LAN / direct connection** remain available without Steam. Share the host's LAN address and displayed port; Steam invites do not apply to these sessions. The desktop opens its LAN port (8080, or a free one) only while a LAN game is hosted: solo and Steam games open no port on the network and cause no firewall prompt.
+- **Versions:** every join carries the network version (`PROTOCOL_VERSION` in `src/shared/protocol.js`). Steam lobbies of another version are not listed, and a host refuses another version with a message saying who has to update. Bump the number with every change that makes two builds incompatible.
 
 ## Progress and authority
 
-This implements the existing game's session-based progression. It does not add durable expedition saves, guest progression storage, Steam Cloud, or host migration. Each new Steam host session starts a fresh expedition. Only an authenticated Steam identity currently admitted to the lobby can establish a gameplay connection. Gameplay validation remains in `ServerWorld`; a host can modify their local game, so this is not a trusted competitive economy.
+The host plays one of their saved expeditions; Steam guests keep their characters in it, keyed by their authenticated Steam ID (see `server/package-info.md`). There is no Steam Cloud and no host migration: when the host leaves, the session ends and the expedition stays on the host's PC. Only an authenticated Steam identity currently admitted to the lobby can establish a gameplay connection. Gameplay validation remains in `ServerWorld`; a host can modify their local game, so this is not a trusted competitive economy.
 
 ## Validation before release
 
@@ -48,6 +51,9 @@ Test the packaged build on two PCs and Steam accounts on different internet conn
 4. Close the host normally, force-close it, and interrupt its network. Guests must return to the menu with a reason; a new host session must work afterward.
 5. Repeat behind home routers without forwarded ports, including a restrictive/CGNAT connection. Check relay connectivity and bandwidth/latency during gameplay.
 6. Confirm a signed-in Steam client and game entitlement, missing DLL/Steam failure messages, offline solo, and LAN fallback. Verify the packaged native dependencies load from ASAR-unpacked files.
+7. Start the packaged build from its `.exe` (it must come back through Steam), open the overlay with Shift+Tab in the menu and in play, and check `%APPDATA%/<product>/logs/game.log` names the build and records the Steam start.
+
+Each launch writes `userData/logs/game.log` (main process, host process, the game page's warnings and errors; the previous four launches are kept). Ask testers for it with every bug report.
 
 References: [Valve networking](https://partner.steamgames.com/doc/features/multiplayer/networking), [Steam lobbies](https://partner.steamgames.com/doc/features/multiplayer/matchmaking), and [binding SDK setup](https://github.com/ArtyProf/steamworks-ffi-node/blob/main/docs/STEAMWORKS_SDK_SETUP.md).
 

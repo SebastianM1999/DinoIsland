@@ -40,7 +40,8 @@ export const hostExpeditions = {
   setLobby: (lobby) => api('/lobby', { lobby }),
   /**
    * Open an expedition (`{ id }`) or create one (`{ create: { name, level } }`) on the host, then join it.
-   * lobby 'private' = solo, 'open' = LAN / internet friends may join too.
+   * lobby 'private' = solo, 'open' = Steam / internet friends may join too, 'lan' = open, and the desktop
+   * host opens its LAN port for the time it is hosted.
    */
   async start({ id, create, lobby = 'private', url = null, steam = null }, { name, outfit }) {
     const opened = id ? await api('/open', { id, lobby }) : await api('/new', { ...create, lobby });

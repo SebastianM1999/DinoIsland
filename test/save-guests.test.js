@@ -13,7 +13,7 @@ import { createGameServer } from '../server/index.js';
 import { OWNER_KEY, SaveCoordinator, guestKey } from '../server/saveCoordinator.js';
 import { SteamSession } from '../desktop/steam-session.js';
 import { createRemoteHost, createBridgeEndpoint } from '../desktop/hostBridge.js';
-import { MSG } from '../src/shared/protocol.js';
+import { MSG, PROTOCOL_VERSION } from '../src/shared/protocol.js';
 import { SteamHub } from './helpers/fakeSteam.js';
 
 async function saveHost(t) {
@@ -60,9 +60,9 @@ test('Steam friends play the host process\'s saved expedition and come back to t
   const [hostSession, guest, stranger] = sessions;
   await assert.rejects(hostSession.hostGame('friends', 'not-a-token'), /Invalid expedition token/);
   const h = await hostSession.hostGame('friends', token);
-  hostSession.send(h.sessionId, { t: MSG.HELLO, name: 'Host' });
+  hostSession.send(h.sessionId, { t: MSG.HELLO, v: PROTOCOL_VERSION, name: 'Host' });
   const g = await guest.joinGame(h.lobbyId);
-  guest.send(g.sessionId, { t: MSG.HELLO, name: 'Ada' });
+  guest.send(g.sessionId, { t: MSG.HELLO, v: PROTOCOL_VERSION, name: 'Ada' });
   await pump();
   const world = host.world;
   assert.deepEqual([...world.players.values()].map((p) => p.key).sort(), [OWNER_KEY, `steam-${users[1].id}`].sort());
@@ -82,12 +82,12 @@ test('Steam friends play the host process\'s saved expedition and come back to t
   assert.ok(events[0].some((e) => e.type === 'closed'));
   const reopened = await saves.open(expedition.id, { lobby: 'open' });
   const h2 = await hostSession.hostGame('friends', reopened.token);
-  hostSession.send(h2.sessionId, { t: MSG.HELLO, name: 'Host' });
+  hostSession.send(h2.sessionId, { t: MSG.HELLO, v: PROTOCOL_VERSION, name: 'Host' });
   // someone else called Ada is someone else
   const s = await stranger.joinGame(h2.lobbyId);
-  stranger.send(s.sessionId, { t: MSG.HELLO, name: 'Ada' });
+  stranger.send(s.sessionId, { t: MSG.HELLO, v: PROTOCOL_VERSION, name: 'Ada' });
   const g2 = await guest.joinGame(h2.lobbyId);
-  guest.send(g2.sessionId, { t: MSG.HELLO, name: 'Ada' });
+  guest.send(g2.sessionId, { t: MSG.HELLO, v: PROTOCOL_VERSION, name: 'Ada' });
   await pump();
   const back = host.playerByKey(`steam-${users[1].id}`);
   assert.equal(back.inv.loot.hide, 7);
@@ -111,11 +111,11 @@ function lanGuest(port, name, wallet) {
   return new Promise((resolve, reject) => {
     const ws = new WebSocket(`ws://127.0.0.1:${port}/`);
     const seen = [];
-    ws.on('open', () => ws.send(JSON.stringify({ t: MSG.HELLO, name })));
+    ws.on('open', () => ws.send(JSON.stringify({ t: MSG.HELLO, v: PROTOCOL_VERSION, name })));
     ws.on('message', (raw) => {
       const msg = JSON.parse(raw);
       seen.push(msg.t);
-      if (msg.t === MSG.IDENT) ws.send(JSON.stringify({ t: MSG.HELLO, name, credential: wallet[msg.world] ?? null }));
+      if (msg.t === MSG.IDENT) ws.send(JSON.stringify({ t: MSG.HELLO, v: PROTOCOL_VERSION, name, credential: wallet[msg.world] ?? null }));
       if (msg.t === MSG.CREDENTIAL) wallet[msg.world] = msg.token;
       if (msg.t === MSG.WELCOME) setTimeout(() => resolve({ ws, seen }), 30);   // (a new guest's CREDENTIAL follows right after)
       if (msg.t === MSG.REJECT) resolve({ ws, rejected: msg.reason, seen });

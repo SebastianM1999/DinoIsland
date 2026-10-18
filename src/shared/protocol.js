@@ -10,7 +10,7 @@
 //     where the dinosaur was then (lag compensation, ≤ CONFIG.net.lagCompMax).
 //
 // ---------------------------------------------------------------- client -> server
-//   hello   { name, outfit?, profile? }                  outfit = { hat, top, pants }; profile = saved { xp, bonus, skills } (shared/skills.js)
+//   hello   { v, name, outfit?, credential? }            v = PROTOCOL_VERSION; outfit = { hat, top, pants }
 //   state   { s, k, x, y, z, yaw, pitch, spd, eq, fl } own movement (fl = PF flags); s = sequence number,
 //                                                       k = last correction epoch seen (older k / s are dropped)
 //   act     { a: <action>, ...fields }                  see ACT below
@@ -27,8 +27,24 @@
 //   correct { x, y, z, k, unstuck? }                    rejected movement / unstuck move; reset prediction, k = new epoch
 //   ev      { e: <event>, ...fields }                   see EV below
 
+/**
+ * The network compatibility version, sent in every HELLO (`v`) and part of the Steam lobby filter
+ * (desktop/steam-session.js STEAM_PROTOCOL). Hosts refuse a different version with a clear reason.
+ * Bump it whenever an older client and a newer host (or the other way round) could no longer play
+ * together: a changed message, field or handshake, or a world rule both sides must agree on.
+ * Save files have their own version (shared/saveSchema.js).
+ */
+export const PROTOCOL_VERSION = 2;
+
+/** Why a client of protocol version `v` cannot join this host, or null when it can. */
+export function versionMismatch(v) {
+  if (v === PROTOCOL_VERSION) return null;
+  if (Number.isSafeInteger(v) && v > PROTOCOL_VERSION) return 'The host plays an older version of the game. Both players need the same version: ask the host to update.';
+  return 'The host plays a newer version of the game. Both players need the same version: update your game.';
+}
+
 export const MSG = {
-  // HELLO { name, outfit, credential? }: credential = this client's guest token for the host's
+  // HELLO { v, name, outfit, credential? }: credential = this client's guest token for the host's
   // expedition (null: none yet), sent after the host asked with IDENT { world }; the host then
   // answers a new guest with CREDENTIAL { world, token } to keep (server/saveCoordinator.js)
   HELLO: 'hello',

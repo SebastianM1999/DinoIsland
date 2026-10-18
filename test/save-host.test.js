@@ -9,7 +9,7 @@ import WebSocket from 'ws';
 import { createGameServer } from '../server/index.js';
 import { SaveCoordinator, OWNER_KEY } from '../server/saveCoordinator.js';
 import { SaveStore } from '../server/saveStore.js';
-import { MSG, EV } from '../src/shared/protocol.js';
+import { MSG, EV, PROTOCOL_VERSION } from '../src/shared/protocol.js';
 
 async function setup(t) {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'dino-host-saves-'));
@@ -33,12 +33,12 @@ async function setup(t) {
   const connect = (token, name = 'Ada') => new Promise((resolve, reject) => {
     const ws = new WebSocket(`ws://127.0.0.1:${port}/${token ? `?owner=${token}` : ''}`);
     const inbox = [];
-    ws.on('open', () => ws.send(JSON.stringify({ t: MSG.HELLO, name, outfit: null, profile: { xp: 99999 } })));
+    ws.on('open', () => ws.send(JSON.stringify({ t: MSG.HELLO, v: PROTOCOL_VERSION, name, outfit: null, profile: { xp: 99999 } })));
     ws.on('message', (raw) => {
       const msg = JSON.parse(raw);
       inbox.push(msg);
       // (a guest of an open expedition is asked for its credential first: this one has none)
-      if (msg.t === MSG.IDENT) ws.send(JSON.stringify({ t: MSG.HELLO, name, outfit: null, credential: null }));
+      if (msg.t === MSG.IDENT) ws.send(JSON.stringify({ t: MSG.HELLO, v: PROTOCOL_VERSION, name, outfit: null, credential: null }));
       if (msg.t === MSG.WELCOME) resolve({ ws, msg, inbox });
       if (msg.t === MSG.REJECT) resolve({ ws, rejected: msg.reason, inbox });
     });

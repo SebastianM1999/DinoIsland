@@ -105,16 +105,13 @@ test('sniper drop and pickup preserve ammunition, cancel reload and resist dupli
   assert.deepEqual(player.inv.guns.sniper, { loaded: 2, reserve: 13, owned: true });
 });
 
-test('demo rejects sniper shots, reloads and equipment recovery without granting a firearm', () => {
-  const { world, player, dino, act, shot } = setup({ demo: true });
+test('without a sniper in the pack its shots, reloads and drops do nothing', () => {
+  const { player, dino, act, shot } = setup();
+  player.inv.guns = {};
   shot(); act(ACT.RELOAD, { kind: 'sniper' }); act(ACT.DROP, { kind: 'sniper' });
-  const item = world.spawnItem('sniper', player.x, player.z, 1, player.y);
-  item.ammo = { loaded: 5, reserve: 25 };
-  act(ACT.PICKUP, { item: item.id });
   assert.deepEqual(player.inv.guns, {});
   assert.equal(player.inv.reloading, null);
   assert.equal(dino.hp, 10000);
-  assert.equal(world.items.has(item.id), true);
 });
 
 test('hut refill restores sniper supplies only within reach of a refill station', () => {

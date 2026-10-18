@@ -54,6 +54,8 @@ No Steam restart-if-needed or single-instance/second-instance handling was found
 
 `test/steam-coop.test.js` uses a fake service. It does not prove DLL loading, native FFI compatibility, relay/NAT traversal, firewall behavior or real callback delivery. Execute the real-account matrix below before claiming working 1–4-player online co-op. [Steam networking](https://partner.steamgames.com/doc/features/multiplayer/networking).
 
+**Status (2026-10-18), structure only:** the Steam API now starts before any window (`desktop/steamStart.cjs`), a packaged build calls `restartAppIfNecessary`, and the single-instance lock forwards `+connect_lobby`. The overlay, invites and launch matrix above are still unproved on a real Steam install.
+
 ### F5 — P1: fourth island and release hardware are outside current performance evidence
 
 `scripts/performance/browser.mjs:77` and `simulation.mjs:22` hard-code `level < 3`, omitting Hollow Mountain. The October 9 historical report in `docs/performance-testing.md:131-152` records Swamp p95 15.0 ms and Volcano p95 17.2 ms, both failing the project's 120 FPS target; it also records long simulation maxima. Subsequent changes may alter those results. These are historical diagnostics, not current release measurements or a universal Steam FPS requirement.
@@ -80,6 +82,8 @@ Existing audio credits, source manifests, Quaternius license and firearm MIT not
 - `desktop/steam-session.js:9` uses a fixed protocol identifier. Define compatibility policy and bump it when incompatible network/world rules change; test old/new builds. A package version need not reject otherwise compatible peers.
 - The desktop HTTP server listens on all interfaces for LAN (`main.cjs:24`). Test the intended LAN access policy and local-control endpoint restrictions. Decide whether developer-facing internet-tunnel/debug options belong in production. The temporary Cloudflare test service is not a substitute for validated Steam co-op.
 - Add user-visible launch failure reporting and persistent diagnostic logs with release version/build ID; inspect renderer/GPU crash recovery. Source currently logs startup errors and quits (`main.cjs:65-68`). Collect only necessary data and document any future telemetry.
+
+**Status (2026-10-18), structure only:** the demo mode is removed (full game only); every join carries `PROTOCOL_VERSION` (`src/shared/protocol.js`), which also names the Steam lobby protocol, and a host refuses other versions with a clear reason; the desktop host listens on loopback and opens a LAN port only while a LAN game is hosted; each launch writes `userData/logs/game.log` (version, OS, main and host process, the game page's warnings and errors, crashes), and error dialogs point to it. Still open here: launch-failure reporting beyond the dialog, a build ID beyond the package version, the old/new build test on real machines, and a decision about the internet tunnel in production.
 
 ## Steamworks owner checklist — account state is unverified
 

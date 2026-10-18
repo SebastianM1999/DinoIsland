@@ -11,7 +11,7 @@ import { migrateLocalPreferences, readItem, writeItem } from '../src/client/core
 import { formatPlayTime, formatSavedAt } from '../src/client/ui/expeditionPanel.js';
 import { sealSave, SAVE_SCHEMA } from '../src/shared/saveSchema.js';
 import { storageKey } from '../src/shared/brand.js';
-import { MSG } from '../src/shared/protocol.js';
+import { MSG, PROTOCOL_VERSION } from '../src/shared/protocol.js';
 import { Net } from '../src/client/net/net.js';
 import { ServerWorld } from '../src/sim/world.js';
 import { exportWorld } from '../src/sim/worldSave.js';
@@ -260,7 +260,7 @@ test('guest credentials: answered on IDENT, kept from CREDENTIAL, per expedition
   const connecting = Net.connect('ws://host', 'Ada', null);
   ws.onopen();
   ws.onmessage({ data: JSON.stringify({ t: MSG.IDENT, world: A }) });
-  assert.deepEqual(sent.at(-1), { t: MSG.HELLO, name: 'Ada', outfit: null, credential: null }, 'nothing held for this expedition yet');
+  assert.deepEqual(sent.at(-1), { t: MSG.HELLO, v: PROTOCOL_VERSION, name: 'Ada', outfit: null, credential: null }, 'nothing held for this expedition yet');
   ws.onmessage({ data: JSON.stringify({ t: MSG.WELCOME, id: 1, slot: 0, now: 0, world: { level: { index: 0 } }, r: 1 }) });
   const net = await connecting;
   ws.onmessage({ data: JSON.stringify({ t: MSG.CREDENTIAL, world: A, token: T1, r: 2 }) });
