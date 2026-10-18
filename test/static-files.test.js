@@ -2,7 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
 import zlib from 'node:zlib';
+import { createHash } from 'node:crypto';
 import { createGameServer } from '../server/index.js';
+import { contentSecurityPolicy } from '../server/staticFiles.js';
 
 /** GET without transparent decompression, to inspect the encoded bytes. */
 function rawGet(url, encoding) {
@@ -66,6 +68,45 @@ test('index.html preloads the menu module graph but not the lazily loaded game',
   assert.ok(!links.includes('/src/client/core/game.js'), 'game.js is imported on demand');
   assert.equal(new Set(links).size, links.length);
   for (const url of links.slice(0, 5)) assert.equal((await fetch(base + url)).status, 200);
+});
+
+test('index.html carries a Content-Security-Policy that allows only its own import map inline', async (t) => {
+  const base = await withServer(t);
+  const page = await fetch(base);
+  const html = await page.text();
+  const csp = page.headers.get('content-security-policy');
+  assert.ok(csp, 'the page is sent with a policy');
+  const directives = new Map(csp.split(';').map((part) => part.trim().split(/\s+/)).map(([name, ...values]) => [name, values]));
+  assert.deepEqual(directives.get('default-src'), ["'self'"]);
+  assert.deepEqual(directives.get('object-src'), ["'none'"]);
+  assert.deepEqual(directives.get('base-uri'), ["'none'"]);
+  assert.deepEqual(directives.get('frame-ancestors'), ["'none'"]);
+  assert.deepEqual(directives.get('style-src'), ["'self'"], 'no inline <style> elements or foreign stylesheets');
+  assert.ok(directives.get('connect-src').includes('ws:') && directives.get('connect-src').includes('wss:'), 'LAN and tunnel joins can connect');
+
+  // Inline scripts: only the import map, allowed by the hash a browser computes over its parsed (LF) text.
+  const inline = [...html.matchAll(/<script(?![^>]*\bsrc=)([^>]*)>([\s\S]*?)<\/script>/g)];
+  assert.deepEqual(inline.map((m) => m[1].trim()), ['type="importmap"']);
+  const hash = createHash('sha256').update(inline[0][2].replace(/\r\n?/g, '\n')).digest('base64');
+  assert.deepEqual(directives.get('script-src'), ["'self'", `'sha256-${hash}'`]);
+  assert.ok(!/unsafe-(inline|eval)/.test(directives.get('script-src').join(' ')));
+  assert.ok(!/\son[a-z]+=/i.test(html), 'no inline event handler attributes');
+  assert.ok(!/<(?:script|link)[^>]+(?:src|href)="(?:https?:)?\/\//.test(html), 'no scripts or stylesheets from other origins');
+
+  const revalidated = await fetch(base, { headers: { 'If-None-Match': page.headers.get('etag') } });
+  assert.equal(revalidated.status, 304);
+  assert.equal(revalidated.headers.get('content-security-policy'), csp);
+  const script = await fetch(`${base}/src/client/main.js`);
+  assert.equal(script.headers.get('content-security-policy'), null, 'only the page carries the policy');
+  await script.arrayBuffer();
+});
+
+test('the policy hashes every inline script and normalizes CRLF like the HTML parser', () => {
+  const crlf = '<script type="importmap">\r\n{"imports":{}}\r\n</script><script>a()</script><script src="x.js"></script>';
+  const lfHash = (text) => `'sha256-${createHash('sha256').update(text).digest('base64')}'`;
+  const scriptSrc = contentSecurityPolicy(crlf).split('; ').find((d) => d.startsWith('script-src '));
+  assert.equal(scriptSrc, `script-src 'self' ${lfHash('\n{"imports":{}}\n')} ${lfHash('a()')}`);
+  assert.match(contentSecurityPolicy(), /^default-src 'self'; script-src 'self'; /);
 });
 
 test('the menu background is a WebP and small', async (t) => {
