@@ -304,3 +304,17 @@ test('the volcano keeps its cycle, sinking columns and opened treasure across a 
   if (v.treasure) assert.deepEqual([b.treasure.opened, b.treasure.by], [true, 'Ada'], 'the lava treasure is not handed out twice');
   for (let i = 0; i < 20; i++) back.step(0.05);
 });
+
+test('a long-running expedition keeps everyone present and only the most recently seen absent explorers', async () => {
+  const { ROSTER_KEEP } = await import('../src/sim/worldSave.js');
+  const world = new ServerWorld(quiet(), { level: 0 });
+  for (let i = 0; i < ROSTER_KEEP + 10; i++) world.roster.set(`guest-${i}`, { key: `guest-${i}`, name: `G${i}`, seen: i });
+  world.join('Here', null, undefined, null, 'owner');
+  const { doc } = reload(world);
+  const keys = doc.world.roster.map((r) => r.key);
+  assert.equal(keys.length, ROSTER_KEEP);
+  assert.ok(keys.includes('owner'));
+  assert.ok(keys.includes(`guest-${ROSTER_KEEP + 9}`), 'the most recent guest stays');
+  assert.ok(!keys.includes('guest-0'), 'the longest gone is pruned');
+  assert.equal(doc.world.roster.find((r) => r.key === 'owner').level, 0, 'records know their island');
+});

@@ -2,7 +2,8 @@ const { ipcMain } = require('electron');
 const path = require('node:path');
 const fs = require('node:fs');
 
-async function installSteam(app, win, localUrl, { demo = false } = {}) {
+/** createHost: the game host Steam lobbies feed (desktop/hostBridge.js: the saved expedition in the host process). */
+async function installSteam(app, win, localUrl, { demo = false, createHost } = {}) {
   let session = null;
   let sdk = null;
   let pump = null;
@@ -27,7 +28,7 @@ async function installSteam(app, win, localUrl, { demo = false } = {}) {
         sdk.setSdkPath(sdkPath);
         if (!sdk.init({ appId })) throw new Error('Start Steam, sign in, and restart the game to use Steam co-op.');
         const { SteamSession, validSteamId } = await import('./steam-session.js');
-        session = new SteamSession(sdk, { emit, demo });
+        session = new SteamSession(sdk, { emit, demo, ...(createHost ? { createHost } : {}) });
         const id = String(sdk.getStatus().steamId ?? '');
         steamId = validSteamId(id) ? id : null;
         const lobbyId = sdk.matchmaking.getConnectLobbyIdFromCommandLine();
@@ -56,7 +57,7 @@ async function installSteam(app, win, localUrl, { demo = false } = {}) {
     status: () => session ? session.status() : { available: false, reason: failure },
     friends: () => session.friends(),
     lobbies: () => session.lobbies(),
-    host: visibility => session.hostGame(visibility),
+    host: arg => (arg && typeof arg === 'object' ? session.hostGame(arg.visibility, arg.ownerToken ?? null) : session.hostGame(arg)),
     join: lobbyId => session.joinGame(lobbyId),
     leave: sessionId => {
       if (!sessionId || sessionId === session.sessionId) session.leave();

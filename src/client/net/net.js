@@ -6,6 +6,7 @@ import { CONFIG } from '../../shared/config.js';
 import { MSG, EV } from '../../shared/protocol.js';
 import { connectSteam } from './steamTransport.js';
 import { sanitizeProfile } from '../../shared/skills.js';
+import { guestCredential, rememberGuestCredential } from '../core/persistence.js';
 
 export class Net {
   constructor(transport, mode) {
@@ -55,7 +56,8 @@ export class Net {
   /** Connect to a co-op server and join with `name`. Resolves after the welcome. */
   static steam(bridge, options, name, outfit) {
     return connectSteam(bridge,
-      () => options.host ? bridge.host(options.visibility) : bridge.join(options.lobbyId),
+      // (ownerToken: hosting a saved expedition of the host process, see client/net/expeditions.js)
+      () => options.host ? bridge.host(options.visibility, options.ownerToken ?? null) : bridge.join(options.lobbyId),
       { t: MSG.HELLO, name, outfit }, transport => new Net(transport, 'online'));
   }
 
@@ -85,6 +87,8 @@ export class Net {
         try { msg = JSON.parse(e.data); } catch { return; }
         if (!settled) {
           if (msg.t === MSG.REJECT) { settled = true; clearTimeout(timer); reject(new Error(msg.reason)); return; }
+          // a saved expedition asks which guest credential we hold for it (none: null, it issues one)
+          if (msg.t === MSG.IDENT) { transport.send({ t: MSG.HELLO, name, outfit, credential: guestCredential(msg.world) }); return; }
           if (msg.t === MSG.WELCOME) { settled = true; clearTimeout(timer); net.welcome = msg; resolve(net); }
         }
         transport.onMessage?.(msg);
@@ -355,6 +359,7 @@ export class Net {
     // The profile can arrive while the island is still loading (no Game yet): validate and keep it here.
     // It belongs to the expedition (the host saves it). Creative mode sends every skill at max rank: shown only, never kept.
     if (msg.t === MSG.PROF && !msg.prof?.creative) this.prof = msg.prof = sanitizeProfile(msg.prof);
+    if (msg.t === MSG.CREDENTIAL) rememberGuestCredential(msg.world, msg.token);
     if (msg.t === MSG.EV && msg.e === EV.SAVED) this.reportSave({ ok: !!msg.ok, at: msg.at, reason: msg.reason, error: msg.error });
     if (msg.t !== MSG.SNAP && Number.isFinite(msg.r)) this.reliableSeq = Math.max(this.reliableSeq, msg.r);
     if ((msg.t === MSG.SNAP || msg.t === MSG.WELCOME || msg.t === MSG.PONG) && Number.isFinite(msg.now)) this.#clock(msg, local);

@@ -124,7 +124,6 @@ export class ServerWorld {
     this.#loadLevel(!this.demo && this.levelIndex + 1 < LEVEL_COUNT ? this.levelIndex + 1 : 0);
     this.mission.startIsland();
     this.dinos.spawnAll();
-    const caps = this.caps();
     for (const p of this.players.values()) {
       const sp = this.layout.spawnPoints[p.slot];
       Object.assign(p, {
@@ -133,23 +132,33 @@ export class ServerWorld {
         downed: false, downT: 0, reviving: null, lastStandUsed: false, invulnUntil: 0,
         lastMoveAt: this.now, moveBudget: 3.5, epoch: p.epoch + 1, breath: DIVE.breath, drownT: 0,
       });
-      if (!this.layout.bowCamp) p.inv.bow = true;
-      if (p.inv.bow) {
-        p.inv.arrows = caps.arrows;
-        p.inv.arrowUses = Array(caps.arrows).fill(W.bow.uses);
-      }
-      p.inv.traps = Math.max(p.inv.traps, caps.traps);
-      p.inv.spear = true;
-      p.inv.spearHealth = W.spear.durability;
-      p.inv.guns = this.gunInventory(); p.inv.reloading = null;
-      p.inv.caps = caps;
-      p.inv.upgrades = [...this.upgrades];
+      this.resupplyForIsland(p);
     }
     for (const p of this.players.values()) {
       this.send(p.id, { t: MSG.WELCOME, id: p.id, slot: p.slot, now: r3(this.now), k: p.epoch, inv: p.inv, world: this.fullState() });
       this.sendProf(p);
     }
     this.checkpoint('island');
+  }
+
+  /**
+   * What sailing to a new island hands out: the bow (it was found on island 1), a full quiver, the
+   * starting traps, a fresh spear and firearms. Explorers on board get it in nextLevel; one who was
+   * away when the team sailed gets it once on return (sim/worldSave.js applyRosterRecord).
+   */
+  resupplyForIsland(p) {
+    const caps = this.caps();
+    if (!this.layout.bowCamp) p.inv.bow = true;
+    if (p.inv.bow) {
+      p.inv.arrows = caps.arrows;
+      p.inv.arrowUses = Array(caps.arrows).fill(W.bow.uses);
+    }
+    p.inv.traps = Math.max(p.inv.traps, caps.traps);
+    p.inv.spear = true;
+    p.inv.spearHealth = W.spear.durability;
+    p.inv.guns = this.gunInventory(); p.inv.reloading = null;
+    p.inv.caps = caps;
+    p.inv.upgrades = [...this.upgrades];
   }
 
   /** A moment worth saving (new island, boat part, base stage, boss, someone left): the host may save soon. */

@@ -110,7 +110,15 @@ async function launch() {
   win.webContents.on('will-navigate', (event, url) => {
     if (!url.startsWith(localUrl)) event.preventDefault();
   });
-  steam = await installSteam(app, win, localUrl, { demo });
+  // Steam lobbies feed the expedition in the host process (desktop/hostBridge.js), never a world of their own
+  const { createRemoteHost } = await import('./hostBridge.js');
+  const channel = {
+    postMessage: (message) => hostProcess?.postMessage(message),
+    on: (event, fn) => host.child.on(event, fn),
+    off: (event, fn) => host.child.off(event, fn),
+  };
+  const remoteHost = createRemoteHost(channel);
+  steam = await installSteam(app, win, localUrl, { demo, createHost: () => remoteHost });
 
   // Whose game this is: the Steam account in the Steam build, this computer's local player otherwise.
   // A Steam build without Steam never falls back to another player's (or an empty) folder.

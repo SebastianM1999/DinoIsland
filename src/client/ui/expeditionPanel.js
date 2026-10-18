@@ -24,6 +24,7 @@ const PURPOSES = {
   solo: { eyebrow: 'Play solo', title: 'Choose an expedition', play: 'Continue', start: 'Start' },
   lan: { eyebrow: 'Host on your network', title: 'Which expedition do you host?', play: 'Host', start: 'Start and host' },
   internet: { eyebrow: 'Host over the internet', title: 'Which expedition do you host?', play: 'Host', start: 'Start and host' },
+  steam: { eyebrow: 'Host with Steam friends', title: 'Which expedition do you host?', play: 'Host', start: 'Start and host' },
 };
 
 /**

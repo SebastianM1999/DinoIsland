@@ -66,8 +66,13 @@ export function rosterRecord(world, p) {
     alive: !defeated,
     buffs: { ...(p.buffs || {}) },
     lastStandUsed: !!p.lastStandUsed,
+    level: world.levelIndex,   // the island this record's position belongs to
+    seen: r3(world.now),       // when the explorer was last in the world (dormant records are pruned by it)
   };
 }
+
+/** Dormant explorers kept per expedition (the most recently seen ones). */
+export const ROSTER_KEEP = 48;
 
 const ITEM_FIELDS = ['id', 'kind', 'n', 'x', 'y', 'z', 't', 'health', 'keep', 'spot', 'ammo'];
 const CARCASS_FIELDS = ['id', 'type', 'x', 'y', 'z', 'yaw', 'maxHp', 'deadT', 'fl', 'radius', 'scale', 'title', 'alpha', 'boss', 'butchered', 'carcassMeat', 'swimOffset'];
@@ -76,8 +81,11 @@ const pick = (o, fields) => Object.fromEntries(fields.filter((f) => o[f] !== und
 /** The world section of an expedition save (wrap it with shared/saveSchema.js `sealSave`). */
 export function exportWorld(world) {
   const living = new Set(world.dinos.list.filter((d) => d.alive).map((d) => d.id));
-  const roster = new Map(world.roster);
+  // explorers present now, then the most recently seen dormant ones (a long-running world meets many guests)
+  const roster = new Map();
   for (const p of world.players.values()) if (p.key) roster.set(p.key, rosterRecord(world, p));
+  const dormant = [...world.roster.values()].filter((r) => !roster.has(r.key)).sort((a, b) => (b.seen ?? 0) - (a.seen ?? 0));
+  for (const r of dormant.slice(0, Math.max(0, ROSTER_KEEP - roster.size))) roster.set(r.key, r);
   const m = world.mission;
   const v = world.volcano;
   const r = world.raids;
@@ -167,6 +175,8 @@ export function applyRosterRecord(world, p, rec) {
     p.buffs = {};
     for (const [k, until] of Object.entries(rec.buffs)) if (CONFIG.fruit.buffs[k] && Number.isFinite(until) && until > world.now) p.buffs[k] = until;
   }
+  // away while the team sailed on: back at the new island's camp, with the travel resupply once
+  if (Number.isInteger(rec.level) && rec.level !== world.levelIndex) { world.resupplyForIsland(p); return; }
   if (rec.alive === false) return;   // defeated: stays at the camp spawn with full health
   p.hp = int(rec.hp, 1, p.maxHp, p.maxHp);
   // the saved spot only if it is still a good place to stand (never inside rock or a base wall)

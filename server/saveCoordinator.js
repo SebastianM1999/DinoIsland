@@ -9,7 +9,7 @@
 //   `autosaveMs` and shortly after checkpoints (new island, boat part, base stage, boss, leave).
 // - A failed write keeps the previous generation, tells the owner, and retries with backoff.
 
-import { randomUUID } from 'node:crypto';
+import { randomUUID, createHash } from 'node:crypto';
 import { ServerWorld } from '../src/sim/world.js';
 import { exportWorld, restoreWorld, worldOptions } from '../src/sim/worldSave.js';
 import { sealSave, cleanSaveName, saveSummary, validSaveId } from '../src/shared/saveSchema.js';
@@ -21,6 +21,10 @@ export const OWNER_KEY = 'owner';
 export const LOBBIES = ['private', 'open'];
 const RETRY_MS = [5000, 15000, 60000];
 const LOOPBACK = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1', 'local']);
+const STEAM_ID = /^[1-9]\d{15,19}$/;
+const CREDENTIAL = /^[0-9a-f-]{36}$/;
+/** A guest's roster key: derived from (never equal to) the credential only that guest holds. */
+export const guestKey = (credential) => `guest-${createHash('sha256').update(credential).digest('hex').slice(0, 32)}`;
 
 export class SaveCoordinatorError extends Error {}
 
@@ -130,15 +134,25 @@ export class SaveCoordinator {
     this.current.lobby = lobby;
   }
 
-  /** Who may join the open expedition (gameHost `admit`). */
-  admit({ addr, url } = {}) {
+  /**
+   * Who may join the open expedition, and as whom (gameHost `admit`):
+   * - the owner: loopback + the token from `open`/`create` -> OWNER_KEY;
+   * - a Steam guest: the authenticated Steam identity of its connection (desktop/steam-session.js) -> `steam-<id>`;
+   * - a LAN / internet guest: first asked for its credential (`ident`), then its own key, or a new
+   *   credential (`issue`) when it has none. Names are never identity.
+   */
+  admit({ addr, url, steamId, credential } = {}) {
     const c = this.current;
     if (!c) return { ok: false, reason: 'No expedition is open on this host.' };
     let token = null;
     try { token = new URL(url ?? '/', 'http://host').searchParams.get('owner'); } catch { /* no token */ }
     if (token && token === c.token && LOOPBACK.has(addr)) return { ok: true, key: OWNER_KEY };
     if (c.lobby !== 'open') return { ok: false, reason: 'This expedition is private.' };
-    return { ok: true };
+    if (typeof steamId === 'string' && STEAM_ID.test(steamId)) return { ok: true, key: `steam-${steamId}` };
+    if (credential === undefined) return { ok: false, ident: c.id };
+    if (typeof credential === 'string' && CREDENTIAL.test(credential)) return { ok: true, key: guestKey(credential) };
+    const issued = randomUUID();
+    return { ok: true, key: guestKey(issued), issue: { world: c.id, token: issued } };
   }
 
   /** gameHost `onCheckpoint`: save soon (bursts coalesce into one write). */

@@ -5,10 +5,12 @@
 //
 // main -> host  { type: 'identity', root } | { type: 'identity', root: null, reason }
 //               { type: 'shutdown' }
-// host -> main  { type: 'ready', port } | { type: 'identity-done', ok, reason }
+//               conn-open / conn-msg / conn-close: Steam players (desktop/hostBridge.js)
+// host -> main  { type: 'ready', port } | { type: 'identity-done', ok, reason } | conn-send / conn-close
 //               { type: 'shutdown-done', ok, error? } | { type: 'failed', error }
 
 import { createGameServer } from '../server/index.js';
+import { createBridgeEndpoint } from './hostBridge.js';
 
 const parent = process.parentPort;
 const demo = process.argv.includes('--demo');
@@ -24,7 +26,10 @@ try {
     });
   });
   let shuttingDown = null;
+  // Steam players, bridged from the main process (desktop/hostBridge.js)
+  const bridge = createBridgeEndpoint(host, (message) => parent.postMessage(message));
   parent.on('message', async ({ data }) => {
+    if (bridge(data)) return;
     if (data?.type === 'identity') {
       let ok = false;
       if (data.root) ok = await saves.useRoot(data.root).catch((error) => { saves.setUnavailable(`The save folder cannot be used: ${error.message}`); return false; });
