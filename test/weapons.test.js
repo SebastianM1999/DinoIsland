@@ -173,7 +173,7 @@ test('drawing pulls the arrow, string and hand back toward the eye while the bow
   assert.ok(full.hand.distanceTo(rest.hand) > 0.2, 'the string hand comes back with it');
 });
 
-test('the nocked arrow is a thick cartoon arrow with a solid head whose tip stays at ARROW_TIP_Y', () => {
+test('the nocked arrow is a slightly sturdier arrow with a solid head whose tip stays at ARROW_TIP_Y', () => {
   const vm = make(); settle(vm, 'bow');
   const head = (geo) => {
     const p = geo.getAttribute('position'), box = new THREE.Box3(), v = new THREE.Vector3();
@@ -186,7 +186,9 @@ test('the nocked arrow is a thick cartoon arrow with a solid head whose tip stay
   // flat blades vanish edge-on (the arrow points almost at the eye): the nocked head is as deep as it is wide
   assert.ok(Math.abs((big.max.z - big.min.z) - (big.max.x - big.min.x)) < 1e-6);
   assert.ok(plain.max.z - plain.min.z < 0.5 * (plain.max.x - plain.min.x), 'flying and lying arrows keep the flat blade');
-  assert.ok(vm.nocked.scale.x > 2 && vm.nocked.scale.z === vm.nocked.scale.x && vm.nocked.scale.y < vm.nocked.scale.x, 'thicker than it is longer-scaled');
+  const { x, y, z } = vm.nocked.scale;
+  assert.ok(x > 1 && x <= 1.5 && z === x, 'a touch thicker than the world arrow, never a fat stick');
+  assert.ok(y > x, 'longer-scaled than it is thickened');
 });
 
 test('the entire held spear matches the first flying frame across both camera projections', () => {

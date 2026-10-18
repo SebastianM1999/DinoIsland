@@ -374,16 +374,23 @@ test('reviving without Rescuer takes the full time, and is cancelled by stop, di
 
 test('a downed player bleeds out into a true death and respawns', () => {
   const { world, players: [a, b], run, evs } = setup(undefined, undefined);
-  a.inv.loot.meat = 3;
+  a.inv.loot.meat = 3; a.inv.loot.hide = 1; a.inv.fruit = ['berry', 'berry'];
   lethal(world, a);
   run(P.bleedOutTime - 1);
   assert.ok(a.downed);
+  const fell = { x: a.x, z: a.z };
   run(1.2);
   assert.ok(!a.downed && !a.alive);
-  assert.equal(a.inv.loot.meat, 0, 'loot lost at true death');
+  assert.equal(a.inv.loot.meat, 0, 'the pack is emptied at true death');
+  assert.deepEqual(a.inv.fruit, []);
   assert.equal(evs(EV.DEATH).length, 1);
+  const dropped = [...world.items.values()].filter((it) => ['meat', 'hide', 'berry'].includes(it.kind) && Math.hypot(it.x - fell.x, it.z - fell.z) < 1.5);
+  assert.deepEqual(dropped.map((it) => [it.kind, it.n]).sort(), [['berry', 2], ['hide', 1], ['meat', 3]], 'one stack per kind where they fell');
+  assert.ok(dropped.every((it) => it.droppedBy === undefined), 'auto-looted on the way back, unlike a deliberate drop');
+  assert.equal(evs(EV.ITEM_ADD).filter((m) => dropped.some((it) => it.id === m.item.id)).length, 3, 'every stack is published');
   run(P.respawnDelay + 0.2);
   assert.ok(a.alive);
+  assert.ok(dropped.every((it) => world.items.has(it.id)), 'the loot stays behind after the respawn');
   assert.equal(a.hp, a.maxHp);
   assert.ok(b.alive);
 });

@@ -5,8 +5,9 @@ import { retainResource } from '../core/resources.js';
 import * as THREE from 'three';
 import { MAT, deform, paint, place, part, merge, mesh, tube, wrap, spike, jitter } from './kit.js';
 
-// Shared contacts in bow-local metres. The shaft rests on the shelf at Y=0.09.
-export const BOW_REST = new THREE.Vector3(0.045, 0.09, 0);
+// Shared contacts in bow-local metres. The shaft rests on the shelf at Y=0.09, on the -X side of the riser: left of
+// the wood in the first-person view, above the fist (a right-handed archer shoots off the left side).
+export const BOW_REST = new THREE.Vector3(-0.045, 0.09, 0);
 export const ARROW_TIP_Y = 0.92;
 
 const cache = new Map();
@@ -70,7 +71,7 @@ export function bowGeometry() {
         place(wrap(0.025, 0.065, 4, ROPE), [0, side * 0.54 - 0.0325, 0.075]),
         part(new THREE.SphereGeometry(0.022, 8, 6), '#e2d0ad', [0, side * 0.64, 0.16]),
       ]),
-      part(new THREE.BoxGeometry(0.08, 0.025, 0.06), WOOD_DARK, [0.025, 0.0685, 0]),
+      part(new THREE.BoxGeometry(0.08, 0.025, 0.06), WOOD_DARK, [-0.025, 0.0685, 0]),
     ]);
   });
 }

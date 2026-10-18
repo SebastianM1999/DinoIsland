@@ -244,7 +244,7 @@ export class Hud {
     this.$death = el('div', 'hud-death');
     this.$death.hidden = true;
     this.$death.setAttribute('role', 'alert');
-    this.$death.innerHTML = `<div class="hud-death-card brush"><span class="hud-death-ic">${icon('skull')}</span><h2>You were defeated</h2><p class="hud-death-sub">Your carried loot is lost.</p><p class="hud-death-count"></p></div>`;
+    this.$death.innerHTML = `<div class="hud-death-card brush"><span class="hud-death-ic">${icon('skull')}</span><h2>You were defeated</h2><p class="hud-death-sub">Your carried loot lies where you fell.</p><p class="hud-death-count"></p></div>`;
     this.$deathCount = this.$death.querySelector('.hud-death-count');
     this.$win = el('div', 'hud-win');
     this.$win.hidden = true;
