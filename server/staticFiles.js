@@ -2,8 +2,10 @@
 // text types (compressed once per file version and kept in memory), long caching
 // for the vendored Three.js and the font, and <link rel="modulepreload"> hints
 // (injected into index.html) for the menu's static import graph so the browser fetches all modules at once
-// instead of discovering them one import level at a time.
+// instead of discovering them one import level at a time. index.html is sent with a
+// Content-Security-Policy (`contentSecurityPolicy`).
 
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import zlib from 'node:zlib';
@@ -26,11 +28,46 @@ function compress(encoding, body) {
     : zlib.gzipSync(body, { level: 9 });
 }
 
+const INLINE_SCRIPT = /<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/g;
+
+/**
+ * The page's Content-Security-Policy. `html` is the served index.html: each inline
+ * <script> (only the import map) is allowed by its SHA-256 hash, never by 'unsafe-inline'.
+ * Relaxations, all needed by the game:
+ * - style-src-attr 'unsafe-inline': HUD/panel templates set `style="..."` attributes
+ *   (bar widths, compass ticks, the scope overlay). <style> elements and stylesheets
+ *   stay 'self'-only, so an injected attribute cannot load anything.
+ * - connect-src ws: wss:: LAN joins go to any `ws://<ip>:<port>` the player types and
+ *   internet joins to a `wss://*.trycloudflare.com` tunnel; the host is not known up front.
+ * - img-src/connect-src blob:: GLTFLoader hands textures embedded in a GLB to the image
+ *   loaders as blob: URLs (only script already running on the page can create those).
+ */
+export function contentSecurityPolicy(html = '') {
+  const hashes = [...html.matchAll(INLINE_SCRIPT)]
+    // The browser hashes the parsed text, where the HTML parser has turned CRLF into LF.
+    .map((match) => `'sha256-${crypto.createHash('sha256').update(match[1].replace(/\r\n?/g, '\n'), 'utf8').digest('base64')}'`);
+  return [
+    "default-src 'self'",
+    ["script-src 'self'", ...hashes].join(' '),
+    "style-src 'self'",
+    "style-src-attr 'unsafe-inline'",
+    "img-src 'self' blob:",
+    "font-src 'self'",
+    "connect-src 'self' ws: wss: blob:",
+    "media-src 'self'",
+    "worker-src 'self'",
+    "object-src 'none'",
+    "base-uri 'none'",
+    "form-action 'self'",
+    "frame-ancestors 'none'",
+  ].join('; ');
+}
+
 /**
  * Sends `body` for a file version. `etagBase` identifies the content, so a
  * matching If-None-Match answers 304 without a body.
  */
-function respond(req, res, { file, body, size, mtimeMs, type, urlPath, etagBase }) {
+function respond(req, res, { file, body, size, mtimeMs, type, urlPath, etagBase, extraHeaders }) {
   const ext = path.extname(file).toLowerCase();
   const etag = `W/"${etagBase}"`;
   const immutable = IMMUTABLE_PREFIXES.some((prefix) => urlPath.startsWith(prefix));
@@ -39,6 +76,7 @@ function respond(req, res, { file, body, size, mtimeMs, type, urlPath, etagBase 
     'Cache-Control': immutable ? 'public, max-age=86400' : 'no-cache',
     ETag: etag,
     Vary: 'Accept-Encoding',
+    ...extraHeaders,
   };
   if (req.headers['if-none-match'] === etag) { res.writeHead(304, headers).end(); return; }
   const encoding = COMPRESSIBLE.has(ext) && size >= MIN_COMPRESS_BYTES ? pickEncoding(req.headers['accept-encoding']) : null;
@@ -89,7 +127,7 @@ export function staticImportGraph(entryUrl, resolveUrl, imports = {}) {
 
 let preloadCache = null;   // { at, links }
 
-/** index.html with modulepreload links for the static module graph. */
+/** index.html with modulepreload links for the static module graph, and its policy. */
 function indexWithPreloads(file, resolveUrl) {
   const html = fs.readFileSync(file, 'utf8');
   const now = Date.now();
@@ -101,7 +139,7 @@ function indexWithPreloads(file, resolveUrl) {
     preloadCache = { at: now, links: modules };
   }
   const tags = preloadCache.links.map((url) => `  <link rel="modulepreload" href="${url}">`).join('\n');
-  return html.replace('</head>', `${tags}\n</head>`);
+  return { html: html.replace('</head>', `${tags}\n</head>`), csp: contentSecurityPolicy(html) };
 }
 
 /** Serves one resolved file. `resolveUrl(urlPath)` maps URL paths to files (used for the module graph). */
@@ -110,9 +148,12 @@ export function serveStatic(req, res, file, { urlPath, type, root, resolveUrl })
     if (err || !st.isFile()) { res.writeHead(404).end('Not found'); return; }
     const isIndex = path.basename(file) === 'index.html' && path.dirname(file) === root;
     if (isIndex) {
-      let body;
-      try { body = Buffer.from(indexWithPreloads(file, resolveUrl)); } catch { res.writeHead(500).end('Could not read page'); return; }
-      respond(req, res, { file, body, size: body.length, mtimeMs: st.mtimeMs, type, urlPath, etagBase: `${body.length}-${Math.round(st.mtimeMs)}-${preloadCache?.links.length ?? 0}` });
+      let page;
+      try { page = indexWithPreloads(file, resolveUrl); } catch { res.writeHead(500).end('Could not read page'); return; }
+      const body = Buffer.from(page.html);
+      respond(req, res, { file, body, size: body.length, mtimeMs: st.mtimeMs, type, urlPath,
+        etagBase: `${body.length}-${Math.round(st.mtimeMs)}-${preloadCache?.links.length ?? 0}`,
+        extraHeaders: { 'Content-Security-Policy': page.csp } });
       return;
     }
     const ext = path.extname(file).toLowerCase();

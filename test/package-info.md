@@ -119,7 +119,7 @@ Grouped by the module area they mainly cover. Many simulation tests also check t
 
 ### Hosting and networking (server/, desktop/)
 - `http-host.test.js` — real HTTP/WebSocket host with two co-op players routing firearm shots and reloads.
-- `static-files.test.js` — static file responses: brotli/gzip bodies decode to the source, ETag answers 304, one-day caching for Three.js and the font, `index.html` carries `modulepreload` links for the menu graph but not for `core/game.js`, the menu background is a small WebP.
+- `static-files.test.js` — static file responses: brotli/gzip bodies decode to the source, ETag answers 304, one-day caching for Three.js and the font, `index.html` carries `modulepreload` links for the menu graph but not for `core/game.js`, the menu background is a small WebP; `index.html` (and its 304) carries the Content-Security-Policy, whose only inline-script allowance is the import map's SHA-256 (CRLF hashed as LF), with no inline handlers or foreign scripts on the page.
 - `lan-address.test.js` — LAN address list, join-field parsing (`src/client/net/lan.js`), `/connection` port info.
 - `internet-host.test.js` — internet relay admits only token WebSockets, control endpoint origin checks, startup failure and stop handling.
 - `steam-coop.test.js` — `SteamSession` with a modelled Steam API: two players through the real game host, lobby caps, demo host restrictions and demo/full separation, invalid lobbies, invites, renderer transport (`connectSteam`).
