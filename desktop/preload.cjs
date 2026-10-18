@@ -8,7 +8,7 @@ contextBridge.exposeInMainWorld('dinoSteam', {
   status: () => call('status'),
   friends: () => call('friends'),
   lobbies: () => call('lobbies'),
-  host: visibility => call('host', visibility),
+  host: (visibility, ownerToken = null) => call('host', { visibility, ownerToken }),
   join: lobbyId => call('join', lobbyId),
   leave: sessionId => call('leave', sessionId),
   invite: friendId => call('invite', friendId),

@@ -105,8 +105,13 @@ export class SteamSession {
     this.steam.richPresence.setRichPresence('steam_player_group_size', String(this.steam.matchmaking.getLobbyMembers(this.lobbyId).length));
   }
 
-  async hostGame(visibility = 'friends') {
+  /**
+   * `ownerToken`: the token the host process handed out for the opened expedition (server/saveCoordinator.js);
+   * the host's own renderer joins with it as the expedition's owner.
+   */
+  async hostGame(visibility = 'friends', ownerToken = null) {
     if (!['friends', 'private', 'public'].includes(visibility)) throw new Error('Invalid lobby visibility.');
+    if (ownerToken !== null && (typeof ownerToken !== 'string' || !/^[0-9a-f-]{36}$/.test(ownerToken))) throw new Error('Invalid expedition token.');
     const generation = this.begin();
     try {
       const result = await this.steam.matchmaking.createLobby({ private: 0, friends: 1, public: 2 }[visibility], this.maxPlayers);
@@ -126,7 +131,7 @@ export class SteamSession {
       this.localPeer = new Peer(data => {
         queueMicrotask(() => this.emit({ type: 'message', sessionId, message: JSON.parse(data) }));
       }, reason => this.endFromHost(reason));
-      this.host.attachConnection(this.localPeer, 'Steam host');
+      this.host.attachConnection(this.localPeer, 'Steam host', ownerToken ? { addr: 'local', url: `/?owner=${ownerToken}` } : {});
       this.publishPresence();
       return { sessionId, lobbyId: this.lobbyId, hosting: true };
     } catch (error) {
@@ -212,7 +217,8 @@ export class SteamSession {
       peer.steamId = info.identityRemote;
       peer.startedAt = this.now();
       this.peers.set(connection, peer);
-      this.host.attachConnection(peer, info.identityRemote);
+      // (the authenticated Steam identity of the connection: a saved expedition keys this guest's character by it)
+      this.host.attachConnection(peer, 'steam', { steamId: info.identityRemote });
       if (sockets.acceptConnection(connection) !== 1) peer.close(0, 'Could not accept connection');
     } else if (connection === this.connection && newState === 3) {
       this.connected = true;

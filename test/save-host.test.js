@@ -37,6 +37,8 @@ async function setup(t) {
     ws.on('message', (raw) => {
       const msg = JSON.parse(raw);
       inbox.push(msg);
+      // (a guest of an open expedition is asked for its credential first: this one has none)
+      if (msg.t === MSG.IDENT) ws.send(JSON.stringify({ t: MSG.HELLO, name, outfit: null, credential: null }));
       if (msg.t === MSG.WELCOME) resolve({ ws, msg, inbox });
       if (msg.t === MSG.REJECT) resolve({ ws, rejected: msg.reason, inbox });
     });
@@ -140,13 +142,18 @@ test('only the game page on this machine may manage expeditions', async (t) => {
 test('the gate: owner key only from loopback with the token, guests only in an open lobby', () => {
   const c = new SaveCoordinator({ timers: { setInterval: () => 0, clearInterval() {}, setTimeout: () => 0, clearTimeout() {} } });
   assert.match(c.admit({ addr: '127.0.0.1' }).reason, /No expedition/);
-  c.current = { token: 'tok', lobby: 'private' };
+  c.current = { id: '0f8fad5b-d9cb-469f-a165-70867728950e', token: 'tok', lobby: 'private' };
   assert.deepEqual(c.admit({ addr: '127.0.0.1', url: '/?owner=tok' }), { ok: true, key: OWNER_KEY });
   assert.equal(c.admit({ addr: '192.168.1.20', url: '/?owner=tok' }).ok, false, 'a LAN machine cannot claim the owner');
   assert.equal(c.admit({ addr: '127.0.0.1', url: '/' }).ok, false);
   c.current.lobby = 'open';
-  assert.deepEqual(c.admit({ addr: '192.168.1.20', url: '/' }), { ok: true });
-  assert.deepEqual(c.admit({ addr: '127.0.0.1', url: '%%bad' }), { ok: true });
+  // a guest is first asked for its credential, then known by it (never by name)
+  assert.deepEqual(c.admit({ addr: '192.168.1.20', url: '/' }), { ok: false, ident: c.current.id });
+  assert.deepEqual(c.admit({ addr: '127.0.0.1', url: '%%bad' }), { ok: false, ident: c.current.id });
+  const fresh = c.admit({ addr: '192.168.1.20', credential: null });
+  assert.equal(fresh.issue.world, c.current.id);
+  assert.deepEqual(c.admit({ addr: '192.168.1.21', credential: fresh.issue.token }), { ok: true, key: fresh.key });
+  assert.notEqual(c.admit({ addr: '192.168.1.20', credential: 'forged' }).key, fresh.key, 'anything else gets a new character');
   assert.throws(() => c.setLobby('everyone'), /Unknown lobby/);
 });
 

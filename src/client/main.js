@@ -201,7 +201,8 @@ async function start(mode, options = {}) {
     if (mode === 'expedition') {
       // a saved expedition: solo (private) or hosted for friends (open), see net/expeditions.js
       const choice = options.choice.create ? { create: { ...options.choice.create, level: startingIsland } } : { id: options.choice.id };
-      net = await expeditions.start({ ...choice, lobby: options.purpose === 'solo' ? 'private' : 'open', url: options.url }, { name, outfit });
+      const steam = options.purpose === 'steam' ? { bridge: window.dinoSteam, visibility: $('lobby-visibility').value } : null;
+      net = await expeditions.start({ ...choice, lobby: options.purpose === 'solo' ? 'private' : 'open', url: options.url, steam }, { name, outfit });
     } else net = mode === 'steam' ? await Net.steam(window.dinoSteam, options, name, outfit) :
       mode === 'online' || mode === 'internet' ? await Net.connect(websocketAddress(options.url ?? serverInput.value), name, outfit) : await Net.local(name, outfit, { level: demo ? 0 : DEBUG_QUERY.has('island') ? DEBUG_ISLAND : unlockedStartingIsland(Number($('play-island').value)), variant: DEBUG_VARIANT, dev: DEBUG_DEV, baseStage: DEBUG_BASE, raidIn: DEBUG_RAID, demo });
   } catch (err) {
@@ -351,7 +352,8 @@ const hostLan = () => {
 $('btn-host-lan').addEventListener('click', hostLan);
 $('btn-host').addEventListener('click', async () => {
   await steamLobby.ready;
-  if (steamLobby.available) void start('steam', { host: true, visibility: $('lobby-visibility').value });
+  // the desktop hosts a saved expedition for Steam friends too; a page without saves hosts a session world
+  if (steamLobby.available) { if (hostsExpeditions) void expeditionPanel.open('steam'); else void start('steam', { host: true, visibility: $('lobby-visibility').value }); }
   else hostLan();
 });
 const steamLobby = initSteamLobby({

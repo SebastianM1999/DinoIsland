@@ -42,8 +42,14 @@ export const hostExpeditions = {
    * Open an expedition (`{ id }`) or create one (`{ create: { name, level } }`) on the host, then join it.
    * lobby 'private' = solo, 'open' = LAN / internet friends may join too.
    */
-  async start({ id, create, lobby = 'private', url = null }, { name, outfit }) {
+  async start({ id, create, lobby = 'private', url = null, steam = null }, { name, outfit }) {
     const opened = id ? await api('/open', { id, lobby }) : await api('/new', { ...create, lobby });
+    if (steam) {
+      // Steam friends: the lobby feeds this expedition (desktop/hostBridge.js); we join it as its owner
+      const net = await Net.steam(steam.bridge, { host: true, visibility: steam.visibility, ownerToken: opened.token }, name, outfit);
+      net.expedition = { ...opened.expedition, kind: 'host', recovered: !!opened.recovered };
+      return net;
+    }
     // (`url`: the internet test's own host address, which carries its tunnel token)
     const address = new URL(url ?? `${wsOrigin()}/`);
     address.searchParams.set('owner', opened.token);

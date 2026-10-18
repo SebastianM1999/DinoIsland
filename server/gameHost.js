@@ -78,7 +78,9 @@ export function startGameHost(httpServer = null, { onConnection, demo = false, w
       if (!msg || typeof msg !== 'object' || Array.isArray(msg)) return;
       if (playerId === null) {
         if (msg.t !== MSG.HELLO) return;
-        const gate = !world ? { ok: false, reason: 'No expedition is open on this host.' } : admit ? admit({ addr, ...info }) : { ok: true };
+        const gate = !world ? { ok: false, reason: 'No expedition is open on this host.' } : admit ? admit({ addr, ...info, credential: msg.credential }) : { ok: true };
+        // a saved expedition asks a guest which credential it holds for it, then waits for the next hello
+        if (gate.ident) { ws.send(JSON.stringify({ t: MSG.IDENT, world: gate.ident })); return; }
         // (progression belongs to the expedition: a client-sent profile is never used)
         const res = gate.ok ? world.join(msg.name, (id) => {
           playerId = id;
@@ -91,6 +93,8 @@ export function startGameHost(httpServer = null, { onConnection, demo = false, w
           ws.close(4000, 'full');
           return;
         }
+        // a new guest keeps this to get the same character back next time
+        if (gate.issue) sendTo(playerId, ws, { t: MSG.CREDENTIAL, ...gate.issue });
         console.log(`[net] player #${playerId} connected from ${addr}`);
         return;
       }

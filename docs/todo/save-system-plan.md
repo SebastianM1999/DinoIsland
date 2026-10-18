@@ -6,7 +6,7 @@ Prepared 2026-10-17 against `0e9140f654cdcd9626fbc45b996333042c08f98b`. See [Ste
 
 Owner decisions:
 
-- **Where the desktop sim runs:** an Electron `utilityProcess` host (`desktop/host-process.js`) serves solo (private lobby), LAN and internet hosting, and owns the expedition files. The Steam host still runs in the main process (phase 4 moves it).
+- **Where the desktop sim runs:** an Electron `utilityProcess` host (`desktop/host-process.js`) serves solo (private lobby), LAN, internet and Steam hosting, and owns the expedition files. Steam P2P traffic is bridged from the main process (`desktop/hostBridge.js`).
 - **Progression is per expedition:** XP, skills, island progress, inventory and backpack belong to each expedition's roster. They are not account-wide. Name, outfit and preferences stay personal. A new expedition starts at level 1 on island 1, or on any island while `TEST_ALL_ISLANDS_UNLOCKED` playtest access is on. This replaces the "keep account-wide XP/skills" default below.
 - **No demo:** the product is the full game. The demo items in this plan are dropped. The demo mode code (`CONFIG.demo`, `--demo`) is still in the source and will be removed separately.
 
@@ -19,9 +19,15 @@ Implemented (phases 1-3):
 - **Browser:** solo worker captures are stored in IndexedDB, with a previous-save fallback and file export/import.
 - **UI:** expedition picker (new, continue, host, rename, delete), Save & quit, and the last-save line in the pause menu.
 
+Phase 4 (done 2026-10-18):
+
+- **Steam hosting of a saved expedition:** the lobby feeds the host process, and the host's renderer joins with the owner token. Steam guests are keyed `steam-<authenticated id>`.
+- **LAN and internet guests:** a host-issued credential (IDENT/CREDENTIAL handshake). The host keeps only a hash, as the roster key, and the client keeps the credential per expedition.
+- **Returning players:** a returning explorer gets their character back exactly once. Someone who missed the voyage comes back at the new camp with the travel resupply. The roster keeps at most 48 absent explorers.
+
 Not yet done:
 
-- **Phase 4:** Steam-hosted saves and the Steam host in the utility process, guest roster keys and reconnect credentials. LAN, internet and Steam guests get a fresh character per session.
+- **Guest credential recovery:** a guest who lost their credential gets a new character. There is no host-approved recovery yet.
 - **Phase 5:** packaged Windows fault tests (power loss, antivirus, OneDrive-redirected AppData) and a soak test.
 - **Phase 6:** Steam Cloud.
 - **Packaged runs:** nothing has been run as a packaged Steam build. `utilityProcess` + asar, two accounts on one PC, and invites while closed need real runs.

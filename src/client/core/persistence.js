@@ -68,3 +68,33 @@ export function writeItem(key, value, store = storage) {
     return false;
   }
 }
+
+// ------------------------------------------------------------------ guest credentials
+
+const CREDENTIALS = storageKey('guest-credentials');
+const MAX_CREDENTIALS = 40;
+const UUID = /^[0-9a-f-]{36}$/;
+
+function credentials(store) {
+  try {
+    const value = JSON.parse(readItem(CREDENTIALS, store) || '{}');
+    return value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+  } catch { return {}; }
+}
+
+/** The credential this player holds for a host's expedition `world` (its UUID), or null. */
+export function guestCredential(world, store = storage) {
+  const token = UUID.test(String(world)) ? credentials(store)[world] : null;
+  return typeof token === 'string' && UUID.test(token) ? token : null;
+}
+
+/** Keep the credential a host issued, so the same character waits there next time (newest MAX_CREDENTIALS). */
+export function rememberGuestCredential(world, token, store = storage) {
+  if (!UUID.test(String(world)) || !UUID.test(String(token))) return false;
+  const all = credentials(store);
+  delete all[world];
+  all[world] = token;
+  const keys = Object.keys(all);
+  for (const old of keys.slice(0, Math.max(0, keys.length - MAX_CREDENTIALS))) delete all[old];
+  return writeItem(CREDENTIALS, JSON.stringify(all), store);
+}

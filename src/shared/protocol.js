@@ -28,7 +28,12 @@
 //   ev      { e: <event>, ...fields }                   see EV below
 
 export const MSG = {
+  // HELLO { name, outfit, credential? }: credential = this client's guest token for the host's
+  // expedition (null: none yet), sent after the host asked with IDENT { world }; the host then
+  // answers a new guest with CREDENTIAL { world, token } to keep (server/saveCoordinator.js)
   HELLO: 'hello',
+  IDENT: 'ident',
+  CREDENTIAL: 'credential',
   STATE: 'state',
   ACT: 'act',
   PING: 'ping',
