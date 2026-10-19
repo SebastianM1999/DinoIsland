@@ -10,6 +10,7 @@ import { requestPrograms } from './programs.js';
 import { LightPool } from './lightPool.js';
 import { TIERS, GraphicsAutoTune, gpuName } from './graphicsTier.js';
 import { warmSceneBatches } from './buildSteps.js';
+import { ShadowCadence } from './shadowCadence.js';
 
 const R = CONFIG.render;
 const _tmpColor = new THREE.Color();
@@ -33,6 +34,7 @@ export class Renderer {
     this.renderScale = null;
     this.aoStrength = 0;
     this.gpuTimer = new GpuTimer(r.getContext());
+    this.shadowCadence = new ShadowCadence();
     this.post = null;
     this.metrics = { cpuRenderMs: 0, gpuMs: null, worldScale: 1, tier: '' };
     this.lastPostSize = '';
@@ -168,7 +170,6 @@ export class Renderer {
     }
     Object.assign(sh.camera, { left: -g.shadowRange, right: g.shadowRange, top: g.shadowRange, bottom: -g.shadowRange });
     sh.camera.updateProjectionMatrix();
-    this.shadowCenter = null;   // re-snap to the new texel size
     this.renderer.shadowMap.needsUpdate = true;
   }
 
@@ -283,13 +284,8 @@ export class Renderer {
     const sx = Math.round(x / texel) * texel, sz = Math.round(z / texel) * texel;
     this.sun.target.position.set(sx, y, sz);
     this.sun.position.set(sx + this.sunDir.x * d, y + this.sunDir.y * d, sz + this.sunDir.z * d);
-    // A moving shadow camera invalidates static shadows even on skipped frames.
-    const previous = this.shadowCenter;
-    if (!previous || previous.x !== sx || previous.y !== y || previous.z !== sz) {
-      this.renderer.shadowMap.needsUpdate = true;
-      this.shadowCenter ??= new THREE.Vector3();
-      this.shadowCenter.set(sx,y,sz);
-    }
+    // No redraw needed here: the shadow matrix is only updated when the shadow map is
+    // drawn, so between redraws map and matrix still match (ShadowCadence redraws soon).
   }
 
   resize() {
@@ -360,7 +356,8 @@ export class Renderer {
     this.autoTune.frame(rawDt, gpu, cap > 0 && cap < 60, !globalThis.document?.hidden);
     this.gpuTimer.begin();
     r.info.reset();
-    r.shadowMap.needsUpdate = true;
+    // At most 60 Hz; #applyShadow (new size or range) asks for one at once
+    if (this.shadowCadence.due(started, r.shadowMap.needsUpdate)) r.shadowMap.needsUpdate = true;
     const scale = this.renderScale;
     // The canvas is created with MSAA; the world target only exists when it
     // is scaled or shaded, and then carries its own MSAA samples.
