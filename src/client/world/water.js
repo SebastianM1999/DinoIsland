@@ -21,6 +21,7 @@
 
 import * as THREE from 'three';
 import { CONFIG } from '../../shared/config.js';
+import { BIOMES } from '../../shared/levels.js';
 import { makeRng } from '../../shared/rng.js';
 import { SPRING_WATER_OFFSET } from '../../shared/springShape.js';
 import { riverGeometry, discGeometry, withSheetAttrs } from './rivers.js';
@@ -30,7 +31,7 @@ const MAX_RIPPLES = 8;
 const smoothstepJS = (a, b, x) => { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 
 // Fallback palette (= the jungle biome) when the layout has no biome.
-const DEFAULT_WATER = { shallow: '#57e6dc', mid: '#1fb4e0', deep: '#1560c4', foam: '#f4fcff', sky: '#a9dcf8' };
+const DEFAULT_WATER = BIOMES.jungle.water;
 const DEFAULT_SUN = '#fff4d8';
 const LAVA = {
   crust: '#1c1412', crustHot: '#6a1a0a', hot: '#e8400c', core: '#ffc23a',
