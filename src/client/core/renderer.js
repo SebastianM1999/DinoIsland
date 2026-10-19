@@ -11,12 +11,15 @@ import { LightPool } from './lightPool.js';
 import { TIERS, GraphicsAutoTune, gpuName } from './graphicsTier.js';
 import { warmSceneBatches } from './buildSteps.js';
 import { ShadowCadence } from './shadowCadence.js';
+import { gradeOf, blendGrade } from './grade.js';
 
 const R = CONFIG.render;
 const _tmpColor = new THREE.Color();
 
 /** Upscaling sharpness; world MSAA is selected by the measured graphics tier. */
 const SHARPNESS = 0.35;
+/** The biomes' colour grade lives in the output pass, so the world always draws into the post target. */
+const GRADED = true;
 
 export class Renderer {
   constructor(canvas) {
@@ -36,6 +39,7 @@ export class Renderer {
     this.gpuTimer = new GpuTimer(r.getContext());
     this.shadowCadence = new ShadowCadence();
     this.post = null;
+    this.grade = gradeOf(null);       // the biome's colour grade (applyBiome / blendBiome)
     this.metrics = { cpuRenderMs: 0, gpuMs: null, worldScale: 1, tier: '' };
     this.lastPostSize = '';
     // Graphics level: chosen per PC by GraphicsAutoTune (see graphicsTier.js).
@@ -65,7 +69,7 @@ export class Renderer {
 
   #adoptWanted() {
     const { scale, ao } = this.wanted;
-    const post = usesPost(scale, ao);
+    const post = usesPost(scale, ao, GRADED);
     if (this.renderScale === null || this.compiledPaths.has(post)) {
       this.renderScale = scale;
       this.aoStrength = ao;
@@ -119,7 +123,7 @@ export class Renderer {
   async #compileShadowVariant(enabled) {
     const r = this.renderer;
     const was = r.shadowMap.enabled;
-    const post = usesPost(this.renderScale, this.aoStrength);
+    const post = usesPost(this.renderScale, this.aoStrength, GRADED);
     let world, view;
     r.shadowMap.enabled = enabled;
     try {
@@ -223,6 +227,7 @@ export class Renderer {
     this.hemi.groundColor.set(sky.hemiGround);
     this.hemi.intensity = (sky.hemiIntensity ?? 1.6) * 0.9;
     this.renderer.toneMappingExposure = sky.exposure ?? 1.05;
+    this.grade = gradeOf(sky);
   }
 
   /**
@@ -245,6 +250,7 @@ export class Renderer {
     col(this.hemi.groundColor, a.hemiGround, b.hemiGround);
     this.hemi.intensity = L(a.hemiIntensity, b.hemiIntensity, 1.6) * 0.9;
     this.renderer.toneMappingExposure = L(a.exposure, b.exposure, 1.05);
+    blendGrade(a, b, k, this.grade);
   }
 
   #setupLights() {
@@ -334,7 +340,7 @@ export class Renderer {
 
   /** The world target when scaling or contact shading is on (created and sized on demand), else null. */
   #syncPost(scale, ao) {
-    if (!usesPost(scale, ao)) return null;
+    if (!usesPost(scale, ao, GRADED)) return null;
     const r = this.renderer;
     this.post ??= new WorldPost(r);
     const size = r.getDrawingBufferSize(_bufferSize);
@@ -362,7 +368,7 @@ export class Renderer {
     // The canvas is created with MSAA; the world target only exists when it
     // is scaled or shaded, and then carries its own MSAA samples.
     const post = this.#syncPost(scale, this.aoStrength);
-    if (post) post.render(this.scene, this.camera, scale < 0.999 ? SHARPNESS : 0, this.aoStrength);
+    if (post) post.render(this.scene, this.camera, scale < 0.999 ? SHARPNESS : 0, this.aoStrength, this.grade);
     else {
       r.setRenderTarget(null);
       r.clear();

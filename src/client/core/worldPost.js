@@ -2,6 +2,7 @@
 // textures, temporal history, motion vectors or additional geometry passes.
 import * as THREE from 'three';
 import { FullScreenQuad } from 'three/addons/postprocessing/Pass.js';
+import { GRADE_GLSL, gradeOf } from './grade.js';
 
 const vertexShader = `varying vec2 vUv;
 void main() { vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }`;
@@ -18,6 +19,7 @@ uniform float nearPlane;
 uniform float farPlane;
 varying vec2 vUv;
 #include <packing>
+${GRADE_GLSL}
 float linearDepth(vec2 uv) {
   return -perspectiveDepthToViewZ(texture2D(tDepth, uv).x, nearPlane, farPlane);
 }
@@ -59,6 +61,7 @@ void main() {
     }
     c *= 1.0 - aoStrength * sum / max(weights, 0.0001);
   }
+  c = vignetted(grade(c), vUv, sourceSize.x / sourceSize.y);
   gl_FragColor = vec4(c, 1.0);
   #include <colorspace_fragment>
 }`;
@@ -103,8 +106,13 @@ void main() {
   gl_FragColor = vec4(vec3(clamp(ao/4.0,0.0,1.0)),1.0);
 }`;
 
-/** The world draws into its own target (not the canvas) when scaled down or contact-shaded. */
-export const usesPost = (scale, ao) => scale < 0.999 || ao > 0;
+const NEUTRAL = gradeOf(null);
+
+/**
+ * The world draws into its own target (not the canvas) when scaled down, contact-shaded or
+ * colour-graded. The game always grades (its biomes' look), so it always draws into the target.
+ */
+export const usesPost = (scale, ao, graded = false) => graded || scale < 0.999 || ao > 0;
 
 export class WorldPost {
   constructor(renderer) {
@@ -118,7 +126,9 @@ export class WorldPost {
       depthTest: false, depthWrite: false,
       uniforms: { tColor: { value: null }, tAO: { value: null }, tDepth: { value: null },
         sourceSize: { value: new THREE.Vector2(1,1) }, aoSize: { value: new THREE.Vector2(1,1) },
-        sharpness: { value: 0 }, aoStrength: { value: 0 }, nearPlane: { value: 0.1 }, farPlane: { value: 900 } },
+        sharpness: { value: 0 }, aoStrength: { value: 0 }, nearPlane: { value: 0.1 }, farPlane: { value: 900 },
+        gradeSaturation: { value: 1 }, gradeContrast: { value: 1 }, gradeVignette: { value: 0 },
+        gradeHighlights: { value: new THREE.Vector3(1, 1, 1) }, gradeShadows: { value: new THREE.Vector3() } },
     });
     this.ao = new THREE.ShaderMaterial({
       name: 'WorldContactAO', vertexShader, fragmentShader: aoFragment,
@@ -165,8 +175,13 @@ export class WorldPost {
     }
   }
 
-  render(scene, camera, sharpness, aoStrength) {
+  render(scene, camera, sharpness, aoStrength, grade = NEUTRAL) {
     const r = this.renderer, u = this.output.uniforms;
+    u.gradeSaturation.value = grade.saturation;
+    u.gradeContrast.value = grade.contrast;
+    u.gradeVignette.value = grade.vignette;
+    u.gradeHighlights.value.fromArray(grade.highlights);
+    u.gradeShadows.value.fromArray(grade.shadows);
     r.setRenderTarget(this.target);
     r.clear();
     r.render(scene,camera);
