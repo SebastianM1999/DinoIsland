@@ -5,6 +5,7 @@
 
 import * as THREE from 'three';
 import { CONFIG } from '../../shared/config.js';
+import { FLOWERS } from '../../shared/palette.js';
 import { makeRng, fbm, smoothstep } from '../../shared/rng.js';
 import { insideBossArena } from '../../shared/bossArena.js';
 import { insideSwampArena } from '../../shared/swampArena.js';
@@ -20,7 +21,7 @@ import { disposeIslandScenes } from '../core/resources.js';
 
 const TAU = Math.PI * 2;
 const C = (h) => new THREE.Color(h);
-const FLOWER_TINTS = ['#ff7fbf', '#ffe066', '#ffffff', '#b49cff', '#ff9a4a', '#ff5f6d'].map(C);
+const FLOWER_TINTS = FLOWERS.map(C);
 
 /** Tuning. */
 export const VEG_TUNING = {

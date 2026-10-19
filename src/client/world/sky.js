@@ -6,13 +6,12 @@
 import * as THREE from 'three';
 import { makeRng } from '../../shared/rng.js';
 import { paint, place, merge, prep } from '../models/kit.js';
+import { BIOMES } from '../../shared/levels.js';
+import { DISTANT_LAND } from '../../shared/palette.js';
 
 // Fallback palette (= the jungle biome) when no layout/biome is given.
-const DEFAULT_SKY = {
-  background: '#7cc8f5', fog: '#a8dcf7',
-  top: '#4fb0f0', horizon: '#a8dcf7', cloud: '#ffffff', sun: '#fff0d6',
-};
-const DEFAULT_LAND = { grass: '#78b857', sand: '#e8c98a', rock: '#9a8fa6' };
+const DEFAULT_SKY = BIOMES.jungle.sky;
+const DEFAULT_LAND = DISTANT_LAND;
 
 const SKY_VERT = /* glsl */`
 varying vec3 vDir;

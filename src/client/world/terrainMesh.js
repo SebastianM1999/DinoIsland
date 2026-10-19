@@ -6,25 +6,23 @@
 import * as THREE from 'three';
 import { fbm, smoothstep } from '../../shared/rng.js';
 import { BIOMES } from '../../shared/levels.js';
+import { GROUND } from '../../shared/palette.js';
 import { causewayQuery } from '../../shared/bossArena.js';
 import { withSurfaceDetail, setSurfaceBiome } from './surfaceDetail.js';
 import { buildCaveTerrainMesh, buildCaveTerrainMeshSteps } from './caveTerrain.js';
 import { TerrainChunks, splitTerrainGeometry } from './terrainChunks.js';
 import { runBuildSteps } from '../core/buildSteps.js';
 
-const JUNGLE = {
-  sandDry: '#f6d08a', sand: '#efc176', sandWet: '#d9a862', seabed: '#e2bd7a', seabedDeep: '#b99a68',
-  grass: '#7cc34a', grassLight: '#95d256', grassDark: '#5ea83a', floor: '#4c9434', high: '#86c650',
-  rock: '#aa9fb4', rockDark: '#8d82a0', rockWarm: '#b59c90', dirt: '#c9985c', dirtDark: '#b0814c', riverbed: '#b3a27a',
-};
+// Fallback for keys a biome leaves out
+const JUNGLE = BIOMES.jungle.terrain;
 // Boss arena ground (see world/bossArena.js): the volcano island's darkest stone
 const VOLCANO = Object.fromEntries(['rock', 'rockDark', 'ash', 'scorch'].map((k) => [k, new THREE.Color(BIOMES.volcano.terrain[k]).multiplyScalar(0.7)]));
-const EMBER = new THREE.Color('#7a2a12');
-const CAUSEWAY = new THREE.Color('#6a5f62');
+const EMBER = new THREE.Color(GROUND.ember);
+const CAUSEWAY = new THREE.Color(GROUND.causeway);
 // Wet ground at the water line and under the waterfall
 const WET = new THREE.Color();          // scratch: the ground's own colour, darkened
-const WET_ROCK = new THREE.Color('#4a4652');
-const WET_MOSS = new THREE.Color('#3f6e3a');
+const WET_ROCK = new THREE.Color(GROUND.wetRock);
+const WET_MOSS = new THREE.Color(GROUND.wetMoss);
 
 /**
  * @param {import('../../shared/terrain.js').Terrain} terrain
