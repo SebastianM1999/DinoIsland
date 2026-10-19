@@ -85,6 +85,7 @@ const BOSS_SKY = {
   top: '#1c1418', horizon: '#7a3424', cloud: '#5a3a36',
   sun: '#ff8a5a', sunIntensity: 1.25, hemiSky: '#6a5a6e', hemiGround: '#8a2e1a', hemiIntensity: 1.0,
   exposure: 0.95,
+  grade: { saturation: 0.95, contrast: 1.1, highlights: '#ffe4cc', shadows: '#1c0806', vignette: 0.4 },
 };
 
 /** The water's own look under its surface: fog colour and reach (daylight rivers and lakes / the dark cave). */

@@ -43,6 +43,8 @@ export const BIOMES = {
       top: '#4fb0f0', horizon: '#a8dcf7', cloud: '#ffffff',
       sun: '#fff0d6', sunIntensity: 2.6, hemiSky: '#bfe6ff', hemiGround: '#d8bb80', hemiIntensity: 1.6,
       exposure: 1.05,
+      // colour grade of the output pass (client/core/grade.js): warm sunlit highlights, teal shade
+      grade: { saturation: 1.06, contrast: 1.05, highlights: '#fff6e6', shadows: '#06141a', vignette: 0.18 },
     },
     water: { shallow: '#57e6dc', mid: '#1fb4e0', deep: '#1560c4', foam: '#f4fcff', sky: '#a9dcf8' },
     dinos: { brachio: 1, stego: 1, raptor: 2, ptera: 3, trex: 0 },   // herds / groups / packs / flyers / rexes
@@ -97,6 +99,8 @@ export const BIOMES = {
       top: '#2a2228', horizon: '#c0583a', cloud: '#5e4e50',
       sun: '#ff9a5e', sunIntensity: 1.6, hemiSky: '#8e7e8a', hemiGround: '#8a3e26', hemiIntensity: 1.2,
       exposure: 0.9,
+      // hot and heavy: ember highlights, smouldering red shade, darker edges
+      grade: { saturation: 1.02, contrast: 1.09, highlights: '#ffeeda', shadows: '#1a0906', vignette: 0.3 },
     },
     water: { shallow: '#4a9a92', mid: '#1d5e72', deep: '#12324e', foam: '#cfd4d6', sky: '#7a5e5c' },
     // its own fruit, one per role (config.js fruit.types): chilis on warm ground, plums, rare obsidian figs
@@ -147,6 +151,8 @@ export const BIOMES = {
       top: '#4d5a52', horizon: '#8a9682', cloud: '#a3aa9c',
       sun: '#e8e2c4', sunIntensity: 1.3, hemiSky: '#a5b4a0', hemiGround: '#5a5038', hemiIntensity: 1.25,
       exposure: 0.85,
+      // muted and murky: drained colour, olive shade (what lurks in the reeds is hard to make out)
+      grade: { saturation: 0.86, contrast: 1.03, highlights: '#f6f8e6', shadows: '#0c1406', vignette: 0.3 },
     },
     water: { shallow: '#5a6a3c', mid: '#3c4a2c', deep: '#26301e', foam: '#b8bfa2', sky: '#7e8a78' },
     // its own fruit, one per role (config.js fruit.types): bog-shore shrubs, figs, hidden lotus
@@ -199,6 +205,8 @@ export const BIOMES = {
       top: '#101826', horizon: '#1c3038', cloud: '#2a3a46',
       sun: '#9fb8d0', sunIntensity: 0, hemiSky: '#4a6a8c', hemiGround: '#2a2038', hemiIntensity: 0.34,
       exposure: 1.3,
+      // inside the mountain: cold, closing in
+      grade: { saturation: 0.94, contrast: 1.06, highlights: '#f0f5ff', shadows: '#04080e', vignette: 0.38 },
     },
     // the two coves outside: a dusk, warm low sun over a teal sea (the client blends sky -> skyOutside by the
     // depth into the mountain, client/world/caveFx.js; the sky dome and the sea use this one)
@@ -207,6 +215,8 @@ export const BIOMES = {
       top: '#182f4a', horizon: '#c7a58a', cloud: '#8fa6b4',
       sun: '#ffc690', sunIntensity: 1.5, hemiSky: '#8ab4cf', hemiGround: '#4a5a62', hemiIntensity: 1.15,
       exposure: 0.95,
+      // dusk in the coves: golden highlights, blue shade
+      grade: { saturation: 1.03, contrast: 1.05, highlights: '#fff0de', shadows: '#050c16', vignette: 0.22 },
     },
     water: { shallow: '#2f7f86', mid: '#16525e', deep: '#0b2a3a', foam: '#9fc4c8', sky: '#1c3038' },
     // flyers and giants never fit under the roof: one raptor pack strayed in, the
