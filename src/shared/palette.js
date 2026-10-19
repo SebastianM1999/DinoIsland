@@ -16,5 +16,10 @@ export const GROUND = {
 /** Meadow flower tints (client/world/vegetation.js): bright, sparse accents. */
 export const FLOWERS = ['#ff7fbf', '#ffe066', '#ffffff', '#b49cff', '#ff9a4a', '#ff5f6d'];
 
+/** Effects on creatures and things (client/models/dino/hitFlash.js). */
+export const FX = {
+  hitFlash: '#ffd9c2',     // warm flash on a dinosaur that takes damage
+};
+
 /** Far islands on the horizon (client/world/sky.js): softer than any biome so they sit back in the haze. */
 export const DISTANT_LAND = { grass: '#78b857', sand: '#e8c98a', rock: '#9a8fa6' };
