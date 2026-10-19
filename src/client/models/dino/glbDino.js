@@ -1,4 +1,5 @@
 import { retainObjectResources } from '../../core/resources.js';
+import { markGlow } from '../../core/glowLayer.js';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { clone } from 'three/addons/utils/SkeletonUtils.js';
@@ -42,7 +43,7 @@ export function registerDinoGLTF(type, gltf, spec = GLB_DINOS[type]) {
  */
 function makeGlow(scene, { material: name, level = .88, pulse = .1, period = 5 }) {
   const mat = new THREE.MeshBasicMaterial({ name, vertexColors: true });
-  scene.traverse(o => { if (o.isMesh && o.material?.name === name) { o.material = mat; o.castShadow = false; } });
+  scene.traverse(o => { if (o.isMesh && o.material?.name === name) { o.material = mat; o.castShadow = false; markGlow(o); } });
   return { material: mat, pulse: now => mat.color.setScalar(level + pulse * Math.sin(now * Math.PI * 2 / period)) };
 }
 

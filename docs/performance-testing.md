@@ -77,7 +77,10 @@ dinosaurs, incapacitated players, missing clients and uncaught browser exception
 
 Customize duration with `--seconds=30 --warmup-seconds=10`, viewport with
 `--width=1920 --height=1080`, target metadata with
-`--target-fps=120`. `--channel=chrome` uses installed Chrome; omit it for bundled
+`--target-fps=120`, the frozen graphics tier with `--tier=N` (`TIERS` index:
+0 Low, 1 Medium (default, the 120 FPS target), 2 High, 3 Ultra; use 2/3 to measure
+High/Ultra-only effects such as bloom, comparing runs at the same tier).
+`--channel=chrome` uses installed Chrome; omit it for bundled
 Chromium. `--software` explicitly requests SwiftShader for portability.
 Software GPU results establish functional execution and relative regressions;
 they cannot establish 120 FPS performance on players' hardware. The report

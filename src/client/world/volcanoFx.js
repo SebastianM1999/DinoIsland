@@ -16,6 +16,7 @@
 // its events). How many flakes and puffs follows the graphics tier.
 
 import * as THREE from 'three';
+import { markGlow } from '../core/glowLayer.js';
 import { makeRng } from '../../shared/rng.js';
 import { SURFACE } from './surfaceDetail.js';
 import { CONFIG } from '../../shared/config.js';
@@ -261,6 +262,7 @@ export function buildVolcanoFx(terrain, layout, camera, { onFog = null, onImpact
     const glow = new THREE.Mesh(flashGeo, new THREE.MeshBasicMaterial({ color: '#ff6a1c', transparent: true, opacity: 0.35, depthWrite: false, blending: THREE.AdditiveBlending }));
     const flash = new THREE.Mesh(flashGeo, new THREE.MeshBasicMaterial({ color: '#ffb060', transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending }));
     const smoke = new THREE.Mesh(flashGeo, new THREE.MeshBasicMaterial({ color: '#3a3230', transparent: true, opacity: 0, depthWrite: false, fog: true }));
+    for (const m of [rock, glow, flash]) markGlow(m);
     for (const m of [ring, disc, rock, glow, flash, smoke]) { m.visible = false; m.renderOrder = 6; group.add(m); }
     return { ring, disc, rock, glow, flash, smoke, active: false, t: 0, at: 0, x: 0, y: 0, z: 0, r: 4, from: new THREE.Vector3(), landed: false };
   });
@@ -279,6 +281,7 @@ export function buildVolcanoFx(terrain, layout, camera, { onFog = null, onImpact
     mouth.position.set(g.x, g.y + 0.06, g.z);
     mouth.scale.setScalar(g.r * 0.85);
     for (const m of [jet, core, cap]) { m.visible = false; m.position.set(g.x, g.y, g.z); }
+    for (const m of [vent, jet, core, cap]) markGlow(m);
     for (const m of [vent, mouth, jet, core, cap]) { m.renderOrder = 6; group.add(m); }
     return { ...g, vent, mouth, jet, core, cap, t: -1, eta: 0, blown: false };
   });

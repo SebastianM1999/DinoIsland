@@ -3,6 +3,7 @@
 // All per-frame work reuses preallocated objects.
 
 import * as THREE from 'three';
+import { markGlow } from '../../core/glowLayer.js';
 import { MAT, deform, paint, place, part, merge, jitter, limb, spike } from '../../models/kit.js';
 import { COL, footprint } from './pieces.js';
 
@@ -102,6 +103,7 @@ export function createFire() {
   im.frustumCulled = false;
   flames.forEach((f, i) => im.setColorAt(i, _c.setRGB(f.tint[0], f.tint[1], f.tint[2])));
   im.instanceColor.needsUpdate = true;
+  markGlow(im);
   group.add(im);
 
   const light = new THREE.PointLight(0xff9a3c, 12, 14, 1.8);

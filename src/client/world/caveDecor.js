@@ -11,6 +11,7 @@
 // Budgets: stalactite 216 tris, stalagmite 216, crystal cluster ~420, mushroom ~170.
 
 import * as THREE from 'three';
+import { markGlow } from '../core/glowLayer.js';
 import { makeRng, smoothstep, fbm } from '../../shared/rng.js';
 import { merge, paint, place, smoothNormals } from '../models/kit.js';
 import { glowMaterial } from './veg/shapes.js';
@@ -330,7 +331,7 @@ export function buildCaveDecor(terrain, layout, { roofY, tier }) {
     geo.crystals.forEach((g, gi) => {
       const list = per[gi];
       if (!list.length) return;
-      const mesh = new THREE.InstancedMesh(g, mat, list.length);
+      const mesh = markGlow(new THREE.InstancedMesh(g, mat, list.length));
       list.forEach((c, i) => {
         const col = glowColor(c.hue, new THREE.Color());
         const y = terrain.heightAt(c.x, c.z);
@@ -357,7 +358,7 @@ export function buildCaveDecor(terrain, layout, { roofY, tier }) {
     const spots = mushroomSpots(terrain, layout, S, share);
     if (spots.length) {
       const mat = glowMaterial(0.8, 0.5);
-      const mesh = new THREE.InstancedMesh(geo.mushroom, mat, spots.length);
+      const mesh = markGlow(new THREE.InstancedMesh(geo.mushroom, mat, spots.length));
       spots.forEach((m, i) => {
         _q.setFromAxisAngle(UP, m.rot);
         _m.compose(_p.set(m.x, m.y - 0.02, m.z), _q, _s.set(m.s, m.s * (0.9 + 0.3 * m.t), m.s));

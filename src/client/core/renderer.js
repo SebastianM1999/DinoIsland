@@ -5,13 +5,14 @@ import * as THREE from 'three';
 import { CONFIG } from '../../shared/config.js';
 import { onSettings, settings, FPS_LIMITS } from './settings.js';
 import { GpuTimer } from './gpuTimer.js';
-import { WorldPost, usesPost } from './worldPost.js';
+import { WorldPost, usesPost, BLOOM } from './worldPost.js';
 import { requestPrograms } from './programs.js';
 import { LightPool } from './lightPool.js';
 import { TIERS, GraphicsAutoTune, gpuName } from './graphicsTier.js';
 import { warmSceneBatches } from './buildSteps.js';
 import { ShadowCadence } from './shadowCadence.js';
 import { gradeOf, blendGrade } from './grade.js';
+import { lightsOnGlowLayer } from './glowLayer.js';
 
 const R = CONFIG.render;
 const _tmpColor = new THREE.Color();
@@ -324,6 +325,7 @@ export class Renderer {
    */
   async prepare() {
     const r = this.renderer;
+    lightsOnGlowLayer(this.scene);   // the island's lights are final now (addLightPool rule)
     const post = this.#syncPost(this.renderScale, this.aoStrength);
     try {
       r.setRenderTarget(post ? this.post.target : null);
@@ -379,7 +381,8 @@ export class Renderer {
     // The canvas is created with MSAA; the world target only exists when it
     // is scaled or shaded, and then carries its own MSAA samples.
     const post = this.#syncPost(scale, this.aoStrength);
-    if (post) post.render(this.scene, this.camera, scale < 0.999 ? SHARPNESS : 0, this.aoStrength, this.grade);
+    if (post) post.render(this.scene, this.camera, scale < 0.999 ? SHARPNESS : 0, this.aoStrength, this.grade,
+      this.graphics.bloom ? BLOOM.strength : 0);
     else {
       r.setRenderTarget(null);
       r.clear();
