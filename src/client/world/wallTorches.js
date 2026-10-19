@@ -5,6 +5,7 @@
 // island build, driven by intensity only - never add, remove or hide lights later).
 
 import * as THREE from 'three';
+import { markGlow } from '../core/glowLayer.js';
 import { WALL_TORCH } from '../../shared/torch.js';
 import { merge, paint, place } from '../models/kit.js';
 import { glowMaterial } from './veg/shapes.js';
@@ -69,6 +70,7 @@ export function buildWallTorches(terrain, layout, gfx) {
   }
   const flameMesh = new THREE.InstancedMesh(flameGeo, glowMaterial(2.2, 0.6), list.length);
   flameMesh.name = 'wall-torch-flames';
+  markGlow(flameMesh);
   flameMesh.frustumCulled = false;
   const zero = new THREE.Matrix4().makeScale(0, 0, 0);
   for (let i = 0; i < list.length; i++) flameMesh.setMatrixAt(i, zero);

@@ -1,4 +1,5 @@
 import { retainResource } from '../../core/resources.js';
+import { markGlow } from '../../core/glowLayer.js';
 // Relic models (the boat parts hidden on every island, see shared/relics.js).
 //
 // API (all return a THREE.Group, origin on the ground, model resting at y=0):
@@ -391,7 +392,7 @@ export function relicGlow(kind) {
   const g = glowGeometry();
   const group = new THREE.Group();
   group.name = `relic-glow-${kind}`;
-  const beam = new THREE.Mesh(g.beamGeo, m.beam);
+  const beam = markGlow(new THREE.Mesh(g.beamGeo, m.beam));
   const halo = new THREE.Mesh(g.haloGeo, m.halo);
   halo.position.y = 0.04;
   const sparks = new THREE.Points(g.sparkGeo, m.sparks);

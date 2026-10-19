@@ -10,7 +10,7 @@ import { levelDef } from '../../src/shared/levels.js';
 import { PROTOCOL_VERSION } from '../../src/shared/protocol.js';
 import { options, number, distribution, environment, report } from './common.mjs';
 
-const opts = options(['seconds', 'warmup-seconds', 'variant', 'max-frame-p95-ms', 'max-frame-p99-ms', 'max-stalls', 'headed', 'software', 'width', 'height', 'target-fps', 'channel', 'output']);
+const opts = options(['seconds', 'warmup-seconds', 'variant', 'max-frame-p95-ms', 'max-frame-p99-ms', 'max-stalls', 'headed', 'software', 'width', 'height', 'target-fps', 'channel', 'output', 'tier']);
 for (const name of ['headed', 'software']) assert(opts[name] === undefined || opts[name] === true, `Use --${name} without a value`);
 const duration = number(opts, 'seconds', 15, 1);
 const warmup = number(opts, 'warmup-seconds', 8);
@@ -25,6 +25,9 @@ const software = !!opts.software;
 const width = number(opts, 'width', 1920, 1);
 const height = number(opts, 'height', 1080, 1);
 const targetFps = number(opts, 'target-fps', 120, 1);
+// Frozen graphics tier (graphicsTier.js TIERS index): 1 = Medium, the default target; 2/3 measure High/Ultra-only effects.
+const tier = number(opts, 'tier', 1, 0);
+assert(Number.isInteger(tier) && tier <= 3, '--tier is 0 (Low) .. 3 (Ultra)');
 const frameP99Limit = opts['max-frame-p99-ms'] === undefined ? null : number(opts, 'max-frame-p99-ms', 0);
 const results = [];
 let browser;
@@ -138,7 +141,7 @@ try {
       page.on('console', message => { if (message.type() === 'error') console.error('[browser]', message.text()); });
       await page.route(`${base}/`, route => route.fulfill({ contentType: 'text/html', body: html }));
       await page.goto(base, { waitUntil: 'load', timeout: 30000 });
-      const measurement = await bounded(page.evaluate(async ({ duration, warmup, base, route }) => {
+      const measurement = await bounded(page.evaluate(async ({ duration, warmup, base, route, tier }) => {
         const [{ Net }, { Game }, settingsModule, { preloadDinoModels }, { TIERS }] = await Promise.all([
           import('/src/client/net/net.js'), import('/src/client/core/game.js'),
           import('/src/client/core/settings.js'), import('/src/client/models/dino/glbDino.js'), import('/src/client/core/graphicsTier.js'),
@@ -151,8 +154,8 @@ try {
         // Controlled benchmark fixture: production still chooses tiers automatically.
         // Freeze both calibration and later slow-workload monitoring.
         game.gfx.autoTune.frame = () => {};
-        game.gfx.autoTune.tier = 1;
-        game.gfx.setTier(TIERS.indexOf(TIERS[1]));
+        game.gfx.autoTune.tier = tier;
+        game.gfx.setTier(TIERS.indexOf(TIERS[tier]));
         await game.gfx.prepare();
         const gl = game.gfx.renderer.getContext();
         const extension = gl.getExtension('WEBGL_debug_renderer_info');
@@ -245,7 +248,7 @@ try {
         net.close();
         const reusable = game.dispose(); reusable.gfx.dispose(); reusable.audio.dispose?.();
         return result;
-      }, { duration, warmup, base, route: view }), (duration + warmup + 120) * 1000, 'Gameplay benchmark');
+      }, { duration, warmup, base, route: view, tier }), (duration + warmup + 120) * 1000, 'Gameplay benchmark');
       const invalidReasons = [];
       if (measurement.connectedPlayers !== 4 || world.players.size < 3) invalidReasons.push('Four-player workload disconnected');
       if (!(measurement.updates > 0 && measurement.movementMeters > 0 && measurement.snapshots > 0)) invalidReasons.push('Missing movement, updates or snapshots');
@@ -276,6 +279,6 @@ try {
   }
 } finally { await browser?.close(); }
 await report({ kind: 'real-game-websocket-rendering', environment: { ...environment(), chromium: browser.version(), headless, requestedChannel: opts.channel ?? 'bundled', requestedSoftware: software },
-  targetFps, frameBudgetMs: 1000 / targetFps, mediumTier: true,
+  targetFps, frameBudgetMs: 1000 / targetFps, mediumTier: tier === 1, tier,
   gates: { frameP95Ms: frameLimit, frameP99Ms: frameP99Limit, stallsOver50ms: stallLimit }, scenarios: results }, opts.output);
 if (results.some(r => !r.valid || frameLimit !== null && r.frameMs.p95 > frameLimit || frameP99Limit !== null && r.frameMs.p99 > frameP99Limit || stallLimit !== null && r.stallsOver50ms > stallLimit)) process.exitCode = 1;

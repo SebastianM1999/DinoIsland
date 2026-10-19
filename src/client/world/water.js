@@ -22,6 +22,7 @@
 import * as THREE from 'three';
 import { CONFIG } from '../../shared/config.js';
 import { BIOMES } from '../../shared/levels.js';
+import { markGlow } from '../core/glowLayer.js';
 import { makeRng } from '../../shared/rng.js';
 import { SPRING_WATER_OFFSET } from '../../shared/springShape.js';
 import { riverGeometry, discGeometry, withSheetAttrs } from './rivers.js';
@@ -652,6 +653,7 @@ export function buildWater(terrain, layout = {}, sunDir = new THREE.Vector3(-0.4
     mesh.position.set(pool.x, level, pool.z);
     mesh.renderOrder = 2;
     mesh.name = lava ? 'lavaPool' : 'pool';
+    if (lava) markGlow(mesh);
     group.add(mesh);
   }
 
@@ -685,6 +687,7 @@ export function buildWater(terrain, layout = {}, sunDir = new THREE.Vector3(-0.4
     const mesh = new THREE.Mesh(geo, mat);
     mesh.renderOrder = 3;
     mesh.name = lava ? 'lavaRiver' : 'river';
+    if (lava) markGlow(mesh);
     group.add(mesh);
   }
 

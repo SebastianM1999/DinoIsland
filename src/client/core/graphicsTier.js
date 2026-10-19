@@ -10,14 +10,15 @@ import { storage as preferences } from './persistence.js';
 
 /**
  * Internal levels, cheapest first. shadowRange is the sun shadow's half
- * extent, lodNear where vegetation switches to coarser meshes, grass the share
+ * extent, lodNear where vegetation switches to coarser meshes, bloom whether bright
+ * lava, fire and crystals glow (worldPost.js BLOOM), grass the share
  * of grass/flower instances drawn.
  */
 export const TIERS = [
-  { name: 'Low', pixelRatio: 0.75, msaaSamples: 0, foliageShadows: false, shadows: false, shadowSize: 1024, shadowRange: 48, grass: 0.35, lodNear: 60 },
-  { name: 'Medium', pixelRatio: 1, msaaSamples: 2, foliageShadows: false, shadows: true, shadowSize: 1024, shadowRange: 48, grass: 0.65, lodNear: 80 },
-  { name: 'High', pixelRatio: CONFIG.render.maxPixelRatio, msaaSamples: 4, foliageShadows: true, shadows: true, shadowSize: CONFIG.render.shadowMapSize, shadowRange: 60, grass: 1, lodNear: 100 },
-  { name: 'Ultra', pixelRatio: 2, msaaSamples: 4, foliageShadows: true, shadows: true, shadowSize: 3072, shadowRange: 70, grass: 1, lodNear: 130 },
+  { name: 'Low', pixelRatio: 0.75, msaaSamples: 0, bloom: false, foliageShadows: false, shadows: false, shadowSize: 1024, shadowRange: 48, grass: 0.35, lodNear: 60 },
+  { name: 'Medium', pixelRatio: 1, msaaSamples: 2, bloom: false, foliageShadows: false, shadows: true, shadowSize: 1024, shadowRange: 48, grass: 0.65, lodNear: 80 },
+  { name: 'High', pixelRatio: CONFIG.render.maxPixelRatio, msaaSamples: 4, bloom: true, foliageShadows: true, shadows: true, shadowSize: CONFIG.render.shadowMapSize, shadowRange: 60, grass: 1, lodNear: 100 },
+  { name: 'Ultra', pixelRatio: 2, msaaSamples: 4, bloom: true, foliageShadows: true, shadows: true, shadowSize: 3072, shadowRange: 70, grass: 1, lodNear: 130 },
 ];
 const TOP = TIERS.length - 1;
 

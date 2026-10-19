@@ -3,6 +3,7 @@
 import * as THREE from 'three';
 import { FullScreenQuad } from 'three/addons/postprocessing/Pass.js';
 import { GRADE_GLSL, gradeOf } from './grade.js';
+import { GLOW_LAYER } from './glowLayer.js';
 
 const vertexShader = `varying vec2 vUv;
 void main() { vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }`;
@@ -17,6 +18,8 @@ uniform float sharpness;
 uniform float aoStrength;
 uniform float nearPlane;
 uniform float farPlane;
+uniform sampler2D tBloom;
+uniform float bloomStrength;
 varying vec2 vUv;
 #include <packing>
 ${GRADE_GLSL}
@@ -60,6 +63,14 @@ void main() {
       weights += weight;
     }
     c *= 1.0 - aoStrength * sum / max(weights, 0.0001);
+  }
+  if (bloomStrength > 0.0) {
+    // screen-blended after tone mapping, so the sharpening clamp above never cuts the glow
+    vec3 b = texture2D(tBloom, vUv).rgb * bloomStrength;
+    #if defined(TONE_MAPPING)
+      b = toneMapping(b);
+    #endif
+    c += (1.0 - c) * b;
   }
   c = vignetted(grade(c), vUv, sourceSize.x / sourceSize.y);
   gl_FragColor = vec4(c, 1.0);
@@ -106,6 +117,48 @@ void main() {
   gl_FragColor = vec4(vec3(clamp(ao/4.0,0.0,1.0)),1.0);
 }`;
 
+// Selective bloom (High/Ultra, graphicsTier `bloom`): only things on the glow layer
+// (glowLayer.js) are drawn, at half size with their own depth, into glowTarget. The bright
+// pass keeps the glow pixels the world itself shows (glow depth not behind the world depth,
+// so lava behind a rock stays dark) and drops dim fogged ones; two quarter-size blurs
+// follow and the output pass adds the result.
+const brightFragment = `
+uniform sampler2D tGlow;
+uniform sampler2D tGlowDepth;
+uniform sampler2D tSceneDepth;
+uniform float threshold;
+uniform float nearPlane;
+uniform float farPlane;
+varying vec2 vUv;
+#include <packing>
+float viewDepth(sampler2D depth) {
+  return -perspectiveDepthToViewZ(texture2D(depth, vUv).x, nearPlane, farPlane);
+}
+void main() {
+  vec3 c = texture2D(tGlow, vUv).rgb;
+  float glowZ = viewDepth(tGlowDepth), sceneZ = viewDepth(tSceneDepth);
+  float shown = 1.0 - smoothstep(0.15 + sceneZ * 0.01, 0.6 + sceneZ * 0.03, glowZ - sceneZ);
+  float peak = max(c.r, max(c.g, c.b));
+  gl_FragColor = vec4(c * shown * smoothstep(threshold, threshold * 1.6, peak), 1.0);
+}`;
+
+const blurFragment = `
+uniform sampler2D tColor;
+uniform vec2 direction;   // one source texel along the blur axis
+varying vec2 vUv;
+void main() {
+  const float w0 = 0.227027, w1 = 0.1945946, w2 = 0.1216216, w3 = 0.054054, w4 = 0.016216;
+  vec3 c = texture2D(tColor, vUv).rgb * w0;
+  c += (texture2D(tColor, vUv + direction * 1.5).rgb + texture2D(tColor, vUv - direction * 1.5).rgb) * w1;
+  c += (texture2D(tColor, vUv + direction * 3.5).rgb + texture2D(tColor, vUv - direction * 3.5).rgb) * w2;
+  c += (texture2D(tColor, vUv + direction * 5.5).rgb + texture2D(tColor, vUv - direction * 5.5).rgb) * w3;
+  c += (texture2D(tColor, vUv + direction * 7.5).rgb + texture2D(tColor, vUv - direction * 7.5).rgb) * w4;
+  gl_FragColor = vec4(c, 1.0);
+}`;
+
+/** Bloom tuning: glow-layer brightness (linear, before exposure) where glow starts, and how strongly it is added. */
+export const BLOOM = { threshold: 0.35, strength: 0.9 };
+
 const NEUTRAL = gradeOf(null);
 
 /**
@@ -128,8 +181,23 @@ export class WorldPost {
         sourceSize: { value: new THREE.Vector2(1,1) }, aoSize: { value: new THREE.Vector2(1,1) },
         sharpness: { value: 0 }, aoStrength: { value: 0 }, nearPlane: { value: 0.1 }, farPlane: { value: 900 },
         gradeSaturation: { value: 1 }, gradeContrast: { value: 1 }, gradeVignette: { value: 0 },
-        gradeHighlights: { value: new THREE.Vector3(1, 1, 1) }, gradeShadows: { value: new THREE.Vector3() } },
+        gradeHighlights: { value: new THREE.Vector3(1, 1, 1) }, gradeShadows: { value: new THREE.Vector3() },
+        tBloom: { value: null }, bloomStrength: { value: 0 } },
     });
+    const pass = (name, fragmentShader, uniforms) => new THREE.ShaderMaterial({
+      name, vertexShader, fragmentShader, uniforms, depthTest: false, depthWrite: false, toneMapped: false });
+    this.bright = pass('WorldBloomBright', brightFragment, { tGlow: { value: null }, tGlowDepth: { value: null },
+      tSceneDepth: { value: null }, threshold: { value: BLOOM.threshold }, nearPlane: { value: 0.1 }, farPlane: { value: 900 } });
+    this.blur = pass('WorldBloomBlur', blurFragment, { tColor: { value: null }, direction: { value: new THREE.Vector2() } });
+    // Always allocated and compiled with the post path (a few MB at quarter size): the graphics
+    // tier only switches the passes on, so a tier change never compiles a program mid-game.
+    const bloomTarget = () => new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, depthBuffer: false });
+    this.glowTarget = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType,
+      depthTexture: new THREE.DepthTexture(1, 1, THREE.UnsignedIntType) });
+    this.glowCamera = new THREE.PerspectiveCamera();
+    this.bloomBright = bloomTarget();
+    this.bloomA = bloomTarget();
+    this.bloomB = bloomTarget();
     this.ao = new THREE.ShaderMaterial({
       name: 'WorldContactAO', vertexShader, fragmentShader: aoFragment,
       depthTest: false, depthWrite: false, toneMapped: false,
@@ -150,6 +218,10 @@ export class WorldPost {
     this.width = width; this.height = height;
     this.output.uniforms.sourceSize.value.set(width,height);
     this.ao.uniforms.sourceSize.value.set(width,height);
+    const hw = Math.max(1, Math.ceil(width / 2)), hh = Math.max(1, Math.ceil(height / 2));
+    this.glowTarget.setSize(hw, hh);
+    this.bloomBright.setSize(hw, hh);
+    for (const t of [this.bloomA, this.bloomB]) t.setSize(Math.max(1, Math.ceil(width / 4)), Math.max(1, Math.ceil(height / 4)));
     if (aoEnabled) {
       this.aoTarget ??= new THREE.WebGLRenderTarget(1,1,{depthBuffer:false});
       const w = Math.max(1,Math.ceil(width/2)), h = Math.max(1,Math.ceil(height/2));
@@ -161,11 +233,13 @@ export class WorldPost {
   /**
    * Compile the full-screen programs ahead of the first frame. Each is built
    * against the target it will draw into (a program is specific to it): the
-   * contact AO into its half-size target, the output pass into the canvas.
+   * contact AO into its half-size target, the bloom passes into theirs (whatever the tier),
+   * the output pass into the canvas.
    */
   async compile(camera) {
     const r = this.renderer;
-    const passes = [[this.ao, this.aoTarget], [this.output, null]].filter(([, target], i) => i === 1 || target);
+    const passes = [[this.ao, this.aoTarget], [this.bright, this.bloomBright], [this.blur, this.bloomA], [this.output, null]]
+      .filter(([material, target]) => material === this.output || target);
     for (const [material, target] of passes) {
       const mesh = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), material);
       try {
@@ -175,7 +249,37 @@ export class WorldPost {
     }
   }
 
-  render(scene, camera, sharpness, aoStrength, grade = NEUTRAL) {
+  /** Glow layer at half size, bright pass and two blurs; the result lands in bloomB. */
+  #bloom(scene, camera) {
+    const r = this.renderer, q = this.quad;
+    // the glow layer alone, without the sky behind it (lights are on the layer: glowLayer.js)
+    const glowCam = this.glowCamera.copy(camera);
+    glowCam.layers.set(GLOW_LAYER);
+    const background = scene.background;
+    scene.background = null;
+    try {
+      r.setRenderTarget(this.glowTarget);
+      r.clear();
+      r.render(scene, glowCam);
+    } finally { scene.background = background; }
+    const bu = this.bright.uniforms;
+    bu.tGlow.value = this.glowTarget.texture;
+    bu.tGlowDepth.value = this.glowTarget.depthTexture;
+    bu.tSceneDepth.value = this.target.depthTexture;
+    bu.nearPlane.value = camera.near; bu.farPlane.value = camera.far;
+    const step = (material, target) => { q.material = material; r.setRenderTarget(target); r.clear(); q.render(r); };
+    step(this.bright, this.bloomBright);
+    const b = this.blur.uniforms;
+    b.tColor.value = this.bloomBright.texture;
+    b.direction.value.set(1 / this.bloomBright.width, 0);
+    step(this.blur, this.bloomA);
+    b.tColor.value = this.bloomA.texture;
+    b.direction.value.set(0, 1 / this.bloomA.height);
+    step(this.blur, this.bloomB);
+  }
+
+  /** `bloom`: 0 (off, Low/Medium) or the strength to add (graphicsTier `bloom`, see BLOOM). */
+  render(scene, camera, sharpness, aoStrength, grade = NEUTRAL, bloom = 0) {
     const r = this.renderer, u = this.output.uniforms;
     u.gradeSaturation.value = grade.saturation;
     u.gradeContrast.value = grade.contrast;
@@ -194,6 +298,9 @@ export class WorldPost {
       r.clear();
       this.quad.render(r);
     }
+    if (bloom > 0) this.#bloom(scene, camera);
+    u.tBloom.value = this.bloomB.texture;
+    u.bloomStrength.value = bloom;
     u.tColor.value = this.target.texture;
     u.tDepth.value = this.target.depthTexture;
     u.tAO.value = this.aoTarget?.texture ?? this.target.texture;
@@ -210,5 +317,7 @@ export class WorldPost {
     this.target?.dispose(); this.target = null;
     this.aoTarget?.dispose(); this.aoTarget = null;
     this.output.dispose(); this.ao.dispose(); this.quad.dispose();
+    this.bright.dispose(); this.blur.dispose();
+    for (const t of [this.glowTarget, this.bloomBright, this.bloomA, this.bloomB]) t.dispose();
   }
 }
