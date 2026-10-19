@@ -32,7 +32,7 @@ export class RemotePlayers {
     tag.querySelector('.np-name').textContent = info.name;
     this.overlay.appendChild(tag);
     const rp = {
-      id: info.id, slot: info.slot, name: info.name,
+      id: info.id, slot: info.slot, name: info.name, host: !!info.host,
       model, tag, hpBar: tag.querySelector('.np-hp i'),
       buf: new InterpBuffer([YAW]),
       hp: info.hp, mhp: CONFIG.player.maxHealth, alive: info.alive, eq: 0, fl: 0, carry: 0,

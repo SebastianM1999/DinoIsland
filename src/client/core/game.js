@@ -430,6 +430,7 @@ export class Game {
     for (const p of world.players) {
       if (p.id === w.id) {
         this.me.name = p.name;
+        this.me.host = !!p.host;
         this.me.outfit = p.outfit;
         this.actions.vm.setOutfit(p.outfit);
         this.hud.setOutfit(p.outfit);
@@ -894,6 +895,11 @@ export class Game {
     this.hud.toast(on ? 'Creative mode on – double-tap Space to fly' : 'Creative mode off', 'bolt');
   }
 
+  /** The host removes another explorer (pause card party list); the server checks who may. */
+  kickPlayer(id) {
+    if (this.me.host && id !== this.me.id) this.net.send({ t: MSG.KICK, id });
+  }
+
   update(dt) {
     const input = this.input;
     const p = this.player;
@@ -1203,8 +1209,8 @@ export class Game {
     this.#updateAsh(dt);
     hud.setBuffs(p.buffs);
     hud.setCompass(p.yaw, this.compassMarkers());
-    const team = [{ id: this.me.id, name: this.me.name, slot: this.me.slot, hp: this.me.hp, mhp: this.maxHp, alive: this.me.alive, downed: !!this.downed, isYou: true }];
-    for (const rp of this.remotes.map.values()) team.push({ id: rp.id, name: rp.name, slot: rp.slot, hp: rp.hp, mhp: rp.mhp, alive: rp.alive, downed: (rp.fl & PF.DOWNED) !== 0, isYou: false });
+    const team = [{ id: this.me.id, name: this.me.name, slot: this.me.slot, hp: this.me.hp, mhp: this.maxHp, alive: this.me.alive, downed: !!this.downed, host: !!this.me.host, isYou: true }];
+    for (const rp of this.remotes.map.values()) team.push({ id: rp.id, name: rp.name, slot: rp.slot, hp: rp.hp, mhp: rp.mhp, alive: rp.alive, downed: (rp.fl & PF.DOWNED) !== 0, host: rp.host, isYou: false });
     team.sort((a, b) => a.slot - b.slot);
     this.team = team;
     hud.setTeam(team);

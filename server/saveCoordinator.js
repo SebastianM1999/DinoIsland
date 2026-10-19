@@ -15,10 +15,10 @@ import { ServerWorld } from '../src/sim/world.js';
 import { exportWorld, restoreWorld, worldOptions } from '../src/sim/worldSave.js';
 import { sealSave, cleanSaveName, saveSummary, validSaveId } from '../src/shared/saveSchema.js';
 import { LEVELS } from '../src/shared/levels.js';
-import { MSG, EV } from '../src/shared/protocol.js';
+import { MSG, EV, OWNER_KEY } from '../src/shared/protocol.js';
 import { SaveStore, describeIoError } from './saveStore.js';
 
-export const OWNER_KEY = 'owner';
+export { OWNER_KEY };
 export const LOBBIES = ['private', 'open', 'lan'];
 const RETRY_MS = [5000, 15000, 60000];
 const LOOPBACK = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1', 'local']);
@@ -94,7 +94,7 @@ export class SaveCoordinator {
     const index = Number.isInteger(level) && level >= 0 && level < LEVELS.length ? level : 0;
     const id = randomUUID();
     const createdAt = this.now();
-    this.host.load((io) => new ServerWorld(io, { level: index, alphas: true }));
+    this.host.load((io) => new ServerWorld(io, { level: index, alphas: true, lobby: lobby !== 'private' }));
     this.#begin({ id, name: cleanSaveName(name), createdAt, lobby, savedAt: 0 });
     const saved = await this.save('new');
     if (!saved.ok) {
@@ -123,7 +123,8 @@ export class SaveCoordinator {
     const { doc } = found;
     await this.#closeCurrent();
     try {
-      this.host.load((io) => restoreWorld(new ServerWorld(io, { ...worldOptions(doc.world), alphas: true }), doc.world));
+      // (hosted for friends: everyone meets in the lobby first, the owner starts; solo plays at once)
+      this.host.load((io) => restoreWorld(new ServerWorld(io, { ...worldOptions(doc.world), alphas: true, lobby: lobby !== 'private' }), doc.world));
     } catch (error) {
       this.host.unload('The expedition could not be loaded.');
       throw new SaveCoordinatorError(`This expedition does not fit this version of the game (${error.message}).`);

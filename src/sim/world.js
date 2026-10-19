@@ -13,7 +13,7 @@ import { GUNS, gunInventory, gunAction, updateGunReload } from './firearms.js';
 import { CONFIG } from '../shared/config.js';
 import { Terrain } from '../shared/terrain.js';
 import { buildLayout } from '../shared/layout.js';
-import { MSG, ACT, EV, EQUIP, PF } from '../shared/protocol.js';
+import { MSG, ACT, EV, EQUIP, PF, OWNER_KEY } from '../shared/protocol.js';
 import { sanitizeProfile, creativeProfile, skillMods, progress, buy, canBuy, SKILL_IDS, MAX_XP, MAX_BONUS_POINTS, RELIC_XP, RELIC_POINTS, DASH } from '../shared/skills.js';
 import { DinoSystem } from './dinos.js';
 import { Mission } from './mission.js';
@@ -65,11 +65,14 @@ const SPRINT_STRIKE_WINDOW = 2;
 export class ServerWorld {
   /**
    * @param {{ send:(to:number|'*', msg:object, except?:number)=>void, log?:(...a:any[])=>void }} host
-   * @param {{ level?: number, variant?: number }} [opts] start island (variant: layout override for testing,
-   *   default the level's fixed map)
+   * @param {{ level?: number, variant?: number, lobby?: boolean }} [opts] start island (variant: layout override for testing,
+   *   default the level's fixed map); lobby: a hosted expedition waits in its lobby until the owner starts it
    */
   constructor(host, opts = {}) {
     this.host = host;
+    // The lobby (a hosted expedition before the owner's Start): explorers join and see each other, the
+    // island waits (step only keeps the clock for timeouts). Whoever joins after Start plays at once.
+    this.inLobby = !!opts.lobby;
     // rare alphas among the spawns (shared/dinoRank.js). The hosts turn them on; a bare world
     // (the tests) keeps every animal ordinary unless a spawn asks for an alpha.
     this.alphas = !!opts.alphas;
@@ -218,6 +221,7 @@ export class ServerWorld {
       hot: null,
       inv: this.freshInventory(),
       lastInput: this.now,
+      lobbySeen: this.lobbyClock ?? 0,   // (lastInput's twin while the island waits in its lobby: idleFor)
       lastMoveAt: this.now,
       moveBudget: 3.5,
       breath: DIVE.breath,   // seconds of air left while the head is under water (see `breathe`)
@@ -243,9 +247,11 @@ export class ServerWorld {
       now: r3(this.now),
       inv: p.inv,
       world: this.fullState(),
+      ...(this.inLobby ? { lobby: this.lobbyState() } : {}),
     });
     this.sendProf(p);
     this.event(EV.PLAYER_JOIN, { player: this.publicPlayer(p) }, p.id);
+    if (this.inLobby) this.sendLobby(p.id);
     this.toast(`${p.name} joined the expedition`, 'team');
     this.log(`join #${p.id} "${p.name}" slot ${slot} (${this.players.size} players)`);
     return { ok: true, id: p.id };
@@ -259,6 +265,7 @@ export class ServerWorld {
     this.event(EV.PLAYER_LEAVE, { id });
     this.toast(`${p.name} left the expedition`, 'team');
     this.dinos.forgetPlayer(id);
+    if (this.inLobby) this.sendLobby();
     this.log(`leave #${id} "${p.name}" (${this.players.size} players)`);
     this.checkpoint('leave');
   }
@@ -281,7 +288,7 @@ export class ServerWorld {
   }
 
   publicPlayer(p) {
-    return { id: p.id, slot: p.slot, name: p.name, outfit: p.outfit, x: r2(p.x), y: r2(p.y), z: r2(p.z), yaw: r3(p.yaw), hp: Math.ceil(p.hp), maxHp: p.maxHp, alive: p.alive, downed: p.downed };
+    return { id: p.id, slot: p.slot, name: p.name, outfit: p.outfit, x: r2(p.x), y: r2(p.y), z: r2(p.z), yaw: r3(p.yaw), hp: Math.ceil(p.hp), maxHp: p.maxHp, alive: p.alive, downed: p.downed, host: p.key === OWNER_KEY };
   }
 
   sendInv(p) {
@@ -876,11 +883,62 @@ export class ServerWorld {
     const p = this.players.get(id);
     if (!p || !msg || typeof msg !== 'object') return;
     p.lastInput = this.now;
+    p.lobbySeen = this.lobbyClock ?? 0;
     switch (msg.t) {
-      case MSG.STATE: return this.onState(p, msg);
-      case MSG.ACT: return this.receiveAction(p, msg);
+      // (nobody plays in the lobby: movement and actions wait for Start)
+      case MSG.STATE: return this.inLobby ? undefined : this.onState(p, msg);
+      case MSG.ACT: return this.inLobby ? undefined : this.receiveAction(p, msg);
       case MSG.PING: return this.send(id, { t: MSG.PONG, c: msg.c, now: r3(this.now) });
+      case MSG.KICK: return this.onKick(p, msg);
+      case MSG.START: return this.onStart(p);
     }
+  }
+
+  /** Seconds since `p` was last heard from (the host's silent-client timeout; the lobby has its own clock). */
+  idleFor(p) {
+    return this.inLobby ? (this.lobbyClock ?? 0) - p.lobbySeen : this.now - p.lastInput;
+  }
+
+  /** Who waits in the lobby: everything its screen shows (characters, outfits, skill trees). */
+  lobbyState() {
+    return {
+      members: [...this.players.values()].sort((a, b) => a.slot - b.slot).map((p) => ({
+        id: p.id, slot: p.slot, name: p.name, outfit: p.outfit, host: p.key === OWNER_KEY,
+        prof: { xp: p.prof.xp, bonus: p.prof.bonus, skills: { ...p.prof.skills } },
+      })),
+    };
+  }
+
+  /** Everyone in the lobby gets its current members (`except`: who just got them with the welcome). */
+  sendLobby(except) {
+    if (this.inLobby) this.event(EV.LOBBY, this.lobbyState(), except);
+  }
+
+  /**
+   * The owner starts the expedition from its lobby: the island comes alive and every explorer gets
+   * a fresh welcome to build it (as after sailing). Late joiners then play at once.
+   */
+  onStart(p) {
+    if (!this.inLobby || p.key !== OWNER_KEY) return;
+    this.inLobby = false;
+    for (const q of this.players.values()) {
+      Object.assign(q, { lastInput: this.now, lastMoveAt: this.now, epoch: q.epoch + 1 });
+      this.send(q.id, { t: MSG.WELCOME, id: q.id, slot: q.slot, now: r3(this.now), k: q.epoch, inv: q.inv, world: this.fullState() });
+      this.sendProf(q);
+    }
+    this.log(`start: ${this.players.size} explorer(s)`);
+  }
+
+  /**
+   * The expedition's owner removes another explorer. The host (server/gameHost.js `kick`) tells
+   * them why, closes their connection and keeps them out of this expedition; the character stays
+   * in the roster like any other leave. A host without `kick` (the solo worker) ignores it.
+   */
+  onKick(p, msg) {
+    const target = this.players.get(msg.id);
+    if (p.key !== OWNER_KEY || !target || target === p || typeof this.host.kick !== 'function') return;
+    this.log(`kick #${target.id} "${target.name}" by #${p.id}`);
+    this.host.kick(target.id, 'The host removed you from this expedition.');
   }
 
   /**
@@ -1623,6 +1681,9 @@ export class ServerWorld {
   // ------------------------------------------------------------------ tick
 
   step(dt) {
+    // (the island and its clock wait for Start: raids, eruptions and regrowth are timed by `now`;
+    // only the lobby's own clock runs, for the silent-client timeout)
+    if (this.inLobby) { this.lobbyClock = (this.lobbyClock ?? 0) + dt; return; }
     this.now += dt;
     this._safe = undefined;
     if (this.base.building && this.now >= this.base.building.until) this.finishBuilding();

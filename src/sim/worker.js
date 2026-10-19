@@ -14,11 +14,10 @@ import { ServerWorld } from './world.js';
 import { exportWorld, restoreWorld, worldOptions } from './worldSave.js';
 import { LEVELS } from '../shared/levels.js';
 import { preloadCaveBake } from '../shared/caveBakeLoad.js';
+import { OWNER_KEY } from '../shared/protocol.js';   // (the solo explorer's roster key: the same as a desktop host's owner)
 
 const AUTOSAVE_MS = 60_000;
 const CHECKPOINT_DELAY_MS = 1500;
-/** The solo explorer's persistent roster key (the same as a desktop host's owner). */
-const OWNER_KEY = 'owner';
 
 let world = null;
 let playerId = null;

@@ -211,9 +211,30 @@ async function start(mode, options = {}) {
   homeSkills.close();
   stopMenuPostcards();
   steamLobby.updateSession(net.steamSession);
+  // A hosted expedition meets in its lobby first; the island is built when the host starts it.
+  const lobby = net.inLobby;
+  if (lobby) {
+    loadingUi.stop();
+    const { runLobby } = await import('./ui/lobbyScreen.js');
+    const started = await runLobby(net, {
+      // (a guest does not know the expedition's name: the island it starts on)
+      title: net.expedition?.name || LEVELS[net.welcome.world?.level?.index]?.name || 'Expedition',
+      invite: net.steamSession ? () => $('btn-invite').click() : null,
+      leave: (reason) => { void leaveLobby(net, reason); },
+    });
+    if (!started) return;   // (leaving reloads the page)
+  }
   menuAudio?.stopMusic();
-  if (await launch(net, null, { openMenu: !!options.openMenu })) setBusy(false, '');
+  // (after a lobby everyone is ready to play: no pause menu over the fresh island)
+  if (await launch(net, null, { openMenu: !lobby && !!options.openMenu })) setBusy(false, '');
   busy = false;
+}
+
+/** Out of the lobby, back to the menu: the host saves and closes its expedition first (guests are told). */
+async function leaveLobby(net, reason) {
+  if (!reason && net.expedition && !net.closed) await expeditions.saveAndQuit(net, { force: true }).catch(() => {});
+  net.close();
+  backToMenu(reason ?? '');
 }
 
 /**
