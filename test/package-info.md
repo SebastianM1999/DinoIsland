@@ -134,6 +134,7 @@ Grouped by the module area they mainly cover. Many simulation tests also check t
 - `creature-steps.test.js` — dinosaur species stride/weight profiles, walking/running cadence, oversized titan contacts, grounded gating, teleport cancellation and frame-rate independence.
 - `graphics-tier.test.js` — conservative graphics startup, measured promotion, sustained three-FPS recovery, hidden-tab exclusion, isolated hitch rejection, frame-cap handling, versioned saved calibration and workload rechecks.
 - `shadow-cadence.test.js` — sun shadow redraws: every frame up to 60 FPS, a steady 60 Hz above (75–240 FPS), forced redraws, no burst after a hitch, and the renderer no longer redraws unconditionally.
+- `sun-direction.test.js` — every biome names a sun high enough for the shadow frustum; the game sets it before sky and water bake it; mood blending never turns the sun.
 - `grade.test.js` — biome colour grade: neutral default, display-value colours, mood blending, every biome sky has a subtle grade, grading forces the post target, the output pass grades after tone mapping and AO.
 - `hit-flash.test.js` — damage flash: one material copy per animal (template untouched, hooks kept, unlit glow shared), emissive adds and fades back, copies freed on dispose but not the cache, DinoView drives it from flinch with no lights.
 - `palette.test.js` — colour bible ratchet: hex literals in `client/world` and `client/models` never exceed their ceilings, palette swatches are valid, jungle fallbacks read `BIOMES.jungle`.
