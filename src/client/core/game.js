@@ -140,6 +140,7 @@ export class Game {
     this.gfx = reuse?.gfx ?? new Renderer(canvas);
     if (reuse?.gfx) this.gfx.reset();
     this.gfx.applyBiome(this.layout.biome.skyOutside ?? this.layout.biome.sky);   // (the Hollow Mountain starts in its daylit cove)
+    this.gfx.setSunDir(this.layout.biome.sunDir);   // before buildSky/buildWater bake it
     this.input = reuse?.input ?? new Input(canvas);
     this.player = new PlayerController(this.terrain, this.layout.playerColliders, this.layout.rockSurfaceAt);
     // progression: the net layer keeps the newest server profile (it can arrive while the island loads); it belongs to the expedition

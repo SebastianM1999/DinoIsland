@@ -18,6 +18,8 @@ const _tmpColor = new THREE.Color();
 
 /** Upscaling sharpness; world MSAA is selected by the measured graphics tier. */
 const SHARPNESS = 0.35;
+/** Towards the sun when a biome names none: high afternoon from the south-west. */
+const DEFAULT_SUN_DIR = [-0.45, 0.78, 0.43];
 /** The biomes' colour grade lives in the output pass, so the world always draws into the post target. */
 const GRADED = true;
 
@@ -263,7 +265,7 @@ export class Renderer {
     sun.shadow.bias = -0.0004;
     sun.shadow.normalBias = 0.6;
     sun.shadow.radius = 3;
-    this.sunDir = new THREE.Vector3(-0.45, 0.78, 0.43).normalize();
+    this.sunDir = new THREE.Vector3(...DEFAULT_SUN_DIR).normalize();
     this.sun = sun;
     this.scene.add(sun, sun.target);
 
@@ -280,6 +282,15 @@ export class Renderer {
     // intensity (the viewmodel moves it to the flame). Adding it later would recompile the viewmodel.
     this.viewTorch = new THREE.PointLight(0xff9a45, 0, 2.2, 2);
     this.viewScene.add(this.viewTorch);
+  }
+
+  /**
+   * Where the sun stands on this island (`biome.sunDir` in shared/levels.js, towards the sun).
+   * Call it before the sky and water are built: they bake the direction into their shaders.
+   */
+  setSunDir(dir) {
+    this.sunDir.set(...(dir ?? DEFAULT_SUN_DIR)).normalize();
+    this.renderer.shadowMap.needsUpdate = true;
   }
 
   /** Keep the shadow frustum centred on the player. */

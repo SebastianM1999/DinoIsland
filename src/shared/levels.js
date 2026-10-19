@@ -47,6 +47,7 @@ export const BIOMES = {
       grade: { saturation: 1.06, contrast: 1.05, highlights: '#fff6e6', shadows: '#06141a', vignette: 0.18 },
     },
     water: { shallow: '#57e6dc', mid: '#1fb4e0', deep: '#1560c4', foam: '#f4fcff', sky: '#a9dcf8' },
+    sunDir: [-0.45, 0.78, 0.43],   // towards the sun (client Renderer.setSunDir): high afternoon from the south-west
     dinos: { brachio: 1, stego: 1, raptor: 2, ptera: 3, trex: 0 },   // herds / groups / packs / flyers / rexes
     music: 'calm',
     // map resources: how many spots of each (shared/layout.js resourceSpots, config.js resources)
@@ -103,6 +104,7 @@ export const BIOMES = {
       grade: { saturation: 1.02, contrast: 1.09, highlights: '#ffeeda', shadows: '#1a0906', vignette: 0.3 },
     },
     water: { shallow: '#4a9a92', mid: '#1d5e72', deep: '#12324e', foam: '#cfd4d6', sky: '#7a5e5c' },
+    sunDir: [-0.62, 0.55, 0.36],   // lower and from the side: long shadows across the ash
     // its own fruit, one per role (config.js fruit.types): chilis on warm ground, plums, rare obsidian figs
     fruit: { bush: 'emberchili', tree: 'ashplum', plant: 'obsidianfig' },
     dinos: { brachio: 1, stego: 1, raptor: 3, ptera: 4, trex: 1 },
@@ -155,6 +157,7 @@ export const BIOMES = {
       grade: { saturation: 0.86, contrast: 1.03, highlights: '#f6f8e6', shadows: '#0c1406', vignette: 0.3 },
     },
     water: { shallow: '#5a6a3c', mid: '#3c4a2c', deep: '#26301e', foam: '#b8bfa2', sky: '#7e8a78' },
+    sunDir: [-0.25, 0.88, 0.38],   // high behind the haze: short, soft shadows
     // its own fruit, one per role (config.js fruit.types): bog-shore shrubs, figs, hidden lotus
     fruit: { bush: 'marshberry', tree: 'swampfig', plant: 'glowlotus' },
     dinos: { brachio: 1, stego: 1, raptor: 3, ptera: 3, trex: 0 },
@@ -219,6 +222,7 @@ export const BIOMES = {
       grade: { saturation: 1.03, contrast: 1.05, highlights: '#fff0de', shadows: '#050c16', vignette: 0.22 },
     },
     water: { shallow: '#2f7f86', mid: '#16525e', deep: '#0b2a3a', foam: '#9fc4c8', sky: '#1c3038' },
+    sunDir: [-0.72, 0.42, 0.3],    // dusk over the coves: low and warm from the west
     // flyers and giants never fit under the roof: one raptor pack strayed in, the
     // pale noise-hunting gloom raptors (packs, sim/ai/gloomRaptor.js) own the dark
     // and a sump lurker waits in every flooded tunnel (sim/ai/sumpLurker.js)
