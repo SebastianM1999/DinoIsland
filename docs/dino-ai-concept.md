@@ -124,6 +124,26 @@ Brains get a perceived target from `senses.target(d, sys)`: `{ id, x, z, vx, vz,
 - `attackPlayer` / `hitPlayer` still validate against the live player; perception never lets a bite land on a
   remembered position.
 
+### 3.2a Downed players are never attacked (decided)
+
+A downed player is never a target. Predators switch to the teammates who come to revive them. Today this holds
+almost by accident: `downPlayer` sets `p.alive = false` (`world.js:486`), and brains skip players who are not alive.
+The new layers must keep it explicit:
+- `senses` gives no awareness to a downed player and drops them as a target. `hurtPlayer` already ignores a player
+  who is not alive (`world.js:372`), so a wind-up that started before the player went down cannot finish them off.
+  Keep that guard and cover it with a test.
+- **Switch to revivers:** when a predator's target goes down, it picks the player whose `p.reviving.to` is that
+  target, if it perceives them. A revive channel emits a quiet noise event at the body, so a predator nearby hears the
+  rescue. If nobody revives, it takes the next perceived player. If there is none, it drops back to stalk or patrol.
+- **No camping:** a predator never orbits or waits near a downed body. Slots around a reviver are placed at
+  `attackRange + 2.5` from the *reviver*, and a predator with no living target leaves the body's area within a few
+  seconds. Bleed-out is the cost of going down; dinos do not add to it.
+- **Fairness for revivers:** reviving is dangerous, but not certain death. Attack tokens per target still apply, so a
+  reviver faces at most `tokens` biters. A hit already cancels the revive channel (`world.js:388`). The director
+  (phase 4) adds no new hunters during the revive; only predators already engaged may switch.
+- **Herbivores** calm down when their attacker goes down and return within their leash. They do not go after revivers
+  unless a reviver hurts the herd.
+
 ### 3.3 `src/sim/ai/utility.js` (phase 2)
 
 A small helper module, not a framework:
@@ -253,6 +273,9 @@ Tests:
 - Seen in the open, not seen behind a hill, behind a big trunk, behind a boulder, or through the cave roof.
 - Not seen behind the dino (cone), but heard when sprinting there.
 - A gunshot raises awareness within its radius only, and the memory holds the noise spot, not the player.
+- A downed player gets no awareness and takes no damage, even when a bite wind-up was already running.
+- A predator whose target goes down switches to a perceived reviver, or else to the next perceived player. With
+  nobody left, it leaves the body's area and does not orbit it.
 - Memory: lose sight → go to the predicted spot → search → forget after `memoryTime`.
 - Stalker and ash rain still shorten sight.
 - A torch makes the gloom raptor notice from further.
@@ -283,6 +306,7 @@ Tests:
 - A blocked-slot fallback still closes in.
 - The pack regroups below `regroupHp`.
 - Lead is capped (a player who juke-turns is not hit by a perfect prediction).
+- On a downed target, the pack's slots and tokens move to the reviver, and never more than `tokens` attack them.
 
 ### Phase 4: director
 Scope: `director.js`; intensity, budget and phases; bosses and raids excluded.
@@ -303,8 +327,9 @@ Tests:
   (`docs/performance-testing.md`). Measure in the worker, not only in Node.
 - **Co-op fairness (high).** More perceptive dinos must not feel like cheating. Every escalation needs an audible or
   visible cue: an alert huff, a head turn, a roar. Tokens are per target so one player is not swarmed while three
-  watch. The director must not starve a lone player of action. Open question: should predators finish off **downed**
-  players, or switch to the revivers? Revive denial is brutal in co-op, so this needs a decision.
+  watch. The director must not starve a lone player of action. Downed players are never attacked, and predators switch to
+  the revivers (decided, see 3.2a). The remaining risk is that reviving becomes too deadly. Watch it in playtests and
+  lower the tokens on a reviver before touching the rule.
 - **Determinism (medium).** See 3.6. Until the existing `Math.random()` calls move to `world.aiRng`, tests must avoid
   asserting on paths through old code that rolls dice.
 - **Difficulty creep (medium).** Smarter and more dangerous at the same time can overshoot. Each phase should ship
