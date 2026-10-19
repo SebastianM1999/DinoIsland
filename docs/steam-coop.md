@@ -26,10 +26,11 @@ The Steam API starts before the game creates its window (Valve's requirement for
 
 ## Player flow
 
-- **Host game:** choose Friends only, Invite only, or Anyone. Hosting starts the expedition immediately and reserves one of four slots for the host.
+- **Host game:** choose Friends only, Invite only, or Anyone. Hosting opens the expedition's **lobby** and reserves one of four slots for the host. Everyone who joins stands on the lobby's stage in their outfit, with their level and a read-only view of their skill tree (**Skills**). The island waits until the host presses **Start expedition**; friends who join later go straight into the running game. LAN and internet hosting use the same lobby; solo has none.
 - **Join friend:** lists friends playing this App ID with a Steam lobby. Refresh updates the list. A lobby ID can also be entered manually.
 - **Browse public games:** searches compatible public lobbies with space available. Steam enforces access to private/friends-only lobbies.
-- **Invite friends:** available in the pause menu during a Steam session. Select an online friend to send a Steam lobby invitation. The lobby ID is also displayed there.
+- **Party list:** the pause menu's Players list shows every explorer with health and marks the host. The host can **Kick** another explorer (a second click confirms): they are told "The host removed you from this expedition.", their character stays in the expedition, and they cannot rejoin until the host reopens it. This works the same for Steam, LAN and internet guests.
+- **Invite friends:** available in the pause menu (under the Players list) during a Steam session. Select an online friend to send a Steam lobby invitation. The lobby ID is also displayed there.
 - Accepted invites launch a closed game through `+connect_lobby`, or generate a join request when the game is already running. An invite received during play shows a HUD toast and **Leave and join friend** in the pause menu; it does not end the current session automatically.
 - Quitting, reloading, leaving, or losing the host closes the session and releases its lobby/network resources. Steam may appoint another lobby owner, but the game deliberately ends instead of pretending the new owner has the world state.
 - **Host LAN game** and **LAN / direct connection** remain available without Steam. Share the host's LAN address and displayed port; Steam invites do not apply to these sessions. The desktop opens its LAN port (8080, or a free one) only while a LAN game is hosted: solo and Steam games open no port on the network and cause no firewall prompt.

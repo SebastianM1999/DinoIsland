@@ -45,11 +45,18 @@ export class Net {
     this.rttSamples = [];
     this.telemetry = { snapshots: 0, staleSnapshots: 0, missingSnapshots: 0, bufferUnderruns: 0, snapshotAge: 0, rttP50: 0, rttP95: 0 };
     transport.onMessage = (msg) => this.#dispatch(msg);
+    this.closeReason = null;        // why the host is closing this session (a REJECT after the welcome: removed by the host)
+    // The expedition's lobby (before the host's Start): the members its screen shows, kept here so an
+    // update that arrives before the screen listens is not lost. lastWelcome: the newest welcome.
+    this.inLobby = false;
+    this.lobbyMembers = null;
+    this.lastWelcome = null;
     transport.onClose = (reason) => {
       this.closed = true;
       this.loading = null;
       clearInterval(this.heartbeat);
-      this.onClose?.(reason);
+      // (the transport only knows its connection ended; the host said why just before)
+      this.onClose?.(this.closeReason ?? reason);
     };
   }
 
@@ -171,6 +178,13 @@ export class Net {
   on(type, fn) {
     if (!this.handlers.has(type)) this.handlers.set(type, []);
     this.handlers.get(type).push(fn);
+  }
+
+  /** Stop hearing `type` with `fn` (registered with `on`). */
+  off(type, fn) {
+    const list = this.handlers.get(type);
+    const i = list ? list.indexOf(fn) : -1;
+    if (i >= 0) list.splice(i, 1);
   }
 
   /** Preserve world changes while cooperative construction yields to networking. */
@@ -328,6 +342,10 @@ export class Net {
 
   #dispatch(msg) {
     if (this.closed || !msg || typeof msg !== 'object') return;
+    if (msg.t === MSG.REJECT) {
+      if (this.myId !== null && typeof msg.reason === 'string') this.closeReason = msg.reason.slice(0, 200);
+      return;
+    }
     const local = performance.now() / 1000;
     if (msg.t === MSG.WELCOME) {
       // A game under construction is tied to its welcome. Do not silently
@@ -336,6 +354,11 @@ export class Net {
         this.#failLoading('The island changed while loading. Reconnect to continue.');
         return;
       }
+      // (the island's clock stood still in the lobby: estimate the server time afresh)
+      if (this.inLobby && !msg.lobby) { this.serverOffset = null; this.offsetSamples = []; this.pongSamples = []; }
+      this.inLobby = !!msg.lobby;
+      this.lobbyMembers = Array.isArray(msg.lobby?.members) ? msg.lobby.members : null;
+      this.lastWelcome = msg;
       this.myId = msg.id;
       this.epoch = msg.k ?? 0;
       this.minSnapNow = msg.now;
@@ -360,6 +383,7 @@ export class Net {
     // It belongs to the expedition (the host saves it). Creative mode sends every skill at max rank: shown only, never kept.
     if (msg.t === MSG.PROF && !msg.prof?.creative) this.prof = msg.prof = sanitizeProfile(msg.prof);
     if (msg.t === MSG.CREDENTIAL) rememberGuestCredential(msg.world, msg.token);
+    if (msg.t === MSG.EV && msg.e === EV.LOBBY && this.inLobby && Array.isArray(msg.members)) this.lobbyMembers = msg.members;
     if (msg.t === MSG.EV && msg.e === EV.SAVED) this.reportSave({ ok: !!msg.ok, at: msg.at, reason: msg.reason, error: msg.error });
     if (msg.t !== MSG.SNAP && Number.isFinite(msg.r)) this.reliableSeq = Math.max(this.reliableSeq, msg.r);
     if ((msg.t === MSG.SNAP || msg.t === MSG.WELCOME || msg.t === MSG.PONG) && Number.isFinite(msg.now)) this.#clock(msg, local);

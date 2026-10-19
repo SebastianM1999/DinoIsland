@@ -15,11 +15,16 @@
 //                                                       k = last correction epoch seen (older k / s are dropped)
 //   act     { a: <action>, ...fields }                  see ACT below
 //   ping    { c }                                       latency probe (server echoes pong)
+//   kick    { id }                                      the host removes player `id` (only the OWNER_KEY explorer may)
+//   start   {}                                          the host starts the expedition waiting in its lobby (OWNER_KEY only)
 //
 // ---------------------------------------------------------------- server -> client
-//   welcome { id, slot, now, k?, inv, world }               full state on join – sent again when
-//                                                       the team sails to the next island
-//   reject  { reason }
+//   welcome { id, slot, now, k?, inv, world, lobby? }       full state on join – sent again when
+//                                                       the team sails to the next island; lobby = { members }
+//                                                       (EV.LOBBY): the expedition waits for the host's start,
+//                                                       which sends everyone a fresh welcome without it
+//   reject  { reason }                                  join refused; after the welcome: why the host is
+//                                                       about to close this connection (removed by the host)
 //   pong    { c, now }
 //   snap    { now, p: [...PLAYER_FIELDS], d: [...DINO_FIELDS] }
 //   inv     { inv }                                     your private inventory changed (inv.torch: owns the hand-held torch)
@@ -34,7 +39,7 @@
  * together: a changed message, field or handshake, or a world rule both sides must agree on.
  * Save files have their own version (shared/saveSchema.js).
  */
-export const PROTOCOL_VERSION = 2;
+export const PROTOCOL_VERSION = 3;
 
 /** Why a client of protocol version `v` cannot join this host, or null when it can. */
 export function versionMismatch(v) {
@@ -61,7 +66,16 @@ export const MSG = {
   PROF: 'prof',
   CORRECT: 'correct',
   EV: 'ev',
+  KICK: 'kick',
+  START: 'start',
 };
+
+/**
+ * The roster key of the explorer who owns the hosted expedition (the solo player, or the desktop
+ * host that opened it: server/saveCoordinator.js). Players see who hosts (publicPlayer `host`),
+ * and only this explorer may remove others (MSG.KICK).
+ */
+export const OWNER_KEY = 'owner';
 
 /** Client actions (msg.a). */
 export const ACT = {
@@ -102,6 +116,7 @@ export const ACT = {
 export const EV = {
   PLAYER_JOIN: 'pjoin',     // { player }
   PLAYER_LEAVE: 'pleave',   // { id }
+  LOBBY: 'lobby',           // { members: [{ id, slot, name, outfit, host, prof: { xp, bonus, skills } }] } who waits in the lobby (before Start)
   ITEM_ADD: 'item+',        // { item }
   ITEM_REMOVE: 'item-',     // { id, by }
   FRUIT: 'fruit',           // { spot, count } (0..4 fruit left on the plant)

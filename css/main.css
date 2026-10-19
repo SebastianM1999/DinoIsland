@@ -644,9 +644,52 @@ body:has(#paused:not([hidden])) #hud :is(.hud-status, .hud-tl, .hud-keys, .hud-b
 #paused .pause-objectives, #paused .pause-team { margin: 0; padding: 0 0 10px; }
 #paused .pause-objectives li { padding: 4px 0; line-height: 1.3; }
 #paused #pause-contracts li { display: block; }
+/* Party list: who hosts, and the host's Kick (a second click confirms, like Leave). */
+#paused .pause-team li { grid-template-columns: minmax(0, 1fr) 72px 40px auto; min-height: 36px; }
+#paused .pause-team .name { display: flex; align-items: center; gap: 6px; }
+#paused .pause-team .name > span:first-child { overflow: hidden; text-overflow: ellipsis; }
+.host-badge { flex: none; padding: 1px 6px; border-radius: 4px; font-size: .68rem; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; color: #23351e; background: var(--yellow); }
+#paused .pause-team .kick { min-height: 30px; padding: 4px 10px; font-size: .8rem; color: #ffb0a4; background: #3b302ce0; border: 1px solid #a8756355; border-radius: 6px; box-shadow: none; }
+#paused .pause-team .kick:hover { background: #4a3a34; }
+#paused .pause-team .kick[data-confirm] { background: var(--red); color: white; }
+#paused #btn-invite { width: 100%; min-height: 44px; margin: 0 0 12px; padding: 8px 16px; background: #274347e6; border: 1px solid #93aaa34d; border-radius: 6px; box-shadow: none; font-size: .95rem; }
+#paused #btn-invite:hover { background: #385a5e; }
+#paused .pause-team .kick:focus-visible, #paused #btn-invite:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
 @media (max-width: 900px) {
   #paused .pause-card { grid-template-columns: minmax(0, 1fr); max-width: 560px; }
   #paused .pause-info { grid-column: 1; grid-row: 4; margin-top: 18px; }
 }
 
 body:has(#paused:not([hidden])) #hud .hud-tr { visibility: hidden; }
+
+/* Expedition lobby (ui/lobbyScreen.js): every explorer on one stage until the host's Start. */
+#lobby { z-index: 60; display: flex; flex-direction: column; align-items: stretch; justify-content: space-between; gap: 8px; padding: 24px 32px; background: radial-gradient(ellipse at 50% 85%, #2f5a4f 0%, #152b2c 60%, #0d1b1d 100%); }
+.lobby-head { text-align: center; }
+.lobby-title { margin: 2px 0 4px; font-size: clamp(1.6rem, 3vw, 2.4rem); color: var(--cream); }
+.lobby-sub { margin: 0; color: #cad6c7; }
+.lobby-stage { position: relative; flex: 1; min-height: 0; }
+.lobby-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.lobby-cards { list-style: none; margin: 0; padding: 0; position: absolute; left: 0; right: 0; bottom: 0; height: 0; }
+.lobby-card { position: absolute; bottom: 0; transform: translateX(-50%); width: min(21vw, 200px); min-height: 124px; display: grid; align-content: start; justify-items: center; gap: 4px; padding: 10px 10px 12px; text-align: center; background: #102629e6; border: 1px solid #93aaa333; border-top: 4px solid var(--c, #fff); border-radius: 8px; }
+.lobby-card.is-open { background: #10262980; border-style: dashed; border-top-color: #93aaa355; color: #a9bfaa; }
+.lobby-card-head { display: flex; align-items: center; justify-content: center; gap: 6px; max-width: 100%; }
+.lobby-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 1.05rem; }
+.lobby-level { font-size: .85rem; color: #cad6c7; }
+.lobby-card .btn { width: 100%; min-height: 34px; padding: 4px 14px; font-size: .85rem; border-radius: 6px; box-shadow: none; }
+.lobby-card .kick { color: #ffb0a4; background: #3b302ce0; border: 1px solid #a8756355; }
+.lobby-card .kick[data-confirm] { background: var(--red); color: white; }
+.lobby-card .btn:focus-visible, .lobby-actions .btn:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+.lobby-actions { display: flex; justify-content: center; flex-wrap: wrap; gap: 12px; }
+.lobby-actions .btn { min-width: 180px; min-height: 48px; }
+.lobby-skills { position: fixed; inset: 0; z-index: 2; display: grid; place-items: center; padding: 2dvh 2vw; background: rgba(8, 16, 18, .72); }
+.lobby-skills-mount { display: flex; width: min(1100px, 100%); height: 92dvh; padding: 16px; background: #152b2cf5; border: 1px solid #8d9e8b66; border-radius: 12px; }
+.lobby-skills-mount .hud-panel { position: static; inset: auto; transform: none; width: 100%; height: 100%; max-height: none; padding: 0; animation: none; }
+.lobby-skills-mount .hud-panel::before { display: none; }
+.lobby-skills-mount .sk-cols { overflow-y: auto; }
+.lobby-skills-mount .sk-xptable { display: none; }
+@media (max-width: 720px) {
+  #lobby { padding: 16px; }
+  .lobby-card { width: 23vw; padding: 6px; }
+  .lobby-card .btn { padding: 2px 6px; font-size: .75rem; }
+  .lobby-actions .btn { min-width: 0; flex: 1; }
+}

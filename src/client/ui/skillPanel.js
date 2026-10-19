@@ -25,9 +25,14 @@ function ensureStylesheet() {
 }
 
 export class SkillPanel {
-  /** @param {{ onBuy: (id: string) => void, onReset: () => void, onClose: () => void }} opts */
-  constructor({ onBuy, onReset, onClose }) {
+  /**
+   * @param {{ onBuy?: (id: string) => void, onReset?: () => void, onClose: () => void, readOnly?: boolean, title?: string }} opts
+   * readOnly: someone else's tree (the lobby): tiles explain, nothing is bought or reset; title: the heading.
+   */
+  constructor({ onBuy, onReset, onClose, readOnly = false, title = 'Skills' }) {
     ensureStylesheet();
+    this.readOnly = readOnly;
+    this.title = title;
     this.onBuy = onBuy;
     this.onReset = onReset;
     this.onClose = onClose;
@@ -43,7 +48,7 @@ export class SkillPanel {
     this.el.setAttribute('aria-label', 'Skills');
     this.el.addEventListener('click', (e) => {
       const card = e.target.closest('[data-skill]');
-      if (card) { this.buy(card.dataset.skill); return; }
+      if (card) { if (this.readOnly) card.focus(); else this.buy(card.dataset.skill); return; }
       const b = e.target.closest('button');
       if (!b || b.disabled) return;
       if (b.dataset.act === 'reset') this.reset();
@@ -175,12 +180,13 @@ export class SkillPanel {
     const id = this.hoverId ?? this.focusId;
     if (!id) {
       const free = buildSkillView(this.view).free;
-      return `<span class="sk-hint">Hover or focus a skill to see what it does &middot; click or Enter to learn a rank (${free} point${free === 1 ? '' : 's'} available) &middot; arrow keys move</span>`;
+      if (this.readOnly) return `<span class="sk-hint">Hover or focus a skill to see what it does &middot; ${free} point${free === 1 ? '' : 's'} unspent &middot; arrow keys move</span>`;
+      return`<span class="sk-hint">Hover or focus a skill to see what it does &middot; click or Enter to learn a rank (${free} point${free === 1 ? '' : 's'} available) &middot; arrow keys move</span>`;
     }
     const s = skillView(this.view, id);
     const status = s.state === 'maxed' ? '<em class="sk-st is-max">Maxed</em>'
       : s.state === 'locked' ? `<em class="sk-st is-bad">${esc(s.reason)}</em>`
-        : `<em class="sk-st is-ok">Click to learn: ${s.cost} point${s.cost > 1 ? 's' : ''}</em>`;
+        : this.readOnly ? '' : `<em class="sk-st is-ok">Click to learn:${s.cost} point${s.cost > 1 ? 's' : ''}</em>`;
     return `<b class="sk-d-name">${esc(s.name)}</b><span class="sk-d-rank">Rank ${s.rank}/${s.max}</span>${status}
       <span class="sk-d-line">${s.now ? `<i>Now</i> ${esc(s.now)}` : '<i>Now</i> Not learned yet'}</span>
       ${s.next ? `<span class="sk-d-line"><i>Next</i> ${esc(s.next)}</span>` : ''}`;
@@ -216,23 +222,23 @@ export class SkillPanel {
     // DOM/classes follow the other HUD panels: hud-panel-head + hud-panel-close, a craft-stockbar strip, wd-foot / wd-btn
     this.el.innerHTML = `
       <header class="hud-panel-head sk-head">
-        <h2>${icon('bolt')} Skills</h2>
+        <h2>${icon('bolt')} ${esc(this.title)}</h2>
         <span class="sk-level">Level ${v.level}${v.capped ? ' (max)' : ''}</span>
-        <span class="hud-panel-close"><kbd>K</kbd> / <kbd>Esc</kbd> Close</span>
+        <span class="hud-panel-close">${this.readOnly ? '' : '<kbd>K</kbd> / '}<kbd>Esc</kbd> Close</span>
       </header>
       <div class="craft-stockbar sk-xprow" role="group" aria-label="Experience">
         <span class="hud-bar-track sk-xpbar" role="progressbar" aria-valuemin="0" aria-valuemax="${v.need}" aria-valuenow="${v.into}"><span class="hud-bar-fill" style="transform:scaleX(${frac})"></span></span>
         <span class="sk-xpnum">${v.capped ? 'Max level' : `${v.into} / ${v.need} XP`}</span>
-        <span class="sk-free${v.free > 0 ? ' has-free' : ''}"><b>${v.free}</b> skill point${v.free === 1 ? '' : 's'} to spend</span>
+        <span class="sk-free${v.free > 0 ? ' has-free' : ''}"><b>${v.free}</b> skill point${v.free === 1 ? '' : 's'} ${this.readOnly ? 'unspent' : 'to spend'}</span>
         <p class="sk-xptable"><b>XP per kill:</b> ${esc(xpTableText())}</p>
       </div>
       <div class="sk-cols">${cols}</div>
       <footer class="wd-foot sk-foot">
         <div class="sk-desc" id="${this.descId}" aria-live="polite">${this.#descHtml()}</div>
         <div class="sk-actions">
-          ${this.atCamp ? '' : '<span class="sk-note">Reset only at camp</span>'}
+          ${this.readOnly ? '' : `${this.atCamp ? '' : '<span class="sk-note">Reset only at camp</span>'}
           ${this.confirming ? '<button type="button" class="wd-btn" data-act="cancel">Cancel</button>' : ''}
-          <button type="button" class="wd-btn${this.confirming ? ' sk-danger' : ''}" data-act="reset"${resetOff ? ' disabled' : ''} title="${this.atCamp ? 'Refund every spent point' : 'Only at camp'}">${resetLabel}</button>
+          <button type="button" class="wd-btn${this.confirming ? ' sk-danger' : ''}" data-act="reset"${resetOff ? ' disabled' : ''} title="${this.atCamp ? 'Refund every spent point' : 'Only at camp'}">${resetLabel}</button>`}
           <button type="button" class="wd-btn" data-act="close">Close</button>
         </div>
       </footer>`;

@@ -13,7 +13,7 @@ import { createGameServer } from '../server/index.js';
 import { OWNER_KEY, SaveCoordinator, guestKey } from '../server/saveCoordinator.js';
 import { SteamSession } from '../desktop/steam-session.js';
 import { createRemoteHost, createBridgeEndpoint } from '../desktop/hostBridge.js';
-import { MSG, PROTOCOL_VERSION } from '../src/shared/protocol.js';
+import { MSG, EV, PROTOCOL_VERSION } from '../src/shared/protocol.js';
 import { SteamHub } from './helpers/fakeSteam.js';
 
 async function saveHost(t) {
@@ -94,6 +94,109 @@ test('Steam friends play the host process\'s saved expedition and come back to t
   assert.equal(back.prof.xp, 321);
   assert.equal(host.playerByKey(`steam-${users[2].id}`).inv.loot.hide, 0);
   assert.equal(host.world.roster.size, 0, 'nobody waits twice');
+});
+
+test('the host removes a Steam guest: told why, kept out of this expedition, welcome again in the next one', async (t) => {
+  const { host, saves } = await saveHost(t);
+  const hub = new SteamHub();
+  const remote = createRemoteHost(processChannel(host));
+  const users = [0, 1].map((i) => hub.createUser(i));
+  const events = users.map(() => []);
+  const sessions = users.map((u, i) => new SteamSession(u, { emit: (e) => events[i].push(e), createHost: () => remote }));
+  t.after(() => { sessions.forEach((s) => s.dispose()); remote.dispose(); });
+  const pump = async (rounds = 4) => { for (let i = 0; i < rounds; i++) { sessions.forEach((s) => s.tick()); await settle(); } };
+  const [hostSession, guest] = sessions;
+  const guestKey = `steam-${users[1].id}`;
+
+  const { token, expedition } = await saves.create({ name: 'Kick run' }, { lobby: 'open' });
+  const h = await hostSession.hostGame('friends', token);
+  hostSession.send(h.sessionId, { t: MSG.HELLO, v: PROTOCOL_VERSION, name: 'Host' });
+  const g = await guest.joinGame(h.lobbyId);
+  guest.send(g.sessionId, { t: MSG.HELLO, v: PROTOCOL_VERSION, name: 'Ada' });
+  await pump();
+  const ada = host.playerByKey(guestKey);
+  const owner = host.playerByKey(OWNER_KEY);
+  ada.inv.loot.hide = 3;
+
+  // the guest cannot remove the host
+  guest.send(g.sessionId, { t: MSG.KICK, id: owner.id });
+  await pump();
+  assert.equal(host.world.players.size, 2);
+
+  hostSession.send(h.sessionId, { t: MSG.KICK, id: ada.id });
+  await pump();
+  assert.equal(host.playerByKey(guestKey), null, 'the guest leaves the world at once');
+  assert.equal(host.world.roster.get(guestKey).inv.loot.hide, 3, 'the character stays in the expedition like any leave');
+  assert.ok(events[1].some((e) => e.message?.t === MSG.REJECT && e.message.reason === 'The host removed you from this expedition.'), 'the guest is told why, before the connection ends');
+  await new Promise((r) => setTimeout(r, 600));
+  await pump();
+  assert.ok(events[1].some((e) => e.type === 'closed'), 'then the connection closes');
+  assert.equal(guest.sessionId, null);
+
+  // rejoining the same expedition is refused with the same reason
+  const again = await guest.joinGame(h.lobbyId);
+  guest.send(again.sessionId, { t: MSG.HELLO, v: PROTOCOL_VERSION, name: 'Ada' });
+  await pump();
+  assert.equal(host.playerByKey(guestKey), null);
+  const rejects = events[1].filter((e) => e.message?.t === MSG.REJECT).map((e) => e.message.reason);
+  assert.deepEqual(rejects, ['The host removed you from this expedition.', 'The host removed you from this expedition.'], 'a refused Steam join hears why before its connection closes');
+  guest.leave();
+
+  // tomorrow's session of the expedition starts with a clean slate
+  await saves.close();
+  await pump();
+  const reopened = await saves.open(expedition.id, { lobby: 'open' });
+  const h2 = await hostSession.hostGame('friends', reopened.token);
+  hostSession.send(h2.sessionId, { t: MSG.HELLO, v: PROTOCOL_VERSION, name: 'Host' });
+  const g2 = await guest.joinGame(h2.lobbyId);
+  guest.send(g2.sessionId, { t: MSG.HELLO, v: PROTOCOL_VERSION, name: 'Ada' });
+  await pump();
+  assert.equal(host.playerByKey(guestKey)?.inv.loot.hide, 3, 'back with the same character');
+});
+
+test('a hosted expedition waits in its lobby until the host starts it; solo plays at once', async (t) => {
+  const { host, saves } = await saveHost(t);
+  const hub = new SteamHub();
+  const remote = createRemoteHost(processChannel(host));
+  const users = [0, 1, 2].map((i) => hub.createUser(i));
+  const events = users.map(() => []);
+  const sessions = users.map((u, i) => new SteamSession(u, { emit: (e) => events[i].push(e), createHost: () => remote }));
+  t.after(() => { sessions.forEach((s) => s.dispose()); remote.dispose(); });
+  const pump = async () => { for (let i = 0; i < 4; i++) { sessions.forEach((s) => s.tick()); await settle(); } };
+  const welcomes = (i) => events[i].filter((e) => e.message?.t === MSG.WELCOME).map((e) => e.message);
+  const [hostSession, guest, late] = sessions;
+
+  const { token, expedition } = await saves.create({ name: 'Lobby run' }, { lobby: 'open' });
+  assert.equal(host.world.inLobby, true);
+  const h = await hostSession.hostGame('friends', token);
+  hostSession.send(h.sessionId, { t: MSG.HELLO, v: PROTOCOL_VERSION, name: 'Host' });
+  const g = await guest.joinGame(h.lobbyId);
+  guest.send(g.sessionId, { t: MSG.HELLO, v: PROTOCOL_VERSION, name: 'Ada' });
+  await pump();
+  assert.deepEqual(welcomes(1)[0].lobby.members.map((m) => [m.name, m.host]), [['Host', true], ['Ada', false]]);
+  assert.ok(events[0].some((e) => e.message?.e === EV.LOBBY && e.message.members.length === 2), 'the host sees Ada arrive');
+  assert.ok(!events[1].some((e) => e.message?.t === MSG.SNAP), 'nothing to play yet');
+
+  guest.send(g.sessionId, { t: MSG.START });
+  await pump();
+  assert.equal(host.world.inLobby, true, 'only the host starts');
+  hostSession.send(h.sessionId, { t: MSG.START });
+  await pump();
+  assert.equal(host.world.inLobby, false);
+  assert.equal(welcomes(0).at(-1).lobby, undefined);
+  assert.equal(welcomes(1).at(-1).lobby, undefined, 'the guest gets the island to build');
+
+  const l = await late.joinGame(h.lobbyId);
+  late.send(l.sessionId, { t: MSG.HELLO, v: PROTOCOL_VERSION, name: 'Ben' });
+  await pump();
+  assert.equal(welcomes(2).length, 1);
+  assert.equal(welcomes(2)[0].lobby, undefined, 'a late arrival plays at once');
+
+  // the same expedition alone: no lobby
+  await saves.close();
+  await pump();
+  await saves.open(expedition.id, { lobby: 'private' });
+  assert.equal(host.world.inLobby, false);
 });
 
 test('a private expedition admits no Steam guest, and a Steam identity can only come from the bridge', () => {

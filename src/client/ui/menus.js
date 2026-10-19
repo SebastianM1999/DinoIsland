@@ -141,7 +141,7 @@ export function initSettings({ onClose } = {}) {
   return { open, close, isOpen: () => !root.hidden };
 }
 
-/** Fill the pause card with the current expedition and team. */
+/** Fill the pause card with the current expedition and team (`game.kickPlayer(id)`: the host's Kick). */
 export function renderPause(game) {
   const m = game.mission;
   $('pause-mission-title').textContent = m?.title || 'Expedition';
@@ -167,23 +167,86 @@ export function renderPause(game) {
     return li;
   }));
 
-  const team = game.team || [{ name: game.me.name, slot: game.me.slot, hp: game.me.hp, alive: game.me.alive, isYou: true }];
+  renderTeam(game);
+}
+
+const KICK_CONFIRM_MS = 3000;
+/** The party list's rows by player id: kept across the pause card's refreshes, so a kick button keeps focus and its confirm state. */
+const teamRows = new Map();
+
+function teamRow(id) {
+  let row = teamRows.get(id);
+  if (row) return row;
+  const li = document.createElement('li');
+  const name = document.createElement('span');
+  name.className = 'name';
+  const label = document.createElement('span');
+  const badge = document.createElement('span');
+  badge.className = 'host-badge';
+  badge.textContent = 'Host';
+  name.append(label, badge);
+  const bar = document.createElement('span');
+  bar.className = 'hp';
+  const fill = document.createElement('i');
+  bar.append(fill);
+  const state = document.createElement('span');
+  state.className = 'state';
+  const action = document.createElement('span');
+  action.className = 'action';
+  const kick = document.createElement('button');
+  kick.type = 'button';
+  kick.className = 'btn kick';
+  action.append(kick);
+  li.append(name, bar, state, action);
+  row = { li, label, badge, fill, state, kick, timer: 0, who: '', onKick: null };
+  const describe = () => kick.setAttribute('aria-label', kick.dataset.confirm ? `Confirm: remove ${row.who} from the expedition` : `Remove ${row.who} from the expedition`);
+  // (removing a player needs a second click, like leaving: a stray click must not end a friend's game)
+  row.reset = () => { clearTimeout(row.timer); delete kick.dataset.confirm; kick.textContent = 'Kick'; describe(); };
+  kick.addEventListener('click', () => {
+    if (!kick.dataset.confirm) {
+      kick.dataset.confirm = '1';
+      kick.textContent = 'Confirm kick';
+      describe();
+      row.timer = setTimeout(row.reset, KICK_CONFIRM_MS);
+      return;
+    }
+    row.reset();
+    kick.disabled = true;   // (until the player is gone, or the next refresh if the host ignored it)
+    row.onKick?.();
+  });
+  row.describe = describe;
+  row.reset();
+  teamRows.set(id, row);
+  return row;
+}
+
+/** The pause card's party list: every explorer with health, who hosts, and Kick for the host. */
+function renderTeam(game) {
+  const team = game.team || [{ id: game.me.id, name: game.me.name, slot: game.me.slot, hp: game.me.hp, alive: game.me.alive, host: game.me.host, isYou: true }];
+  const iHost = team.some((p) => p.isYou && p.host);
   $('pause-team-count').textContent = `${team.length} explorer${team.length === 1 ? '' : 's'}`;
-  $('pause-team').replaceChildren(...team.map((p) => {
-    const li = document.createElement('li');
-    li.style.setProperty('--c', CONFIG.playerColors[p.slot % 4]);
+  const ids = new Set(team.map((p) => p.id));
+  for (const [id, row] of teamRows) if (!ids.has(id)) { row.reset(); row.li.remove(); teamRows.delete(id); }
+  const rows = team.map((p) => {
+    const row = teamRow(p.id);
     const hp = Math.max(0, Math.round(p.hp ?? 0));
-    const name = document.createElement('span');
-    name.className = 'name';
-    name.textContent = p.name + (p.isYou ? ' (you)' : '');
-    const bar = document.createElement('span');
-    bar.className = 'hp';
-    bar.innerHTML = `<i style="width:${Math.min(100, (hp / CONFIG.player.maxHealth) * 100)}%"></i>`;
-    const state = document.createElement('span');
-    state.className = 'state';
-    state.textContent = p.alive === false ? 'Down' : `${hp}`;
-    li.append(name, bar, state);
-    return li;
-  }));
+    row.li.style.setProperty('--c', CONFIG.playerColors[p.slot % 4]);
+    row.label.textContent = p.name + (p.isYou ? ' (you)' : '');
+    // (alone, "Host" says nothing: the marker matters once friends are in)
+    row.badge.hidden = !p.host || team.length < 2;
+    row.fill.style.width = `${Math.min(100, (hp / CONFIG.player.maxHealth) * 100)}%`;
+    row.state.textContent = p.alive === false ? 'Down' : `${hp}`;
+    const canKick = iHost && !p.isYou;
+    row.kick.hidden = !canKick;
+    if (!canKick) row.reset();
+    else if (!row.kick.dataset.confirm) row.kick.disabled = false;
+    row.who = p.name;
+    row.describe();
+    row.onKick = () => game.kickPlayer(p.id);
+    return row.li;
+  });
+  const ul = $('pause-team');
+  // (reorder only when needed: moving a focused button out of the list would drop its focus)
+  if (rows.length !== ul.children.length || rows.some((li, i) => ul.children[i] !== li)) ul.replaceChildren(...rows);
 }
 
