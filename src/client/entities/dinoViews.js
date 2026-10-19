@@ -20,6 +20,7 @@ import { buildTrex, TREX_ANIM, trexExtraUpdate } from '../models/dino/trex.js';
 import { buildSarcoFallback, buildSumpLurkerFallback, SARCO_ANIM } from '../models/dino/sarcoFallback.js';
 import { SarcoEffects } from './sarcoEffects.js';
 import { buildGLBDino } from '../models/dino/glbDino.js';
+import { makeHitFlash } from '../models/dino/hitFlash.js';
 import { disposeIslandScenes } from '../core/resources.js';
 import { CreatureStepCadence } from '../audio/creatureSteps.js';
 
@@ -66,6 +67,7 @@ export class DinoView {
     this.sp = sp;
     this.stepCadence = new CreatureStepCadence();
     this.root = this.rig.root;
+    this.flash = makeHitFlash(this.root);   // own material copies: the damage flash is per animal
     // oversized animals (the Primeval Grove's titan)
     this.scale = desc.sc || 1;
     if (this.scale !== 1) this.root.scale.multiplyScalar(this.scale);
@@ -200,6 +202,7 @@ export class DinoView {
         ? this.ctx.camera.position : null,
     });
     if (!this.rig.isGLB && this.flinch > 0) this.rig.body.rotation.z += Math.sin(this.flinch * 30) * 0.05 * this.flinch;
+    this.flash?.set(this.flinch * this.flinch);   // bright on the hit, gone in ~0.25 s
     this.sp.extraUpdate?.(this, animationDt);
     this.updateBar(dt);
   }
