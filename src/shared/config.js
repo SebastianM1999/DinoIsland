@@ -244,7 +244,7 @@ export const CONFIG = {
   dinos: {
     'alpha-sarcosuchus': {
       name: 'Alpha Sarcosuchus', health: 1800, radius: 2.2,
-      bodyLengthScale: .9, bodyHeightScale: .9,
+      bodyLengthScale: .9, bodyHeightScale: .9, height: 3.4455,
       // water ambusher (sim/ai/aquatic.js, DinoSystem): walks/swims in water up to maxWaterDepth, sinks to `shallow + range * submergence`
       // below the surface, its carcass floats `carcassDepth` under it; phaseClips: boss snapshot rows carry clip phases
       aquatic: { maxWaterDepth: 6, submerge: { shallow: 0.35, range: 2.75 }, carcassDepth: 0.8, phaseClips: true },
@@ -268,6 +268,7 @@ export const CONFIG = {
       turnRate: 0.7,
       alertRadius: 14,        // sprinting/attacking players inside this radius cause panic
       fleeTime: 9,
+      height: 13.007,          // fitted model height (m): head room under a roof (sim/dinos.js walkable)
       closeRadius: 6,          // walking closer than this makes it defend itself
       defendRange: 16,         // attacked from closer than this: it fights back instead of fleeing
       defendTime: 7,
@@ -290,6 +291,7 @@ export const CONFIG = {
       walkSpeed: 1.6,
       chargeSpeed: 8.8,
       turnRate: 1.6,
+      height: 3.758,
       territoryRadius: 26,
       angerRadius: 13,
       calmTime: 10,
@@ -319,7 +321,7 @@ export const CONFIG = {
       walkSpeed: 3.2,
       runSpeed: 10.2,
       turnRate: 4.5,
-      sightRadius: 34,
+      height: 1.675,
       attackRange: 1.9,
       attackDamage: 8,
       attackCooldown: 1.5,
@@ -329,6 +331,9 @@ export const CONFIG = {
       loot: { meat: 1, teeth: 2 },
       butcher: { loot: { bones: 2, skull: 1 } },
       respawn: 90,
+      // perception (sim/ai/senses.js): sight range m, half view angle rad, hearing x noise radius, memory s,
+      // awareness gained per second at the cone's centre up close / lost per second unseen, felt even unseen within `feel` m
+      ai: { senses: { sightRange: 34, fov: 1.4, hearing: 1.4, memoryTime: 20, gain: 1.6, decay: 0.25, feel: 3 } },
     },
     // Cave raptor kin (Hollow Mountain tunnels): blind, hunts by noise. Spawns only where the layout lists
     // `caveDinoSpots`; the per-level count is `level.dinos['gloom-raptor']`.
@@ -339,12 +344,7 @@ export const CONFIG = {
       walkSpeed: 3.4,
       runSpeed: 11.4,
       turnRate: 5,
-      sightRadius: 12,        // nearly blind: short sight (shortened further by ash rain)
-      senseRadius: 7,         // anything this close is felt/smelled even when silent
-      hearingRadius: 46,      // long hearing: the base distance at noise level 1 (sprinting)
-      walkNoise: 0.4,         // noise levels x hearingRadius: walking / sprinting / gunfire + arrows
-      sprintNoise: 1,
-      shotNoise: 1.5,
+      height: 2.083,
       attackRange: 2.1,
       attackDamage: 10,
       attackCooldown: 1.4,
@@ -354,6 +354,9 @@ export const CONFIG = {
       loot: { meat: 1, teeth: 2 },
       butcher: { loot: { bones: 2, skull: 1 } },
       respawn: 90,
+      // nearly blind (short sight, shortened further by ash rain), long hearing, feels anything within 7 m;
+      // a carried torch is seen from much further (senses.js LIGHT)
+      ai: { senses: { sightRange: 12, fov: 1.5, hearing: 2.5, memoryTime: 25, gain: 2, decay: 0.2, feel: 7 } },
     },
     // Cave ambusher of the flooded tunnels (Hollow Mountain): lies submerged, lunges at players who swim or stand at
     // the water's edge, drags back into the water. Not a boss: normal respawn, no phases. Spawns only at flooded
@@ -366,6 +369,7 @@ export const CONFIG = {
       lungeSpeed: 9,
       turnRate: 4,
       sightRadius: 16,        // clouded eyes: it feels the ripples more than it sees
+      height: 0.723,
       lungeRange: 6,          // players this close to its water get lunged at
       edge: 3,                // ... when they stand within this distance of deep water (or swim)
       leashRadius: 14,        // never farther than this from the flooded spot it spawned at
@@ -414,6 +418,7 @@ export const CONFIG = {
       count: 3,
       flySpeed: 11,
       diveSpeed: 24,
+      height: 1.855,
       circleRadius: 30,
       circleHeight: 28,
       targetRadius: 55,
@@ -432,7 +437,7 @@ export const CONFIG = {
       walkSpeed: 2.6,
       runSpeed: 7.6,          // slower than a sprinting player – you can escape
       turnRate: 1.3,
-      sightRadius: 40,
+      height: 5.919,
       chaseTime: 14,
       restTime: 18,
       biteRange: 4.2,
@@ -445,44 +450,48 @@ export const CONFIG = {
       loot: { meat: 6, teeth: 4 },
       butcher: { loot: { bones: 6, skull: 1, teeth: 2 } },
       respawn: 300,
+      // narrower cone, hears gunshots from ~120 m (senses.js NOISE x hearing)
+      ai: { senses: { sightRange: 40, fov: 1.05, hearing: 2.2, memoryTime: 18, gain: 1.3, decay: 0.2, feel: 5 } },
     },
     // Test species (docs/newDinos): the Blender models shown in the game before their own AI exists. They reuse the
     // raptor's pack brain (sim/ai/testDinos.js); `peaceful` ones only fight back after a hit. Spawned on islands whose
     // `level.dinos` names them (island 1). Footprints are rough estimates from the fitted model length.
     triceratops: {
       name: 'Triceratops', peaceful: true, health: 320, groupSize: 1,
-      walkSpeed: 1.6, runSpeed: 7.5, turnRate: 1.6, sightRadius: 0,
+      walkSpeed: 1.6, runSpeed: 7.5, turnRate: 1.6, height: 3.47,
       attackRange: 3.6, attackDamage: 24, attackCooldown: 2.4, giveUpRadius: 40,
       radius: 2.0, body: [[0, 1.2], [1.6, 1.0], [3.0, 0.6], [-1.6, 0.9], [-3.0, 0.4]],
       loot: { meat: 3, hide: 2 }, butcher: { loot: { bones: 4, skull: 1 } }, respawn: 150,
     },
     ankylosaurus: {
       name: 'Ankylosaurus', peaceful: true, health: 380, groupSize: 1,
-      walkSpeed: 1.2, runSpeed: 5.0, turnRate: 1.4, sightRadius: 0,
+      walkSpeed: 1.2, runSpeed: 5.0, turnRate: 1.4, height: 2.511,
       attackRange: 3.8, attackDamage: 30, attackCooldown: 2.8, giveUpRadius: 40,
       radius: 1.7, body: [[0, 1.2], [1.3, 0.9], [2.4, 0.4], [-1.3, 0.9], [-2.6, 0.4]],
       loot: { meat: 3, hide: 2 }, butcher: { loot: { bones: 4, skull: 1 } }, respawn: 150,
     },
     pachycephalosaurus: {
       name: 'Pachycephalosaurus', peaceful: true, health: 140, groupSize: 1,
-      walkSpeed: 2.2, runSpeed: 7.8, turnRate: 2.6, sightRadius: 0,
+      walkSpeed: 2.2, runSpeed: 7.8, turnRate: 2.6, height: 1.996,
       attackRange: 2.4, attackDamage: 18, attackCooldown: 2.0, giveUpRadius: 45,
       radius: 0.9, body: [[0, 0.55], [0.9, 0.4], [1.7, 0.3], [-1.0, 0.35]],
       loot: { meat: 2, hide: 1 }, butcher: { loot: { bones: 3, skull: 1 } }, respawn: 120,
     },
     dilophosaurus: {
       name: 'Dilophosaurus', health: 110, groupSize: 1,
-      walkSpeed: 2.8, runSpeed: 9.4, turnRate: 3.8, sightRadius: 28,
+      walkSpeed: 2.8, runSpeed: 9.4, turnRate: 3.8, height: 3.083,
       attackRange: 2.6, attackDamage: 12, attackCooldown: 1.6, giveUpRadius: 55,
       radius: 0.9, body: [[0, 0.5], [1.2, 0.35], [2.4, 0.25], [-1.4, 0.3]],
       loot: { meat: 2, teeth: 2 }, butcher: { loot: { bones: 3, skull: 1 } }, respawn: 120,
+      ai: { senses: { sightRange: 28, fov: 1.4, hearing: 1.2, memoryTime: 15, gain: 1.4, decay: 0.25, feel: 3 } },
     },
     spinosaurus: {
       name: 'Spinosaurus', health: 800, groupSize: 1,
-      walkSpeed: 2.4, runSpeed: 7.2, turnRate: 1.4, sightRadius: 34,
+      walkSpeed: 2.4, runSpeed: 7.2, turnRate: 1.4, height: 6.262,
       attackRange: 4.6, attackDamage: 40, attackCooldown: 2.0, giveUpRadius: 50,
       radius: 2.6, body: [[0.2, 1.2], [2.0, 0.9], [3.8, 0.6], [5.4, 0.4], [-2.0, 0.9], [-3.8, 0.55], [-5.4, 0.35]],
       loot: { meat: 6, teeth: 4 }, butcher: { loot: { bones: 6, skull: 1, teeth: 2 } }, respawn: 300,
+      ai: { senses: { sightRange: 30, fov: 1.2, hearing: 1.2, memoryTime: 15, gain: 1.2, decay: 0.25, feel: 4 } },
     },
   },
 

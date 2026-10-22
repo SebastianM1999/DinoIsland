@@ -10,6 +10,8 @@ import { DinoSystem, climbSlope } from '../src/sim/dinos.js';
 import { insideGrove } from '../src/shared/grove.js';
 import { insideBossArena } from '../src/shared/bossArena.js';
 import { CONFIG } from '../src/shared/config.js';
+import { SAFE_MARGIN } from '../src/shared/base.js';
+import { alarm } from '../src/sim/ai/senses.js';
 
 const TYPES = ['raptor', 'trex', 'stego', 'brachio'];
 const ISLANDS = 12;
@@ -64,17 +66,23 @@ function clearDinos(world) {
   world.dinos.respawnQueue = [];
 }
 
-/** A dinosaur of `type` at (x, z) that wants to get to the player (or, for the brachio, to `goal`). */
+/**
+ * A dinosaur of `type` at (x, z) that wants to get to the player (or, for the brachio, to `goal`). Hunters are
+ * told where the player is (ai/senses.js alarm), whether they see them over the rim or not.
+ */
 function spawnHunter(world, type, x, z, p, goal) {
   const sys = world.dinos;
   if (type === 'raptor') {
     sys.groups.set('rp', { id: 'rp', home: { x, z }, target: p.id, wander: null, wanderT: 0 });
-    return sys.spawn('raptor', x, z, { group: 'rp', slot: 0 });
+    const d = sys.spawn('raptor', x, z, { group: 'rp', slot: 0 });
+    alarm(d, sys, p.id);
+    return d;
   }
   if (type === 'trex') {
     if (world.layout.trexPatrol.length < 3) world.layout.trexPatrol = [{ x, z }, { x: x + 20, z }, { x, z: z + 20 }];
     const d = sys.spawn('trex', x, z, { wp: 0 });
     Object.assign(d, { mode: 'chase', targetId: p.id, chaseT: 0 });
+    alarm(d, sys, p.id);
     return d;
   }
   if (type === 'stego') {
@@ -140,7 +148,7 @@ test('downhill may be steep, uphill may not; water, lava, the grove, the boss is
         const x = (rnd() * 2 - 1) * 350, z = (rnd() * 2 - 1) * 350;
         const wet = t.waterDepthAt(x, z) > 1.2 || t.lavaLevelAt(x, z) !== null;
         const zone = world.safeZone();
-        const banned = insideGrove(L, x, z, 3) || insideBossArena(L, x, z, 4) || (zone && Math.hypot(x - zone.x, z - zone.z) < zone.r + 10);
+        const banned = insideGrove(L, x, z, 3) || insideBossArena(L, x, z, 4) || (zone && Math.hypot(x - zone.x, z - zone.z) < zone.r + SAFE_MARGIN);
         if (wet || banned) {
           assert.ok(!sys.walkable(x, z, d, true), `island ${level + 1}/${variant} ${type}: ${x.toFixed(1)},${z.toFixed(1)} stays closed going down`);
           closed++;

@@ -31,7 +31,7 @@ import { buildBowCamp } from '../world/bowCamp.js';
 import { buildHutSteps } from '../world/hut.js';
 import { buildBaseView } from '../world/base.js';
 import { BasePanel } from '../ui/basePanel.js';
-import { campStations, safeZone, applyBaseColliders, hasBasePlots, freshBase, CAMP_BENCH } from '../../shared/base.js';
+import { campStations, safeZone, applyBaseColliders, hasBasePlots, freshBase, CAMP_BENCH, SAFE_MARGIN } from '../../shared/base.js';
 import { WIND } from '../models/kit.js';
 import { RemotePlayers } from '../entities/remotePlayers.js';
 import { Hud } from '../ui/hud.js';
@@ -1161,7 +1161,7 @@ export class Game {
   #inDanger() {
     const p = this.player.pos;
     const zone = safeZone(this.layout, this.base, this.layout.level.index);
-    if (zone && Math.hypot(p.x - zone.x, p.z - zone.z) < zone.r + 6) return false;
+    if (zone && Math.hypot(p.x - zone.x, p.z - zone.z) < zone.r + SAFE_MARGIN) return false;
     if (this.time - (this.lastHurtAt ?? -99) < 3) return true;
     for (const v of this.dinos.map.values()) {
       if (!v.alive || v.type === 'brachio') continue;

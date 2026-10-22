@@ -6,6 +6,8 @@ import { LEVELS } from '../src/shared/levels.js';
 import { GLB_DINOS } from '../src/client/models/dino/glbCatalog.js';
 import { SPECIES } from '../src/client/entities/dinoViews.js';
 import { TEST_DINO_TYPES, TEST_BRAINS } from '../src/sim/ai/testDinos.js';
+import { ServerWorld } from '../src/sim/world.js';
+import { updateSenses } from '../src/sim/ai/senses.js';
 
 test('test species are registered on server and client and spawn on island 1', () => {
   for (const type of TEST_DINO_TYPES) {
@@ -17,22 +19,20 @@ test('test species are registered on server and client and spawn on island 1', (
 });
 
 test('peaceful test species ignore players until hit, predators hunt on sight', () => {
-  const player = { id: 'p1', x: 3, z: 0, alive: true };
-  const sys = {
-    groups: new Map(), list: [],
-    world: { players: new Map([[player.id, player]]), sightMul: () => 1, now: 0 },
-    inSafeZone: () => false, distTo: (d, x, z) => Math.hypot(d.x - x, d.z - z),
-    nearestPlayer: (d, r, ok) => (Math.hypot(player.x - d.x, player.z - d.z) <= r && ok(player) ? player : null),
-    roar() {}, steer() { return 0; }, halt() {}, attackPlayer() {}, randomWalkablePoint: (d, x, z) => ({ x, z }),
-  };
+  const world = new ServerWorld({ send() {} }, { variant: 1 });
+  const { id } = world.join('Watcher');
+  const player = world.players.get(id), sys = world.dinos;
+  sys.inSafeZone = () => false;
   for (const type of TEST_DINO_TYPES) {
+    for (const d of [...sys.list]) sys.remove(d);
     const brain = TEST_BRAINS[type];
-    const pack = { id: type, home: { x: 0, z: 0 }, target: null, wander: null, wanderT: 0 };
+    const pack = { id: type, home: { x: player.x, z: player.z }, target: null, wander: null, wanderT: 0 };
     sys.groups.set(type, pack);
-    const d = { type, x: 0, z: 0, group: type, slot: 0, alive: true, fl: 0 };
-    sys.list = [d];
-    brain.init(d, sys);
-    brain.update(d, sys, 0.1);
+    // in plain view: a few metres in front of its face
+    const d = sys.spawn(type, player.x, player.z - 6, { group: type, slot: 0 });
+    d.x = player.x; d.z = player.z - 6; d.yaw = Math.PI;
+    sys.steer = () => 0; sys.halt = () => {};
+    for (let k = 0; k < 20; k++) { world.now += 0.1; updateSenses(sys, 0.1); brain.update(d, sys, 0.1); }
     assert.equal(pack.target, CONFIG.dinos[type].peaceful ? null : player.id, `${type}: reaction on sight`);
     brain.onHurt(d, sys, player.id);
     assert.equal(pack.target, player.id, `${type}: fights back after a hit`);

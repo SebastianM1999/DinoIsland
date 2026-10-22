@@ -4,6 +4,7 @@ import { ServerWorld } from '../src/sim/world.js';
 import { raptorBrain } from '../src/sim/ai/raptor.js';
 import { raiderStep } from '../src/sim/raids.js';
 import { DS } from '../src/shared/protocol.js';
+import { updateSenses } from '../src/sim/ai/senses.js';
 
 function setup(raid = false) {
   const world = new ServerWorld({ send() {} }, { variant: 1 });
@@ -22,7 +23,8 @@ function setup(raid = false) {
   sys.halt = () => {};
   sys.inSafeZone = () => false;
   sys.attackPlayer = () => attacks.push(true);
-  const step = dt => raid ? raiderStep(sys, d, dt) : raptorBrain.update(d, sys, dt);
+  // the senses run before the brains every tick (DinoSystem.update)
+  const step = (dt) => { world.now += dt; updateSenses(sys, dt); return raid ? raiderStep(sys, d, dt) : raptorBrain.update(d, sys, dt); };
   return { world, sys, p, d, moves, attacks, step };
 }
 

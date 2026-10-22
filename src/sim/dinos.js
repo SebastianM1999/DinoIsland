@@ -25,6 +25,9 @@ import { aquaticGroundHeight, carcassSurface } from './ai/aquatic.js';
 import { raiderStep } from './raids.js';
 import { ALPHA, canBeAlpha, alphaTitle } from '../shared/dinoRank.js';
 import { findPath, canWalkSegment } from './pathfind.js';
+import { updateSenses, hear, NOISE } from './ai/senses.js';
+import { occluderBlocked } from '../shared/visibility.js';
+import { SAFE_MARGIN } from '../shared/base.js';
 
 const BRAINS = { brachio: brachioBrain, stego: stegoBrain, raptor: raptorBrain, 'gloom-raptor': gloomRaptorBrain, ptera: pteraBrain, trex: trexBrain, 'alpha-sarcosuchus': sarcosuchusBrain, 'sump-lurker': sumpLurkerBrain, 'crystal-plodder': crystalPlodderBrain, ...TEST_BRAINS };
 const r2 = (v) => Math.round(v * 100) / 100;
@@ -44,6 +47,8 @@ const SWIM_SINK = 0.7;
 // canopy up to its head (m, before scale). Shorter animals pass below it - on a slope a crown
 // downhill hangs at their feet, and the paths (sim/pathfind.js) do not plan round crowns.
 const NECK_HEIGHT = { brachio: 8.5 };
+/** Roof height an animal needs under the Hollow Mountain: its fitted model height plus a metre. */
+const headRoom = (d) => (CONFIG.dinos[d.type].height ?? 6) * (d.scale || 1) + 1;
 const crownTop = (d) => (NECK_HEIGHT[d.type] ?? 0) * (d.scale || 1);
 /** Stuck safety net: seconds of wanting to move without getting anywhere before a nudge. */
 const NUDGE_INSIDE = 2;     // standing inside a collider / on ground it can't stand on
@@ -223,10 +228,11 @@ export class DinoSystem {
     if (!downhill && t.slopeAt(x, z) > climbSlope(d) && !(d.scrambleUntil > this.world.now) && !((aquatic || swim) && depth > 0.5)) return false;
     if (t.lavaLevelAt(x, z) !== null) return false;
     // under the roof of the Hollow Mountain: never where a body does not fit (Infinity elsewhere)
-    if (t.isCave && t.clearanceAt(x, z) < (d.type === 'raptor' ? 3.5 : 7)) return false;
-    // the hut / the team's base (shared/base.js safeZone): dinosaurs keep out
+    if (t.isCave && t.clearanceAt(x, z) < headRoom(d)) return false;
+    // the hut / the team's base (shared/base.js safeZone): dinosaurs keep out of the very ring in
+    // which players count as safe (inSafeZone), so no player stands where only they can strike
     const zone = this.world.safeZone();
-    if (zone && !d.raid && (x - zone.x) ** 2 + (z - zone.z) ** 2 < (zone.r + 10) ** 2) return false;
+    if (zone && !d.raid && (x - zone.x) ** 2 + (z - zone.z) ** 2 < (zone.r + SAFE_MARGIN) ** 2) return false;
     return Math.abs(x) < CONFIG.world.size / 2 - 20 && Math.abs(z) < CONFIG.world.size / 2 - 20;
   }
 
@@ -504,6 +510,7 @@ export class DinoSystem {
     d.avoidSide = -(d.avoidSide || 1);
     d.wander = null;
     d.route = null;
+    d.search = null;
     BRAINS[d.type].onStuck?.(d, this);
   }
 
@@ -553,7 +560,14 @@ export class DinoSystem {
       ox = d.x - Math.sin(d.yaw) * front; oz = d.z - Math.cos(d.yaw) * front;
     }
     const y = p.y + 1;
-    return segmentColliders(ox, y, oz, p.x, y, p.z, this.colliders, this.world.layout.groundAt) < 0;
+    if (segmentColliders(ox, y, oz, p.x, y, p.z, this.colliders, this.world.layout.groundAt) >= 0) return false;
+    // a ridge crest or a boulder between them (segmentColliders leaves rocks and the ground out)
+    const oy = Math.max(y, (d.y ?? this.terrain.heightAt(ox, oz)) + 1);
+    for (let i = 1; i < 8; i++) {
+      const k = i / 8;
+      if (this.terrain.heightAt(ox + (p.x - ox) * k, oz + (p.z - oz) * k) > oy + (y - oy) * k + 0.3) return false;
+    }
+    return !occluderBlocked({ x: ox, y: oy, z: oz }, { x: p.x, y, z: p.z }, this.world.layout, true);
   }
 
   /** Damage + knockback away from `origin` (default: the animal's centre; a tail uses its hip pivot). */
@@ -576,8 +590,11 @@ export class DinoSystem {
   inSafeZone(p, d = null) {
     if (d?.raid) return false;
     const zone = this.world.safeZone();
-    return !!zone && (p.x - zone.x) ** 2 + (p.z - zone.z) ** 2 < (zone.r + 6) ** 2;
+    return !!zone && (p.x - zone.x) ** 2 + (p.z - zone.z) ** 2 < (zone.r + SAFE_MARGIN) ** 2;
   }
+
+  /** A player made a noise at (x, z) heard `radius` m away by an ordinary ear (ai/senses.js NOISE). */
+  noise(x, z, radius, kind, by) { hear(this, x, z, radius, kind, by); }
 
   /** Call/roar with a per-animal cooldown so re-targeting never spams sound. */
   roar(d, cooldown = 5) {
@@ -586,9 +603,10 @@ export class DinoSystem {
     this.world.event(EV.ROAR, { id: d.id });
   }
 
-  randomWalkablePoint(d, cx, cz, radius, tries = 20) {
+  /** `rnd`: the random source (the senses pass the seeded `world.aiRng`). */
+  randomWalkablePoint(d, cx, cz, radius, tries = 20, rnd = Math.random) {
     for (let i = 0; i < tries; i++) {
-      const a = Math.random() * Math.PI * 2, r = Math.sqrt(Math.random()) * radius;
+      const a = rnd() * Math.PI * 2, r = Math.sqrt(rnd()) * radius;
       const x = cx + Math.cos(a) * r, z = cz + Math.sin(a) * r;
       if (this.walkable(x, z, d) && !this.bodyBlocked(d, x, z, Math.atan2(-(x - (d.x ?? cx)), -(z - (d.z ?? cz))))) return { x, z };
     }
@@ -678,6 +696,7 @@ export class DinoSystem {
   update(dt) {
     const w = this.world;
     const T = CONFIG.tracks;
+    updateSenses(this, dt);   // what every animal sees, hears and remembers (ai/senses.js)
     for (let i = this.list.length - 1; i >= 0; i--) {
       const d = this.list[i];
       if (!d.alive) {
@@ -762,6 +781,7 @@ export class DinoSystem {
             d.trap = tr.id;
             d.stuckT = CONFIG.weapons.trap.holdTime * (d.type === 'trex' ? 0.4 : d.type === 'brachio' ? 0.8 : 1);
             w.event(EV.TRAP_SNAP, { id: tr.id, dino: d.id });
+            if (w.players.has(tr.owner)) this.noise(tr.x, tr.z, NOISE.trap.radius, 'trap', tr.owner);
             w.toast(`A ${CONFIG.dinos[d.type].name} is caught in a trap!`, 'trap');
             w.mission.onTrapCatch();
             this.damage(d, CONFIG.weapons.trap.damage, 'leg', tr.owner, 'trap');

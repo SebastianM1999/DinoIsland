@@ -282,6 +282,12 @@ export function campStations(layout, base, levelIndex) {
   return st;
 }
 
+/**
+ * Metres beyond the safe zone's `r` that belong to it: players within `r + SAFE_MARGIN` are left alone, and
+ * dinosaurs never set foot inside that same ring (sim/dinos.js walkable / inSafeZone).
+ */
+export const SAFE_MARGIN = 8;
+
 /** The area dinosaurs keep out of (and leave players alone in): { x, z, r } or null. */
 export function safeZone(layout, base, levelIndex) {
   const st = campStations(layout, base, levelIndex);

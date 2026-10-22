@@ -13,7 +13,7 @@ import { makeSampleResult } from '../src/client/models/firearms/reference/clips.
 function fixture(kind) {
   const d = { id: 2, type: 'raptor', x: 0, y: 0, z: -10, radius: 0.7, alive: true, hp: 70 };
   const p = { id: 1, alive: true, x: 0, y: 0, z: 0, yaw: 0, pitch: 0, eq: EQUIP.indexOf(kind), inv: { guns: gunInventory(), reloading: null }, nextFireAt: 0, mods: { reloadMul: 1 } };
-  const w = { now: 0, sendInv() {}, event() {}, hitPose: (dino) => dino, layout: { groundAt: () => 0, colliders: { circles: [], boxes: [] } },
+  const w = { now: 0, noises: [], sendInv() {}, event() {}, hitPose: (dino) => dino, playerNoise(q, kind) { this.noises.push([q.id, kind]); }, layout: { groundAt: () => 0, colliders: { circles: [], boxes: [] } },
     dinos: { get: id => id === d.id ? d : null, damage: (d, amount) => { d.hp -= amount; } } };
   const shot = { a: ACT.SHOT, kind, o: [0, CONFIG.player.eyeHeight, 0], dir: [0, 0, -1], dino: d.id, p: [0, CONFIG.player.eyeHeight, -10], zone: 'body' };
   return { w, p, d, shot };
@@ -24,6 +24,7 @@ for (const kind of ['pistol', 'rifle', 'mpx', 'sniper']) {
     gunAction(w, p, shot);
     assert.equal(d.hp, 70 - CONFIG.weapons[kind].damage);
     assert.equal(p.inv.guns[kind].loaded, CONFIG.weapons[kind].magazine - 1);
+    assert.deepEqual(w.noises, [[p.id, 'gun']], 'a shot is heard by the dinosaurs (ai/senses.js)');
     gunAction(w, p, shot); assert.equal(d.hp, 70 - CONFIG.weapons[kind].damage);
     w.now += CONFIG.weapons[kind].cooldown;
     gunAction(w, p, { ...shot, p: [10, CONFIG.player.eyeHeight, -10] });

@@ -1,6 +1,6 @@
 # Dino AI concept: smarter, more dangerous dinosaurs
 
-Status: design concept, nothing implemented. Each phase in section 5 becomes its own PR.
+Status: phase 1 (senses + memory) implemented, phases 2-4 open. Each phase in section 5 becomes its own PR.
 
 Goal: every species is dangerous and feels like it thinks. **Predators hunt on sight**. **Herbivores are
 defensive-aggressive**: they threaten you, then charge or fight back when you come too close or hurt the herd,
