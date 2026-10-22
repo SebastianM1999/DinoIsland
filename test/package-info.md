@@ -56,8 +56,10 @@ Grouped by the module area they mainly cover. Many simulation tests also check t
 - `dino-contact.test.js` — player-vs-dinosaur body contact (`resolveDinoContact`) and contact damage events.
 - `sump-lurker.test.js` — Sump Lurker config, flooded-spot-only spawning (never on levels 0-2), submerged lurk, edge lunge and drag back, staying near water, retreat when hurt, GLB clips (`sumpLurkerBrain`, fake pool terrain).
 - `crystal-plodder.test.js` — Crystal Plodder config, cave-only count, hall choice over the fixed map + variants 1-3 (`plodderChambers`), no stacking with gloom packs, peaceful until hurt/crowded, short charge, club sweep and hit-once strike.
-- `test-dinos.test.js` — test species registered on server and client, one each on island 1 only, peaceful ones ignore players until hit, predators hunt on sight.
-- `gloom-raptor.test.js` — Gloom Raptor config, noise hearing, cave-spot-only spawning, GLB clips.
+- `test-dinos.test.js` — test species registered on server and client, one each on island 1 only, peaceful ones ignore players until hit, predators hunt on sight (real world, senses then brain).
+- `gloom-raptor.test.js` — Gloom Raptor config, hearing a sprint but not a silent player, going to the noise spot (not the player), a torch seen from further in the cave and in the open, cave-spot-only spawning, GLB clips.
+- `dino-senses.test.js` — dinosaur perception (`ai/senses.js`) on a real world: view cone, heard behind its back via a real state packet, sight blocked by a hill, trunk, boulder and cave roof, Stalker and ash rain, gunshot earshot and the shot spot as memory, losing sight (predicted spot, search, giving up, forgetting), downed players never perceived or hurt (bite wind-up), switching to a reviver or leaving the body, no safe-zone dead ring, bites stopped by ridges and boulders, head room by species height, the per-tick ray cap with four players.
+- `sight-grid.test.js` — the occluder grid (`occluderBlocked`) equals the brute-force check over thousands of random and grid-aligned segments on every island's fixed map.
 - `raptor-fear.test.js` — raptor retreat/hesitation behaviour and raid raiders (`raptorBrain`, `raiderStep`).
 - `stego-tail.test.js` — stegosaurus tail sweep geometry and hits (`stegoBrain`, `tailSweep`).
 - `ptera-flight.test.js` — dead pteranodons fall with momentum and drop loot on impact (`DinoSystem`, `pteraBrain`).

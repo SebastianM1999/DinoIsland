@@ -8,7 +8,10 @@ import { DINO_TYPES, DS } from '../src/shared/protocol.js';
 import { XP_BY_TYPE } from '../src/shared/skills.js';
 import { LEVELS, levelDef } from '../src/shared/levels.js';
 import { ServerWorld } from '../src/sim/world.js';
-import { gloomRaptorBrain, noiseRadius, noticesLight } from '../src/sim/ai/gloomRaptor.js';
+import { gloomRaptorBrain } from '../src/sim/ai/gloomRaptor.js';
+import { updateSenses, LEVEL, levelOf } from '../src/sim/ai/senses.js';
+import { PF } from '../src/shared/protocol.js';
+import { lineBlocked } from '../src/shared/visibility.js';
 import { GLB_DINOS } from '../src/client/models/dino/glbCatalog.js';
 import { SPECIES } from '../src/client/entities/dinoViews.js';
 
@@ -19,10 +22,10 @@ test('gloom raptor config is sane and slightly tougher and faster than the rapto
   const R = CONFIG.dinos.raptor;
   assert.ok(DINO_TYPES.includes(TYPE));
   assert.ok(C.health > R.health && C.runSpeed > R.runSpeed && C.groupSize >= R.groupSize);
-  assert.ok(C.sightRadius < R.sightRadius, 'short sight');
-  assert.ok(C.hearingRadius > R.sightRadius, 'long hearing');
-  assert.ok(C.senseRadius > 0 && C.senseRadius < C.hearingRadius);
-  assert.ok(C.walkNoise < C.sprintNoise && C.sprintNoise < C.shotNoise, 'quiet < loud < gunfire');
+  const S = C.ai.senses, RS = R.ai.senses;
+  assert.ok(S.sightRange < RS.sightRange / 2, 'short sight');
+  assert.ok(S.hearing > RS.hearing, 'long hearing');
+  assert.ok(S.feel > RS.feel && S.feel < S.sightRange, 'feels what is close');
   for (const key of ['walkSpeed', 'runSpeed', 'turnRate', 'attackRange', 'attackDamage', 'attackCooldown', 'giveUpRadius', 'radius', 'respawn'])
     assert.ok(C[key] > 0, key);
   assert.ok(C.loot && C.butcher && C.body.length > 0);
@@ -77,36 +80,72 @@ test('packs spawn only where the layout lists caveDinoSpots, never on the existi
   assert.equal(gloom.length, 5, 'packs of 2 and 3');
 });
 
-test('gloom raptors notice players by noise, not by sight', () => {
-  const now = 100;
-  const quiet = { spd: 0, sprinting: false, mods: { stalkerMul: 1 } };
-  const walker = { spd: 3, sprinting: false, mods: { stalkerMul: 1 } };
-  const sprinter = { spd: 7, sprinting: true, mods: { stalkerMul: 1 } };
-  const shooter = { spd: 0, sprinting: false, lastShotAt: now - 1, mods: { stalkerMul: 1 } };
-  assert.equal(noiseRadius(quiet, now), 0);
-  assert.ok(noiseRadius(walker, now) > 0 && noiseRadius(walker, now) < noiseRadius(sprinter, now));
-  assert.ok(noiseRadius(shooter, now) > noiseRadius(sprinter, now));
-  assert.equal(noiseRadius({ ...shooter, lastShotAt: now - 10 }, now), 0, 'a shot is forgotten after a few seconds');
-  assert.equal(noiseRadius({ ...sprinter, mods: { stalkerMul: 0.5 } }, now), noiseRadius(sprinter, now) / 2, 'Stalker hushes the noise');
-  assert.equal(noticesLight({}, {}), false, 'the light hook is a no-op until the torch exists');
-});
-
-test('a pack goes for a sprinting player it hears but ignores a silent one at the same distance', () => {
+/** A gloom pack of one, `dist` m from the player in clear view, facing away from them (`face()` turns it round). */
+function gloomBehind(dist) {
   const world = new ServerWorld({ send() {} }, { variant: 1 });
   const { id } = world.join('Gloom tester');
   const p = world.players.get(id), sys = world.dinos;
+  for (const d of [...sys.list]) sys.remove(d);
   sys.inSafeZone = () => false;
+  // out on open ground, well away from the camp (dinosaurs keep out of its safe ring)
+  const zone = world.safeZone();
+  const spot = sys.findFreeSpot({ type: TYPE, radius: 2 }, zone.x + 70, zone.z, { maxDist: 40 });
+  p.x = spot.x; p.z = spot.z; p.y = world.terrain.heightAt(p.x, p.z);
   sys.groups.set('g', { home: { x: p.x, z: p.z }, target: null, wander: null, wanderT: 0 });
+  // a direction in which nothing (ground, trunk, rock) stands between them
+  let a = 0;
+  for (; a < Math.PI * 2; a += Math.PI / 16) {
+    const x = p.x + Math.cos(a) * dist, z = p.z + Math.sin(a) * dist, y = world.terrain.heightAt(x, z);
+    if (sys.walkable(x, z, { type: TYPE }) && !lineBlocked({ x, y: y + 1.8, z }, { x: p.x, y: p.y + 1.2, z: p.z }, world.terrain, world.layout)) break;
+  }
   const d = sys.spawn(TYPE, p.x, p.z, { group: 'g', slot: 0 });
-  d.x = p.x + 30; d.z = p.z;
-  sys.steer = () => {}; sys.halt = () => {};
+  d.x = p.x + Math.cos(a) * dist; d.z = p.z + Math.sin(a) * dist; d.y = world.terrain.heightAt(d.x, d.z);
+  d.yaw = Math.atan2(-Math.cos(a), -Math.sin(a));   // looking away: the player is behind it
+  const face = () => { d.yaw = Math.atan2(Math.cos(a), Math.sin(a)); };
+  const goals = [];
+  sys.steer = (_, x, z) => { goals.push({ x, z }); return 0; };
+  sys.halt = () => {};
+  const tick = (n = 1) => { for (let k = 0; k < n; k++) { world.now += 0.05; updateSenses(sys, 0.05); gloomRaptorBrain.update(d, sys, 0.05); } };
+  return { world, p, d, sys, goals, tick, face };
+}
+
+test('a pack goes for a sprinting player it hears but ignores a silent one at the same distance', () => {
+  const { world, p, d, sys, tick } = gloomBehind(30);
   p.spd = 0; p.sprinting = false;
-  gloomRaptorBrain.update(d, sys, 0.05);
+  tick(20);
   assert.equal(sys.groups.get('g').target, null, 'silent player at 30 m is not noticed');
-  p.spd = 7; p.sprinting = true;
-  gloomRaptorBrain.update(d, sys, 0.05);
-  assert.equal(sys.groups.get('g').target, id, 'sprinting player at 30 m is heard');
+  for (let k = 0; k < 2; k++) { world.playerNoise(p, 'sprint'); tick(11); }   // (one noise every half second)
+  assert.equal(sys.groups.get('g').target, p.id, 'sprinting player at 30 m is heard');
   assert.ok(d.fl & 1);
+});
+
+test('a heard noise sends the pack to the noise spot, not to where the player went', () => {
+  const { world, p, d, goals, tick } = gloomBehind(30);
+  const spot = { x: p.x, z: p.z };
+  world.playerNoise(p, 'gun');
+  tick();
+  p.x -= 12;   // the shooter slips away without a sound
+  tick(4);
+  const m = d.senses.memory.get(p.id);
+  assert.equal(m.how, 'heard');
+  assert.deepEqual([m.x, m.z], [spot.x, spot.z]);
+  const g = goals.at(-1);
+  assert.ok(Math.hypot(g.x - spot.x, g.z - spot.z) < 6, 'heads for the shot');
+  assert.ok(Math.hypot(g.x - p.x, g.z - p.z) > 6, 'not for the player');
+});
+
+test('a carried torch gives the player away from much further than the gloom raptor sees', () => {
+  // under the mountain's roof (a high ceiling everywhere) and out in the open
+  for (const [roof, dist] of [[true, C.ai.senses.sightRange * 1.8], [false, C.ai.senses.sightRange * 1.12]]) {
+    for (const torch of [false, true]) {
+      const { world, p, d, tick, face } = gloomBehind(dist);
+      if (roof) world.terrain.ceilingAt = () => 1e4;
+      face();   // looking at the player, who stands still
+      p.spd = 0; p.fl = torch ? PF.TORCH : 0;
+      tick(60);
+      assert.equal(levelOf(d, p.id) >= LEVEL.ALERT, torch, `${roof ? 'cave' : 'open'}: ${torch ? 'the torch is seen' : 'darkness hides the player'}`);
+    }
+  }
 });
 
 test('the GLB ships every clip the catalog names plus roar and hurt', async () => {

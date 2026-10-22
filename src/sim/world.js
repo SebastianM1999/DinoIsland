@@ -16,6 +16,7 @@ import { buildLayout } from '../shared/layout.js';
 import { MSG, ACT, EV, EQUIP, PF, OWNER_KEY } from '../shared/protocol.js';
 import { sanitizeProfile, creativeProfile, skillMods, progress, buy, canBuy, SKILL_IDS, MAX_XP, MAX_BONUS_POINTS, RELIC_XP, RELIC_POINTS, DASH } from '../shared/skills.js';
 import { DinoSystem } from './dinos.js';
+import { NOISE } from './ai/senses.js';
 import { Mission } from './mission.js';
 import { resolveCircle, penetration } from '../shared/collision.js';
 import { resolveDinoContact, DINO_CONTACT, dinoBodyCircles } from '../shared/dinoContact.js';
@@ -23,7 +24,7 @@ import { butcherTime, carcassLoot } from '../shared/dinoRank.js';
 import { makeRng } from '../shared/rng.js';
 import { lineBlocked, DINO_SIGHTING } from '../shared/visibility.js';
 import { sanitizeOutfit, sameOutfit } from '../shared/outfits.js';
-import { planIsland } from '../shared/island.js';
+import { planIsland, islandSeed } from '../shared/island.js';
 import { levelDef, LEVEL_COUNT } from '../shared/levels.js';
 import { TORCH, WALL_TORCH } from '../shared/torch.js';
 import { CAVE_WALK_MAX } from '../shared/caveField.js';
@@ -99,6 +100,8 @@ export class ServerWorld {
     this.variant = variant;
     this.terrain = new Terrain(planIsland(level, variant));
     this.layout = buildLayout(this.terrain);
+    // the dinosaurs' new AI layers draw from this (ai/senses.js), so a fixed island replays the same
+    this.aiRng = makeRng((islandSeed(level, variant) ^ 0x5eed) >>> 0);
     this.items = new Map();
     this.torchSpawns = [];
     this.traps = new Map();
@@ -552,6 +555,7 @@ export class ServerWorld {
     this.stopRevive(p);
     const t = P.reviveTime * p.mods.reviveTimeMul;
     p.reviving = { to: q.id, until: this.now + t };
+    this.playerNoise(p, 'revive', q.x, q.z);   // a predator nearby hears the rescue at the body
     this.event(EV.REVIVE, { id: q.id, by: p.id, to: q.id, secs: r2(t) });
   }
 
@@ -671,6 +675,17 @@ export class ServerWorld {
     if (!p.mods.bloodlust || !p.alive) return;
     this.healPlayer(p, p.mods.bloodlustHeal * p.maxHp);
     p.bloodlustUntil = this.now + p.mods.bloodlustTime;
+  }
+
+  /**
+   * Player `p` made a noise of `kind` (ai/senses.js NOISE) at its feet or at (x, z): dinosaurs in earshot
+   * hear it. Stalker hushes it; repeats within the kind's `every` seconds are one noise (automatic fire).
+   */
+  playerNoise(p, kind, x = p.x, z = p.z) {
+    const n = NOISE[kind], at = (p.noiseAt ??= {});
+    if (this.now - (at[kind] ?? -99) < n.every) return;
+    at[kind] = this.now;
+    this.dinos.noise(x, z, n.radius * (p.mods?.stalkerMul ?? 1), kind, p.id);
   }
 
   /** Dinosaurs see this much of their usual range (the volcano's ash rain). */
@@ -1005,6 +1020,8 @@ export class ServerWorld {
       p.lastSprintAt = at;
     } else p.sprinting = false;
     if (!historical) {
+      if (p.sprinting) this.playerNoise(p, 'sprint');
+      else if (p.spd > 0.6) this.playerNoise(p, 'walk');
       this.resolvePlayerDinos(p, previous);
       const h = (p.stateHistory ??= []);
       h.push({ s: p.lastSeq, at, epoch: p.epoch, x: p.x, y: p.y, z: p.z, yaw: p.yaw, pitch: p.pitch,
@@ -1154,6 +1171,7 @@ export class ServerWorld {
         const pose = this.hitPose(d, m.rt);
         if (!this.validMeleeHit(p, d, m.p, pose)) return;
         p.nextMeleeAt = this.now + W.spear.cooldown;
+        this.playerNoise(p, 'melee');
         this.dinos.damage(d, W.spear.damage * (1 + this.mods().spearDamage), plausibleZone(d, pose, m.p, m.zone), p.id, 'spear');   // skill multipliers: DinoSystem.damage
         inv.spearHealth = Math.max(0, (inv.spearHealth ?? W.spear.durability) - W.spear.useWear);
         if (!inv.spearHealth) { inv.spear = false; this.toast('Your spear broke - refill at the hut', 'spear', p.id); }
@@ -1183,7 +1201,7 @@ export class ServerWorld {
           inv.spear = false;
           inv.spearHealth = 0;
         }
-        p.lastShotAt = this.now;   // noise: blind cave dinosaurs hear shots (ai/gloomRaptor.js)
+        this.playerNoise(p, 'bow');   // a bow string or a throw (ai/senses.js)
         p.nextFireAt = this.now + (kind === 'spear' ? W.spear.throwCooldown * (1 + u.throwCooldown) : W.bow.cooldown);
         this.projectiles.set(`${p.id}:${m.pid}`, { kind, health, t: this.now, pw: Math.max(0, Math.min(1, Number(m.pw) || 0)), o: m.o.slice(), v: m.v.slice() });
         this.sendInv(p);

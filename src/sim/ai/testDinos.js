@@ -1,19 +1,18 @@
 // Test species (docs/newDinos): Triceratops, Ankylosaurus, Pachycephalosaurus, Dilophosaurus, Spinosaurus.
 // Their Blender models are in the game before their own behaviour is written, so each one runs the raptor's
 // pack brain (`packHunterBrain`) as a pack of one: wander round its home, chase, attack (plays the Attack clip),
-// back off. Predators notice players by sight; `peaceful` species (CONFIG) only fight back after a hit.
+// back off. Predators notice players with their senses (ai/senses.js); `peaceful` species (CONFIG) only fight back after a hit.
 // They spawn on a ring round the hut on islands whose `level.dinos` names them (island 1).
 
 import { CONFIG } from '../../shared/config.js';
-import { packHunterBrain, spawnPack } from './raptor.js';
+import { packHunterBrain, spawnPack, alertTarget } from './raptor.js';
 
 export const TEST_DINO_TYPES = ['triceratops', 'ankylosaurus', 'pachycephalosaurus', 'dilophosaurus', 'spinosaurus'];
 const RING = 45;              // metres from the hut, far enough that predators do not camp the camp
 
 function testBrain(type, index) {
   const C = CONFIG.dinos[type];
-  const acquire = C.peaceful ? () => null
-    : (d, sys) => sys.nearestPlayer(d, C.sightRadius * sys.world.sightMul(), (p) => !sys.inSafeZone(p));
+  const acquire = C.peaceful ? () => null : alertTarget;
   return {
     ...packHunterBrain(type, C, acquire),
     spawnInitial(sys) {

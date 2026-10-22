@@ -1,12 +1,26 @@
 // T-Rex: rare apex predator that creates danger and chaos. Patrols a long
-// loop, roars, chases players it sees for a limited time (a sprinting
-// player can escape; the hut is always safe), bites hard, then rests.
+// loop, stops and looks when something catches its eye, walks over to
+// noises it hears (a gunshot carries far), roars at players it sees and
+// chases them for a limited time (a sprinting player can escape, breaking
+// the line of sight makes it search where it lost you; the hut is always
+// safe), bites hard, then rests.
 
 import { CONFIG } from '../../shared/config.js';
 import { DS } from '../../shared/protocol.js';
+import { LEVEL, perceive, perceived, alarm, forget, afterDowned, searchGoal, senseSpec } from './senses.js';
 
 const C = CONFIG.dinos.trex;
+const SIGHT = senseSpec('trex').sightRange;
 const BITE_WINDUP = 0.45;
+
+/** Back to the patrol, resting a while before it hunts again. */
+function givesUp(d) {
+  d.mode = 'patrol';
+  d.modeT = 0;
+  d.targetId = null;
+  d.search = null;
+  d.rest = C.restTime;
+}
 
 export const trexBrain = {
   spawnInitial(sys) {
@@ -42,6 +56,7 @@ export const trexBrain = {
 
   onHurt(d, sys, byId) {
     const p = sys.world.players.get(byId);
+    alarm(d, sys, byId);
     if (!p || d.mode === 'chase' || d.mode === 'bite') return;
     d.targetId = byId;
     d.mode = 'roar';
@@ -56,19 +71,33 @@ export const trexBrain = {
     d.rest = Math.max(0, d.rest - dt);
     const pts = sys.world.layout.trexPatrol;
 
-    const target = d.targetId ? sys.world.players.get(d.targetId) : null;
-    const lost = !target || !target.alive || sys.inSafeZone(target);
+    // its target went down: it never finishes them off - a reviver it perceives, the next player, or nobody
+    if (d.targetId != null && sys.world.players.get(d.targetId)?.downed && d.mode !== 'bite') {
+      const next = afterDowned(d, sys, d.targetId);
+      if (next) d.targetId = next.id;
+      else givesUp(d);
+    }
+    const t = d.targetId != null ? perceived(d, sys, d.targetId) : null;
+    const target = t?.p ?? null;
+    const lost = !t;
 
     switch (d.mode) {
       case 'patrol': {
         d.fl &= ~1;
         if (d.rest <= 0) {
-          const p = sys.nearestPlayer(d, C.sightRadius * sys.world.sightMul(), (q) => !sys.inSafeZone(q));
+          const p = perceive(d, sys, LEVEL.ALERT);
           if (p) {
             d.targetId = p.id;
-            d.mode = 'roar';
             d.modeT = 0;
-            sys.roar(d);
+            if (p.seen) { d.mode = 'roar'; sys.roar(d); } else d.mode = 'investigate';
+            return;
+          }
+          // something caught its eye or ear: stop and look that way
+          const hunch = perceive(d, sys, LEVEL.SUSPICIOUS);
+          if (hunch) {
+            sys.halt(d, dt);
+            sys.turnTo(d, Math.atan2(-(hunch.x - d.x), -(hunch.z - d.z)), dt, C.turnRate);
+            d.st = DS.ALERT;
             return;
           }
         }
@@ -99,24 +128,42 @@ export const trexBrain = {
         }
         return;
       }
+      case 'investigate': {
+        // heard something: walk over to where the noise was and look round there
+        d.fl &= ~1;
+        if (lost) { givesUp(d); d.rest = 0; return; }
+        if (t.seen) { d.mode = 'roar'; d.modeT = 0; sys.roar(d); return; }
+        const goal = searchGoal(d, sys, t);
+        if (!goal) { forget(d, t.id); givesUp(d); d.rest = 0; return; }
+        sys.steer(d, goal.x, goal.z, C.walkSpeed * 1.6, dt);
+        d.st = DS.WALK;
+        return;
+      }
       case 'chase': {
         d.fl |= 1;
         d.chaseT += dt;
         // hiding between trees that are too close for its body works: it gives up
-        if (lost || d.chaseT > C.chaseTime || (d.blockedT || 0) > 3 || sys.distTo(d, target.x, target.z) > C.sightRadius * 1.6) {
+        if (lost || d.chaseT > C.chaseTime || (d.blockedT || 0) > 3 || sys.distTo(d, t.x, t.z) > SIGHT * 1.6) {
           if ((d.blockedT || 0) > 3) sys.roar(d);
           d.blockedT = 0;
-          d.mode = 'patrol';
-          d.modeT = 0;
-          d.targetId = null;
-          d.rest = C.restTime;
+          givesUp(d);
           return;
         }
+        if (!t.seen) {
+          // lost sight of you: where it saw you last, then around there
+          const goal = searchGoal(d, sys, t);
+          if (!goal) { forget(d, t.id); givesUp(d); return; }
+          sys.steer(d, goal.x, goal.z, t.age < 3 ? C.runSpeed * 0.85 : C.walkSpeed * 1.6, dt);
+          d.st = d.spd > C.walkSpeed * 1.3 ? DS.RUN : DS.WALK;
+          return;
+        }
+        d.search = null;
         const dist = sys.distTo(d, target.x, target.z);
         if (dist < C.biteRange && d.cool <= 0) {
           d.mode = 'bite';
           d.modeT = 0;
           d.bitten = false;
+          d.biteAt = target.id;
           sys.cue(d, target.id);
           return;
         }
@@ -130,8 +177,10 @@ export const trexBrain = {
         if (target) sys.turnTo(d, Math.atan2(-(target.x - d.x), -(target.z - d.z)), dt, C.turnRate * 2);
         if (!d.bitten && d.modeT > BITE_WINDUP) {
           d.bitten = true;
-          if (target && target.alive && sys.distTo(d, target.x, target.z) < C.biteRange + 1) {
-            sys.hitPlayer(d, target, C.biteDamage, C.knockback, 1);
+          // the live player, never a remembered spot (a bite on someone who went down meanwhile: hurtPlayer refuses)
+          const victim = sys.world.players.get(d.biteAt);
+          if (victim && sys.distTo(d, victim.x, victim.z) < C.biteRange + 1) {
+            sys.hitPlayer(d, victim, C.biteDamage, C.knockback, 1);
           }
         }
         if (d.modeT > 1.0) {
