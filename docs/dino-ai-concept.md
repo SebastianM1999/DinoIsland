@@ -4,7 +4,7 @@ Status: design concept, nothing implemented. Each phase in section 5 becomes its
 
 Goal: every species is dangerous and feels like it thinks. **Predators hunt on sight**. **Herbivores are
 defensive-aggressive**: they threaten you, then charge or fight back when you come too close or hurt the herd,
-but they do not chase far, so hunting them for meat stays possible.
+but they do not chase far.
 
 Ground rules that do not change:
 - The sim stays authoritative. All AI runs in `src/sim/` (Node server, Electron host, solo Web Worker); clients only
@@ -22,13 +22,12 @@ Ground rules that do not change:
 |---|---|---|
 | **Perception: sight cone + line of sight** | Stealth games (Thief, Splinter Cell, Far Cry "awareness meter") | A player is seen only inside a view cone, within range, with a clear line (`lineBlocked`). Distance, light, movement and the Stalker skill change how fast awareness grows instead of a yes/no circle. |
 | **Hearing as noise events** | Same family; the gloom raptor already does a cut-down version | The world emits noise *events* (`{x, z, radius, kind, t}`) for shots, sprinting, melee, trap snaps and falls. Every dino within the radius hears them, so a gunshot draws a T-Rex from far away. Events cost nothing between shots, unlike a per-tick loudness check. |
-| **Smell / wind** | Predator stalking behaviour; Far Cry and Hunt-style scent | A short radius that is longer downwind, and fresh meat or blood on a player extends it. It needs no raycast. Only a global wind vector is needed (the volcano's ash already blows on a wind). |
 | **Gradual awareness states** | Awareness meters | Per dino and player: `unaware → suspicious → alert → hunting`. Awareness rises with stimulus and decays without it, with hysteresis between thresholds. "Suspicious" is the window where a careful player can still back off, which makes the game fair. |
 | **Memory** | Standard last-known-position model (e.g. *F.E.A.R.*, *The Last of Us*) | `lastSeen {x, z, vx, vz, t}`. When sight is lost, the dino goes to the predicted spot and searches with expanding points, then forgets after a timeout. Breaking line of sight therefore matters, and hiding works. |
 | **Utility AI** | Dave Mark, *Behavioral Mathematics for Game AI*; GDC "Improving AI Decision Modeling Through Utility Theory" | Each option (graze, rest, investigate, stalk, chase, attack, threaten, defend herd, flee, search, regroup) gets a score from 0 to 1, built from response curves over needs (hunger, fear, own HP fraction, distance from home, pack size, target value). The best score wins, with a momentum bonus and a minimum commit time. It sits *on top of* the existing mode machines and picks which mode to enter. Behaviour trees and GOAP were considered and rejected: our brains already are small state machines, and a tree or a planner adds a runtime and authoring cost without a matching gain. |
 | **Reynolds steering** | Craig Reynolds, "Steering Behaviors for Autonomous Characters" (GDC 1999) | Seek and arrive already exist (`steer`). New: **pursue with lead** (aim at `p + v * t`, with `t` capped), evade, separation inside packs and herds, and orbiting a slot. These are targets fed into the existing `steer`, so collision, slopes, swimming and `#detour` / A* stay untouched. |
 | **Pack tactics** | Wolf hunts: approach, encircle, test, relay chase (Mech; Muro et al. 2011, "Wolf-pack hunting strategies emerge from simple rules", *Behavioural Processes*) and Doom (2016) attack tokens | **Surround slots** around the target, an **attack-token** budget (only N bite at once, the rest circle and feint), **roles** (a driver pushes from the front, flankers cut off the escape direction), **regroup** when the pack is split or hurt. Muro shows that two rules (close in to a safe distance, keep apart from packmates) already produce encirclement, which is our cheap fallback when slots are blocked. |
-| **Chase economics** | Optimal foraging / real predators: cheetahs and lions abandon most chases early | Commit while the expected gain (target weakness, meat carried, target alone) beats the cost (time, distance not closing, own HP, distance from home). Ambushers (sarcosuchus, sump lurker) commit once, then reset. This replaces fixed timers such as the T-Rex's `chaseTime`. |
+| **Chase economics** | Optimal foraging / real predators: cheetahs and lions abandon most chases early | Commit while the expected gain (target weakness, target alone) beats the cost (time, distance not closing, own HP, distance from home). Ambushers (sarcosuchus, sump lurker) commit once, then reset. This replaces fixed timers such as the T-Rex's `chaseTime`. |
 | **Co-op pacing director** | Michael Booth, "The AI Systems of Left 4 Dead" (2009) | One controller per world tracks how intense each player's last minutes were and limits how many predators may escalate from stalking to attacking at once. It also allows more pressure after quiet stretches. Four players are not swarmed, and one player still feels hunted. |
 
 ---
@@ -76,7 +75,7 @@ world.step(dt)
 Per dino, in `d.senses`:
 - `aware: Map<playerId, number>` with values from 0 to 1. Thresholds `suspicious`, `alert` and `hunting` come from
   config, with a gap between rising and falling thresholds.
-- `memory: Map<playerId, {x, z, vx, vz, t, how}>`. `how` is `'seen' | 'heard' | 'smelled' | 'told'`.
+- `memory: Map<playerId, {x, z, vx, vz, t, how}>`. `how` is `'seen' | 'heard' | 'told'`.
 - `noise: []`, the inbox filled by `world` noise events this tick.
 
 **Sight**, checked in order from cheap to expensive, stopping at the first fail:
@@ -92,10 +91,6 @@ sprinting (throttled to every 0.5 s per player), melee hits, trap snaps and dino
 A dino that hears a noise gets a jump in awareness and a memory entry with `how: 'heard'` at the noise position,
 **not** the player position. It investigates the spot and does not know where you went. The gloom raptor's `noiseRadius`
 becomes the first user of this event path, and `noticesLight` reads `carriesLight(p.fl)`.
-
-**Smell.** A radius check with no raycast, stretched downwind (`dot(windDir, toPlayer)`), and longer when a player
-carries meat (`p.inv.loot.meat`). It only raises awareness up to `suspicious`, so it pulls a predator closer to
-look, but never on its own starts an attack.
 
 **Memory and search.** When sight is lost, the dino moves to `lastSeen + v * min(2 s, age)`, then picks 3-5 search
 points with `randomWalkablePoint` in a radius that grows from 6 to 18 m. After `memoryTime` it forgets that player.
@@ -211,7 +206,7 @@ stay until the phase that replaces them deletes them.
 raptor: {
   // ... existing fields ...
   ai: {
-    senses: { sightRange: 34, fov: 1.4, hearing: 1, smell: 10, memoryTime: 20, gain: 1.2, decay: 0.25 },
+    senses: { sightRange: 34, fov: 1.4, hearing: 1, memoryTime: 20, gain: 1.2, decay: 0.25 },
     utility: { thinkRate: 3, momentum: 0.15, minCommit: 1.5, weights: { stalk: 1, chase: 1.1, attack: 1, regroup: 0.8 } },
     pack: { tokens: 2, ring: 4, regroupDist: 25, regroupHp: 0.35 },
     chase: { commitMin: 4, giveUpNoGain: 5, leash: 90 },
@@ -236,23 +231,23 @@ means any herd member taking damage. That sets the whole herd to at least `alert
 
 | Species | Role | Perception | Behaviour (target) | Changes from today |
 |---|---|---|---|---|
-| **Raptor** | Pack hunter | Cone 160°, sight 34 m, good hearing, smell 10 m | Stalks in cover while `suspicious`, calls the pack, surrounds with slots, bites in turns with tokens (2), feints, pursues with lead, searches last position, regroups when hurt | Replaces flank offset, live tracking and the fixed give-up radius |
+| **Raptor** | Pack hunter | Cone 160°, sight 34 m, good hearing | Stalks in cover while `suspicious`, calls the pack, surrounds with slots, bites in turns with tokens (2), feints, pursues with lead, searches last position, regroups when hurt | Replaces flank offset, live tracking and the fixed give-up radius |
 | **Gloom raptor** | Cave pack hunter | Nearly blind (12 m), hearing through noise events, torch light ×2 | As raptor with 1 token; strongly drawn to noise and torches, investigates the *noise spot*, fits low tunnels | Uses noise events; `noticesLight` live; head room from `height` (weakness 9) |
 | **T-Rex** | Lone apex | Cone 120°, sight 40 m, hears gunshots ~120 m | Patrols, investigates shots, roar + ground-shake telegraph before a charge, pursues with lead, pushes through thin trees, searches last position, chase economics instead of `chaseTime` | Noise events, memory/search, economics |
-| **Pteranodon** | Aerial opportunist | Wide cone from above, LOS from altitude | As today (dives, steals meat) but targets by utility with HP as a fraction, leads moving targets on the dive | Weakness 10 fixed; lead on dive |
+| **Pteranodon** | Aerial opportunist | Wide cone from above, LOS from altitude | As today (dives) but targets by utility with HP as a fraction, leads moving targets on the dive | Weakness 10 fixed; lead on dive |
 | **Alpha Sarcosuchus**, **Sump Lurker** | Ambushers | Water-edge sight + ripples (noise) | Unchanged mode machines; commit once, reset; may hear shots and reposition underwater | Senses only; bosses not under the director |
-| **Brachiosaurus** | Herd giant | Short cone, smell | Herd turns to face; threat: rear-up and roar at ~12 m; stomps at `closeRadius`; when a member is hurt, adults close ranks round the injured one while the herd drifts away; leash ~20 m | Escalation + herd memory; keeps its stomp |
+| **Brachiosaurus** | Herd giant | Short cone | Herd turns to face; threat: rear-up and roar at ~12 m; stomps at `closeRadius`; when a member is hurt, adults close ranks round the injured one while the herd drifts away; leash ~20 m | Escalation + herd memory; keeps its stomp |
 | **Triceratops** | Herd defender | Cone 140°, sight 25 m | Head-down threat with horn toss and ground paw at ~15 m; short charge (≤ 25 m leash, committed line, dodgeable); herd forms a front toward the threat | **Own brain** (`triceratops.js`), no raptor bites |
-| **Ankylosaurus** | Armoured tank | Poor sight 15 m, smell | Does not flee. Turns its rump, club swing (`makeTailSweep`) when close, a few steps' charge, very short leash (~10 m) | **Own brain** using `territorial.js` |
+| **Ankylosaurus** | Armoured tank | Poor sight 15 m | Does not flee. Turns its rump, club swing (`makeTailSweep`) when close, a few steps' charge, very short leash (~10 m) | **Own brain** using `territorial.js` |
 | **Pachycephalosaurus** | Skittish rammer | Cone 180°, sight 30 m, good hearing | Flighty: runs from a group, but a lone player who closes in gets a telegraphed head-butt charge with knockback; leash ~30 m | **Own brain** |
 | **Stegosaurus** | Territorial | As today, plus LOS | Current anger/charge/tail kept; anger now needs a perceived intruder; leash from its territory | Perception only |
-| **Crystal Plodder** | Cave herbivore | Smell, ripple noise | Current behaviour kept (never leaves its hall); torch light makes it notice from further | Perception only |
+| **Crystal Plodder** | Cave herbivore | Ripple noise | Current behaviour kept (never leaves its hall); torch light makes it notice from further | Perception only |
 | **Dilophosaurus** | Spitter | Cone 160°, sight 28 m | Keeps distance, frill display, blinding spit (projectile), retreats when rushed | Needs a projectile and client effect: **separate PR after phase 3** |
 | **Spinosaurus** | Water-edge ambusher | Sight 30 m, ripples | Waits at river and lake edges, lunges at players in or near water, short land chase | Reuses `aquatic.js`: **separate PR after phase 3** |
 
-Meat hunting stays viable because:
+Herbivore fights stay fair because:
 - Every herbivore strike is telegraphed (threat display, wind-up) and dodgeable by sprinting or side-stepping.
-- Leashes are short, so a hunter who backs off is safe.
+- Leashes are short, so a player who backs off is safe.
 - Ranged attacks from beyond the leash still work, but the herd **remembers** the shooter and drifts out of range
   instead of standing still. You have to stalk, not camp.
 
