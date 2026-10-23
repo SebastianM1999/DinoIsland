@@ -541,6 +541,16 @@ export const CONFIG = {
     },
   },
 
+  // Co-op pacing director (sim/ai/director.js, docs/dino-ai-concept.md 3.5). Hunt budget = base + perPlayer x (players - 1)
+  // predators in chase or attack at once (x relaxMul while relaxing, + quietBonus after quietAfter s below `quiet`).
+  // Intensity per player (0..1) decays over `decay` s and rises by damage x (lost HP / max HP), `downed` on going
+  // down and nearRate per second per hunting predator within `near` m; `peak` starts a peak held peakTime s, then
+  // the party relaxes at least relaxTime s.
+  ai: {
+    director: { base: 4, perPlayer: 1.5, relaxMul: 0.5, quietAfter: 60, quietBonus: 1, quiet: 0.1,
+      decay: 30, damage: 1.5, downed: 0.6, near: 20, nearRate: 0.02, peak: 0.7, peakTime: 8, relaxTime: 20 },
+  },
+
   tracks: {
     spacing: 2.6,            // meters between footprints
     maxPerDino: 60,

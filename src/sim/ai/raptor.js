@@ -57,6 +57,8 @@ const LEAVE = { dist: 25, time: 8 };
 const members = (sys, pack) => sys.list.filter((o) => o.group === pack.id && o.alive);
 /** A member without a token feints this often (per second, on average) and for this long. */
 const FEINT_RATE = 0.6, FEINT_TIME = 0.5;
+/** A pack hunter the director holds back keeps this far (m) from its target. */
+export const STALK_DIST = 14;
 const rand = (sys) => (sys.world.aiRng ?? Math.random)();
 
 /** `d` gives back its attack token (bite over, frightened, regrouping, target changed). */
@@ -180,9 +182,18 @@ export function packHunterBrain(type, species, acquire = alertTarget) {
         }
       }
 
+      if (!t) sys.director?.release(d);   // no target any more: its hunting place is free
+
       // --- hunt a target it does not see: where it was last, then search around there
       if (t && !t.seen) {
         d.fl |= 1;
+        // held back by the director: it does not search closer than the stalking distance, it looks that way
+        if (sys.director && !sys.director.canHunt(d, sys.world) && Math.hypot(t.x - d.x, t.z - d.z) < STALK_DIST) {
+          sys.halt(d, dt);
+          sys.turnTo(d, Math.atan2(-(t.x - d.x), -(t.z - d.z)), dt);
+          d.st = DS.ALERT;
+          return;
+        }
         const goal = searchGoal(d, sys, t);
         if (!goal) { forget(d, t.id); sys.halt(d, dt); d.st = DS.ALERT; return; }
         sys.steer(d, goal.x, goal.z, t.age < 3 ? C.runSpeed * 0.8 : C.walkSpeed * 1.5, dt);
@@ -197,6 +208,20 @@ export function packHunterBrain(type, species, acquire = alertTarget) {
         const target = t.p;
         const dist = sys.distTo(d, target.x, target.z);
         const all = members(sys, pack);
+        // over the director's hunt budget: it stalks (watches and follows at a distance) instead of closing in
+        if (sys.director && !sys.director.mayHunt(d, sys.world)) {
+          letGo(d, sys);
+          const goal = muroGoal(d, t, all, STALK_DIST, P.separation);
+          if (Math.hypot(goal.x - d.x, goal.z - d.z) > 1.5) {
+            sys.steer(d, goal.x, goal.z, C.walkSpeed * 1.5, dt);
+            d.st = DS.WALK;
+          } else {
+            sys.halt(d, dt);
+            sys.turnTo(d, Math.atan2(-(target.x - d.x), -(target.z - d.z)), dt);
+            d.st = DS.ALERT;
+          }
+          return;
+        }
         // strung out or badly hurt: fall back to the leader (or home), call, then come in again
         const rg = regroupPoint(sys, pack, all, P);
         if (rg) {
