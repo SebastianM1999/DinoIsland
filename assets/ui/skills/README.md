@@ -10,6 +10,16 @@ down uniformly to fit smaller windows. All skill tiles share one compact size;
 single tiles center under their tier, and labels center in their allotted space.
 Compact layouts reduce ornament before text.
 
+## Browser regression check
+
+Open the home skill preview, close it, then continue a saved solo expedition
+without reloading the page. Open Skills with K. The HUD stylesheet may arrive
+after the skill stylesheet in this route: tier gate SVGs must remain hidden,
+the level emblem must remain 1.25 em square, and tier labels must stay inside
+their compact header strips. Skill-specific SVG rules intentionally outrank
+the generic `.hud svg` rule regardless of stylesheet order. Also check a
+direct expedition start and a home-only preview.
+
 Created with the built-in ImageGen tool on 2026-10-23 from the user's attached
 skill-tree design reference. Encoded to WebP at quality 0.92 (450,364 bytes).
 The original generated PNG remains in the local Codex generated-images folder;
