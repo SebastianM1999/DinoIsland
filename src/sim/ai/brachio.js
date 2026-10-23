@@ -1,12 +1,33 @@
 // Brachiosaurus: peaceful, slow, lives in a small herd that wanders the
-// eastern meadows, grazes, and flees together when threatened.
+// eastern meadows, grazes, and flees together when threatened. A player it
+// notices coming close gets a threat display first (head high, bellow), then
+// the stomp; a hit on one animal puts the whole herd on to the attacker, and
+// while the herd drifts away the adults close ranks round the injured one.
 
 import { CONFIG } from '../../shared/config.js';
 import { DS } from '../../shared/protocol.js';
 import { GROVE, titanScale } from '../../shared/grove.js';
+import { LEVEL, perceive, alarm } from './senses.js';
 
 const C = CONFIG.dinos.brachio;
+const D = C.ai.defend;
 const PF_SPRINT = 1;
+
+/**
+ * Threat display: a player it sees inside `warn` m (but not yet at stomp distance) makes it stop, face them and
+ * bellow. Returns true while it displays.
+ */
+function threaten(d, sys, dt) {
+  const t = perceive(d, sys, LEVEL.ALERT);
+  if (!t?.seen) return false;
+  const dist = Math.hypot(t.x - d.x, t.z - d.z);
+  if (dist > D.warn * (d.scale || 1) || dist < C.closeRadius) return false;
+  sys.halt(d, dt);
+  sys.turnTo(d, Math.atan2(-(t.x - d.x), -(t.z - d.z)), dt, C.turnRate * 1.3);
+  d.st = DS.ROAR;
+  sys.roar(d, 6);
+  return true;
+}
 
 function herdOf(sys, d) {
   return sys.groups.get(d.group);
@@ -25,10 +46,15 @@ function defend(d, sys, dt) {
     if (!close) { d.fl &= ~1; return false; }
     d.defendT = C.defendTime * 0.6;
     d.targetId = close.id;
+    d.defendFrom = { x: d.x, z: d.z };
     sys.roar(d);
   }
+  d.defendFrom ??= { x: d.x, z: d.z };
   const p = sys.world.players.get(d.targetId);
-  if (!p || !p.alive || sys.inSafeZone(p) || sys.distTo(d, p.x, p.z) > C.defendRange * 1.6) {
+  // leash: it never follows further than `leash` m from where the defence began
+  if (!p || !p.alive || sys.inSafeZone(p) || sys.distTo(d, p.x, p.z) > C.defendRange * 1.6
+    || Math.hypot(p.x - d.defendFrom.x, p.z - d.defendFrom.z) > D.leash * (d.scale || 1)) {
+    d.defendFrom = null;
     d.defendT = 0;
     d.stompT = -1;
     d.fl &= ~1;
@@ -142,8 +168,13 @@ export const brachioBrain = {
     const p = sys.world.players.get(byId);
     if (!herd) return;
     if (herd.panic <= 0) sys.roar(d);   // alarm bellow
+    // herd memory: the whole herd knows who did it and where they stood
+    for (const o of sys.list) if (o.group === d.group && o.alive) alarm(o, sys, byId);
+    herd.injured = d.id;
+    herd.injuredAt = sys.world.now;
     // An attacker close by gets stomped; from far away the herd just flees.
     if (p && sys.distTo(d, p.x, p.z) < C.defendRange) {
+      if (!(d.defendT > 0)) d.defendFrom = { x: d.x, z: d.z };
       d.defendT = C.defendTime;
       d.targetId = byId;
     }
@@ -190,10 +221,19 @@ export const brachioBrain = {
     }
 
     const panic = herd.panic > 0;
-    // Followers keep formation around the leader (behind and to the side).
+    if (!panic && threaten(d, sys, dt)) return;
+    // Followers keep formation around the leader (behind and to the side); while the herd flees from a hit, the
+    // others close ranks round the injured animal, on the side the threat came from.
+    const injured = panic && herd.injured !== d.id && sys.world.now - (herd.injuredAt ?? -Infinity) < D.injured
+      ? sys.list.find((o) => o.id === herd.injured && o.alive && o.group === d.group) : null;
     let tx, tz;
     if (isLeader) {
       tx = herd.target?.x ?? d.x; tz = herd.target?.z ?? d.z;
+    } else if (injured && herd.threat) {
+      const ux = herd.threat.x - injured.x, uz = herd.threat.z - injured.z, l = Math.hypot(ux, uz) || 1;
+      const side = d.slot % 2 ? 1 : -1;
+      tx = injured.x + (ux / l) * 6 - (uz / l) * side * 5;
+      tz = injured.z + (uz / l) * 6 + (ux / l) * side * 5;
     } else {
       const side = d.slot % 2 ? 1 : -1;
       const back = 7 + d.slot * 3;

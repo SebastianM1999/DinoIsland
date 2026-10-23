@@ -63,7 +63,22 @@ function climb(d, cooldown = C.attackCooldown) {
   d.cool = cooldown;
 }
 
-function pickTarget(sys, d) {
+/** Seconds of lead on a dive, at most (and never more than the time to arrive). */
+export const LEAD_MAX = 0.6;
+
+/** Offset from the target to aim the dive at: its velocity (from the last two ticks) times the time to arrive. */
+export function diveLead(d, p, dt) {
+  const prev = d.leadPrev;
+  d.leadPrev = { id: p.id, x: p.x, z: p.z };
+  if (!prev || prev.id !== p.id || !(dt > 0)) return { x: 0, z: 0 };
+  let vx = (p.x - prev.x) / dt, vz = (p.z - prev.z) / dt;
+  const sp = Math.hypot(vx, vz);
+  if (sp > 12) { vx *= 12 / sp; vz *= 12 / sp; }   // a teleport (respawn, knockback) is not a run
+  const time = Math.min(LEAD_MAX, Math.hypot(p.x - d.x, p.y - d.y, p.z - d.z) / C.diveSpeed);
+  return { x: vx * time, z: vz * time };
+}
+
+export function pickTarget(sys, d) {
   const area = d.area;
   let best = null, bestScore = 0;
   for (const p of sys.world.players.values()) {
@@ -74,7 +89,8 @@ function pickTarget(sys, d) {
     if (dist > notice && near > notice) continue;
     let alone = true;
     for (const q of sys.world.players.values()) if (q !== p && q.alive && Math.hypot(q.x - p.x, q.z - p.z) < 14) alone = false;
-    let score = 1 + (alone ? 2 : 0) + (p.hp < 50 ? 2 : 0) + (p.inv.loot.meat > 0 ? 3 : 0) - near / 80;
+    // injured counts as a fraction of the player's own max HP (Thick Skin raises it)
+    let score = 1 + (alone ? 2 : 0) + (p.hp / (p.maxHp || 100) < 0.5 ? 2 : 0) + (p.inv.loot.meat > 0 ? 3 : 0) - near / 80;
     if (score > bestScore) { bestScore = score; best = p; }
   }
   return best;
@@ -134,6 +150,7 @@ export const pteraBrain = {
           const p = pickTarget(sys, d);
           if (p) {
             d.targetId = p.id;
+            d.leadPrev = null;
             d.mode = 'dive';
             d.modeT = 0;
             sys.roar(d);
@@ -145,8 +162,9 @@ export const pteraBrain = {
         d.st = DS.DIVE;
         const p = sys.world.players.get(d.targetId);
         if (!p || !p.alive || sys.inSafeZone(p, d) || d.modeT > 7) { climb(d, 4); break; }
-        // lead the target a little
-        const dist = flyTo(sys, d, p.x, p.y + 1.0, p.z, C.diveSpeed, dt, 3.2);
+        // lead the target a little: aim where it will be when the dive arrives (capped, a juke still works)
+        const lead = diveLead(d, p, dt);
+        const dist = flyTo(sys, d, p.x + lead.x, p.y + 1.0, p.z + lead.z, C.diveSpeed, dt, 3.2);
         if (dist < 2.3) {
           sys.hitPlayer(d, p, C.diveDamage, C.knockback, 1);
           sys.cue(d, p.id);

@@ -1,17 +1,43 @@
 // T-Rex: rare apex predator that creates danger and chaos. Patrols a long
 // loop, stops and looks when something catches its eye, walks over to
 // noises it hears (a gunshot carries far), roars at players it sees and
-// chases them for a limited time (a sprinting player can escape, breaking
+// chases them while the chase pays (a sprinting player can escape, breaking
 // the line of sight makes it search where it lost you; the hut is always
 // safe), bites hard, then rests.
 
 import { CONFIG } from '../../shared/config.js';
 import { DS } from '../../shared/protocol.js';
 import { LEVEL, perceive, perceived, alarm, forget, afterDowned, searchGoal, senseSpec } from './senses.js';
+import { curve, score } from './utility.js';
 
 const C = CONFIG.dinos.trex;
 const SIGHT = senseSpec('trex').sightRange;
+const E = C.ai.chase;
 const BITE_WINDUP = 0.45;
+/** Another player this close to the target: it is not alone (a lone target is worth a longer chase). */
+const ALONE = 14;
+
+/**
+ * Chase economics (docs/dino-ai-concept.md 1, "chase economics"): how much the chase it sees is still worth,
+ * 0..1. It drops while the gap does not close (allowed longer for a weak or lone target), the further it is
+ * from where the chase began (`leash`) and the more hurt the T-Rex is. Below `E.worth` after `E.commitMin` s
+ * it gives up; this replaces a fixed chase timer.
+ */
+export function chaseWorth(d, sys, t, dt) {
+  const c = d.chase ??= { x: d.x, z: d.z, best: Infinity, stall: 0 };
+  const dist = Math.hypot(t.x - d.x, t.z - d.z);
+  if (dist < c.best - 0.5) { c.best = dist; c.stall = 0; } else c.stall += dt;
+  const p = t.p;
+  const weak = p?.maxHp ? 1 - p.hp / p.maxHp : 0;
+  let alone = true;
+  for (const q of sys.world.players.values()) if (q !== p && q.alive && Math.hypot(q.x - t.x, q.z - t.z) < ALONE) alone = false;
+  const allow = E.giveUpNoGain * (1 + 0.6 * weak + (alone ? 0.3 : 0));
+  return score([
+    curve.inv(c.stall, allow * 0.4, allow),
+    curve.inv(Math.hypot(d.x - c.x, d.z - c.z), E.leash * 0.6, E.leash),
+    curve.linear(d.hp / (d.maxHp || 1), 0.1, 0.35),
+  ]);
+}
 
 /** Back to the patrol, resting a while before it hunts again. */
 function givesUp(d) {
@@ -19,6 +45,7 @@ function givesUp(d) {
   d.modeT = 0;
   d.targetId = null;
   d.search = null;
+  d.chase = null;
   d.rest = C.restTime;
 }
 
@@ -125,6 +152,7 @@ export const trexBrain = {
           d.mode = d.mode === 'roar' && !lost ? 'chase' : 'patrol';
           d.modeT = 0;
           d.chaseT = 0;
+          d.chase = null;
         }
         return;
       }
@@ -141,9 +169,11 @@ export const trexBrain = {
       }
       case 'chase': {
         d.fl |= 1;
-        d.chaseT += dt;
-        // hiding between trees that are too close for its body works: it gives up
-        if (lost || d.chaseT > C.chaseTime || (d.blockedT || 0) > 3 || sys.distTo(d, t.x, t.z) > SIGHT * 1.6) {
+        d.chaseT = (d.chaseT || 0) + dt;
+        // a chase that no longer pays (gap not closing, too far from where it began, badly hurt) is dropped;
+        // hiding between trees that are too close for its body works too
+        const worth = t?.seen ? chaseWorth(d, sys, t, dt) : 1;
+        if (lost || (d.chaseT > E.commitMin && worth < E.worth) || (d.blockedT || 0) > 3 || sys.distTo(d, t.x, t.z) > SIGHT * 1.6) {
           if ((d.blockedT || 0) > 3) sys.roar(d);
           d.blockedT = 0;
           givesUp(d);

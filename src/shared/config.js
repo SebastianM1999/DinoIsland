@@ -283,6 +283,12 @@ export const CONFIG = {
       loot: { meat: 4, hide: 2 },
       butcher: { loot: { bones: 6, skull: 1 } },   // knife (V) on the carcass: what it gives on top of `loot` (time: shared/dinoRank.js)
       respawn: 120,
+      // short cone; `defend`: a noticed player within `warn` m gets the threat display (head high, bellow) before the
+      // stomp at closeRadius; a defending animal stops following past `leash` m from where the defence began
+      ai: {
+        senses: { sightRange: 20, fov: 1, hearing: 1, memoryTime: 20, gain: 1, decay: 0.2, feel: 7 },
+        defend: { warn: 12, leash: 20, injured: 10 },
+      },
     },
     stego: {
       name: 'Stegosaurus',
@@ -313,6 +319,8 @@ export const CONFIG = {
       loot: { meat: 2, hide: 1, plates: 2 },
       butcher: { loot: { bones: 4, skull: 1, plates: 1 } },
       respawn: 150,
+      // anger needs an intruder it noticed (sim/ai/senses.js); anything within `feel` m is noticed anyway
+      ai: { senses: { sightRange: 18, fov: 1.4, hearing: 1, memoryTime: 15, gain: 1.2, decay: 0.25, feel: 5 } },
     },
     raptor: {
       name: 'Velociraptor',
@@ -438,7 +446,6 @@ export const CONFIG = {
       runSpeed: 7.6,          // slower than a sprinting player – you can escape
       turnRate: 1.3,
       height: 5.919,
-      chaseTime: 14,
       restTime: 18,
       biteRange: 4.2,
       biteDamage: 45,
@@ -451,32 +458,62 @@ export const CONFIG = {
       butcher: { loot: { bones: 6, skull: 1, teeth: 2 } },
       respawn: 300,
       // narrower cone, hears gunshots from ~120 m (senses.js NOISE x hearing)
-      ai: { senses: { sightRange: 40, fov: 1.05, hearing: 2.2, memoryTime: 18, gain: 1.3, decay: 0.2, feel: 5 } },
+      ai: {
+        senses: { sightRange: 40, fov: 1.05, hearing: 2.2, memoryTime: 18, gain: 1.3, decay: 0.2, feel: 5 },
+        // chase economics: never gives up before commitMin s; the gap may stay open giveUpNoGain s (longer for a weak
+        // or lone target); worth falls toward 0 beyond leash m from where the chase began; it gives up below worth
+        chase: { commitMin: 4, giveUpNoGain: 5, leash: 90, worth: 0.3 },
+      },
     },
-    // Test species (docs/newDinos): the Blender models shown in the game before their own AI exists. They reuse the
-    // raptor's pack brain (sim/ai/testDinos.js); `peaceful` ones only fight back after a hit. Spawned on islands whose
-    // `level.dinos` names them (island 1). Footprints are rough estimates from the fitted model length.
+    // New island 1 species (docs/newDinos), spawned on a ring round the hut on islands whose `level.dinos` names them.
+    // Footprints are rough estimates from the fitted model length. The three herbivores are defensive
+    // (sim/ai/defender.js, docs/dino-ai-concept.md section 4): `ai.defend` = warn (threat display within m),
+    // strike (an intruder this close gets attacked), charge (an attacker this close gets charged), leash (m from
+    // where the threat began), calm (s a hit is remembered by the herd), territory (graze radius m), cooldown (s),
+    // run (the committed charge: wind-up s, speed m/s, max time s, contact reach m past the body, recover s).
+    // `ai.utility` (sim/ai/utility.js): think rate Hz, momentum, minimum commit s, option weights.
     triceratops: {
-      name: 'Triceratops', peaceful: true, health: 320, groupSize: 1,
+      name: 'Triceratops', health: 320, groupSize: 2,
       walkSpeed: 1.6, runSpeed: 7.5, turnRate: 1.6, height: 3.47,
-      attackRange: 3.6, attackDamage: 24, attackCooldown: 2.4, giveUpRadius: 40,
+      attackDamage: 24, knockback: 12,
       radius: 2.0, body: [[0, 1.2], [1.6, 1.0], [3.0, 0.6], [-1.6, 0.9], [-3.0, 0.4]],
       loot: { meat: 3, hide: 2 }, butcher: { loot: { bones: 4, skull: 1 } }, respawn: 150,
+      ai: {
+        senses: { sightRange: 25, fov: 1.22, hearing: 1, memoryTime: 20, gain: 1.2, decay: 0.2, feel: 4 },
+        utility: { thinkRate: 3, momentum: 0.15, minCommit: 1, weights: { strike: 1.1 } },
+        defend: { warn: 15, strike: 7, charge: 22, leash: 25, calm: 20, territory: 18, cooldown: 2.5,
+          run: { windup: 0.7, speed: 8, time: 2.6, reach: 1.6, recover: 0.8 } },
+      },
     },
     ankylosaurus: {
-      name: 'Ankylosaurus', peaceful: true, health: 380, groupSize: 1,
+      name: 'Ankylosaurus', health: 380, groupSize: 1,
       walkSpeed: 1.2, runSpeed: 5.0, turnRate: 1.4, height: 2.511,
-      attackRange: 3.8, attackDamage: 30, attackCooldown: 2.8, giveUpRadius: 40,
+      tailRange: 4.3, tailDamage: 30, tailKnockback: 13, chargeDamage: 12,
       radius: 1.7, body: [[0, 1.2], [1.3, 0.9], [2.4, 0.4], [-1.3, 0.9], [-2.6, 0.4]],
       loot: { meat: 3, hide: 2 }, butcher: { loot: { bones: 4, skull: 1 } }, respawn: 150,
+      ai: {
+        senses: { sightRange: 15, fov: 1.3, hearing: 1, memoryTime: 15, gain: 1, decay: 0.25, feel: 4 },
+        // never flees: it turns its rump and holds its ground
+        utility: { thinkRate: 3, momentum: 0.15, minCommit: 1, weights: { strike: 1.1, avoid: 0.6 } },
+        defend: { warn: 10, strike: 5, charge: 8, leash: 10, calm: 15, territory: 14, cooldown: 2.8,
+          run: { windup: 0.4, speed: 4.5, time: 0.9, reach: 1, recover: 0.4 } },
+      },
     },
     pachycephalosaurus: {
-      name: 'Pachycephalosaurus', peaceful: true, health: 140, groupSize: 1,
+      name: 'Pachycephalosaurus', health: 140, groupSize: 1,
       walkSpeed: 2.2, runSpeed: 7.8, turnRate: 2.6, height: 1.996,
-      attackRange: 2.4, attackDamage: 18, attackCooldown: 2.0, giveUpRadius: 45,
+      attackDamage: 18, knockback: 14,
       radius: 0.9, body: [[0, 0.55], [0.9, 0.4], [1.7, 0.3], [-1.0, 0.35]],
       loot: { meat: 2, hide: 1 }, butcher: { loot: { bones: 3, skull: 1 } }, respawn: 120,
+      ai: {
+        senses: { sightRange: 30, fov: 1.57, hearing: 1.5, memoryTime: 15, gain: 1.4, decay: 0.25, feel: 3 },
+        utility: { thinkRate: 4, momentum: 0.15, minCommit: 0.8, weights: { flee: 1.2 } },
+        // skittish: runs from two or more players, or below `flee.hp` of its health
+        defend: { warn: 18, strike: 9, charge: 20, leash: 30, calm: 15, territory: 20, cooldown: 2.5, flee: { hp: 0.35 },
+          run: { windup: 0.5, speed: 8, time: 2.2, reach: 2.4, recover: 0.2 } },
+      },
     },
+    // Predators without their own behaviour yet: the raptor's pack brain as a pack of one (sim/ai/testDinos.js).
     dilophosaurus: {
       name: 'Dilophosaurus', health: 110, groupSize: 1,
       walkSpeed: 2.8, runSpeed: 9.4, turnRate: 3.8, height: 3.083,
