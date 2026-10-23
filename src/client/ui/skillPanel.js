@@ -1,4 +1,4 @@
-// Skill tree panel (key K), in the style of the other HUD panels: level and XP, then
+// Illustrated expedition skill tree panel (key K): level and XP, then
 // Fighting / Endurance / Durability as three columns of icon tiles grouped by
 // tier. Hovering or focusing a tile shows what it does in the footer. Buying
 // sends one rank to the server (ACT.SKILL) and updates the view optimistically;
@@ -7,7 +7,6 @@
 
 import { buildSkillView, skillView, previewBuy, refundOf, xpTableText } from './skillModel.js';
 import { skillIcon, treeIcon, LOCK_ICON, TICK_ICON } from './skillIcons.js';
-import { icon } from './icons.js';
 import { freshProfile } from '../../shared/skills.js';
 
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -29,7 +28,7 @@ export class SkillPanel {
    * @param {{ onBuy?: (id: string) => void, onReset?: () => void, onClose: () => void, readOnly?: boolean, title?: string }} opts
    * readOnly: someone else's tree (the lobby): tiles explain, nothing is bought or reset; title: the heading.
    */
-  constructor({ onBuy, onReset, onClose, readOnly = false, title = 'Skills' }) {
+  constructor({ onBuy, onReset, onClose, readOnly = false, title = 'Skill tree' }) {
     ensureStylesheet();
     this.readOnly = readOnly;
     this.title = title;
@@ -44,7 +43,7 @@ export class SkillPanel {
     this.focusId = null;
     this.descId = `skill-description-${++panelSequence}`;
     this.el = document.createElement('section');
-    this.el.className = 'hud-panel hud-skills brush';
+    this.el.className = 'hud-panel hud-skills';
     this.el.setAttribute('aria-label', 'Skills');
     this.el.addEventListener('click', (e) => {
       const card = e.target.closest('[data-skill]');
@@ -59,7 +58,12 @@ export class SkillPanel {
     // hover on the tiles fills the footer; moving off a tile (onto the panel) shows the focused one / the hint again
     this.el.addEventListener('pointerover', (e) => this.#setHover('hoverId', e.target.closest?.('[data-skill]')?.dataset.skill ?? null));
     this.el.addEventListener('pointerleave', () => this.#setHover('hoverId', null));
-    this.el.addEventListener('focusin', (e) => this.#setHover('focusId', e.target.closest?.('[data-skill]')?.dataset.skill ?? null));
+    this.el.addEventListener('focusin', (e) => {
+      // Keyboard inspection takes over from a pointer left on another tile.
+      this.hoverId = null;
+      this.focusId = e.target.closest?.('[data-skill]')?.dataset.skill ?? null;
+      this.#updateDesc();
+    });
     this.el.addEventListener('focusout', (e) => { if (!e.relatedTarget?.closest?.('[data-skill]')) this.#setHover('focusId', null); });
   }
 
@@ -187,7 +191,7 @@ export class SkillPanel {
     const status = s.state === 'maxed' ? '<em class="sk-st is-max">Maxed</em>'
       : s.state === 'locked' ? `<em class="sk-st is-bad">${esc(s.reason)}</em>`
         : this.readOnly ? '' : `<em class="sk-st is-ok">Click to learn:${s.cost} point${s.cost > 1 ? 's' : ''}</em>`;
-    return `<b class="sk-d-name">${esc(s.name)}</b><span class="sk-d-rank">Rank ${s.rank}/${s.max}</span>${status}
+    return `<span class="sk-detail-disc sk-${s.tree}" aria-hidden="true">${skillIcon(s.id)}</span><b class="sk-d-name">${esc(s.name)}</b><span class="sk-d-rank">Rank ${s.rank}/${s.max}</span>${status}
       <span class="sk-d-line">${s.now ? `<i>Now</i> ${esc(s.now)}` : '<i>Now</i> Not learned yet'}</span>
       ${s.next ? `<span class="sk-d-line"><i>Next</i> ${esc(s.next)}</span>` : ''}`;
   }
@@ -219,27 +223,32 @@ export class SkillPanel {
       </section>`).join('');
     const resetLabel = this.confirming ? `Refund ${refund} point${refund === 1 ? '' : 's'} - confirm` : 'Reset skills';
     const resetOff = !this.atCamp || refund === 0 || !!this.view.creative;
-    // DOM/classes follow the other HUD panels: hud-panel-head + hud-panel-close, a craft-stockbar strip, wd-foot / wd-btn
+    // One illustrated panel is shared by the home preview, lobby and live HUD.
     this.el.innerHTML = `
-      <header class="hud-panel-head sk-head">
-        <h2>${icon('bolt')} ${esc(this.title)}</h2>
-        <span class="sk-level">Level ${v.level}${v.capped ? ' (max)' : ''}</span>
-        <span class="hud-panel-close">${this.readOnly ? '' : '<kbd>K</kbd> / '}<kbd>Esc</kbd> Close</span>
-      </header>
-      <div class="craft-stockbar sk-xprow" role="group" aria-label="Experience">
-        <span class="hud-bar-track sk-xpbar" role="progressbar" aria-valuemin="0" aria-valuemax="${v.need}" aria-valuenow="${v.into}"><span class="hud-bar-fill" style="transform:scaleX(${frac})"></span></span>
+      <header class="sk-head">
+        <div class="sk-heading"><h2>${treeIcon('endurance')} <span>${esc(this.title)}</span></h2>
+          <p class="sk-kicker">Prepare your expedition</p>
+          <p class="sk-intro">${this.readOnly ? 'Each expedition has its own level and skills. Earn points there and spend them at its camp.' : 'Forge your own path. Learn new skills, strengthen your explorer, and prepare for the hunt.'}</p>
+        </div>
+        <button type="button" class="sk-close-top" data-act="close" aria-label="Close skill tree" title="Close (Esc)">×</button>
+      <div class="sk-xprow" role="group" aria-label="Experience" title="${esc(xpTableText())}">
+        <span class="sk-xp-emblem" aria-hidden="true">${treeIcon('endurance')}</span>
+        <span class="sk-xpbar" role="progressbar" aria-label="Explorer experience" aria-valuemin="0" aria-valuemax="${v.need}" aria-valuenow="${v.into}"><span class="hud-bar-fill" style="transform:scaleX(${frac})"></span></span>
         <span class="sk-xpnum">${v.capped ? 'Max level' : `${v.into} / ${v.need} XP`}</span>
-        <span class="sk-free${v.free > 0 ? ' has-free' : ''}"><b>${v.free}</b> skill point${v.free === 1 ? '' : 's'} ${this.readOnly ? 'unspent' : 'to spend'}</span>
-        <p class="sk-xptable"><b>XP per kill:</b> ${esc(xpTableText())}</p>
       </div>
+      <div class="sk-progress">
+        <span class="sk-level">${treeIcon('endurance')} Level ${v.level}${v.capped ? ' (max)' : ''}</span>
+        <span class="sk-free${v.free > 0 ? ' has-free' : ''}"><b>${v.free}</b> skill point${v.free === 1 ? '' : 's'} ${this.readOnly ? 'unspent' : 'to spend'}</span>
+      </div>
+      </header>
       <div class="sk-cols">${cols}</div>
       <footer class="wd-foot sk-foot">
         <div class="sk-desc" id="${this.descId}" aria-live="polite">${this.#descHtml()}</div>
-        <div class="sk-actions">
+        <div class="sk-actions${this.confirming ? ' is-confirming' : ''}">
           ${this.readOnly ? '' : `${this.atCamp ? '' : '<span class="sk-note">Reset only at camp</span>'}
           ${this.confirming ? '<button type="button" class="wd-btn" data-act="cancel">Cancel</button>' : ''}
-          <button type="button" class="wd-btn${this.confirming ? ' sk-danger' : ''}" data-act="reset"${resetOff ? ' disabled' : ''} title="${this.atCamp ? 'Refund every spent point' : 'Only at camp'}">${resetLabel}</button>`}
-          <button type="button" class="wd-btn" data-act="close">Close</button>
+          <button type="button" class="wd-btn${this.confirming ? ' sk-danger' : ''}" data-act="reset"${resetOff ? ' disabled' : ''} title="${this.atCamp ? 'Refund every spent point' : 'Only at camp'}"><span aria-hidden="true">↶</span> ${resetLabel}</button>`}
+          <button type="button" class="wd-btn sk-close-btn" data-act="close"><span aria-hidden="true">×</span> Close</button>
         </div>
       </footer>`;
     const cols_ = this.el.querySelector('.sk-cols');

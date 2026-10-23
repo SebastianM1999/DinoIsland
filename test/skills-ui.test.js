@@ -4,6 +4,55 @@ import { Net } from '../src/client/net/net.js';
 import { MSG, EV } from '../src/shared/protocol.js';
 import { SKILL_IDS, SKILLS, TIER_GATE, freshProfile, progress, skillMods, MAX_XP, sanitizeProfile } from '../src/shared/skills.js';
 import { buildSkillView, skillView, tierLabel, tierGateText, previewBuy, refundOf, xpTableText, nearCamp, campStationPoints } from '../src/client/ui/skillModel.js';
+import { SkillPanel } from '../src/client/ui/skillPanel.js';
+
+// Only the event surface needed by the panel: layout is checked in a real browser.
+function withPanel(options, check) {
+  const previous = globalThis.document;
+  const events = {}, description = { innerHTML: '' };
+  const element = {
+    hidden: true, setAttribute() {},
+    addEventListener: (name, listener) => { events[name] = listener; },
+    querySelector: selector => selector === '.sk-desc' ? description : null,
+  };
+  globalThis.document = { activeElement: null, querySelector: () => ({}), createElement: () => element };
+  let panel;
+  try {
+    panel = new SkillPanel({ onClose() {}, ...options });
+    check({ panel, events, description });
+  } finally { panel?.dispose(); globalThis.document = previous; }
+}
+
+const tileTarget = id => ({ closest: selector => selector === '[data-skill]' ? { dataset: { skill: id }, focus() {} } : null });
+
+test('panel: keyboard inspection replaces the description of a stationary pointer', () => {
+  withPanel({}, ({ events, description }) => {
+    events.pointerover({ target: tileTarget('bruteForce') });
+    assert.match(description.innerHTML, /Brute Force/);
+    events.focusin({ target: tileTarget('weakSpot') });
+    assert.match(description.innerHTML, /Weak Spot/);
+    assert.match(description.innerHTML, /Spend 4 points in Fighting first/);
+    events.pointerover({ target: tileTarget('deepLungs') });
+    assert.match(description.innerHTML, /Deep Lungs/);
+  });
+});
+
+test('panel: the home and lobby preview inspect skills without spending points', () => {
+  let buys = 0;
+  withPanel({ readOnly: true, onBuy: () => buys++ }, ({ panel, events }) => {
+    events.click({ target: tileTarget('bruteForce') });
+    assert.equal(buys, 0);
+    assert.deepEqual(panel.view, freshProfile());
+  });
+});
+
+test('panel: close controls use the shared close callback', () => {
+  let closed = 0;
+  withPanel({ onClose: () => closed++ }, ({ events }) => {
+    events.click({ target: { closest: selector => selector === 'button' ? { dataset: { act: 'close' } } : null } });
+    assert.equal(closed, 1);
+  });
+});
 
 // ------------------------------------------------------------------ progression belongs to the expedition
 

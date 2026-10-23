@@ -159,29 +159,19 @@
 .tour-map-label { display: block; margin: 12px 0 4px; color: #d5dfc9; font-size: .8rem; }
 #tour-island { width: 100%; min-height: 44px; font: inherit; color: #fff1d0; background: #132b2de6; border: 1px solid #b3c6b7; border-radius: 5px; padding: 8px 12px; }
 #tour-island:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
-/* Same complete tree as in play, with a saved-build footer in the home menu. */
-#home-skills { justify-content: center; }
-.home-skills-card { width: min(1500px, 100%); height: 92dvh; max-height: 92dvh; display: flex; flex-direction: column; overflow: hidden; background: #152b2cf5; border: 1px solid #8d9e8b66; border-radius: 12px; padding: 20px; }
-.home-skills-card .home-dialog-head { flex: none; margin-bottom: 0; }
+/* The skill panel owns its illustrated header, tree and footer in both hosts. */
+#home-skills { padding: 0; justify-content: center; background: #102a24; }
+.home-skills-card { width: 100%; height: 100dvh; max-height: none; display: flex; flex-direction: column; overflow: hidden; background: transparent; border: 0; border-radius: 0; padding: 0; }
 .home-skills-mount { flex: 1; min-height: 0; }
-.home-skills-mount .hud-panel { position: static; inset: auto; transform: none; width: 100%; height: 100%; max-height: none; padding: 0; animation: none; }
-.home-skills-mount .sk-head { margin: 0 0 6px; justify-content: flex-end; }
-.home-skills-mount .sk-head h2 { display: none; }
-.home-skills-mount .hud-panel::before { display: none; }
-.home-skills-mount .sk-cols { overflow-y: auto; }
-.home-skills-mount .sk-foot { height: auto; min-height: 90px; }
-.home-skills-mount .sk-xptable { display: none; }
-.home-skills-mount .hud-panel-close { display: none; }
-.home-skills-help, .home-skills-status { color: #cad6c7; font-size: .9rem; margin: 8px 0 12px; }
+.home-skills-mount .hud-panel { position: relative; inset: auto; transform: none; width: 100%; height: 100%; max-height: none; animation: none; }
+.home-skills-status { color: #cad6c7; font-size: .9rem; margin: 8px 0 12px; }
 .home-skills-status:empty { display: none; }
-.home-skills-mount .sk-actions { flex-wrap: wrap; }
 @media (max-width: 900px) {
   #home-explorer-root .home-dialog-card { grid-template-columns: 1fr; }
   #home-explorer-root .home-explorer-stats { grid-template-columns: repeat(3, 1fr); gap: 10px; }
   #home-explorer-root .home-explorer-summary { border-right: 0; padding-right: 0; }
   #home-explorer-root .home-explorer-progress { margin-bottom: 4px; }
   #home-explorer-root .wd-body { grid-template-columns: minmax(150px, .65fr) minmax(0, 1fr); }
-  .home-skills-card { max-height: calc(100dvh - 40px); }
 }
 @media (max-width: 580px) {
   #home-explorer-root .wd-body { grid-template-columns: 1fr; }
