@@ -341,7 +341,12 @@ export const CONFIG = {
       respawn: 90,
       // perception (sim/ai/senses.js): sight range m, half view angle rad, hearing x noise radius, memory s,
       // awareness gained per second at the cone's centre up close / lost per second unseen, felt even unseen within `feel` m
-      ai: { senses: { sightRange: 34, fov: 1.4, hearing: 1.4, memoryTime: 20, gain: 1.6, decay: 0.25, feel: 3 } },
+      // pack tactics (sim/ai/pack.js): attack tokens per target (only this many bite at once), ring slots round the
+      // target, regroup when spread over regroupDist m or below regroupHp of the pack's health, pursuit lead s, spacing m
+      ai: {
+        senses: { sightRange: 34, fov: 1.4, hearing: 1.4, memoryTime: 20, gain: 1.6, decay: 0.25, feel: 3 },
+        pack: { tokens: 2, ring: 4, regroupDist: 25, regroupHp: 0.35, lead: 0.8, separation: 2.5 },
+      },
     },
     // Cave raptor kin (Hollow Mountain tunnels): blind, hunts by noise. Spawns only where the layout lists
     // `caveDinoSpots`; the per-level count is `level.dinos['gloom-raptor']`.
@@ -364,7 +369,11 @@ export const CONFIG = {
       respawn: 90,
       // nearly blind (short sight, shortened further by ash rain), long hearing, feels anything within 7 m;
       // a carried torch is seen from much further (senses.js LIGHT)
-      ai: { senses: { sightRange: 12, fov: 1.5, hearing: 2.5, memoryTime: 25, gain: 2, decay: 0.2, feel: 7 } },
+      ai: {
+        senses: { sightRange: 12, fov: 1.5, hearing: 2.5, memoryTime: 25, gain: 2, decay: 0.2, feel: 7 },
+        // one biter at a time in the dark tunnels
+        pack: { tokens: 1, ring: 4, regroupDist: 20, regroupHp: 0.35, lead: 0.6, separation: 2.5 },
+      },
     },
     // Cave ambusher of the flooded tunnels (Hollow Mountain): lies submerged, lunges at players who swim or stand at
     // the water's edge, drags back into the water. Not a boss: normal respawn, no phases. Spawns only at flooded

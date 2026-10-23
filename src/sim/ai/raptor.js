@@ -1,12 +1,16 @@
 // Velociraptor: fast, alert, aggressive pack hunter. Wanders its home
 // territory, spots players in its view cone (ai/senses.js), calls the pack,
-// chases and flanks them, bites and darts back (hit-and-run). A player who
-// breaks the line of sight is searched for where it was last seen.
+// surrounds them (ai/pack.js: ring slots, a driver from the front, one on the
+// escape side), bites in turns (attack tokens) while the others circle and
+// feint, and darts back after each bite (hit-and-run). A strung-out or badly
+// hurt pack regroups. A player who breaks the line of sight is searched for
+// where it was last seen.
 // Hits scare it off briefly; traps stop it.
 
 import { CONFIG } from '../../shared/config.js';
 import { DS } from '../../shared/protocol.js';
 import { LEVEL, perceive, perceived, share, alarm, forget, afterDowned, searchGoal } from './senses.js';
+import { packSpec, assignSlots, leadPoint, muroGoal, takeToken, tokenFree, dropToken, regroupPoint, ASSIGN_EVERY, RING_GAP } from './pack.js';
 
 const RAPTOR = CONFIG.dinos.raptor;
 const C = RAPTOR;
@@ -51,6 +55,23 @@ const SHARE_EVERY = 0.5;
 const LEAVE = { dist: 25, time: 8 };
 
 const members = (sys, pack) => sys.list.filter((o) => o.group === pack.id && o.alive);
+/** A member without a token feints this often (per second, on average) and for this long. */
+const FEINT_RATE = 0.6, FEINT_TIME = 0.5;
+const rand = (sys) => (sys.world.aiRng ?? Math.random)();
+
+/** `d` gives back its attack token (bite over, frightened, regrouping, target changed). */
+function letGo(d, sys) {
+  if (d.biting != null) dropToken(sys, d, d.biting);
+  d.biting = null;
+}
+
+/** The hunt is over (or moved on): forget the slot plan and the once-per-hunt regroup. */
+function endHunt(pack) {
+  pack.target = null;
+  pack.plan = null;
+  pack.hurtRegrouped = false;
+  pack.regroup = null;
+}
 
 /** The pack calls: whoever knows something about the target tells the others (ai/senses.js share). */
 function sharePack(sys, pack, from = null) {
@@ -77,6 +98,7 @@ function leaveBody(sys, pack, d, body) {
  */
 export function packHunterBrain(type, species, acquire = alertTarget) {
   const C = species;
+  const P = packSpec(type);
   return {
     respawn(sys, r) {
       const pack = sys.groups.get(r.group);
@@ -89,7 +111,8 @@ export function packHunterBrain(type, species, acquire = alertTarget) {
       d.cool = 0;
       d.retreat = 0;
       d.frightened = 0;
-      d.flank = (d.slot % 3 - 1) * 0.9;   // approach angle offset for pack flanking
+      d.feintT = 0;
+      d.biting = null;
     },
 
     /** Nudged free by the dino system: the pack wanders somewhere else. */
@@ -123,7 +146,9 @@ export function packHunterBrain(type, species, acquire = alertTarget) {
       pack.id ??= d.group;
       d.cool = Math.max(0, d.cool - dt);
       d.retreat = Math.max(0, d.retreat - dt);
-      if (updateRaptorFear(d, sys, dt, C)) return;
+      // the bite and the dart back are over: the token goes back to the pool
+      if (d.biting != null && d.retreat <= 0) letGo(d, sys);
+      if (updateRaptorFear(d, sys, dt, C)) { letGo(d, sys); return; }
 
       // validate / acquire the pack's target
       if (pack.target != null) {
@@ -132,9 +157,9 @@ export function packHunterBrain(type, species, acquire = alertTarget) {
           // down: never finish them off - go for whoever revives them, or the next player, or let the body be
           const next = afterDowned(d, sys, p.id);
           if (next) pack.target = next.id;
-          else { pack.target = null; leaveBody(sys, pack, d, p); }
+          else { endHunt(pack); leaveBody(sys, pack, d, p); }
         } else if (!p || !p.alive || sys.inSafeZone(p, d)) {
-          pack.target = null;
+          endHunt(pack);
         }
       }
       let t = null;
@@ -142,8 +167,8 @@ export function packHunterBrain(type, species, acquire = alertTarget) {
         sharePack(sys, pack);
         t = perceived(d, sys, pack.target);
         // nobody in the pack knows where it is any more, or it is too far from home: the hunt is over
-        if (t && sys.distTo(t, pack.home.x, pack.home.z) > C.giveUpRadius + 30) { pack.target = null; t = null; }
-        else if (!t && !members(sys, pack).some((o) => perceived(o, sys, pack.target))) pack.target = null;
+        if (t && sys.distTo(t, pack.home.x, pack.home.z) > C.giveUpRadius + 30) { endHunt(pack); t = null; }
+        else if (!t && !members(sys, pack).some((o) => perceived(o, sys, pack.target))) endHunt(pack);
       }
       if (pack.target == null) {
         const seen = acquire(d, sys);
@@ -165,12 +190,22 @@ export function packHunterBrain(type, species, acquire = alertTarget) {
         return;
       }
 
-      // --- chase
+      // --- chase (pack tactics, ai/pack.js)
       if (t) {
         d.fl |= 1;
         d.search = null;
         const target = t.p;
         const dist = sys.distTo(d, target.x, target.z);
+        const all = members(sys, pack);
+        // strung out or badly hurt: fall back to the leader (or home), call, then come in again
+        const rg = regroupPoint(sys, pack, all, P);
+        if (rg) {
+          letGo(d, sys);
+          if (rg.leader === d.id) sys.roar(d);
+          sys.steer(d, rg.x + Math.sin(d.slot * 2.1) * 3, rg.z + Math.cos(d.slot * 2.1) * 3, C.runSpeed * 0.8, dt);
+          d.st = DS.RUN;
+          return;
+        }
         if (d.retreat > 0) {
           // dart back after a bite
           const away = Math.atan2(d.x - target.x, d.z - target.z);
@@ -178,19 +213,54 @@ export function packHunterBrain(type, species, acquire = alertTarget) {
           d.st = DS.RUN;
           return;
         }
-        if (dist < C.attackRange + 0.4 && d.cool <= 0) {
+        // bites in turns: only the holders of the target's attack tokens may bite
+        if (dist < C.attackRange + 0.4 && d.cool <= 0 && takeToken(sys, d, t.id, P.tokens)) {
           d.st = DS.ATTACK;
           sys.halt(d, dt);
           sys.attackPlayer(d, target, C.attackDamage, 3.5);
           d.cool = C.attackCooldown + Math.random() * 0.5;
           d.retreat = RETREAT_TIME;
+          d.biting = t.id;
           return;
         }
-        // flank: approach from an angle offset per pack member
-        const base = Math.atan2(d.x - target.x, d.z - target.z) + d.flank * Math.min(1, dist / 12);
-        const r = dist > 6 ? Math.min(dist - 1, 3) : 0.8;
-        const tx = target.x + Math.sin(base) * r, tz = target.z + Math.cos(base) * r;
-        sys.steer(d, tx, tz, dist > 3 ? C.runSpeed : C.walkSpeed * 1.5, dt, C.turnRate * (dist < 5 ? 1.6 : 1));
+        // slots round the target, handed out every ASSIGN_EVERY s (deterministic by dino id)
+        const now = sys.world.now;
+        if (!pack.plan || now >= pack.planAt || pack.planFor !== t.id) {
+          pack.plan = assignSlots(sys, all, t, P, C.attackRange);
+          pack.planAt = now + ASSIGN_EVERY;
+          pack.planFor = t.id;
+        }
+        const slot = pack.plan.slots.get(d.id);
+        const ring = C.attackRange + RING_GAP;
+        const mayBite = d.cool <= 0 && tokenFree(sys, d, t.id, P.tokens);
+        let goal;
+        d.feintT = Math.max(0, (d.feintT ?? 0) - dt);
+        if (pack.plan.fallback || !slot) {
+          // no room for a ring: close in to the safe distance, keep apart from packmates
+          goal = muroGoal(d, t, all, mayBite ? 0 : ring, P.separation);
+        } else if (mayBite) {
+          // whoever may bite goes for where the target will be (pursuit with a capped lead)
+          goal = leadPoint(d, t, C.runSpeed, P.lead);
+          if (slot.role === 'driver') sys.roar(d, 8);
+        } else if (slot.role === 'driver') {
+          // the driver without a token keeps up the pressure from the front, at the ring's distance
+          goal = muroGoal(d, t, all, ring, P.separation);
+          sys.roar(d, 8);
+        } else if (d.feintT > 0) {
+          // feint: a short dash in and out (pressure without a pile-on)
+          goal = dist > C.attackRange + 1.2 ? { x: t.x, z: t.z } : { x: t.x + slot.dx, z: t.z + slot.dz };
+        } else {
+          goal = { x: t.x + slot.dx, z: t.z + slot.dz };
+          if (Math.hypot(goal.x - d.x, goal.z - d.z) < 1.5 && rand(sys) < dt * FEINT_RATE) d.feintT = FEINT_TIME;
+        }
+        const left = Math.hypot(goal.x - d.x, goal.z - d.z);
+        if (left < 0.6 && !mayBite) {
+          sys.halt(d, dt);
+          sys.turnTo(d, Math.atan2(-(target.x - d.x), -(target.z - d.z)), dt, C.turnRate * 1.6);
+          d.st = DS.ALERT;
+          return;
+        }
+        sys.steer(d, goal.x, goal.z, left > 3 || d.feintT > 0 ? C.runSpeed : C.walkSpeed * 1.5, dt, C.turnRate * (dist < 5 ? 1.6 : 1));
         d.st = d.spd > C.walkSpeed * 1.2 ? DS.RUN : DS.WALK;
         return;
       }

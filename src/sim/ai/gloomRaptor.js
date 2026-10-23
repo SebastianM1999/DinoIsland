@@ -1,5 +1,5 @@
 // Gloom Raptor: the cave-dwelling, nearly blind cousin of the Velociraptor. It lives in packs in the
-// tunnel maze of the "Hollow Mountain" level. The pack logic (wander, flank, hit-and-run, fear, search) is the
+// tunnel maze of the "Hollow Mountain" level. The pack logic (wander, surround, bite in turns, hit-and-run, fear, search) is the
 // raptor's (`packHunterBrain`); what differs is its senses (CONFIG ai.senses, ai/senses.js): a few metres of
 // sight, a long ear for noise events (it goes to where it heard the noise, not to where you went), anything
 // within 7 m is felt, and a carried torch is seen from much further off.

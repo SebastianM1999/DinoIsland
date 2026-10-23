@@ -136,7 +136,11 @@ export function perceived(d, sys, id) {
   if (!perceivable(sys, d, p)) return null;
   if (!senseSpec(d.type)) return { id, p, x: p.x, z: p.z, vx: 0, vz: 0, seen: true, age: 0, how: 'seen' };
   const s = sensesOf(d);
-  if (seesNow(d, sys, id)) return { id, p, x: p.x, z: p.z, vx: 0, vz: 0, seen: true, age: 0, how: 'seen' };
+  if (seesNow(d, sys, id)) {
+    // live position, and the velocity measured between its last two looks (pack slots and pursuit lead on it)
+    const m = s.memory.get(id);
+    return { id, p, x: p.x, z: p.z, vx: m?.vx ?? 0, vz: m?.vz ?? 0, seen: true, age: 0, how: 'seen' };
+  }
   const m = s.memory.get(id);
   if (!m) return null;
   const age = sys.world.now - m.t, lead = Math.min(2, age);

@@ -1,6 +1,6 @@
 # Dino AI concept: smarter, more dangerous dinosaurs
 
-Status: phase 1 (senses + memory) and phase 2 (utility + herbivore brains) implemented, phases 3-4 open. Each phase
+Status: phases 1-3 implemented (senses + memory, utility + herbivore brains, pack tactics), phase 4 open. Each phase
 in section 5 becomes its own PR. What was built differently from this plan is listed per phase in section 5.
 
 Goal: every species is dangerous and feels like it thinks. **Predators hunt on sight**. **Herbivores are
@@ -315,6 +315,15 @@ Tests:
 - The pack regroups below `regroupHp`.
 - Lead is capped (a player who juke-turns is not hit by a perfect prediction).
 - On a downed target, the pack's slots and tokens move to the reviver, and never more than `tokens` attack them.
+
+As built (`test/dino-pack.test.js`):
+- Tokens are per target island-wide (`sys.tokens`), not per pack, so two packs on one player share the budget.
+- The driver goes straight in when it may bite and otherwise holds the ring distance in front; ring members without a
+  token hold their slot (facing the target) and feint now and then. Slots are offsets that move with the target and
+  are reassigned every 0.5 s.
+- A slot on a slope is allowed (only water, cliffs and the camp drop it). The hurt regroup happens once per hunt;
+  regrouping for spread at most every 20 s.
+- `perceived` now carries the measured velocity while a player is seen (it was 0), for the escape slot and the lead.
 
 ### Phase 4: director
 Scope: `director.js`; intensity, budget and phases; bosses and raids excluded.
