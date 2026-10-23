@@ -31,7 +31,7 @@
 .sk-xpnum { white-space: nowrap; font-size: .85em; font-weight: 800; }
 .sk-progress { position: absolute; bottom: 2%; right: 2.8%; display: grid; justify-items: center; gap: .15em; }
 .sk-level { display: flex; align-items: center; gap: .6em; background: linear-gradient(#5d4723, #302d1a); border: 2px solid #f5c05d; border-radius: 1.5em; padding: .12em 1.3em; color: #ffe499; font-weight: 800; font-size: 1.25em; box-shadow: inset 0 2px #ffdb8c, 0 3px 0 #23392c; }
-.sk-level svg { width: 1.25em; height: 1.25em; }
+.hud-skills .sk-level svg { width: 1.25em; height: 1.25em; flex: none; }
 .sk-free { border: 2px solid #8bd7cf; border-radius: 2em; padding: .1em .9em; background: linear-gradient(#246964, #12443f); font-size: .85em; font-weight: 700; white-space: nowrap; }
 .sk-free b { color: #e2f7a6; }
 .sk-cols { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1.6%; margin: 0 2.4%; min-height: 0; }
@@ -49,7 +49,9 @@
 .sk-tierlabel { flex: none; border-radius: 2em; padding: .08em .6em; border: 1px solid #ffcf82; background: linear-gradient(#9b733e88, #51412d88); font-weight: 800; text-transform: uppercase; font-size: .92em; }
 .sk-gate { font-weight: 600; font-size: max(14px, .8em); white-space: nowrap; }
 .sk-tier:not(.is-locked) .sk-gate { color: #c0ec91; }
-.sk-gate svg, .sk-gate-track { display: none; }
+/* HUD styles can arrive again after a home/lobby preview. These rules must
+   outrank `.hud svg` regardless of stylesheet order. */
+.hud-skills .sk-gate svg, .hud-skills .sk-gate-track { display: none; }
 .sk-tiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-rows: minmax(0, 1fr); align-items: center; column-gap: .6em; padding: 0 .7em; min-height: 0; }
 .sk-tiles > :last-child:nth-child(odd) { grid-column: 1 / -1; width: calc((100% - .6em) / 2); justify-self: center; }
 .sk-tile { position: relative; display: grid; grid-template-columns: 3em minmax(0, 1fr); grid-template-rows: 1fr 1fr; gap: 0 .35em; align-items: center; height: calc(100% - .4em); max-height: 3.65em; min-width: 0; min-height: 0; padding: .25em .35em; border: 1px solid color-mix(in srgb, var(--ac) 65%, transparent); border-radius: 1.3em; background: linear-gradient(130deg, color-mix(in srgb, var(--dark) 83%, #eee), color-mix(in srgb, var(--dark) 80%, transparent)); color: #fff7e7; text-align: center; text-shadow: 0 2px 2px #000b; box-shadow: inset 0 1px 2px #ffffff2b, 0 2px 2px #06191555; }
