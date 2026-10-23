@@ -1,14 +1,9 @@
-# Skill tree artwork
+# Historical skill tree artwork
 
-`jungle-skill-tree.webp` is the decorative 1672 × 941 skin used by
-`css/skills.css` for the shared home / lobby / ingame `SkillPanel`.
-It contains no text, skill tiles, progress bars or interactive controls.
-All gameplay data and controls are live HTML/SVG, derived from the existing
-shared skill rules. The layout preserves the artwork's 1672:941 aspect ratio,
-is capped at 1672 px wide, and centers within wider/taller viewports. It scales
-down uniformly to fit smaller windows. All skill tiles share one compact size;
-single tiles center under their tier, and labels center in their allotted space.
-Compact layouts reduce ornament before text.
+`jungle-skill-tree.webp` is retained as the earlier generated design reference.
+It is no longer loaded by the game. The shared home/lobby/ingame SkillPanel
+now uses native CSS stone/parchment surfaces and red/green/blue branch colors,
+with the real slideshow or game scene behind the dialog.
 
 ## Browser regression check
 
@@ -23,7 +18,7 @@ direct expedition start and a home-only preview.
 Created with the built-in ImageGen tool on 2026-10-23 from the user's attached
 skill-tree design reference. Encoded to WebP at quality 0.92 (450,364 bytes).
 The original generated PNG remains in the local Codex generated-images folder;
-the runtime only needs the WebP committed here.
+this WebP remains for design provenance only.
 
 Generation prompt:
 
