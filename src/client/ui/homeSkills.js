@@ -10,12 +10,7 @@ export function initHomeSkills() {
   root.className = 'home-dialog screen';
   root.hidden = true;
   root.innerHTML = `
-    <section class="home-dialog-card home-skills-card brush" role="dialog" aria-modal="true" aria-labelledby="home-skills-title" aria-describedby="home-skills-help" tabindex="-1">
-      <header class="home-dialog-head">
-        <div><p class="menu-eyebrow">Prepare your expedition</p><h2 id="home-skills-title">Skill tree</h2></div>
-        <button type="button" class="icon-btn home-dialog-close" aria-label="Close skill tree" title="Close (Esc)">×</button>
-      </header>
-      <p id="home-skills-help" class="home-skills-help">Read every skill before heading out. Each expedition keeps its own explorer level and skills: earn points there and spend them at its camp.</p>
+    <section class="home-dialog-card home-skills-card" role="dialog" aria-modal="true" aria-label="Skill tree" tabindex="-1">
       <div class="home-skills-mount"></div>
       <p class="home-skills-status" role="status" aria-live="polite"></p>
     </section>`;
@@ -53,20 +48,9 @@ export function initHomeSkills() {
       }
       const { SkillPanel } = await import('./skillPanel.js');
       panel = new SkillPanel({
-        onBuy() {
-          panel.setProfile(freshProfile());   // (cancels the panel's wait for a server answer)
-          status.textContent = 'Skills are bought in an expedition, at its camp.';
-        },
-        onReset() { status.textContent = 'Skills are reset in an expedition, at its camp.'; },
+        readOnly: true,
         onClose: close,
       });
-      // Adapt only this panel instance to the read-only title screen.
-      const render = panel.render.bind(panel);
-      panel.render = (...args) => {
-        render(...args);
-        panel.el.querySelector('.hud-panel-close').hidden = true;
-        panel.el.querySelector('[data-act="close"]').textContent = 'Close';
-      };
       panel.el.hidden = true;
       panel.setAtCamp(true);
       mount.replaceChildren(panel.el);
@@ -97,7 +81,6 @@ export function initHomeSkills() {
     }
   }
 
-  root.querySelector('.home-dialog-close').addEventListener('click', close);
   root.addEventListener('pointerdown', event => { if (event.target === root) close(); });
   root.addEventListener('keydown', event => {
     if (root.hidden) return;

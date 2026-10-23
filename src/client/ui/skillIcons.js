@@ -4,16 +4,18 @@
 const svg = (body) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${body}</svg>`;
 
 const HEART = '<path d="M12 20S4 15 4 9.5A4.5 4.5 0 0 1 12 7a4.5 4.5 0 0 1 8 2.5C20 15 12 20 12 20z"/>';
+const CLAWS = '<path fill="currentColor" stroke="none" d="M3 21C4 13 9 7 17 3L3 21Zm6 1C10 14 15 8 22 4L9 22ZM2 14C3 8 7 4 13 2L2 14Z"/>';
+const LEAF = '<path fill="currentColor" stroke="none" d="M12 1C10 6 4 7 4 13a8 8 0 0 0 7 8V9l2 3v9a8 8 0 0 0 7-8c0-6-6-7-8-12Z"/><path d="M12 12v11"/>';
 
 export const SKILL_ICONS = {
   // fighting
-  bruteForce: svg('<path d="M5 19 15 9"/><path d="M13 5l6-1-1 6z"/>'),
+  bruteForce: svg(CLAWS),
   marksman: svg('<circle cx="12" cy="12" r="7"/><path d="M12 2v5M12 17v5M2 12h5M17 12h5"/>'),
   steadyHands: svg('<rect x="3" y="9" width="18" height="6" rx="3"/><circle cx="12" cy="12" r="1.4"/><path d="M8 9v2M16 9v2"/>'),
   weakSpot: svg('<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r=".6"/>'),
   executioner: svg('<path d="M12 4a7 7 0 0 0-4 12.7V19h8v-2.3A7 7 0 0 0 12 4z"/><path d="M9.5 11.5h.01M14.5 11.5h.01M10.5 19v-2M13.5 19v-2"/>'),
   sprintStrike: svg('<path d="M3 17h8M8 14l3 3-3 3"/><path d="M17 3l-4 7h5l-4 8"/>'),
-  butchersEye: svg('<path d="M4 20 12 12"/><path d="M12 12C14 6 18 4 20 4c0 3-1 7-6 9z"/>'),
+  butchersEye: svg('<path fill="currentColor" stroke="none" d="M1 12C7 3 17 3 23 12c-6 9-16 9-22 0Z"/><circle cx="12" cy="12" r="4" fill="#14252c" stroke="none"/><circle cx="12" cy="12" r="1.8" fill="currentColor" stroke="none"/>'),
   bloodlust: svg('<path d="M12 3s6 6.5 6 11a6 6 0 0 1-12 0c0-4.5 6-11 6-11z"/><path d="M9.5 15a2.5 2.5 0 0 0 2 2.2"/>'),
   // endurance
   deepLungs: svg('<path d="M12 4v8"/><path d="M12 8C9 8 6 12 6 17c0 2 1 3 3 3 2 0 3-1 3-3"/><path d="M12 8c3 0 6 4 6 9 0 2-1 3-3 3-2 0-3-1-3-3"/>'),
@@ -36,8 +38,8 @@ export const SKILL_ICONS = {
 };
 
 export const TREE_ICONS = {
-  fighting: svg('<path d="M4 20 18 6M20 20 6 6"/><path d="M14 5h5v5M10 5H5v5"/>'),
-  endurance: svg('<path d="M13 3 5 13h6l-1 8 8-10h-6z"/>'),
+  fighting: svg(CLAWS),
+  endurance: svg(LEAF),
   durability: svg('<path d="M12 3 5 6v6c0 4.5 3 7.5 7 9 4-1.5 7-4.5 7-9V6z"/><path d="M12 15s-3-1.8-3-4a1.7 1.7 0 0 1 3-1 1.7 1.7 0 0 1 3 1c0 2.2-3 4-3 4z"/>'),
 };
 
