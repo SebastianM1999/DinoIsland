@@ -25,7 +25,6 @@
 .menu-play-options .btn { display: flex; justify-content: center; align-items: center; gap: 8px; font-size: 1rem; }
 .menu-play-options svg { width: 18px; height: 18px; }
 #menu .lobby-status { min-height: 1.4em; margin: 8px 0; color: #cad6c7; font-size: .85rem; }
-#menu .lobby-players:empty { display: none; }
 .menu-link { font: inherit; font-weight: 700; font-size: .95rem; min-height: 44px; padding: 8px 12px; background: transparent; border: 1px solid transparent; border-radius: 5px; color: #fff1d0; }
 .menu-link:hover { background: #d5dfc91a; border-color: #97aa9255; }
 .menu-link:focus-visible, .home-dialog input:focus-visible, .home-dialog select:focus-visible, #player-name:focus-visible, .tour-stop:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
@@ -39,8 +38,8 @@
 .tour-stop { font: inherit; background: #132b2dcc; color: #fff1d0; border: 1px solid #b3c6b7; border-radius: 5px; padding: 8px 12px; min-height: 44px; }
 #tour-count { font-variant-numeric: tabular-nums; color: #fff1d0; white-space: nowrap; }
 /* Dedicated create/join/information panels keep the main screen uncluttered. */
-.home-dialog { z-index: 55; background: #0c1b1e55; display: flex; align-items: center; justify-content: flex-start; padding: 5vh 5vw; }
-.home-panel, .home-dialog-card { width: min(540px, 100%); max-height: 90dvh; overflow-y: auto; scrollbar-width: thin; background: #152b2cf5; border: 1px solid #8d9e8b66; border-radius: 12px; padding: 24px 28px; box-shadow: 0 16px 60px #0005; }
+.home-dialog { z-index: 55; background: #0c1b1e88; display: flex; align-items: center; justify-content: center; padding: 4vh 4vw; }
+.home-panel, .home-dialog-card { width: min(760px, 100%); max-height: 92dvh; overflow-y: auto; scrollbar-width: thin; background: #152b2cf5; border: 1px solid #8d9e8b66; border-radius: 12px; padding: 28px 36px; box-shadow: 0 16px 60px #0005; }
 .home-panel-head, .home-dialog-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 16px; }
 .home-panel h2, .home-dialog-head h2 { margin: 0; color: #fff1d0; font-size: 2rem; line-height: 1.1; }
 .home-panel-head .menu-eyebrow, .home-dialog-head .menu-eyebrow { margin-bottom: 6px; }
@@ -52,7 +51,6 @@
 .home-option label { font-size: .85rem; color: #d5dfc9; }
 .home-dialog input, .home-dialog select { width: 100%; min-width: 0; min-height: 44px; font: inherit; padding: 8px 12px; color: #fff1d0; background: #0d1e21; border: 1px solid #6c8172; border-radius: 6px; }
 .home-dialog .btn { width: 100%; text-align: left; }
-.home-dialog .copy-address { width: 44px; flex: 0 0 44px; padding: 8px; }
 .home-dialog footer { display: flex; justify-content: space-between; gap: 12px; margin-top: 14px; }
 .home-dialog footer .btn { width: auto; }
 .home-dialog a { color: #ffd75e; }
@@ -60,7 +58,7 @@
 .home-feedback:empty { display: none; }
 .home-guide-steps { padding-left: 26px; }
 /* Expedition picker (ui/expeditionPanel.js): one card per saved expedition. */
-.expeditions-panel { width: min(640px, 100%); }
+.home-dialog .expeditions-panel { width: min(960px, 100%); }
 .home-dialog .expedition-new .btn { width: auto; flex: 0 0 auto; }
 .expedition-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
 .expedition-card { display: flex; justify-content: space-between; align-items: center; gap: 14px; padding: 12px 14px; background: #0d1e21; border: 1px solid #6c817266; border-radius: 8px; }
@@ -80,6 +78,26 @@
 .home-guide-steps li { padding-left: 8px; margin: 20px 0; }
 .home-guide-steps h3 { margin: 0; color: #fff1d0; }
 .home-guide-steps p { margin: 6px 0; }
+/* Steam create/join: big side-by-side choice cards (radio labels or buttons), stacked on narrow windows. */
+.home-dialog .home-steam-panel { width: min(1040px, 100%); }
+.home-choices { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; margin: 20px 0 8px; padding: 0; border: 0; min-width: 0; }
+.home-choices[hidden] { display: none; }
+.home-choices legend { padding: 0; margin-bottom: 10px; font-size: 1.1rem; font-weight: 700; color: #fff1d0; }
+.home-dialog .home-choice { position: relative; display: grid; align-content: start; gap: 8px; min-height: 140px; padding: 20px 22px; font: inherit; text-align: left; color: #cad6c7; background: #0d1e21; border: 2px solid #6c817266; border-radius: 10px; cursor: pointer; transition: border-color .15s, background-color .15s; }
+.home-choice strong { color: #fff1d0; font-size: 1.2rem; }
+.home-choice span { font-size: .92rem; line-height: 1.4; }
+.home-choice input { position: absolute; opacity: 0; pointer-events: none; }
+.home-dialog .home-choice:hover:not(:disabled, :has(input:checked)) { background: #19302f; border-color: #8d9e8b; }
+.home-choice:has(input:checked) { border-color: #ffc933; background: #2a3a26; }
+.home-choice:has(input:checked) strong::after { content: ' ✓'; color: #ffc933; }
+.home-choice:has(input:focus-visible), .home-dialog .home-choice:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
+.home-dialog .home-choice:disabled { opacity: .5; cursor: default; }
+.home-dialog footer .btn-primary { min-width: 200px; text-align: center; }
+/* Wide windows: the guide in two columns, no scrolling. */
+@media (min-width: 1000px) {
+  #home-guide .home-panel { width: min(960px, 100%); }
+  .home-guide-steps { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 40px; }
+}
 /* The existing outfit picker, integrated into a saved-explorer dialog. */
 #home-explorer-root .home-dialog-card { width: min(800px, 100%); }
 #home-explorer-root .home-dialog-card::before { display: none; }
@@ -143,7 +161,7 @@
 #tour-island:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
 /* Same complete tree as in play, with a saved-build footer in the home menu. */
 #home-skills { justify-content: center; }
-.home-skills-card { width: min(1100px, 100%); height: 90dvh; max-height: 90dvh; display: flex; flex-direction: column; overflow: hidden; background: #152b2cf5; border: 1px solid #8d9e8b66; border-radius: 12px; padding: 20px; }
+.home-skills-card { width: min(1500px, 100%); height: 92dvh; max-height: 92dvh; display: flex; flex-direction: column; overflow: hidden; background: #152b2cf5; border: 1px solid #8d9e8b66; border-radius: 12px; padding: 20px; }
 .home-skills-card .home-dialog-head { flex: none; margin-bottom: 0; }
 .home-skills-mount { flex: 1; min-height: 0; }
 .home-skills-mount .hud-panel { position: static; inset: auto; transform: none; width: 100%; height: 100%; max-height: none; padding: 0; animation: none; }

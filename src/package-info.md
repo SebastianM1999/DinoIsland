@@ -19,8 +19,8 @@ src/shared/ ──▶ src/shared/ only       (no DOM, no three, no Math.random, 
 
 ## Hosting
 - **Solo (browser):** `Net.local` (`client/net/net.js`) starts `sim/worker.js` as a Web Worker, so the same `ServerWorld` runs off the render thread; saved expeditions live in IndexedDB (`client/net/expeditions.js`).
-- **Solo and hosting (desktop):** the Electron app (`desktop/main.cjs`) runs the server in a utility process (`desktop/host-process.js`) that owns the player's saved expeditions (`server/saveCoordinator.js`); solo is the open expedition with a private lobby, LAN/internet hosting opens the same expedition to friends.
-- **LAN / online:** `server/gameHost.js` runs `ServerWorld` and talks WebSocket.
+- **Solo and hosting (desktop):** the Electron app (`desktop/main.cjs`) runs the server in a utility process (`desktop/host-process.js`) that owns the player's saved expeditions (`server/saveCoordinator.js`); solo is the open expedition with a private lobby, Steam hosting opens the same expedition to friends.
+- **Co-op:** Steam only. `server/gameHost.js` runs `ServerWorld` and talks WebSocket to the desktop window over loopback; Steam players are bridged into the same host (`desktop/hostBridge.js`). There is no LAN or internet play.
 - **Steam:** `desktop/steam*.cjs/js` + `client/net/steamTransport.js` carry the same protocol over Steam P2P.
 
 ## Authority model (details at the top of `shared/protocol.js`)
@@ -66,7 +66,7 @@ Where each feature lives in each layer. Paths are relative to `src/` unless they
 | Audio | | | audio/* | audio |
 | Graphics tier, settings | | | core/renderer.js, graphicsTier.js, settings.js, ui/menus.js | graphics-tier |
 | Expedition saves (multiple independent expeditions; XP, skills, inventory and island progress per expedition; autosave, checkpoints, Save & quit, backups, desktop files per Steam account, browser IndexedDB) | saveSchema.js | worldSave.js, world.js (`roster`, `checkpoint`, `opts.firstId/now`), worker.js | net/expeditions.js, ui/expeditionPanel.js, core/persistence.js (preferences), main.js (picker, Save & quit); server/saveStore.js, saveCoordinator.js, saveRoutes.js, gameHost.js (`load`/`unload`/`admit`); desktop/host-process.js, hostBridge.js (Steam players), personal-store.cjs, main.cjs | world-save, save-store, save-host, save-guests, solo-worker, expeditions-client |
-| Hosting, LAN, internet, Steam | brand.js, protocol.js (`PROTOCOL_VERSION`) | worker.js | net/, ui/steamLobby.js, ui/internetTest.js; server/gameHost.js (version check), lanListener.js (LAN door); desktop/steamStart.cjs, steam.cjs, logFile.cjs | http-host, lan-address, lan-host, internet-host, steam-coop, version-handshake, desktop-start |
+| Hosting, Steam co-op | brand.js, protocol.js (`PROTOCOL_VERSION`) | worker.js | net/, ui/steamLobby.js; server/gameHost.js (version check); desktop/steamStart.cjs, steam.cjs, logFile.cjs | http-host, steam-coop, version-handshake, desktop-start |
 
 ## Known hot spots
 - `sim/world.js` (~1500 lines), `client/core/game.js` (~1000, imports ~50 modules) and `client/ui/hud.js` (~1000) are touched by almost every feature. Their docs list the areas inside each file.

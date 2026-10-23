@@ -54,10 +54,10 @@ export function initSteamLobby({ join, isPlaying, leaveToJoin, notifyInvite = ()
     releasePointer();
     mode = nextMode;
     previousFocus = document.activeElement;
-    $('friends-title').textContent = mode === 'join' ? 'Join a friend' : 'Invite friends';
-    $('lobby-id-form').hidden = mode !== 'join';
+    $('friends-title').textContent = { join: 'Join a friend', public: 'Public expeditions', invite: 'Invite friends' }[mode];
+    $('lobby-id-form').hidden = mode === 'invite';
     $('btn-browse-lobbies').hidden = mode === 'invite';
-    $('btn-browse-lobbies').textContent = 'Browse public games';
+    $('btn-browse-lobbies').textContent = mode === 'public' ? 'Show friends' : 'Browse public games';
     panel.hidden = false;
     $('btn-close-friends').focus();
     void refresh();
@@ -77,6 +77,7 @@ export function initSteamLobby({ join, isPlaying, leaveToJoin, notifyInvite = ()
   }
 
   $('btn-friends').addEventListener('click', () => open('join'));
+  $('btn-public').addEventListener('click', () => open('public'));
   $('btn-invite').addEventListener('click', () => open('invite'));
   $('btn-close-friends').addEventListener('click', close);
   $('btn-refresh-friends').addEventListener('click', refresh);
@@ -107,15 +108,14 @@ export function initSteamLobby({ join, isPlaying, leaveToJoin, notifyInvite = ()
 
   const ready = (async () => {
     let state;
-    try { state = bridge ? await bridge.status() : { available: false, reason: 'Steam friends need the Steam desktop build. Use an internet test or play solo.' }; }
-    catch { state = { available: false, reason: 'Steam could not start. Restart Steam and the game. Solo and LAN are available.' }; }
+    try { state = bridge ? await bridge.status() : { available: false, reason: 'Co-op runs through Steam: start the game from Steam to play with friends. Solo works here.' }; }
+    catch { state = { available: false, reason: 'Steam could not start. Restart Steam and the game. Solo is still available.' }; }
     available = state.available;
-    $('btn-host').textContent = available ? 'Host game' : 'Host LAN game';
     $('btn-host').hidden = !available;
-    $('btn-friends').disabled = !available;
-    $('home-steam-note').textContent = available ? 'Join a friend or browse public Steam expeditions.' : 'Steam friends and public games are available in the Steam desktop build. Use an invitation address below to join from a browser.';
-    $('lobby-visibility').hidden = $('visibility-label').hidden = !available;
-    $('steam-status').textContent = available ? `Connected to Steam as ${state.name}. Up to 4 explorers.` : state.reason;
+    $('btn-friends').disabled = $('btn-public').disabled = !available;
+    $('home-steam-note').textContent = available ? `Signed in to Steam as ${state.name}.` : state.reason;
+    $('lobby-visibility').hidden = !available;
+    $('steam-status').textContent = available ? `Signed in to Steam as ${state.name}.` : state.reason;
     if (available) {
       if (!$('player-name').value) $('player-name').value = state.name.slice(0, 14);
       bridge.onEvent(event => { if (event.type === 'invite') void requestedJoin(event.lobbyId); });

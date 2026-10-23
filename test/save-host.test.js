@@ -13,12 +13,11 @@ import { MSG, EV, PROTOCOL_VERSION } from '../src/shared/protocol.js';
 
 async function setup(t) {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'dino-host-saves-'));
-  const { httpServer, host, saves, internet } = createGameServer({ saves: true });
+  const { httpServer, host, saves } = createGameServer({ saves: true });
   await new Promise((r) => httpServer.listen(0, '127.0.0.1', r));
   const port = httpServer.address().port;
   t.after(async () => {
     await saves.shutdown();
-    internet.stop();
     host.stop();
     httpServer.closeAllConnections();   // (fetch keeps its connections alive)
     await new Promise((r) => httpServer.close(r));

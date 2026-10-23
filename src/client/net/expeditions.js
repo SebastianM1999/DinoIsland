@@ -2,7 +2,7 @@
 //
 // - host (desktop): the expeditions live in the host process (desktop/host-process.js,
 //   server/saveCoordinator.js) and are managed over its loopback-only /saves routes. Playing one
-//   opens it on the host and connects to it like a LAN game, with the owner token: solo is the
+//   opens it on the host and connects to it over loopback, with the owner token: solo is the
 //   open expedition with a private lobby.
 // - browser: the expeditions live in this origin's IndexedDB. Playing one restores it into the
 //   solo worker (sim/worker.js), whose captures are sealed and stored here. A browser may evict
@@ -40,10 +40,9 @@ export const hostExpeditions = {
   setLobby: (lobby) => api('/lobby', { lobby }),
   /**
    * Open an expedition (`{ id }`) or create one (`{ create: { name, level } }`) on the host, then join it.
-   * lobby 'private' = solo, 'open' = Steam / internet friends may join too, 'lan' = open, and the desktop
-   * host opens its LAN port for the time it is hosted.
+   * lobby 'private' = solo, 'open' = Steam friends may join too.
    */
-  async start({ id, create, lobby = 'private', url = null, steam = null }, { name, outfit }) {
+  async start({ id, create, lobby = 'private', steam = null }, { name, outfit }) {
     const opened = id ? await api('/open', { id, lobby }) : await api('/new', { ...create, lobby });
     if (steam) {
       // Steam friends: the lobby feeds this expedition (desktop/hostBridge.js); we join it as its owner
@@ -51,8 +50,7 @@ export const hostExpeditions = {
       net.expedition = { ...opened.expedition, kind: 'host', recovered: !!opened.recovered };
       return net;
     }
-    // (`url`: the internet test's own host address, which carries its tunnel token)
-    const address = new URL(url ?? `${wsOrigin()}/`);
+    const address = new URL(`${wsOrigin()}/`);
     address.searchParams.set('owner', opened.token);
     const net = await Net.connect(address.href, name, outfit);
     net.expedition = { ...opened.expedition, kind: 'host', recovered: !!opened.recovered };

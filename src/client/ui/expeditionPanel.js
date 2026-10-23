@@ -1,7 +1,7 @@
 // The expedition picker on the title screen: every saved expedition as a card (island, play
 // time, last save, party) with Continue / Host, Rename, Delete (and Export in the browser),
 // plus "New expedition", which always creates a separate expedition. Used for solo play and,
-// on the desktop, for choosing which expedition to host for LAN or internet friends.
+// on the desktop, for choosing which expedition to host for Steam friends.
 
 const esc = (value) => String(value).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
@@ -22,8 +22,6 @@ export function formatSavedAt(at, now = Date.now()) {
 
 const PURPOSES = {
   solo: { eyebrow: 'Play solo', title: 'Choose an expedition', play: 'Continue', start: 'Start' },
-  lan: { eyebrow: 'Host on your network', title: 'Which expedition do you host?', play: 'Host', start: 'Start and host' },
-  internet: { eyebrow: 'Host over the internet', title: 'Which expedition do you host?', play: 'Host', start: 'Start and host' },
   steam: { eyebrow: 'Host with Steam friends', title: 'Which expedition do you host?', play: 'Host', start: 'Start and host' },
 };
 

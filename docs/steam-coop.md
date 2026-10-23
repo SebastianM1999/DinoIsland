@@ -26,14 +26,14 @@ The Steam API starts before the game creates its window (Valve's requirement for
 
 ## Player flow
 
-- **Host game:** choose Friends only, Invite only, or Anyone. Hosting opens the expedition's **lobby** and reserves one of four slots for the host. Everyone who joins stands on the lobby's stage in their outfit, with their level and a read-only view of their skill tree (**Skills**). The island waits until the host presses **Start expedition**; friends who join later go straight into the running game. LAN and internet hosting use the same lobby; solo has none.
-- **Join friend:** lists friends playing this App ID with a Steam lobby. Refresh updates the list. A lobby ID can also be entered manually.
-- **Browse public games:** searches compatible public lobbies with space available. Steam enforces access to private/friends-only lobbies.
-- **Party list:** the pause menu's Players list shows every explorer with health and marks the host. The host can **Kick** another explorer (a second click confirms): they are told "The host removed you from this expedition.", their character stays in the expedition, and they cannot rejoin until the host reopens it. This works the same for Steam, LAN and internet guests.
+- **Create game:** choose Friends only, Invite only, or Anyone, then **Host game**. Hosting opens the expedition's **lobby** and reserves one of four slots for the host. Everyone who joins stands on the lobby's stage in their outfit, with their level and a read-only view of their skill tree (**Skills**). The island waits until the host presses **Start expedition**; friends who join later go straight into the running game. Solo has none.
+- **Join game > Join a friend:** lists friends playing this App ID with a Steam lobby. Refresh updates the list. A lobby ID can also be entered manually.
+- **Join game > Browse public games:** searches compatible public lobbies with space available. Steam enforces access to private/friends-only lobbies.
+- **Party list:** the pause menu's Players list shows every explorer with health and marks the host. The host can **Kick** another explorer (a second click confirms): they are told "The host removed you from this expedition.", their character stays in the expedition, and they cannot rejoin until the host reopens it. This works the same for every guest.
 - **Invite friends:** available in the pause menu (under the Players list) during a Steam session. Select an online friend to send a Steam lobby invitation. The lobby ID is also displayed there.
 - Accepted invites launch a closed game through `+connect_lobby`, or generate a join request when the game is already running. An invite received during play shows a HUD toast and **Leave and join friend** in the pause menu; it does not end the current session automatically.
 - Quitting, reloading, leaving, or losing the host closes the session and releases its lobby/network resources. Steam may appoint another lobby owner, but the game deliberately ends instead of pretending the new owner has the world state.
-- **Host LAN game** and **LAN / direct connection** remain available without Steam. Share the host's LAN address and displayed port; Steam invites do not apply to these sessions. The desktop opens its LAN port (8080, or a free one) only while a LAN game is hosted: solo and Steam games open no port on the network and cause no firewall prompt.
+- Co-op is Steam only: there is no LAN or internet play. The desktop host listens on loopback only, opens no port on the network and causes no firewall prompt.
 - **Versions:** every join carries the network version (`PROTOCOL_VERSION` in `src/shared/protocol.js`). Steam lobbies of another version are not listed, and a host refuses another version with a message saying who has to update. Bump the number with every change that makes two builds incompatible.
 
 ## Progress and authority
@@ -51,21 +51,9 @@ Test the packaged build on two PCs and Steam accounts on different internet conn
 3. Test public discovery, private invites, a full four-player lobby, failed joins, and mismatched builds. Ensure a player can leave and rejoin without occupying a stale slot.
 4. Close the host normally, force-close it, and interrupt its network. Guests must return to the menu with a reason; a new host session must work afterward.
 5. Repeat behind home routers without forwarded ports, including a restrictive/CGNAT connection. Check relay connectivity and bandwidth/latency during gameplay.
-6. Confirm a signed-in Steam client and game entitlement, missing DLL/Steam failure messages, offline solo, and LAN fallback. Verify the packaged native dependencies load from ASAR-unpacked files.
+6. Confirm a signed-in Steam client and game entitlement, missing DLL/Steam failure messages, and offline solo. Verify the packaged native dependencies load from ASAR-unpacked files.
 7. Start the packaged build from its `.exe` (it must come back through Steam), open the overlay with Shift+Tab in the menu and in play, and check `%APPDATA%/<product>/logs/game.log` names the build and records the Steam start.
 
 Each launch writes `userData/logs/game.log` (main process, host process, the game page's warnings and errors; the previous four launches are kept). Ask testers for it with every bug report.
 
 References: [Valve networking](https://partner.steamgames.com/doc/features/multiplayer/networking), [Steam lobbies](https://partner.steamgames.com/doc/features/multiplayer/matchmaking), and [binding SDK setup](https://github.com/ArtyProf/steamworks-ffi-node/blob/main/docs/STEAMWORKS_SDK_SETUP.md).
-
-## Remote friend testing without Steam
-
-Use **Host internet test** on the Windows host. On first use it downloads cloudflared 2026.9.3 from Cloudflare's official GitHub release into the OS temporary `dinosaur-island-tools` folder and verifies its pinned SHA-256 digest before executing it. It starts a hidden, temporary Quick Tunnel with Cloudflare's default transport (QUIC with HTTP/2 fallback). The game waits for a registered connection and DNS propagation before publishing the address.
-
-The host clicks the clipboard icon beside **Address to send your friends**, or copies it from the pause menu. Friends run their own copy of the game, paste the complete `wss://.../?room=...` value into **Friend’s internet address**, and click **Join internet test**. Preserve the room token in the copied address. This is an internet relay, not a LAN address or a permanent dedicated server.
-
-The tunnel exposes a separate loopback listener that accepts only gameplay WebSocket upgrades carrying the random room token. HTTP pages, assets, local configuration, and tunnel-control APIs are not exposed through it. Starting/stopping the tunnel is restricted to local requests with a matching origin. The host's own gameplay connection has a separate owner token; disconnecting it closes the tunnel and guests. **Stop internet test** can also cancel startup or an unused tunnel.
-
-This is a temporary test service without an uptime guarantee, and depends on Cloudflare and outbound connectivity. If antivirus HTTPS inspection replaces Cloudflare's edge certificate, the game reports the certificate failure and leaves verification enabled. Prefer allowing this specific helper in the security software rather than disabling verification. If a guest's DNS resolver blocks the new hostname, they need a resolver that can resolve it; the host checks public DNS propagation without changing system DNS settings.
-
-[Cloudflare Quick Tunnel documentation](https://developers.cloudflare.com/tunnel/get-started/quick-tunnels/). Production Steam co-op uses Steam's networking APIs instead of this helper.

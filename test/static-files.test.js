@@ -82,7 +82,7 @@ test('index.html carries a Content-Security-Policy that allows only its own impo
   assert.deepEqual(directives.get('base-uri'), ["'none'"]);
   assert.deepEqual(directives.get('frame-ancestors'), ["'none'"]);
   assert.deepEqual(directives.get('style-src'), ["'self'"], 'no inline <style> elements or foreign stylesheets');
-  assert.ok(directives.get('connect-src').includes('ws:') && directives.get('connect-src').includes('wss:'), 'LAN and tunnel joins can connect');
+  assert.ok(directives.get('connect-src').includes('ws:') && directives.get('connect-src').includes('wss:'), 'the page can reach its host over WebSocket');
 
   // Inline scripts: only the import map, allowed by the hash a browser computes over its parsed (LF) text.
   const inline = [...html.matchAll(/<script(?![^>]*\bsrc=)([^>]*)>([\s\S]*?)<\/script>/g)];

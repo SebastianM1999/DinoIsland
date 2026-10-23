@@ -62,7 +62,7 @@
 - `collision.js` is used by `src/client/player/controller.js` (local movement) and `src/sim/dinos.js`, `src/sim/unstuck.js`, `src/sim/world.js` (server checks).
 - Shape builders (`caveShape`, `ruinsShape`, `boatShape`, `springShape`, `treeShapes`, `rockShapes`) feed colliders into `layout.js` and the matching meshes in `src/client/models/props/*.js`, `src/client/world/rocks.js`, `src/client/world/veg/trees.js`, `src/client/world/water.js`.
 - Rule catalogs: `base.js` (sim `world.js`, `raids.js`, `towers.js`; client `world/base.js`, `ui/basePanel.js`), `crafting.js` (sim `world.js`; client `ui/craftingPanel.js`), `skills.js` (sim `world.js`, `dinos.js`, `worldSave.js`; client `net/net.js`, `ui/skillPanel.js`, `ui/skillModel.js`, `player/controller.js`), `missions.js` (sim `mission.js`; client `ui/hud.js`), `outfits.js` (sim `world.js`; client `ui/wardrobe.js`, `models/playerModel.js`).
-- `brand.js` is used by client UI/settings, `src/sim/mission.js`, `server/index.js`, `server/internetHost.js`, `desktop/steam-session.js`.
+- `brand.js` is used by client UI/settings, `src/sim/mission.js`, `server/index.js`, `desktop/steam-session.js`.
 
 ## Rules
 - Imports only other files in `src/shared/` — never `src/client/`, `src/sim/`, `three`, Node built-ins or DOM APIs. `brand.js#migrateStorage` touches storage only through an injectable argument (defaults to `globalThis.localStorage`, wrapped in try/catch).
