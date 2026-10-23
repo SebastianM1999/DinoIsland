@@ -259,24 +259,21 @@ body.island-theme :is(.home-panel, .home-dialog-card:not(.home-skills-card), .se
   border-top-color: #b99b67; border-left-color: #a98b59;
   border-right-color: #675338; border-bottom-color: #5a4b34;
 }
-body.island-theme :is(.home-panel, .home-dialog-card:not(.home-skills-card), .settings-card, .pause-card, .friends-card, .hud-panel)::after {
-  content: ''; position: absolute; inset: 0; z-index: 2; pointer-events: none;
-  border-radius: inherit;
+body.island-theme .dialog-ornament {
+  position: fixed; pointer-events: none; user-select: none; padding: 30px;
+  border-radius: 28px;
+  /* Overlay extends 22 px outside the frame, but only 8 px inside. The
+     transparent center guarantees foliage cannot paint over any content. */
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask-composite: exclude;
   background-image: var(--dialog-leaves), var(--dialog-leaves-reversed), var(--dialog-vine), var(--dialog-vine), var(--dialog-vine-horizontal), var(--dialog-vine-horizontal);
-  background-position: left top, right bottom, -7px 72px, right -10px top 110px, 75px -10px, right 68px bottom -12px;
+  background-position: left top, right bottom, 5px 72px, right 5px top 110px, 75px 5px, right 68px bottom 5px;
   background-size: 108px 108px, 96px 96px, 38px 228px, 38px 228px, 228px 38px, 228px 38px;
   background-repeat: no-repeat, no-repeat, repeat-y, repeat-y, repeat-x, repeat-x;
 }
-/* Close controls and heading copy sit above the decorative corner tips. */
-body.island-theme :is(.home-panel-head, .home-dialog-head, .settings-head, .hud-panel-head, .sk-head) :is(h2, button):not(.board-close) {
-  position: relative; z-index: 3;
-}
-body.island-theme #paused .pause-close,
-body.island-theme .hud-panel .board-close { z-index: 3; }
-body.island-theme #home-explorer-root .hud-panel::after { display: none; }
 @media (max-width: 850px), (max-height: 650px) {
-  body.island-theme :is(.home-panel, .home-dialog-card:not(.home-skills-card), .settings-card, .pause-card, .friends-card, .hud-panel)::after {
+  body.island-theme .dialog-ornament {
     background-size: 72px 72px, 64px 64px, 25px 180px, 25px 180px, 180px 25px, 180px 25px;
-    background-position: left top, right bottom, -7px 60px, right -8px top 90px, 60px -9px, right 55px bottom -10px;
+    background-position: left top, right bottom, 8px 60px, right 8px top 90px, 60px 8px, right 55px bottom 8px;
   }
 }

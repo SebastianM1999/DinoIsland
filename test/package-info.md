@@ -2,6 +2,7 @@
 > Automated tests for shared rules, the authoritative simulation, headless client logic, the server and the Steam session, run with Node's built-in test runner (`npm test` = `node --test`).
 
 ## Files
+- `dialog-ornaments.test.js` — viewport geometry, modal visibility, event batching, absence of a continuous layout loop, removal and cleanup for exterior dialog foliage. Headless fixtures do not establish rendered appearance.
 
 - `coverage-gaps.test.js` — reporting of uncovered lines, functions and branches, including topic filters.
 - `performance-harness.test.js` — benchmark percentile correctness, invalid-sample rejection and fail-closed timing-budget arguments; deterministic checks, without timing thresholds.
