@@ -244,11 +244,10 @@ export class SkillPanel {
       <div class="sk-cols">${cols}</div>
       <footer class="wd-foot sk-foot">
         <div class="sk-desc" id="${this.descId}" aria-live="polite">${this.#descHtml()}</div>
-        <div class="sk-actions${this.confirming ? ' is-confirming' : ''}">
+        <div class="sk-actions${this.confirming ? ' is-confirming' : ''}"${this.readOnly ? ' hidden' : ''}>
           ${this.readOnly ? '' : `${this.atCamp ? '' : '<span class="sk-note">Reset only at camp</span>'}
           ${this.confirming ? '<button type="button" class="wd-btn" data-act="cancel">Cancel</button>' : ''}
           <button type="button" class="wd-btn${this.confirming ? ' sk-danger' : ''}" data-act="reset"${resetOff ? ' disabled' : ''} title="${this.atCamp ? 'Refund every spent point' : 'Only at camp'}"><span aria-hidden="true">↶</span> ${resetLabel}</button>`}
-          <button type="button" class="wd-btn sk-close-btn" data-act="close"><span aria-hidden="true">×</span> Close</button>
         </div>
       </footer>`;
     const cols_ = this.el.querySelector('.sk-cols');

@@ -56,7 +56,8 @@ body.island-theme #menu :is(.btn, .menu-link, .tour-stop, .icon-btn),
 body.island-theme #paused :is(.btn, .menu-link, .tour-stop, .icon-btn),
 body.island-theme #menu .tour-island-button,
 body.island-theme :where(#settings, #paused, #steam-friends, .home-dialog, .lobby-screen) :is(.btn, .menu-link, .tour-stop, .icon-btn),
-body.island-theme .hud-panel:not(.hud-skills) :is(.wd-btn, .wd-arrow, .craft-tab) {
+body.island-theme .hud-panel:not(.hud-skills) :is(.wd-btn, .wd-arrow, .craft-tab),
+body.island-theme .hud-panel .sk-close-top {
   min-height: 44px; padding: 9px 18px; font-family: var(--font); font-weight: 800; font-size: 16px;
   color: var(--stone-text); text-align: center; text-shadow: 0 2px 1px #101c1a;
   border: 2px solid var(--button-edge, #9d825a); border-radius: 9px 12px 8px 11px;
@@ -71,13 +72,15 @@ body.island-theme :is(#menu, #settings, #paused, #steam-friends, .home-dialog, .
 body.island-theme .hud-panel:not(.hud-skills) [data-inventory-action=drop] { --button-top: #8b4b3e; --button-bottom: #542c2b; --button-edge: #c28562; }
 body.island-theme #menu :is(.btn, .menu-link, .tour-stop, .icon-btn):hover:not(:disabled),
 body.island-theme :where(#settings, #paused, #steam-friends, .home-dialog, .lobby-screen) :is(.btn, .menu-link, .tour-stop, .icon-btn):hover:not(:disabled),
-body.island-theme .hud-panel:not(.hud-skills) :is(.wd-btn, .wd-arrow, .craft-tab):hover:not(:disabled) { border-color: #f2cf7a; filter: brightness(1.13); }
+body.island-theme .hud-panel:not(.hud-skills) :is(.wd-btn, .wd-arrow, .craft-tab):hover:not(:disabled),
+body.island-theme .hud-panel .sk-close-top:hover { border-color: #f2cf7a; filter: brightness(1.13); }
 body.island-theme :is(#menu, #settings, #paused, #steam-friends, .home-dialog, .lobby-screen) :is(button, input, select, summary):focus-visible,
 body.island-theme .hud-panel:not(.hud-skills) :is(button, input):focus-visible { outline: 3px solid #ffe49c; outline-offset: 3px; }
 body.island-theme :is(#menu, #settings, #paused, #steam-friends, .home-dialog, .lobby-screen) :is(.btn, .menu-link, .icon-btn):disabled,
 body.island-theme .hud-panel:not(.hud-skills) .wd-btn:disabled { opacity: .45; filter: saturate(.3); cursor: default; }
 body.island-theme :is(.home-panel-head, .home-dialog-head, .settings-head) :is(.menu-link, .icon-btn),
-body.island-theme #paused .pause-close {
+body.island-theme #paused .pause-close,
+body.island-theme .hud-panel .sk-close-top {
   width: 44px; height: 44px; min-width: 44px; flex: none; padding: 6px; font-size: 28px; line-height: 1;
 }
 body.island-theme :is(.settings-head, .pause-close) .icon-btn svg { width: 24px; height: 24px; }

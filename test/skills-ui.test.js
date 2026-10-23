@@ -46,12 +46,20 @@ test('panel: the home and lobby preview inspect skills without spending points',
   });
 });
 
-test('panel: close controls use the shared close callback', () => {
+test('panel: previews and play keep one close control, including during reset confirmation', () => {
   let closed = 0;
-  withPanel({ onClose: () => closed++ }, ({ events }) => {
-    events.click({ target: { closest: selector => selector === 'button' ? { dataset: { act: 'close' } } : null } });
-    assert.equal(closed, 1);
-  });
+  for (const readOnly of [false, true]) {
+    withPanel({ readOnly, onClose: () => closed++ }, ({ panel, events }) => {
+      for (const confirming of [false, true]) {
+        panel.confirming = confirming;
+        panel.render();
+        assert.equal((panel.el.innerHTML.match(/data-act="close"/g) ?? []).length, 1);
+        assert.match(panel.el.innerHTML, /aria-label="Close skill tree"/);
+      }
+      events.click({ target: { closest: selector => selector === 'button' ? { dataset: { act: 'close' } } : null } });
+    });
+  }
+  assert.equal(closed, 2);
 });
 
 // ------------------------------------------------------------------ progression belongs to the expedition
