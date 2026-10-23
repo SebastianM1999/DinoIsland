@@ -1,6 +1,7 @@
 # Dino AI concept: smarter, more dangerous dinosaurs
 
-Status: phase 1 (senses + memory) implemented, phases 2-4 open. Each phase in section 5 becomes its own PR.
+Status: phase 1 (senses + memory) and phase 2 (utility + herbivore brains) implemented, phases 3-4 open. Each phase
+in section 5 becomes its own PR. What was built differently from this plan is listed per phase in section 5.
 
 Goal: every species is dangerous and feels like it thinks. **Predators hunt on sight**. **Herbivores are
 defensive-aggressive**: they threaten you, then charge or fight back when you come too close or hurt the herd,
@@ -290,6 +291,18 @@ Tests:
 - A sniper outside the leash makes the herd move away.
 - T-Rex abandons a chase that does not close.
 - Ptera prefers 40/150 over 60/100 correctly by fraction.
+
+As built (`test/dino-utility.test.js`):
+- The three herbivores share `src/sim/ai/defender.js` (utility options graze, watch, threaten, strike, return, avoid,
+  flee); `triceratops.js`, `ankylosaurus.js` and `pachycephalosaurus.js` add only their strike. The Triceratops now
+  spawns as a herd of 2.
+- No new `DS` value: the threat display reuses `DS.ROAR` (the Pachycephalosaurus plays its Roar challenge clip, the
+  others the procedural roar overlay), so no client or protocol change was needed.
+- The horn thrust and head-butt hit times come from the clip timings in the `art/sources/<type>/README.md` files. The
+  Ankylosaurus club sweep is an estimate from those timings, not measured from the baked clip like the stego's
+  `SWEEP`; measure it when the clip changes.
+- T-Rex: `chaseTime` is gone, `ai.chase` and `chaseWorth` replace it. The Stegosaurus and Brachiosaurus got
+  `ai.senses` (anger, threat display). The Crystal Plodder is unchanged (its torch reaction is still open).
 
 ### Phase 3: pack tactics
 Scope: `pack.js`; `packHunterBrain` uses slots, tokens, roles and regroup; pursuit with lead.

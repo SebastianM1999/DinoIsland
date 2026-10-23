@@ -8,6 +8,7 @@ import { CONFIG } from '../../shared/config.js';
 import { DS } from '../../shared/protocol.js';
 import { angleDiff } from '../../shared/rng.js';
 import { makeTailSweep, rearYaw, dir, smoothstep, grazeWander } from './territorial.js';
+import { LEVEL, levelOf, alarm } from './senses.js';
 
 const C = CONFIG.dinos.stego;
 const TAIL_TIME = 1.2;          // length of the Attack clip (art/sources/stego, Stegosaurus_Attack)
@@ -114,6 +115,7 @@ export const stegoBrain = {
     d.anger = C.calmTime;
     const p = sys.world.players.get(byId);
     if (p) d.targetId = byId;
+    alarm(d, sys, byId);
     // Attacked from the front: whip round fast and answer with a heavy tail swing.
     if (p && d.alive && d.mode !== 'tail' && (d.counterCool || 0) <= 0
       && sys.distTo(d, p.x, p.z) < C.counterRange * (d.scale || 1)
@@ -131,8 +133,9 @@ export const stegoBrain = {
     d.counterCool = Math.max(0, (d.counterCool || 0) - dt);
     const home = d.home;
 
-    // provocation: players inside the territory and close to the animal
-    const intruder = sys.nearestPlayer(d, C.angerRadius, (p) => !sys.inSafeZone(p) && Math.hypot(p.x - home.x, p.z - home.z) < C.territoryRadius * 1.3);
+    // provocation: players inside the territory and close to the animal that it has noticed (seen, heard or felt)
+    const intruder = sys.nearestPlayer(d, C.angerRadius, (p) => !sys.inSafeZone(p) && levelOf(d, p.id) >= LEVEL.SUSPICIOUS
+      && Math.hypot(p.x - home.x, p.z - home.z) < C.territoryRadius * 1.3);
     if (intruder) {
       if (d.anger <= 0) sys.roar(d);
       d.anger = C.calmTime;

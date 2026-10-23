@@ -128,12 +128,14 @@ test('losing sight: it goes to the predicted spot, searches round it, then forge
   s.run(2, raptorBrain);
   assert.equal(s.sys.groups.get('pk').target, s.p.id, 'hunting');
   // the player runs east for a moment and then vanishes from sight (far off and behind a wall of rock)
-  for (let k = 0; k < 5; k++) { s.p.x += 0.4; s.run(DT, raptorBrain); }
+  for (let k = 0; k < 10; k++) { s.p.x += 0.4; s.run(DT, raptorBrain); }   // (long enough for two looks: a velocity)
   // from here the animal arrives wherever it heads (movement is not under test)
   s.sys.steer = (d, x, z) => { goals.push({ x, z, t: s.world.now }); d.x = x; d.z = z; return 0; };
   const last = { x: s.p.x, z: s.p.z };
   s.p.x += 400;
-  s.run(LOOK, raptorBrain);   // (until its next look it still counts as seen)
+  // until its next look it still counts as seen: let only the senses run up to the first tick it does not
+  // (with the brain on, the instant arrivals here could finish the whole search inside that window)
+  for (let k = 0; k * DT < LOOK + DT && perceived(s.d, s.sys, s.p.id)?.seen !== false; k++) s.run(DT);
   const t = perceived(s.d, s.sys, s.p.id);
   assert.equal(t?.seen, false);
   assert.ok(Math.abs(t.x - last.x) < 20, 'remembered, not live');
