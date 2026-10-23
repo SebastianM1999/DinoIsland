@@ -13,6 +13,7 @@ import { initSteamLobby } from './ui/steamLobby.js';
 import { initHomeMenu } from './ui/homeMenu.js';
 import { initHomeExplorer } from './ui/homeExplorer.js';
 import { initHomeSkills } from './ui/homeSkills.js';
+import { initDialogOrnaments } from './ui/dialogOrnaments.js';
 import { initLoadingScreen } from './ui/loadingScreen.js';
 import { mapPreviewFrames, preloadMapPreviews } from './ui/mapPreviews.js';
 import { LEVELS } from '../shared/levels.js';
@@ -33,6 +34,7 @@ const DEBUG_DEV = DEBUG_QUERY.has('dev') || DEBUG_QUERY.has('pin');   // ?dev: t
 const DEBUG_START = ['island', 'variant', 'base', 'raid', 'dev', 'pin'].some((k) => DEBUG_QUERY.has(k));
 const expeditions = pickExpeditions();
 document.title = BRAND.name;
+initDialogOrnaments();
 
 // SVG filter that gives HUD and menu panels their brush-stroke edges.
 document.body.insertAdjacentHTML('beforeend', `

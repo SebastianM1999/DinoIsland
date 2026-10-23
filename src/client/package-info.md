@@ -24,6 +24,8 @@
 - `core/game.js` (and everything only it imports) is loaded with a dynamic `import()` from `main.js`: prefetched when the browser is idle after the menu is up, and awaited in `launch()`. Keep new static imports of game-only modules out of `main.js`, `ui/menus.js`, `ui/wardrobe.js` and the other menu modules, or they end up on the menu's critical path (the server preloads the static graph).
 - `?debug` exposes the running game as `window.dinoGame`; `window.__game` is always set.
 
+`main.js` initializes `ui/dialogOrnaments.js` once for menu and in-game dialog frames. Its separate fixed overlays preserve dialog clipping and internal scrolling.
+
 ## Rules
 - Client code imports from `src/shared/` and other `src/client/` folders, never from `src/sim/` or `server/`. The one link to the sim is the Worker URL `../../sim/worker.js` in `net/net.js` (solo play), which runs in its own thread.
 - The client is not authoritative: gameplay effects are requests (`net.act(ACT.*)`) and movement updates (`net.sendState`); the server answers with snapshots, events and corrections.

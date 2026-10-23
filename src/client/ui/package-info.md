@@ -2,6 +2,7 @@
 > Plain-DOM user interface: the in-game HUD and minimap, the dialogs opened at world stations (crafting, base, boat, wardrobe, skills, grove), shell menus, the performance readout and the Steam lobby helper.
 
 ## Files
+- `dialogOrnaments.js` — independent inert foliage overlays around visible dialogs, measured outside their scrolling boxes. A transparent inner cutout protects all controls; hidden/inert/lower-modal frames are suppressed. Measurements run on show, resize, scrolling and opening-animation completion, with no gameplay-frame loop. Removed panels release their observer/overlay; initialization returns cleanup.
 - Torch: `hud.setTorch(owned, lit)` pill beside the quiver (hidden until picked up, shows L and Lit/Out); `icons.js` `torch`, `itemInfo.js` `torch`.
 - `hud.js` — `Hud`: the in-game HUD (~1080 lines, see below).
 - `missionSummary.js` — pure compact goal copy from host mission phases/relic progress; keeps pinned contracts visible without rendering the entire checklist during play. Full objectives remain in the expedition menu and board, and the live HUD expands expedition objectives and team quests with X.
