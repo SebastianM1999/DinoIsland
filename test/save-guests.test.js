@@ -1,5 +1,5 @@
 // Guests of a saved expedition (phase 4): Steam players reach the host process's expedition through
-// desktop/hostBridge.js and are known by their Steam identity; LAN / internet guests by a host-issued
+// desktop/hostBridge.js and are known by their Steam identity; other WebSocket guests by a host-issued
 // credential (server/saveCoordinator.js). Both get their character back exactly once; names never
 // identify anybody.
 import test from 'node:test';
@@ -18,11 +18,10 @@ import { SteamHub } from './helpers/fakeSteam.js';
 
 async function saveHost(t) {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'dino-guests-'));
-  const { httpServer, host, saves, internet } = createGameServer({ saves: true });
+  const { httpServer, host, saves } = createGameServer({ saves: true });
   await saves.useRoot(root);
   t.after(async () => {
     await saves.shutdown();
-    internet.stop();
     host.stop();
     httpServer.closeAllConnections();
     await new Promise((r) => httpServer.close(r));

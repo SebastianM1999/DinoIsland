@@ -20,7 +20,7 @@ const MAX_MSG_BYTES = 8 * 1024;
  * admit({ addr, url }) -> { ok:true, key? } | { ok:false, reason }: who may join, and as whom.
  * onCheckpoint(reason): the world reached a moment worth saving.
  */
-export function startGameHost(httpServer = null, { onConnection, worldless = false, admit = null, onCheckpoint = null } = {}) {
+export function startGameHost(httpServer = null, { worldless = false, admit = null, onCheckpoint = null } = {}) {
   installCaveBakes();   // (the Hollow Mountain's baked walk grid: assets/cave, see src/shared/caveBake.js)
   const wss = httpServer ? new WebSocketServer({ server: httpServer, maxPayload: MAX_MSG_BYTES }) : null;
   /** @type {Map<number, import('ws').WebSocket>} */
@@ -142,7 +142,6 @@ export function startGameHost(httpServer = null, { onConnection, worldless = fal
   }
   wss?.on('connection', (ws, req) => {
     attachConnection(ws, req.socket.remoteAddress, { url: req.url });
-    onConnection?.(ws, req);
   });
 
   /** Close every connection (they see `reason`); their players leave the current world first. */

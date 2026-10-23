@@ -32,10 +32,9 @@ function hello(port, message) {
 }
 
 test('a host refuses another build before it joins, and admits its own', async (t) => {
-  const { httpServer, host, internet } = createGameServer();
+  const { httpServer, host } = createGameServer();
   await new Promise((r) => httpServer.listen(0, '127.0.0.1', r));
   t.after(async () => {
-    internet.stop();
     host.stop();
     httpServer.closeAllConnections();
     await new Promise((r) => httpServer.close(r));

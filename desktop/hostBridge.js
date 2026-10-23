@@ -7,7 +7,7 @@
 //
 // `createRemoteHost` (main) looks like a game host to SteamSession (attachConnection, stop);
 // `serveBridgedConnections` (host process) turns the messages into WebSocket-like sockets for
-// server/gameHost.js `attachConnection`, so Steam, LAN and loopback players share one world.
+// server/gameHost.js `attachConnection`, so Steam and loopback players share one world.
 
 import { EventEmitter } from 'node:events';
 

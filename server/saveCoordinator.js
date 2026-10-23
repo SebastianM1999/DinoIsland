@@ -3,8 +3,7 @@
 //
 // - Solo is the open expedition with a private lobby: only the owner's connection (loopback +
 //   the token handed out by `open`) joins, under the roster key OWNER_KEY. An open lobby also
-//   admits guests (Steam friends, internet); a 'lan' lobby is an open one that also opens the
-//   host's LAN door (`onLobby`, server/lanListener.js).
+//   admits guests (Steam friends).
 // - Saves are captured between ticks (this runs on the host's event loop, never inside
 //   world.step), written one after another (SaveStore generations), autosaved every
 //   `autosaveMs` and shortly after checkpoints (new island, boat part, base stage, boss, leave).
@@ -19,7 +18,7 @@ import { MSG, EV, OWNER_KEY } from '../src/shared/protocol.js';
 import { SaveStore, describeIoError } from './saveStore.js';
 
 export { OWNER_KEY };
-export const LOBBIES = ['private', 'open', 'lan'];
+export const LOBBIES = ['private', 'open'];
 const RETRY_MS = [5000, 15000, 60000];
 const LOOPBACK = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1', 'local']);
 const STEAM_ID = /^[1-9]\d{15,19}$/;
@@ -30,11 +29,8 @@ export const guestKey = (credential) => `guest-${createHash('sha256').update(cre
 export class SaveCoordinatorError extends Error {}
 
 export class SaveCoordinator {
-  /** onLobby(lobby | null): the open expedition's lobby changed (null: none is open); may return a promise. */
-  constructor({ now = Date.now, autosaveMs = 60_000, checkpointDelayMs = 1500, log = (...a) => console.log('[saves]', ...a), timers = globalThis, onLobby = null } = {}) {
+  constructor({ now = Date.now, autosaveMs = 60_000, checkpointDelayMs = 1500, log = (...a) => console.log('[saves]', ...a), timers = globalThis } = {}) {
     this.now = now;
-    this.onLobby = onLobby;
-    this.lobbyChange = Promise.resolve();
     this.autosaveMs = autosaveMs;
     this.checkpointDelayMs = checkpointDelayMs;
     this.log = log;
@@ -102,7 +98,6 @@ export class SaveCoordinator {
       this.#end();
       throw new SaveCoordinatorError(saved.error);
     }
-    await this.lobbyChange;
     return { token: this.current.token, expedition: this.#summary() };
   }
 
@@ -113,8 +108,7 @@ export class SaveCoordinator {
     if (this.current?.id === id) {
       this.setLobby(lobby);
       this.current.token = randomUUID();
-      await this.lobbyChange;
-      return { token: this.current.token, expedition: this.#summary() };
+        return { token: this.current.token, expedition: this.#summary() };
     }
     const found = await this.store.read(id);
     if (!found) throw new SaveCoordinatorError('That expedition no longer exists.');
@@ -132,7 +126,6 @@ export class SaveCoordinator {
     this.#begin({ id, name: doc.name, createdAt: doc.createdAt, lobby, savedAt: doc.savedAt });
     this.current.lastNow = this.host.world.now;
     if (found.recovered) this.log(`expedition ${id}: the newest save was damaged, recovered generation ${found.gen}`);
-    await this.lobbyChange;
     return { token: this.current.token, expedition: this.#summary(), recovered: !!found.recovered };
   }
 
@@ -140,20 +133,13 @@ export class SaveCoordinator {
     if (!this.current) throw new SaveCoordinatorError('No expedition is open.');
     if (!LOBBIES.includes(lobby)) throw new SaveCoordinatorError('Unknown lobby setting.');
     this.current.lobby = lobby;
-    this.#lobbyChanged();
-  }
-
-  #lobbyChanged() {
-    if (!this.onLobby) return;
-    const lobby = this.current?.lobby ?? null;
-    this.lobbyChange = this.lobbyChange.then(() => this.onLobby(lobby)).catch((error) => this.log('lobby change failed:', error.message));
   }
 
   /**
    * Who may join the open expedition, and as whom (gameHost `admit`):
    * - the owner: loopback + the token from `open`/`create` -> OWNER_KEY;
    * - a Steam guest: the authenticated Steam identity of its connection (desktop/steam-session.js) -> `steam-<id>`;
-   * - a LAN / internet guest: first asked for its credential (`ident`), then its own key, or a new
+   * - any other guest: first asked for its credential (`ident`), then its own key, or a new
    *   credential (`issue`) when it has none. Names are never identity.
    */
   admit({ addr, url, steamId, credential } = {}) {
@@ -238,7 +224,6 @@ export class SaveCoordinator {
     if (!result.ok && !force) return result;
     this.host.unload('The host closed the expedition.');
     this.#end();
-    await this.lobbyChange;
     return result;
   }
 
@@ -285,7 +270,6 @@ export class SaveCoordinator {
     if (!LOBBIES.includes(lobby)) lobby = 'private';
     this.current = { id, name, createdAt, lobby, savedAt, token: randomUUID(), lastError: null, lastNow: 0 };
     this.retries = 0;
-    this.#lobbyChanged();
     this.autosave = this.timers.setInterval(() => {
       const w = this.host.world;
       if (this.current && w && w.now > this.current.lastNow + 1) void this.save('auto');
@@ -298,7 +282,6 @@ export class SaveCoordinator {
     this.timers.clearTimeout(this.retryTimer);
     this.autosave = this.checkpointTimer = this.retryTimer = null;
     this.current = null;
-    this.#lobbyChanged();
   }
 
   async #closeCurrent() {

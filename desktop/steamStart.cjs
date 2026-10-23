@@ -12,14 +12,14 @@ const STEAM_ID = /^[1-9]\d{15,19}$/;
  * Returns { sdk, appId, configured, steamId, failure, restart }:
  * - configured: a real App ID is set (this is the Steam build), even when Steam itself failed;
  * - restart: Steam relaunches the game; quit at once without opening anything;
- * - sdk: the initialized SDK, or null with `failure` (shown to the player; solo and LAN still work).
+ * - sdk: the initialized SDK, or null with `failure` (shown to the player; solo still works).
  * `sdkPath`: the folder with the Steamworks redistributables; `packaged`: app.isPackaged.
  */
 function startSteam({ sdkPath, packaged = false, config = {}, env = process.env, platform = process.platform,
   exists = fs.existsSync, loadSdk = () => require('steamworks-ffi-node').SteamworksSDK.getInstance(), log = console } = {}) {
   const appId = Number(env.DINO_STEAM_APP_ID || env.SteamAppId || config.appId);
   if (!Number.isSafeInteger(appId) || appId < 1 || appId > 0xffffffff) {
-    return { sdk: null, appId: null, configured: false, steamId: null, restart: false, failure: 'Steam co-op is not configured yet. Use an internet test or play solo.' };
+    return { sdk: null, appId: null, configured: false, steamId: null, restart: false, failure: 'Steam co-op is not configured yet. Solo is available.' };
   }
   const failed = (failure) => ({ sdk: null, appId, configured: true, steamId: null, restart: false, failure });
   if (platform === 'win32' && !exists(path.join(sdkPath, 'redistributable_bin', 'win64', 'steam_api64.dll'))) {

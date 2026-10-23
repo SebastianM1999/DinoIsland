@@ -161,9 +161,6 @@ test('desktop: the host backend talks to /saves and joins with the owner token',
   assert.equal(opened, 'ws://127.0.0.1:5000/?owner=t0k');
   assert.deepEqual(calls[0], { url: '/saves/open', body: { id: A, lobby: 'open' } });
   assert.equal(net.expedition.recovered, true);
-  const internet = await hostExpeditions.start({ id: A, url: 'ws://127.0.0.1:5000/?internetOwner=abc' }, { name: 'Ada' });
-  assert.equal(opened, 'ws://127.0.0.1:5000/?internetOwner=abc&owner=t0k');
-  internet.close();
   assert.deepEqual(await hostExpeditions.saveAndQuit(net), { ok: false, error: 'disk full' });
   assert.deepEqual(await hostExpeditions.status(), { available: false, reason: 'Start Steam' });
   assert.deepEqual(await hostExpeditions.list(), []);

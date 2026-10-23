@@ -11,7 +11,7 @@ npm ci
 npm start
 ```
 
-Open `http://localhost:8080` for co-op, or select **Play solo (offline)** on the title screen. Other players can join the host's LAN IP and port through the server field. The HTTP and WebSocket server listens on port 8080 by default; `node server/index.js --port 9000` changes it.
+Open `http://localhost:8080` and select **Play solo** on the title screen. This development server listens on port 8080 by default; `node server/index.js --port 9000` changes it. Co-op is Steam only (desktop build); in the browser, Create and Join game explain that.
 
 ```powershell
 npm test
@@ -19,15 +19,13 @@ npm run desktop
 npm run build:win
 ```
 
-The Windows build is in `dist/win-unpacked/`. Keep the entire folder together when running or distributing it. The desktop app opens a LAN port only while you host a LAN game (port 8080, or a free one when 8080 is taken); expand **LAN / direct connection** to see the address to share. Set `DINO_LAN_PORT` before launch for another LAN port (`DINO_DESKTOP_PORT` fixes the game window's own local port). Each launch writes a log to `%APPDATA%/<product>/logs/game.log` (the previous four are kept). Browser builds use port 8080 by default.
+The Windows build is in `dist/win-unpacked/`. Keep the entire folder together when running or distributing it. The desktop app listens on loopback only and opens no port on the network (`DINO_DESKTOP_PORT` fixes the game window's own local port). Each launch writes a log to `%APPDATA%/<product>/logs/game.log` (the previous four are kept). Browser builds use port 8080 by default.
 
-Steam desktop co-op has **Host game**, **Join friend**, public lobby browsing, and **Invite friends** in the pause menu. Configure the game's App ID and add the SDK runtime before building for Steam; see [Steam setup and release checks](docs/steam-coop.md). Builds without Steam configuration show the reason and keep solo/LAN available.
-
-For remote friend tests before Steam setup, click **Host internet test**. The Windows host downloads a verified Cloudflare tunnel helper on first use, starts a temporary relay, and shows a `wss://` address with a copy button. Share the whole address; friends paste it into **Friend’s internet address** and click **Join internet test** in their own copy of the game. The pause menu also has the address/copy button. No router changes are needed. Leaving or closing the host stops the tunnel. This uses Cloudflare's temporary test service; it is separate from the Steam release networking.
+Steam desktop co-op has **Host game**, **Join friend**, public lobby browsing, and **Invite friends** in the pause menu. Configure the game's App ID and add the SDK runtime before building for Steam; see [Steam setup and release checks](docs/steam-coop.md). Builds without Steam configuration show the reason and keep solo available.
 
 ## Game plan status
 
-The game implements first-person movement, procedural dinosaur and player models, five dinosaur behaviors, spear/bow/trap hunting, fruit, carried loot, hut storage, and 1–4 player WebSocket co-op. The server owns AI, damage, health, loot, inventory, and mission progress and checks movement and attack reports from clients.
+The game implements first-person movement, procedural dinosaur and player models, five dinosaur behaviors, spear/bow/trap hunting, fruit, carried loot, hut storage, and 1–4 player Steam co-op. The server owns AI, damage, health, loot, inventory, and mission progress and checks movement and attack reports from clients.
 
 The game is level based: every level is one oblong, randomly generated island (`src/shared/island.js`, biomes and difficulty in `src/shared/levels.js`). The team starts at the hut on the west beach. Three boat parts are hidden at random sites (a cave, the ruins, a dinosaur nest, the highest peak, under the waterfall, on the river bank or beside the lava flow). Players pick them up by walking over them, open the repair dialog at the wrecked boat on the east beach, and set sail together once everyone is aboard. The first island is a small jungle tutorial island; the second and last is a bigger, dark volcanic island with a lava flow and tougher dinosaurs. Sailing away from it wins the game, and a fresh first island starts. Mountains have a winding trail to the top (walking off-road is fine), caves are dug into hill flanks, the waterfall springs from a grotto in the cliff, and slopes too steep to walk can't be climbed by jumping. The mission board shows the boat parts as the main quest, with active contracts on the left and finished ones on the right.
 

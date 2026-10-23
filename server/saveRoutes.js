@@ -58,7 +58,7 @@ export function handleSaveRoutes(req, res, coordinator, port) {
     '/saves/status': () => coordinator.status(),
     '/saves/new': (b) => coordinator.create({ name: b.name, level: b.level }, { lobby: b.lobby }),
     '/saves/open': (b) => coordinator.open(b.id, { lobby: b.lobby }),
-    '/saves/lobby': async (b) => { coordinator.setLobby(b.lobby); await coordinator.lobbyChange; return coordinator.status(); },
+    '/saves/lobby': async (b) => { coordinator.setLobby(b.lobby); return coordinator.status(); },
     '/saves/save': () => coordinator.save('manual'),
     '/saves/close': (b) => coordinator.close({ force: b.force === true }),
     '/saves/rename': (b) => coordinator.rename(b.id, b.name),

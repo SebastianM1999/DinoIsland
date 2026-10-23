@@ -1,7 +1,6 @@
 // Entry point: menu / lobby flow and game start.
 
 import { Net } from './net/net.js';
-import { CONFIG } from '../shared/config.js';
 import { ICON_SPRITE, initSettings, renderPause } from './ui/menus.js';
 import { savedOutfit } from './ui/wardrobe.js';
 import { unlockedStartingIsland, availableStartingIsland } from './core/islandProgress.js';
@@ -11,8 +10,6 @@ import { initExpeditionPanel, formatSavedAt } from './ui/expeditionPanel.js';
 import { preloadDinoModels } from './models/dino/glbDino.js';
 import { GameAudio } from './audio/audio.js';
 import { initSteamLobby } from './ui/steamLobby.js';
-import { initLanAddress, websocketAddress } from './net/lan.js';
-import { initInternetTest } from './ui/internetTest.js';
 import { initHomeMenu } from './ui/homeMenu.js';
 import { initHomeExplorer } from './ui/homeExplorer.js';
 import { initHomeSkills } from './ui/homeSkills.js';
@@ -54,9 +51,9 @@ const loadingUi = initLoadingScreen(loading);
 const canvas = $('game');
 const status = $('lobby-status');
 const nameInput = $('player-name');
-const serverInput = $('server-url');
-const buttons = [$('btn-join'), $('btn-solo'), $('btn-host'), $('btn-host-lan'), $('btn-friends'), $('btn-host-internet'), $('btn-join-internet')];
-const internetTest = initInternetTest();
+const buttons = [$('btn-solo'), $('btn-host'), $('btn-friends'), $('btn-public')];
+// Steam lobby type picked in the Create dialog (desktop/steam-session.js hostGame)
+const lobbyVisibility = () => document.querySelector('input[name="lobby-visibility"]:checked')?.value ?? 'friends';
 const homeMenu = initHomeMenu();
 const homeExplorer = initHomeExplorer();
 const homeSkills = initHomeSkills();
@@ -161,15 +158,12 @@ function setPaused(show) {
   if (show && !settingsUi.isOpen()) $('btn-resume').focus({ preventScroll: true });
   if (!show) settingsUi.close();
 }
-const served = location.protocol.startsWith('http');
-
 function setBusy(busy, text = '') {
   for (const b of buttons) b.disabled = busy;
-  $('btn-friends').disabled = busy || !steamLobby.available;
+  $('btn-friends').disabled = $('btn-public').disabled = busy || !steamLobby.available;
   status.textContent = text;
   homeMenu.feedback(text);
   for (const button of document.querySelectorAll('[data-home-panel], #btn-explorer, #btn-home-skills')) button.disabled = busy;
-  if (text) delete status.dataset.auto;
 }
 
 async function start(mode, options = {}) {
@@ -178,7 +172,7 @@ async function start(mode, options = {}) {
   playMenuMusic();
   const name = nameInput.value.trim() || 'Explorer';
   writeItem(storageKey('name'), name);
-  setBusy(true, mode === 'online' ? 'Connecting…' : 'Starting…');
+  setBusy(true, options.lobbyId ? 'Connecting…' : 'Starting…');
   const startingIsland = mode === 'expedition' && options.choice.id ? options.choice.island ?? 0 : unlockedStartingIsland(Number($('play-island').value));
   void loadingUi.start({ islandName: LEVELS[startingIsland].name, frames: mapPreviewFrames(startingIsland) });
   // Stop construction before starting the worker/network, not after connecting.
@@ -186,19 +180,14 @@ async function start(mode, options = {}) {
   let net;
   try {
     const outfit = savedOutfit();
-    if (mode === 'internet' || options.purpose === 'internet') options.url = await internetTest.start();
     if (mode === 'expedition') {
-      // a saved expedition: solo (private) or hosted for friends (open), see net/expeditions.js
+      // a saved expedition: solo (private) or hosted for Steam friends (open), see net/expeditions.js
       const choice = options.choice.create ? { create: { ...options.choice.create, level: startingIsland } } : { id: options.choice.id };
-      const steam = options.purpose === 'steam' ? { bridge: window.dinoSteam, visibility: $('lobby-visibility').value } : null;
-      // (lobby 'lan' also opens the desktop host's LAN port, server/lanListener.js; solo and Steam games open none)
-      const lobby = options.purpose === 'solo' ? 'private' : options.purpose === 'lan' ? 'lan' : 'open';
-      net = await expeditions.start({ ...choice, lobby, url: options.url, steam }, { name, outfit });
-      if (lobby === 'lan') void lanAddress.refresh();
-    } else net = mode === 'steam' ? await Net.steam(window.dinoSteam, options, name, outfit) :
-      mode === 'online' || mode === 'internet' ? await Net.connect(websocketAddress(options.url ?? serverInput.value), name, outfit) : await Net.local(name, outfit, { level: DEBUG_QUERY.has('island') ? DEBUG_ISLAND : unlockedStartingIsland(Number($('play-island').value)), variant: DEBUG_VARIANT, dev: DEBUG_DEV, baseStage: DEBUG_BASE, raidIn: DEBUG_RAID });
+      const steam = options.purpose === 'steam' ? { bridge: window.dinoSteam, visibility: lobbyVisibility() } : null;
+      const lobby = options.purpose === 'solo' ? 'private' : 'open';
+      net = await expeditions.start({ ...choice, lobby, steam }, { name, outfit });
+    } else net = mode === 'steam' ? await Net.steam(window.dinoSteam, options, name, outfit) : await Net.local(name, outfit, { level: DEBUG_QUERY.has('island') ? DEBUG_ISLAND : unlockedStartingIsland(Number($('play-island').value)), variant: DEBUG_VARIANT, dev: DEBUG_DEV, baseStage: DEBUG_BASE, raidIn: DEBUG_RAID });
   } catch (err) {
-    if (mode === 'internet' || options.purpose === 'internet') internetTest.stop();
     busy = false;
     loadingUi.stop();
     void startMenuPostcards();
@@ -276,7 +265,6 @@ async function launch(net, reuse = null, { openMenu = false } = {}) {
   } catch (err) {
     console.error(err);
     net.close();
-    internetTest.stop();
     loadingUi.stop();
     // A failed expedition transition has already retired its previous Game.
     // Reload through the normal teardown so the borrowed renderer/input shell
@@ -333,18 +321,12 @@ async function launch(net, reuse = null, { openMenu = false } = {}) {
 }
 
 function backToMenu(reason) {
-  internetTest.stop();
   game?.audio.stopMusic();
   // Simplest robust teardown: reload with the reason in the hash.
   location.hash = reason ? `msg=${encodeURIComponent(reason)}` : '';
   location.reload();
 }
 
-$('join-form').addEventListener('submit', (e) => {
-  e.preventDefault();
-  if (document.activeElement === $('friend-internet-address')) start('online', { url: $('friend-internet-address').value, openMenu: true });
-  else start('online', { openMenu: true });
-});
 // Solo play and (on the desktop) hosting go through the saved expeditions; testing aids start unsaved.
 const expeditionPanel = initExpeditionPanel({
   backend: expeditions,
@@ -353,21 +335,12 @@ const expeditionPanel = initExpeditionPanel({
 });
 const hostsExpeditions = expeditions.kind === 'host';
 $('btn-solo').addEventListener('click', () => { if (DEBUG_START) void start('local'); else void expeditionPanel.open('solo'); });
-$('btn-host-internet').addEventListener('click', () => {
-  if (hostsExpeditions) void expeditionPanel.open('internet');
-  else void start('internet', { url: `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}` });
-});
-$('btn-join-internet').addEventListener('click', () => start('online', { url: $('friend-internet-address').value, openMenu: true }));
-const hostLan = () => {
-  if (hostsExpeditions) void expeditionPanel.open('lan');
-  else void start('online', { url: `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}` });
-};
-$('btn-host-lan').addEventListener('click', hostLan);
 $('btn-host').addEventListener('click', async () => {
   await steamLobby.ready;
-  // the desktop hosts a saved expedition for Steam friends too; a page without saves hosts a session world
-  if (steamLobby.available) { if (hostsExpeditions) void expeditionPanel.open('steam'); else void start('steam', { host: true, visibility: $('lobby-visibility').value }); }
-  else hostLan();
+  // the desktop hosts a saved expedition for Steam friends; a page without saves hosts a session world
+  if (!steamLobby.available) return;
+  if (hostsExpeditions) void expeditionPanel.open('steam');
+  else void start('steam', { host: true, visibility: lobbyVisibility() });
 });
 const steamLobby = initSteamLobby({
   join: lobbyId => start('steam', { lobbyId, openMenu: true }),
@@ -481,38 +454,8 @@ leaveBtn.addEventListener('click', async () => {
 
 nameInput.value = readItem(storageKey('name')) || '';
 nameInput.addEventListener('input', () => { writeItem(storageKey('name'), nameInput.value.slice(0, 14)); });
-serverInput.value = served ? `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}` : `ws://localhost:${CONFIG.net.port}`;
 const hashMsg = new URLSearchParams(location.hash.slice(1)).get('msg');
 if (hashMsg) {
   status.textContent = hashMsg;
   history.replaceState(null, '', location.pathname);
 }
-
-// Lobby: show who is already on the server.
-async function pollLobby() {
-  if (!menu.hidden && served && !busy && !steamLobby.available) {
-    try {
-      const res = await fetch('/status', { cache: 'no-store' });
-      const s = await res.json();
-      const list = $('lobby-players');
-      list.replaceChildren(...s.players.map((p) => {
-        const li = document.createElement('li');
-        li.textContent = p.name;
-        li.style.setProperty('--c', CONFIG.playerColors[p.slot % 4]);
-        return li;
-      }));
-      if (!status.textContent || status.dataset.auto) {
-        status.dataset.auto = '1';
-        status.textContent = s.players.length
-          ? `${s.players.length}/${s.maxPlayers} explorers on this server`
-          : 'The server is empty – start the expedition!';
-        if (s.players.length >= s.maxPlayers) status.textContent = `The server is full (${s.maxPlayers}/${s.maxPlayers}).`;
-      }
-    } catch {
-      status.textContent = 'No co-op server found – you can still play solo.';
-    }
-  }
-  setTimeout(pollLobby, 2000);
-}
-pollLobby();
-const lanAddress = initLanAddress();

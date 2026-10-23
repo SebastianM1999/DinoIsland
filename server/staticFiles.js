@@ -37,8 +37,8 @@ const INLINE_SCRIPT = /<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/g;
  * - style-src-attr 'unsafe-inline': HUD/panel templates set `style="..."` attributes
  *   (bar widths, compass ticks, the scope overlay). <style> elements and stylesheets
  *   stay 'self'-only, so an injected attribute cannot load anything.
- * - connect-src ws: wss:: LAN joins go to any `ws://<ip>:<port>` the player types and
- *   internet joins to a `wss://*.trycloudflare.com` tunnel; the host is not known up front.
+ * - connect-src ws: wss:: the page connects to its own host's WebSocket (the desktop host
+ *   process on a random loopback port, or the dev server).
  * - img-src/connect-src blob:: GLTFLoader hands textures embedded in a GLB to the image
  *   loaders as blob: URLs (only script already running on the page can create those).
  */
