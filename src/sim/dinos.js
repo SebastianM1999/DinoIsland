@@ -29,6 +29,7 @@ import { raiderStep } from './raids.js';
 import { ALPHA, canBeAlpha, alphaTitle } from '../shared/dinoRank.js';
 import { findPath, canWalkSegment } from './pathfind.js';
 import { updateSenses, hear, NOISE } from './ai/senses.js';
+import { Director } from './ai/director.js';
 import { occluderBlocked } from '../shared/visibility.js';
 import { SAFE_MARGIN } from '../shared/base.js';
 
@@ -77,6 +78,7 @@ export class DinoSystem {
     const diff = world.layout.level.difficulty;
     this.hpMul = Math.pow(diff, 0.85);
     this.dmgMul = 1 + (diff - 1) * 0.6;
+    this.director = new Director();   // co-op pacing: how many predators may hunt at once (ai/director.js)
   }
 
   get(id) { return this.byId.get(id); }
@@ -701,6 +703,7 @@ export class DinoSystem {
     const w = this.world;
     const T = CONFIG.tracks;
     updateSenses(this, dt);   // what every animal sees, hears and remembers (ai/senses.js)
+    this.director.tick(this, dt);
     for (let i = this.list.length - 1; i >= 0; i--) {
       const d = this.list[i];
       if (!d.alive) {

@@ -148,7 +148,9 @@ export const pteraBrain = {
         flyTo(sys, d, tx, circleY(tx, tz) + Math.sin(d.modeT * 0.5) * 3, tz, C.flySpeed, dt, 1.2);
         if (d.cool <= 0) {
           const p = pickTarget(sys, d);
-          if (p) {
+          // the director (ai/director.js) may hold it back: it keeps circling and tries again shortly
+          if (p && !(sys.director?.mayHunt(d, sys.world) ?? true)) d.cool = 2;
+          else if (p) {
             d.targetId = p.id;
             d.leadPrev = null;
             d.mode = 'dive';
@@ -160,6 +162,7 @@ export const pteraBrain = {
       }
       case 'dive': {
         d.st = DS.DIVE;
+        sys.director?.mayHunt(d, sys.world);   // (keeps its place through the dive)
         const p = sys.world.players.get(d.targetId);
         if (!p || !p.alive || sys.inSafeZone(p, d) || d.modeT > 7) { climb(d, 4); break; }
         // lead the target a little: aim where it will be when the dive arrives (capped, a juke still works)

@@ -16,6 +16,9 @@ const E = C.ai.chase;
 const BITE_WINDUP = 0.45;
 /** Another player this close to the target: it is not alone (a lone target is worth a longer chase). */
 const ALONE = 14;
+/** Held back by the director (ai/director.js), it keeps about this far (m) from its target. */
+const STALK_DIST = 20;
+const mayHunt = (d, sys) => sys.director?.mayHunt(d, sys.world) ?? true;
 
 /**
  * Chase economics (docs/dino-ai-concept.md 1, "chase economics"): how much the chase it sees is still worth,
@@ -40,13 +43,14 @@ export function chaseWorth(d, sys, t, dt) {
 }
 
 /** Back to the patrol, resting a while before it hunts again. */
-function givesUp(d) {
+function givesUp(d, sys) {
   d.mode = 'patrol';
   d.modeT = 0;
   d.targetId = null;
   d.search = null;
   d.chase = null;
   d.rest = C.restTime;
+  sys.director?.release(d);
 }
 
 export const trexBrain = {
@@ -102,7 +106,7 @@ export const trexBrain = {
     if (d.targetId != null && sys.world.players.get(d.targetId)?.downed && d.mode !== 'bite') {
       const next = afterDowned(d, sys, d.targetId);
       if (next) d.targetId = next.id;
-      else givesUp(d);
+      else givesUp(d, sys);
     }
     const t = d.targetId != null ? perceived(d, sys, d.targetId) : null;
     const target = t?.p ?? null;
@@ -149,20 +153,41 @@ export const trexBrain = {
         d.st = DS.ROAR;
         if (target) sys.turnTo(d, Math.atan2(-(target.x - d.x), -(target.z - d.z)), dt, C.turnRate * 1.5);
         if (d.modeT > 1.6) {
-          d.mode = d.mode === 'roar' && !lost ? 'chase' : 'patrol';
+          d.mode = d.mode === 'roar' && !lost ? (mayHunt(d, sys) ? 'chase' : 'stalk') : 'patrol';
           d.modeT = 0;
           d.chaseT = 0;
           d.chase = null;
         }
         return;
       }
+      case 'stalk': {
+        // held back by the director: it follows at a distance, watching, and charges once it may hunt
+        d.fl |= 1;
+        if (lost) { givesUp(d, sys); d.rest = 0; return; }
+        if (t.seen && mayHunt(d, sys)) { d.mode = 'chase'; d.modeT = 0; d.chaseT = 0; d.chase = null; sys.roar(d); return; }
+        const dist = sys.distTo(d, t.x, t.z);
+        if (!t.seen) {
+          const goal = searchGoal(d, sys, t);
+          if (!goal) { forget(d, t.id); givesUp(d, sys); d.rest = 0; return; }
+          sys.steer(d, goal.x, goal.z, C.walkSpeed, dt);
+          d.st = DS.WALK;
+        } else if (dist > STALK_DIST + 4) {
+          sys.steer(d, t.x, t.z, C.walkSpeed * 1.4, dt);
+          d.st = DS.WALK;
+        } else {
+          sys.halt(d, dt);
+          sys.turnTo(d, Math.atan2(-(t.x - d.x), -(t.z - d.z)), dt, C.turnRate);
+          d.st = DS.ALERT;
+        }
+        return;
+      }
       case 'investigate': {
         // heard something: walk over to where the noise was and look round there
         d.fl &= ~1;
-        if (lost) { givesUp(d); d.rest = 0; return; }
+        if (lost) { givesUp(d, sys); d.rest = 0; return; }
         if (t.seen) { d.mode = 'roar'; d.modeT = 0; sys.roar(d); return; }
         const goal = searchGoal(d, sys, t);
-        if (!goal) { forget(d, t.id); givesUp(d); d.rest = 0; return; }
+        if (!goal) { forget(d, t.id); givesUp(d, sys); d.rest = 0; return; }
         sys.steer(d, goal.x, goal.z, C.walkSpeed * 1.6, dt);
         d.st = DS.WALK;
         return;
@@ -170,19 +195,20 @@ export const trexBrain = {
       case 'chase': {
         d.fl |= 1;
         d.chaseT = (d.chaseT || 0) + dt;
+        if (!mayHunt(d, sys)) { d.mode = 'stalk'; d.modeT = 0; return; }
         // a chase that no longer pays (gap not closing, too far from where it began, badly hurt) is dropped;
         // hiding between trees that are too close for its body works too
         const worth = t?.seen ? chaseWorth(d, sys, t, dt) : 1;
         if (lost || (d.chaseT > E.commitMin && worth < E.worth) || (d.blockedT || 0) > 3 || sys.distTo(d, t.x, t.z) > SIGHT * 1.6) {
           if ((d.blockedT || 0) > 3) sys.roar(d);
           d.blockedT = 0;
-          givesUp(d);
+          givesUp(d, sys);
           return;
         }
         if (!t.seen) {
           // lost sight of you: where it saw you last, then around there
           const goal = searchGoal(d, sys, t);
-          if (!goal) { forget(d, t.id); givesUp(d); return; }
+          if (!goal) { forget(d, t.id); givesUp(d, sys); return; }
           sys.steer(d, goal.x, goal.z, t.age < 3 ? C.runSpeed * 0.85 : C.walkSpeed * 1.6, dt);
           d.st = d.spd > C.walkSpeed * 1.3 ? DS.RUN : DS.WALK;
           return;
@@ -203,6 +229,7 @@ export const trexBrain = {
       }
       case 'bite': {
         d.st = DS.ATTACK;
+        mayHunt(d, sys);   // (keeps its place with the director through the bite)
         sys.move(d, C.walkSpeed * 0.5, dt);
         if (target) sys.turnTo(d, Math.atan2(-(target.x - d.x), -(target.z - d.z)), dt, C.turnRate * 2);
         if (!d.bitten && d.modeT > BITE_WINDUP) {

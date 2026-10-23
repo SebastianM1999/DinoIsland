@@ -1,6 +1,8 @@
 # Dino AI concept: smarter, more dangerous dinosaurs
 
-Status: phases 1-3 implemented (senses + memory, utility + herbivore brains, pack tactics), phase 4 open. Each phase
+Status: phases 1-4 implemented (senses + memory, utility + herbivore brains, pack tactics, director). Still open: the
+Dilophosaurus and Spinosaurus brains (section 4), the Crystal Plodder's torch reaction, and moving the old
+`Math.random()` calls to `world.aiRng` (3.6). Each phase
 in section 5 becomes its own PR. What was built differently from this plan is listed per phase in section 5.
 
 Goal: every species is dangerous and feels like it thinks. **Predators hunt on sight**. **Herbivores are
@@ -334,6 +336,15 @@ Tests:
 - Relax after a downed player lowers it.
 - Predators over budget still stalk (on-sight reaction holds).
 - Bosses and raiders are ignored.
+
+As built (`test/dino-director.test.js`):
+- `sys.director` lives on the `DinoSystem` and is ticked right after the senses. Brains ask `mayHunt` every tick
+  they chase or attack; a place goes stale 2.5 s after the last ask (a raptor's fright lasts up to 2 s), and a
+  pack hunter with no target any more or a T-Rex that gives up frees it at once.
+- Held back: raptors stalk at 14 m (`STALK_DIST`) and do not search closer than that, the T-Rex gets a `stalk`
+  mode at about 20 m, the pteranodon keeps circling. Searching an unseen target does not take a place.
+- Leashed animals (the grove titan, arena bosses) are not counted, besides raiders and non-predators.
+- Tuning in `CONFIG.ai.director` (base 4, +1.5 per extra player, half while relaxing, +1 after a quiet minute).
 
 ---
 
