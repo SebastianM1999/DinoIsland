@@ -352,4 +352,3 @@ For reusable buttons, tabs and control ornaments, generate a separate consistent
 - `src/client/ui/expeditionPanel.js`, `lobbyScreen.js`, `steamLobby.js`: saves, lobby, Steam/public/friend states.
 - `src/client/ui/craftingPanel.js`, `basePanel.js`, `boatPanel.js`, `grovePrompt.js`, `loadingScreen.js`, with their shared catalogs: in-game station dialogs and loading.
 - Approved theme: `css/skills.css`, `assets/ui/skills/jungle-skill-tree.webp` and the current skill-tree screenshot.
-
