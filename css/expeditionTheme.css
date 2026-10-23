@@ -1,0 +1,242 @@
+/* Shared expedition materials. References inform the surfaces; the real
+   slideshow and island remain the backgrounds. Specificity is intentional:
+   hud.css is also loaded lazily after a home preview. */
+body.island-theme {
+  --stone: #252c29;
+  --stone-deep: #141e1d;
+  --bronze: #907654;
+  --parchment: #ead5a8;
+  --parchment-ink: #302d22;
+  --stone-text: #fff0d2;
+  --stone-muted: #c5c9b8;
+  --stone-surface: linear-gradient(145deg, #53605212, transparent 38%), linear-gradient(35deg, transparent 63%, #b5a67d0c 63.2%, transparent 64%), #252c29;
+  --stone-rim: inset 0 2px 0 #e5d3a830, inset 0 -4px 0 #0d161d70, 0 5px 0 #181a16, 0 16px 42px #0006;
+}
+
+/* Frames, deliberately separate from the live HUD and accepted skill tree. */
+body.island-theme :is(.home-panel, .home-dialog-card:not(.home-skills-card), .settings-card, .pause-card, .friends-card),
+body.island-theme .hud-panel:not(.hud-skills) {
+  color: var(--stone-text);
+  background: var(--stone-surface);
+  border: 3px solid var(--bronze);
+  border-radius: 12px 17px 13px 16px;
+  box-shadow: var(--stone-rim);
+  outline: 1px solid #171f18;
+  padding: 20px 24px;
+}
+body.island-theme :is(.home-dialog-card:not(.home-skills-card), .settings-card, .pause-card, .friends-card).brush::before,
+body.island-theme .hud-panel:not(.hud-skills).brush::before { display: none; }
+body.island-theme .hud-panel:not(.hud-skills):not(.hud-inv) { max-height: calc(100dvh - 32px); overflow-y: auto; scrollbar-width: none; }
+body.island-theme .home-dialog:not(#home-skills) { justify-content: center; background: #0b191c66; padding: 24px; }
+body.island-theme :is(#settings, #paused, #steam-friends) { background: #0b191c88; backdrop-filter: blur(3px); }
+body.island-theme :is(.home-panel, .home-dialog-card:not(.home-skills-card)) { max-height: calc(100dvh - 48px); scrollbar-width: none; }
+body.island-theme :is(.home-panel, .home-dialog-card)::-webkit-scrollbar { display: none; }
+body.island-theme .home-panel { width: min(760px, 100%); }
+body.island-theme :is(.home-panel p, .home-option label, .home-explorer-progress, .lobby-note) { color: var(--stone-muted); }
+body.island-theme :is(.home-panel-head, .home-dialog-head, .settings-head),
+body.island-theme .hud-panel:not(.hud-skills) > .hud-panel-head {
+  min-height: 64px; margin: 0 0 16px; padding: 10px 14px;
+  background: linear-gradient(155deg, #f5e4bd, #d5b77e);
+  color: var(--parchment-ink); border: 1px solid #b89a66; border-radius: 7px 11px 7px 9px;
+  box-shadow: inset 0 2px #fff4d27a, 0 3px 0 #141b18;
+  align-items: center; gap: 12px;
+}
+body.island-theme :is(.home-panel-head, .home-dialog-head, .settings-head) h2,
+body.island-theme .hud-panel:not(.hud-skills) > .hud-panel-head h2 {
+  color: var(--parchment-ink); text-shadow: 0 1px #fff1cb; font-weight: 800; font-size: clamp(24px, 2.5vw, 34px); line-height: 1.05;
+}
+body.island-theme :is(.home-panel-head, .home-dialog-head) .menu-eyebrow { color: #63563c; font-size: 12px; margin-bottom: 5px; }
+body.island-theme .hud-panel:not(.hud-skills) .hud-panel-close { color: #63563c; font-size: .85em; }
+body.island-theme .settings-head .settings-icon { width: 32px; height: 32px; flex: none; color: #63523a; }
+
+/* Carved buttons. Colors are variants, not independent components. */
+body.island-theme #menu :is(.btn, .menu-link, .tour-stop, .icon-btn),
+body.island-theme #paused :is(.btn, .menu-link, .tour-stop, .icon-btn),
+body.island-theme #menu .tour-island-button,
+body.island-theme :where(#settings, #paused, #steam-friends, .home-dialog, .lobby-screen) :is(.btn, .menu-link, .tour-stop, .icon-btn),
+body.island-theme .hud-panel:not(.hud-skills) :is(.wd-btn, .wd-arrow, .craft-tab) {
+  min-height: 44px; padding: 9px 18px; font-family: var(--font); font-weight: 800; font-size: 16px;
+  color: var(--stone-text); text-align: center; text-shadow: 0 2px 1px #101c1a;
+  border: 2px solid var(--button-edge, #9d825a); border-radius: 9px 12px 8px 11px;
+  background: linear-gradient(155deg, var(--button-top, #655543), var(--button-bottom, #3b3930));
+  box-shadow: inset 0 2px 0 #f8e8b62b, inset 0 -3px 0 #141c2066, 0 3px 0 #101b19;
+  transition: border-color .12s, filter .12s, transform .12s;
+}
+body.island-theme :where(#menu, #settings, #paused, #steam-friends, .home-dialog, .lobby-screen) .btn-primary,
+body.island-theme .hud-panel:not(.hud-skills) .wd-primary { --button-top: #277d94; --button-bottom: #154253; --button-edge: #6eb9ca; }
+body.island-theme :is(.home-dialog, .lobby-screen) :is(.expedition-actions .btn-primary, #btn-expedition-new, .lobby-start) { --button-top: #547744; --button-bottom: #2c482b; --button-edge: #9abf72; }
+body.island-theme :is(#menu, #settings, #paused, #steam-friends, .home-dialog, .lobby-screen) :is(.btn-danger, .expedition-delete),
+body.island-theme .hud-panel:not(.hud-skills) [data-inventory-action=drop] { --button-top: #8b4b3e; --button-bottom: #542c2b; --button-edge: #c28562; }
+body.island-theme #menu :is(.btn, .menu-link, .tour-stop, .icon-btn):hover:not(:disabled),
+body.island-theme :where(#settings, #paused, #steam-friends, .home-dialog, .lobby-screen) :is(.btn, .menu-link, .tour-stop, .icon-btn):hover:not(:disabled),
+body.island-theme .hud-panel:not(.hud-skills) :is(.wd-btn, .wd-arrow, .craft-tab):hover:not(:disabled) { border-color: #f2cf7a; filter: brightness(1.13); }
+body.island-theme :is(#menu, #settings, #paused, #steam-friends, .home-dialog, .lobby-screen) :is(button, input, select, summary):focus-visible,
+body.island-theme .hud-panel:not(.hud-skills) :is(button, input):focus-visible { outline: 3px solid #ffe49c; outline-offset: 3px; }
+body.island-theme :is(#menu, #settings, #paused, #steam-friends, .home-dialog, .lobby-screen) :is(.btn, .menu-link, .icon-btn):disabled,
+body.island-theme .hud-panel:not(.hud-skills) .wd-btn:disabled { opacity: .45; filter: saturate(.3); cursor: default; }
+body.island-theme :is(.home-panel-head, .home-dialog-head, .settings-head) :is(.menu-link, .icon-btn),
+body.island-theme #paused .pause-close {
+  width: 44px; height: 44px; min-width: 44px; flex: none; padding: 6px; font-size: 28px; line-height: 1;
+}
+body.island-theme :is(.settings-head, .pause-close) .icon-btn svg { width: 24px; height: 24px; }
+body.island-theme .home-dialog :is(input:not([type=file]), select),
+body.island-theme :is(#join-form input, #pause-internet input, #lobby-id),
+body.island-theme .friends-card input {
+  color: var(--stone-text); background: #111c1b; border: 2px solid #756548; border-radius: 6px;
+  box-shadow: inset 0 3px 5px #0005; min-height: 44px;
+}
+body.island-theme .home-dialog input::placeholder { color: #a4ad9b; }
+body.island-theme :is(.home-dialog, .settings-card, .friends-card) a { color: #89d6e6; }
+
+/* Home rail: keep the photograph visible instead of adding a baked scene. */
+body.island-theme #menu .logo { color: #f0ddb1; text-shadow: 0 3px #362e1e, 0 7px 18px #0008; letter-spacing: .01em; }
+body.island-theme #menu .explorer-card { background: #202c29e8; border: 2px solid #8d7655; border-radius: 9px; box-shadow: inset 0 2px #d5c48f22, 0 3px 0 #0b191b; }
+body.island-theme #menu #player-name { color: #fff0cf; }
+body.island-theme #menu #btn-solo { text-align: center; grid-template-columns: 1fr auto; font-size: 1.4rem; padding: 13px 20px; }
+body.island-theme #menu .menu-utilities { gap: 7px; }
+body.island-theme #menu .menu-utilities .menu-link { font-size: 14px; padding: 7px 12px; }
+body.island-theme #menu .explorer-card .menu-link { padding: 7px 10px; font-size: 14px; }
+body.island-theme #menu .menu-kicker { color: #d8c7a0; }
+body.island-theme #menu #menu-preview::after { background: linear-gradient(90deg, #101d1bec, #101d1bd9 24%, #101d1b40 48%, transparent 72%), linear-gradient(0deg, #101d1b66, transparent 35%); }
+
+/* Shared section slabs, saved expeditions and connection cards. */
+body.island-theme .home-panel .home-option { padding: 15px; margin: 12px 0; background: #172321c9; border: 1px solid #7d6c4d; border-radius: 8px; }
+body.island-theme .home-panel .home-option h3 { margin: -15px -15px 3px; padding: 9px 14px; color: #fff0d3; background: linear-gradient(110deg, #285361, #1d3d47); border-bottom: 1px solid #6a887e; font-size: 19px; }
+body.island-theme #home-host .home-option:nth-of-type(1) h3 { background: linear-gradient(110deg, #704035, #412e2a); }
+body.island-theme #home-host .home-option:nth-of-type(2) h3 { background: linear-gradient(110deg, #48623c, #283e2d); }
+body.island-theme .home-panel .btn { text-align: center; }
+body.island-theme #home-expeditions .expeditions-panel { width: min(900px, 100%); }
+body.island-theme #home-expeditions .expedition-card { background: #29332e; border: 1px solid #736448; border-radius: 8px; padding: 15px; }
+body.island-theme #home-expeditions .expedition-actions { display: grid; grid-template-columns: repeat(3, auto); gap: 5px; }
+body.island-theme #home-expeditions .expedition-actions .btn-primary { grid-column: 1 / -1; width: 100%; }
+body.island-theme #home-expeditions .expedition-actions .menu-link { min-height: 36px; font-size: 13px; padding: 4px 8px; }
+body.island-theme #home-expeditions .expedition-badge { background: #46603a; color: #edf2cf; }
+body.island-theme #home-credits .home-panel { width: min(700px, 100%); }
+body.island-theme #home-guide .home-guide-steps { padding-left: 24px; }
+body.island-theme #home-guide .home-guide-steps li { padding: 10px 12px; margin: 10px 0; border-bottom: 1px solid #77644866; }
+body.island-theme #home-guide .home-guide-steps h3 { color: #ead5a8; }
+body.island-theme .home-panel footer { justify-content: flex-end; }
+
+/* Settings stays one size across tabs, with a fixed footer and scrollable body. */
+body.island-theme #settings .settings-card { width: min(860px, 100%); height: min(760px, calc(100dvh - 48px)); padding: 18px; }
+body.island-theme #settings .settings-head { flex: none; margin-bottom: 12px; }
+body.island-theme #settings .settings-tabs { flex: none; gap: 8px; background: transparent; padding: 0; margin: 0 0 10px; }
+body.island-theme #settings .settings-tabs [role=tab] {
+  min-height: 48px; border: 2px solid #887452; border-radius: 7px; padding: 9px 12px;
+  background: linear-gradient(#4c4b3e, #292f2a); color: #f5e5c4; box-shadow: inset 0 2px #d5c99b22, 0 3px #121f1b;
+}
+body.island-theme #settings .settings-tabs [aria-selected=true] { background: linear-gradient(#327c8d, #174658); border-color: #86c9d2; color: #fff0cf; }
+body.island-theme #settings .settings-panel { padding: 2px 2px 8px; }
+body.island-theme #settings .settings-group { background: linear-gradient(110deg, #e6cf9c, #c4a775); color: #332e21; border: 1px solid #a38b61; padding: 4px 12px; border-radius: 4px; font-size: 17px; font-weight: 800; text-transform: none; letter-spacing: 0; margin: 8px 0 5px; }
+body.island-theme #settings .setting-row { min-height: 55px; padding: 10px 14px; margin: 5px 0; border: 1px solid #666047; border-radius: 6px; background: #15211f; grid-template-columns: minmax(140px, 1fr) minmax(120px, 1.75fr) 90px; }
+body.island-theme #settings .setting-row label { color: #f9edd6; font-size: 16px; }
+body.island-theme #settings .setting-row output { color: #ffedbe; }
+body.island-theme #settings .setting-row input[type=range] { height: 14px; border: 2px solid #6a6a4f; background: linear-gradient(90deg, #79ad4c var(--fill), #0b1719 var(--fill)); box-shadow: inset 0 2px 3px #0008; }
+body.island-theme #settings input[type=range]::-webkit-slider-thumb { width: 19px; height: 29px; border-radius: 5px; background: linear-gradient(110deg, #f0ddaf, #b89967); border: 2px solid #8c7450; box-shadow: inset 1px 1px #fff0ce, 0 2px 2px #0008; }
+body.island-theme #settings input[type=range]::-moz-range-thumb { width: 16px; height: 25px; border-radius: 5px; background: #d4bc8c; border: 2px solid #8c7450; }
+body.island-theme #settings input[type=checkbox] { width: 26px; height: 26px; accent-color: #7fc5ca; }
+body.island-theme #settings .audio-credits { border: 1px solid #776447; border-radius: 6px; padding: 10px 14px; background: #192522; }
+body.island-theme #settings .audio-credits summary { font-weight: 800; color: #f4e6c9; }
+body.island-theme #settings .controls-list { gap: 0 15px; margin: 0; }
+body.island-theme #settings .controls-list :is(dt, dd) { padding: 8px 10px; border-bottom: 1px solid #73634866; min-height: 43px; margin: 0; }
+body.island-theme #settings .controls-list dt { align-self: stretch; background: #172320; }
+body.island-theme #settings .controls-list dd { color: #e7e5d5; }
+body.island-theme #settings kbd { background: linear-gradient(#e9d5ab, #b79d70); color: #2d2c20; border: 1px solid #806b47; box-shadow: 0 2px #463a27; }
+body.island-theme #settings .settings-foot { flex: none; border-top: 1px solid #897251; padding-top: 12px; margin-top: 8px; }
+
+/* Pause, friends and lobby: real scene shows through the space around frames. */
+body.island-theme #paused { align-items: center; justify-content: center; padding: 24px; }
+body.island-theme #paused .pause-card { display: block; width: min(1000px, 100%); max-height: calc(100dvh - 48px); padding: 20px 24px; margin: 0; overflow-y: auto; scrollbar-width: none; }
+body.island-theme #paused .pause-close { left: auto; right: 18px; top: 18px; }
+body.island-theme #paused .pause-grid { display: grid; grid-template-columns: minmax(220px, .7fr) minmax(0, 1.3fr); gap: 24px; }
+body.island-theme #paused .pause-head { padding: 12px 58px 14px 16px; margin-bottom: 20px; border: 1px solid #b89a66; border-radius: 7px; background: linear-gradient(155deg, #f5e4bd, #d5b77e); }
+body.island-theme #paused .pause-head h2 { color: #302d22; text-shadow: 0 1px #fff1cb; }
+body.island-theme #paused :is(.pause-live, .pause-sub, .pause-save) { color: #61543a; }
+body.island-theme #paused :is(.pause-actions, .pause-info) { grid-column: auto; grid-row: auto; margin-top: 0; }
+body.island-theme #paused .pause-block { background: #15221fe0; border: 1px solid #7b694a; }
+body.island-theme #paused .pause-block h3 { color: #eed8a7; }
+body.island-theme #paused .pause-team li { background: #2d3b30; color: #f5e7cb; }
+body.island-theme #steam-friends .friends-card { width: min(760px, 100%); }
+body.island-theme #steam-friends .friends-list li { background: #172522; border: 1px solid #786649; border-radius: 7px; }
+body.island-theme #lobby.lobby-screen { background: radial-gradient(ellipse at 50% 65%, #415a3ca8, transparent 65%), #152822; }
+body.island-theme .lobby-screen .lobby-card { background: #24332ae8; border: 2px solid #89714f; border-radius: 9px; }
+body.island-theme #lobby .lobby-card .btn { min-height: 36px; padding: 6px 10px; font-size: 14px; }
+body.island-theme .lobby-screen .lobby-head h2 { color: #eed7a5; }
+
+/* Inventory: the existing eight pockets, six backpack cells and live explorer. */
+body.island-theme .hud-panel.hud-inv { width: min(1180px, 95vw); height: min(760px, 94dvh); font-size: clamp(13px, min(1.12vw, 1.9dvh), 18px); padding: 18px 22px; }
+body.island-theme .hud-panel.hud-inv > .hud-panel-head { margin-bottom: 14px; min-height: 58px; }
+body.island-theme .hud-inv .hud-inv-body { grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); gap: 18px; }
+body.island-theme .hud-inv .hud-inv-items > h3 { min-height: 32px; padding: 7px 10px; margin: 0 0 8px; font-size: 18px; line-height: 1; background: linear-gradient(110deg, #794839, #492e29); color: #fff0d3; border: 1px solid #a77555; border-radius: 6px; }
+body.island-theme .hud-inv .hud-inv-items > h3:nth-of-type(2) { margin-top: 15px; background: linear-gradient(110deg, #4b6a3d, #2c452e); border-color: #78915a; }
+body.island-theme .hud-inv h3 small { font-size: 12px; color: #e0d5bb; }
+body.island-theme .hud-inv :is(.hud-pockets, .hud-backpack) { gap: 8px; flex: none; }
+body.island-theme .hud-inv .hud-cell { height: clamp(64px, 11dvh, 104px); color: #f2dfb2; border: 2px solid #8e7953; border-radius: 8px 11px 7px 10px; background: linear-gradient(145deg, #39443a, #192722); box-shadow: inset 0 2px #c3c39826, inset 0 -3px #0e1a1c88; }
+body.island-theme .hud-inv .hud-cell-ic { inset: 9px 17px 33px; }
+body.island-theme .hud-inv .hud-cell-ic svg { width: 100%; height: 100%; }
+body.island-theme .hud-inv .hud-cell-n { bottom: 20px; font-size: 13px; line-height: 1; }
+body.island-theme .hud-inv .hud-cell-name { font-size: 13px; bottom: 5px; left: 5px; right: 5px; }
+body.island-theme .hud-inv .hud-cell[aria-pressed=true] { border-color: #ffe49b; background: linear-gradient(#5a583a, #34422c); box-shadow: inset 0 0 0 1px #f5cd67, 0 0 9px #e7bc5344; }
+body.island-theme .hud-inv .hud-pocket-n { font-size: 16px; left: 6px; top: 3px; }
+body.island-theme .hud-inv .hud-bag-empty { background: #14201d; opacity: .55; border: 2px dashed #7b7956; }
+body.island-theme .hud-inv .hud-inv-detail { border: 2px solid #806d4b; background: radial-gradient(ellipse at 50% 80%, #54774455, transparent 65%), #15231f; border-radius: 9px; padding: 18px; }
+body.island-theme .hud-inv .hud-inv-drop { border: 1px dashed #b09b69; border-radius: 6px; color: #d7c8a5; background: #17231f; padding: 9px; font-size: 14px; }
+body.island-theme .hud-inv .hud-inv-detail h3 { color: #efdab0; }
+body.island-theme .hud-inv .hud-inv-note { color: #c7cbb7; font-size: 13px; }
+body.island-theme .hud-inv .hud-inv-stat { color: #dbd5bc; margin: 12px 0; }
+body.island-theme .hud-inv .hud-inv-kind { color: #cfae6d; }
+body.island-theme .hud-inv :is(.hud-inv-statrows dt, .hud-inv-stats > p) { color: #c5c9b8; }
+body.island-theme .hud-inv .hud-inv-statrows dd { color: #f6e6c2; }
+
+/* Other station panels share the same surfaces without changing their controls. */
+body.island-theme .hud-panel:not(.hud-skills) :is(.craft-stockbar, .craft-row, .boat-part, .wd-slot) { background: #172521; border-color: #7e6b4b; border-radius: 7px; }
+body.island-theme .hud-panel:not(.hud-skills) :is(.craft-stock-label, .craft-txt small, .base-intro, .boat-status, .boat-part-txt small) { color: #c9c9b5; }
+body.island-theme .hud-panel:not(.hud-skills) .craft-tab.is-on { --button-top: #376c78; --button-bottom: #1c434c; --button-edge: #8cc1c5; color: #fff0d3; }
+body.island-theme .hud-panel:not(.hud-skills) .craft-row.is-done { border-color: #91ad67; background: #2b412b; }
+body.island-theme .hud-panel:not(.hud-skills) .boat-part.is-found { border-color: #92ae67; background: #30442e; }
+body.island-theme .hud-panel:not(.hud-skills) .wd-stage { background: radial-gradient(ellipse at 50% 80%, #a4ba6b44, transparent 60%), #1c3027; border: 1px solid #7b6b4a; }
+body.island-theme .hud-panel:not(.hud-skills) .wd-swatch { border-color: #8c7751; border-radius: 6px; }
+body.island-theme .hud-panel:not(.hud-skills) .wd-arrow { width: 44px; height: 44px; min-width: 44px; flex: none; padding: 0; }
+body.island-theme .hud-panel:not(.hud-skills) .wd-drag { color: #e0d8b9; }
+body.island-theme #home-explorer-root .home-dialog-card { width: min(1180px, 100%); }
+body.island-theme #home-explorer-root .hud-panel { background: transparent; border: 0; box-shadow: none; outline: 0; padding: 0; }
+body.island-theme #home-explorer-root .home-explorer-summary { border-color: #84704e; }
+body.island-theme .hud-panel:not(.hud-skills) .wd-foot { padding-top: 12px; border-top: 1px solid #7b694b; }
+
+@media (max-width: 800px) {
+  body.island-theme :is(.home-dialog:not(#home-skills), #settings, #paused, #steam-friends) { padding: 12px; }
+  body.island-theme :is(.home-panel, .home-dialog-card:not(.home-skills-card), .settings-card, .pause-card, .friends-card) { padding: 14px; max-height: calc(100dvh - 24px); }
+  body.island-theme #settings .settings-card { height: calc(100dvh - 24px); padding: 12px; }
+  body.island-theme #settings .setting-row { grid-template-columns: minmax(115px, 1fr) minmax(80px, 1.4fr) 70px; gap: 8px; padding: 9px; }
+  body.island-theme #settings .setting-row :is(label, output) { font-size: 14px; }
+  body.island-theme .hud-panel.hud-inv { padding: 12px; }
+  body.island-theme .hud-inv .hud-inv-body { gap: 10px; }
+  body.island-theme .hud-inv .hud-inv-detail { padding: 12px; }
+  body.island-theme .hud-inv h3 small { display: none; }
+  body.island-theme .hud-inv .hud-inv-items > h3 { font-size: 16px; margin-bottom: 6px; min-height: 28px; }
+  body.island-theme .hud-inv .hud-cell-ic { inset-inline: 10px; }
+  body.island-theme .hud-inv .hud-cell-name { font-size: 11px; }
+}
+@media (max-height: 650px) {
+  body.island-theme .hud-panel.hud-inv { padding: 10px 14px; height: 96dvh; }
+  body.island-theme .hud-panel.hud-inv > .hud-panel-head { min-height: 48px; margin-bottom: 8px; padding-block: 6px; }
+  body.island-theme .hud-inv .hud-cell { height: 9.5dvh; min-height: 52px; }
+  body.island-theme .hud-inv .hud-inv-items > h3 { margin-bottom: 5px; padding-block: 5px; min-height: 26px; }
+  body.island-theme .hud-inv .hud-inv-items > h3:nth-of-type(2) { margin-top: 9px; }
+  body.island-theme .hud-inv .hud-inv-stat { margin-block: 7px; }
+  body.island-theme .hud-inv .hud-inv-drop { padding: 5px; }
+}
+@media (max-width: 520px) {
+  body.island-theme #settings .setting-row { grid-template-columns: minmax(0, 1fr) 64px; }
+  body.island-theme #settings .setting-row label { grid-column: 1 / -1; }
+  body.island-theme #settings .setting-row input { grid-column: 1; }
+  body.island-theme #settings .settings-tabs [role=tab] { padding-inline: 5px; font-size: 14px; }
+  body.island-theme #home-expeditions .expedition-actions { grid-template-columns: repeat(3, 1fr); }
+}
+@media (max-width: 700px) {
+  body.island-theme #paused .pause-grid { grid-template-columns: minmax(0, 1fr); }
+  body.island-theme .hud-inv .hud-inv-body { grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); }
+}
+@media (prefers-reduced-motion: reduce) {
+  body.island-theme :is(.btn, .menu-link, .wd-btn, .craft-tab, .icon-btn) { transition: none; }
+}

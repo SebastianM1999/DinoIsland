@@ -49,6 +49,8 @@
 - Tests: `test/skills-ui.test.js` (skillModel), `test/tracking-minimap.test.js` (buildMapBase), `test/ordering.test.js` (PerfStats). `test/party-list.test.js` (`renderPause` party list with a minimal fake DOM).
 
 ## Rules
+
+- `css/expeditionTheme.css` supplies the shared stone/parchment skin for home menus, settings, credits, saves, pause/lobby, inventory and station dialogs. It scopes rules through `body.island-theme`, survives lazy HUD stylesheet loading, and keeps the slideshow/live scene as the backdrop. Reference images guide materials and hierarchy, never item catalogs, settings or slot counts. The separately approved illustrated skill tree retains its own stylesheet/artwork.
 - Dialogs never talk to the network. They receive callbacks (`onCraft`, `onBuild`, `onTower`, `onRepair`, `onBuy`, `onWear`, ...) and `core/game.js` turns them into `net.act(ACT.…)`. The server validates every action; `SkillPanel` treats its optimistic state as a guess replaced by `MSG.PROF`.
 - Costs, recipes, skills, relics, outfits and texts come from `src/shared/` (`crafting.js`, `base.js`, `skills.js`, `relics.js`, `outfits.js`, `config.js`); do not hard-code game numbers here.
 - HUD per-frame setters only touch `transform` / canvas pixels, skip unchanged values and never read layout during a frame (header rule in `hud.js`).
