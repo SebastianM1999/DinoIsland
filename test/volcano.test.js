@@ -11,6 +11,7 @@ import { ServerWorld } from '../src/sim/world.js';
 import { CONFIG } from '../src/shared/config.js';
 import { EV, MSG } from '../src/shared/protocol.js';
 import { resolveCircle } from '../src/shared/collision.js';
+import { makeRng } from '../src/shared/rng.js';
 import { VOLCANO_ARENA, insideVolcanoArena, columnTop, columnCycle } from '../src/shared/volcanoArena.js';
 
 const VARIANTS = [1, 2, 3, 4, 5, 6];
@@ -356,9 +357,10 @@ test('no crust plates: the lava flows lie open (but for the bridges)', () => {
 });
 
 /** The volcano island, no dinosaurs, one player at a spot. */
-function volcanoWorld(variant = 2) {
+function volcanoWorld(variant = 2, seed = 1) {
   const out = [];
   const world = new ServerWorld({ send: (to, msg) => out.push({ to, msg }) }, { level: 2, variant });
+  world.volcano.rng = makeRng(seed);
   for (const d of [...world.dinos.list]) world.dinos.remove(d);
   world.dinos.respawnQueue = [];
   const p = world.players.get(world.join('Vulcan').id);
@@ -455,6 +457,23 @@ test('ash rain blows in on the wind between eruptions, which keep their time', (
   run(C.first - A.first - A.durMax - 0.4);
   assert.equal(world.volcano.phase, 'calm');
   run(0.6);
+  assert.equal(world.volcano.phase, 'rumble');
+});
+
+test('wind ash too close to the eruption is deferred without delaying the eruption', () => {
+  // Seed 43 draws nearly durMax. At the first eligible .05 s tick, floating
+  // point accumulation leaves slightly less than durMax + 20 s before rumble.
+  const { world, put, run, evs } = volcanoWorld(5, 43);
+  const eruptionAt = world.volcano.until;
+  put(world.layout.hut.x, world.layout.hut.z);
+  run(CONFIG.volcano.ash.first + 0.1);
+  assert.equal(world.volcano.phase, 'calm');
+  assert.equal(world.volcano.nextAsh, eruptionAt);
+  assert.equal(world.volcano.until, eruptionAt);
+  assert.equal(evs(EV.VOLCANO).some(event => event.source === 'wind'), false);
+  run(eruptionAt - world.now - 0.1);
+  assert.equal(world.volcano.phase, 'calm');
+  run(0.2);
   assert.equal(world.volcano.phase, 'rumble');
 });
 
