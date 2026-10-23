@@ -10,7 +10,7 @@ body.island-theme {
   --stone-text: #fff0d2;
   --stone-muted: #c5c9b8;
   --stone-surface: linear-gradient(145deg, #53605212, transparent 38%), linear-gradient(35deg, transparent 63%, #b5a67d0c 63.2%, transparent 64%), #252c29;
-  --stone-rim: inset 0 2px 0 #e5d3a830, inset 0 -4px 0 #0d161d70, 0 5px 0 #181a16, 0 16px 42px #0006;
+  --stone-rim: inset 0 3px 1px #f4dfac75, inset 3px 0 2px #ccb17d40, inset 0 -6px 2px #0d161db0, inset -3px 0 2px #10191499, 0 5px 0 #181a16, 0 16px 42px #0008;
 }
 
 /* Frames, separate from live HUD readouts and the skill tree's own layout. */
@@ -246,24 +246,37 @@ body.island-theme .hud-panel:not(.hud-skills) .wd-foot { padding-top: 12px; bord
   body.island-theme :is(.btn, .menu-link, .wd-btn, .craft-tab, .icon-btn) { transition: none; }
 }
 
-/* Small vector plants stay in the rim: no raster scenery and no hit targets.
-   The asymmetric leaves and warm stems echo the island's living stonework. */
+/* Raised leaves and looping vines cross the bevel in front of the frame.
+   Gradients and offset shadows supply depth without animation or hit targets. */
 body.island-theme {
   --dialog-leaves: url('../assets/ui/dialog-leaves.svg');
+  --dialog-leaves-reversed: url('../assets/ui/dialog-leaves-reversed.svg');
   --dialog-vine: url('../assets/ui/dialog-vine.svg');
+  --dialog-vine-horizontal: url('../assets/ui/dialog-vine-horizontal.svg');
+}
+body.island-theme :is(.home-panel, .home-dialog-card:not(.home-skills-card), .settings-card, .pause-card, .friends-card, .hud-panel) {
+  border-width: 4px;
+  border-top-color: #b99b67; border-left-color: #a98b59;
+  border-right-color: #675338; border-bottom-color: #5a4b34;
 }
 body.island-theme :is(.home-panel, .home-dialog-card:not(.home-skills-card), .settings-card, .pause-card, .friends-card, .hud-panel)::after {
-  content: ''; position: absolute; inset: 0; z-index: -1; pointer-events: none;
+  content: ''; position: absolute; inset: 0; z-index: 2; pointer-events: none;
   border-radius: inherit;
-  background-image: var(--dialog-leaves), var(--dialog-leaves), var(--dialog-vine), var(--dialog-vine);
-  background-position: left top, right bottom, left 48px, right 74px;
-  background-size: 56px 56px, 48px 48px, 14px 150px, 12px 170px;
-  background-repeat: no-repeat, no-repeat, repeat-y, repeat-y;
-  opacity: .9;
+  background-image: var(--dialog-leaves), var(--dialog-leaves-reversed), var(--dialog-vine), var(--dialog-vine), var(--dialog-vine-horizontal), var(--dialog-vine-horizontal);
+  background-position: left top, right bottom, -7px 72px, right -10px top 110px, 75px -10px, right 68px bottom -12px;
+  background-size: 108px 108px, 96px 96px, 38px 228px, 38px 228px, 228px 38px, 228px 38px;
+  background-repeat: no-repeat, no-repeat, repeat-y, repeat-y, repeat-x, repeat-x;
 }
+/* Close controls and heading copy sit above the decorative corner tips. */
+body.island-theme :is(.home-panel-head, .home-dialog-head, .settings-head, .hud-panel-head, .sk-head) :is(h2, button):not(.board-close) {
+  position: relative; z-index: 3;
+}
+body.island-theme #paused .pause-close,
+body.island-theme .hud-panel .board-close { z-index: 3; }
 body.island-theme #home-explorer-root .hud-panel::after { display: none; }
 @media (max-width: 850px), (max-height: 650px) {
   body.island-theme :is(.home-panel, .home-dialog-card:not(.home-skills-card), .settings-card, .pause-card, .friends-card, .hud-panel)::after {
-    background-size: 32px 32px, 30px 30px, 8px 150px, 8px 170px;
+    background-size: 72px 72px, 64px 64px, 25px 180px, 25px 180px, 180px 25px, 180px 25px;
+    background-position: left top, right bottom, -7px 60px, right -8px top 90px, 60px -9px, right 55px bottom -10px;
   }
 }
