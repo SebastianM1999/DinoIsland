@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 112 112">
+  <defs>
+    <linearGradient id="leaf" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#d0dc78"/><stop offset=".35" stop-color="#8bab43"/><stop offset=".68" stop-color="#4d792e"/><stop offset="1" stop-color="#203f24"/></linearGradient>
+    <linearGradient id="stem" x1="0" y1="0" x2="1" y2="0"><stop stop-color="#3d3521"/><stop offset=".4" stop-color="#b4a363"/><stop offset=".65" stop-color="#7d7541"/><stop offset="1" stop-color="#3f4828"/></linearGradient>
+    <filter id="lift" x="-40%" y="-40%" width="190%" height="190%"><feDropShadow dx="3" dy="5" stdDeviation="2" flood-color="#071711" flood-opacity=".8"/></filter>
+    <path id="blade" d="M0 0C-14-9-18-27-8-39C7-35 14-15 0 0Z"/>
+  </defs>
+  <g transform="translate(112 112) rotate(180)"><g filter="url(#lift)">
+    <path d="M8 109C23 80 5 56 20 30S63 11 107 9" fill="none" stroke="#142d20" stroke-width="12"/>
+    <path d="M8 109C23 80 5 56 20 30S63 11 107 9" fill="none" stroke="url(#stem)" stroke-width="8"/>
+    <path d="M11 105C25 77 8 55 23 31S65 14 105 11" fill="none" stroke="#d3c383" stroke-opacity=".65" stroke-width="1.5"/>
+    <g fill="url(#leaf)" stroke="#284b26" stroke-width="1.2">
+      <use href="#blade" transform="translate(16 83) rotate(45)"/>
+      <use href="#blade" transform="translate(14 65) rotate(-18)"/>
+      <use href="#blade" transform="translate(19 47) rotate(65)"/>
+      <use href="#blade" transform="translate(29 30) rotate(-12)"/>
+      <use href="#blade" transform="translate(47 20) rotate(83)"/>
+      <use href="#blade" transform="translate(69 14) rotate(48) scale(.8)"/>
+      <use href="#blade" transform="translate(90 11) rotate(94) scale(.7)"/>
+    </g>
+    <path d="M16 83L36 64M14 65L9 40M19 47L44 35M29 30L28 7M47 20L75 15M69 14L82 1" stroke="#e0e6a1" stroke-width="1.4" stroke-opacity=".65" fill="none"/>
+  </g>
+</g></svg>
