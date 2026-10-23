@@ -223,7 +223,7 @@ export class SkillPanel {
       </section>`).join('');
     const resetLabel = this.confirming ? `Refund ${refund} point${refund === 1 ? '' : 's'} - confirm` : 'Reset skills';
     const resetOff = !this.atCamp || refund === 0 || !!this.view.creative;
-    // One illustrated panel is shared by the home preview, lobby and live HUD.
+    // One native stone panel is shared by the home preview, lobby and live HUD.
     this.el.innerHTML = `
       <header class="sk-head">
         <div class="sk-heading"><h2>${treeIcon('endurance')} <span>${esc(this.title)}</span></h2>

@@ -13,7 +13,7 @@ body.island-theme {
   --stone-rim: inset 0 2px 0 #e5d3a830, inset 0 -4px 0 #0d161d70, 0 5px 0 #181a16, 0 16px 42px #0006;
 }
 
-/* Frames, deliberately separate from the live HUD and accepted skill tree. */
+/* Frames, separate from live HUD readouts and the skill tree's own layout. */
 body.island-theme :is(.home-panel, .home-dialog-card:not(.home-skills-card), .settings-card, .pause-card, .friends-card),
 body.island-theme .hud-panel:not(.hud-skills) {
   color: var(--stone-text);
@@ -23,7 +23,9 @@ body.island-theme .hud-panel:not(.hud-skills) {
   box-shadow: var(--stone-rim);
   outline: 1px solid #171f18;
   padding: 20px 24px;
+  isolation: isolate;
 }
+body.island-theme .home-panel { position: relative; }
 body.island-theme :is(.home-dialog-card:not(.home-skills-card), .settings-card, .pause-card, .friends-card).brush::before,
 body.island-theme .hud-panel:not(.hud-skills).brush::before { display: none; }
 body.island-theme .hud-panel:not(.hud-skills):not(.hud-inv) { max-height: calc(100dvh - 32px); overflow-y: auto; scrollbar-width: none; }
@@ -239,4 +241,26 @@ body.island-theme .hud-panel:not(.hud-skills) .wd-foot { padding-top: 12px; bord
 }
 @media (prefers-reduced-motion: reduce) {
   body.island-theme :is(.btn, .menu-link, .wd-btn, .craft-tab, .icon-btn) { transition: none; }
+}
+
+/* Small vector plants stay in the rim: no raster scenery and no hit targets.
+   The asymmetric leaves and warm stems echo the island's living stonework. */
+body.island-theme {
+  --dialog-leaves: url('../assets/ui/dialog-leaves.svg');
+  --dialog-vine: url('../assets/ui/dialog-vine.svg');
+}
+body.island-theme :is(.home-panel, .home-dialog-card:not(.home-skills-card), .settings-card, .pause-card, .friends-card, .hud-panel)::after {
+  content: ''; position: absolute; inset: 0; z-index: -1; pointer-events: none;
+  border-radius: inherit;
+  background-image: var(--dialog-leaves), var(--dialog-leaves), var(--dialog-vine), var(--dialog-vine);
+  background-position: left top, right bottom, left 48px, right 74px;
+  background-size: 56px 56px, 48px 48px, 14px 150px, 12px 170px;
+  background-repeat: no-repeat, no-repeat, repeat-y, repeat-y;
+  opacity: .9;
+}
+body.island-theme #home-explorer-root .hud-panel::after { display: none; }
+@media (max-width: 850px), (max-height: 650px) {
+  body.island-theme :is(.home-panel, .home-dialog-card:not(.home-skills-card), .settings-card, .pause-card, .friends-card, .hud-panel)::after {
+    background-size: 32px 32px, 30px 30px, 8px 150px, 8px 170px;
+  }
 }
