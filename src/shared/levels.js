@@ -217,12 +217,12 @@ export const BIOMES = {
 
 /** The islands, in order. Sailing away from the last one wins the game. */
 export const LEVELS = [
-  // the first island only has raptors and pteranodons – plus the giant locked
+  // the first island only has raptors (in pairs, as Jonas' message warns: raptorPack) and pteranodons – plus the giant locked
   // away in the Primeval Grove (shared/grove.js), a teaser for later islands –
   // and the Boss Arena, a lava islet beside the boat (shared/bossArena.js)
   // + one of each test species (sim/ai/testDinos.js) on a ring round the camp, to see the new Blender models in the game
   { name: 'Emerald Jungle', biome: 'jungle', dinos: { brachio: 0, stego: 0, raptor: 4,
-    triceratops: 1, ankylosaurus: 1, pachycephalosaurus: 1, dilophosaurus: 1, spinosaurus: 1 }, grove: true, bossArena: true, variant: 1 },
+    triceratops: 1, ankylosaurus: 1, pachycephalosaurus: 1, dilophosaurus: 1, spinosaurus: 1 }, raptorPack: 2, grove: true, bossArena: true, variant: 1 },
   // twice the land area of the first island (incl. its boss islet); the swamp
   // arena in the waist waits for its boss (shared/swampArena.js)
   { name: 'Misty Swamp', biome: 'swamp', scale: 0.86, swampArena: true, seedIndex: 2, variant: 1 },
@@ -254,6 +254,8 @@ export function levelDef(index) {
     grove: !!base.grove,
     bossArena: !!base.bossArena,
     swampArena: !!base.swampArena,
+    // raptors per pack (null: the usual mix of 2 and 3)
+    raptorPack: base.raptorPack ?? null,
     // which seed family the island's variants come from (shared/island.js islandSeed)
     seedIndex: base.seedIndex ?? i,
     // the fixed map: the island always builds this variant (sim/world.js; `?variant=N` overrides it)
