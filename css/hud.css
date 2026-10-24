@@ -1150,6 +1150,8 @@
 .note-sheet.note-wall { background: linear-gradient(170deg, #5c5560, #47414b); color: #ece6f1; box-shadow: inset 0 0 2.2em rgba(0, 0, 0, 0.5); }
 .note-sheet.note-wall h2 { color: #ece6f1; }
 .note-actions { display: flex; justify-content: flex-end; gap: 0.6em; }
+.note-learned { display: flex; align-items: center; gap: 0.4em; margin: 0 0 0.9em; color: #ffe7a3; font-weight: 800; }
+.note-learned svg { width: 1.4em; height: 1.4em; flex: none; }
 .note-journal { max-height: 58vh; overflow-y: auto; margin-bottom: 1em; }
 .note-journal h3 { margin: 0.6em 0 0.4em; color: var(--ink-dim); font-size: 0.95em; text-transform: uppercase; letter-spacing: 0.05em; }
 .note-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.45em; }

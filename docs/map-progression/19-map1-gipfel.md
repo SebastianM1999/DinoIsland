@@ -31,3 +31,9 @@ Das Jägerlager mit dem Bogen liegt jetzt **oben am Gipfel** als Elias' Lager. D
 
 ## Nicht hier
 - Tier-2/3-Freischaltung über Nachrichten (folgt in 21/23 mit eigenen `learn`-Einträgen).
+
+## Umsetzung (Abweichungen)
+- Das Lager liegt nicht direkt auf dem Gipfel: Dort sitzen das Ptera-Nest und das Bootsteil. Es liegt auf einer flachen Stelle 8–26 m darunter, 2–7 m neben dem Bergpfad, mit sanftem Boden dazwischen, damit es zu Fuß erreichbar ist. Gibt es so eine Stelle nicht, bleibt es wie bisher am Trail (fester Map: Gipfel).
+- Es gibt kein eigenes `recipesKnown`: Ein Rezept gilt als bekannt, sobald seine Notiz (`learn`) gelesen ist. Saves aus der Zeit vor der Story (`story` fehlt) gelten als `legacy` und kennen alle Rezepte.
+- Gelernt werden Pfeile, Falle, Ersatzspeer, `bow1`, `spear1`, `quiver1`. Einen Köder gibt es im Spiel noch nicht.
+- Die Notiz zeigt unter dem Text, was sie dem Team beibringt; das Crafting-Panel zeigt unbekannte Rezepte als „Unknown“.

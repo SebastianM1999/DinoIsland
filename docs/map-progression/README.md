@@ -33,7 +33,7 @@ Dieser Ordner ist der Gesamtplan für Waffen-Freischaltung, Dino-Level, Craft-Ki
 | 16 | [Map 1: Ankunft am Strand](16-map1-ankunft.md) | 15 | world.js (Inventar, Lagerfeuer, Spawn) | umgesetzt (claude/story-arrival) |
 | 17 | [Intro-/Outro-Cutscene](17-cutscene.md) | – | game.js (Start, Spielende) | umgesetzt (claude/story-cutscene) |
 | 18 | [Story-Quests](18-story-quests.md) | 15 | world.js (Mission-Events) | umgesetzt (claude/story-quests) |
-| 19 | [Map 1: Elias' Lager am Gipfel](19-map1-gipfel.md) | 15, 16 | world.js (craft) | offen |
+| 19 | [Map 1: Elias' Lager am Gipfel](19-map1-gipfel.md) | 15, 16 | world.js (craft) | umgesetzt (claude/story-peak) |
 | 20 | [Map 1: Raptoren in Paaren](20-raptoren-paare.md) | – | – | offen |
 | 21 | [Map 2: Laterne und Glutblut](21-laterne.md) | 15, 18 | world.js (Inventar, Butchern) | offen |
 | 22 | [Reise Ashfall ↔ Hollow Mountain](22-inselreise.md) | 18 | world.js (nextLevel/loadLevel) | offen |

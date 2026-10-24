@@ -329,7 +329,7 @@ export class PlayerActions {
   select(i) {
     if (i === this.game.eq) return;
     // (island 1: no bow in hand until you found yours at the hunter's camp)
-    if (EQUIP[i] === 'bow' && this.inv.bow === false) return this.fullAlert("No bow yet – find it at the hunter's camp before the mountain", 'bow');
+    if (EQUIP[i] === 'bow' && this.inv.bow === false) return this.fullAlert("No bow yet – find one at Elias' camp below the summit", 'bow');
     if (!this.canSelect(i)) return;   // (a firearm not carried)
     this.game.eq = i;
     this.drawing = false;
@@ -806,6 +806,7 @@ export class PlayerActions {
       guns: inv.guns, reloading: inv.reloading, weapon: this.tool,
       arrows: inv.arrows,
       arrowUses: inv.arrowUses,
+      bow: inv.bow,
       spear: inv.spear,
       spearFound: inv.spearFound,
       spearHealth: inv.spearHealth,

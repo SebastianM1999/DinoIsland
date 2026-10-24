@@ -4,6 +4,7 @@
 
 import { NOTE_BY_ID, NOTES } from '../../shared/notes.js';
 import { LEVELS } from '../../shared/levels.js';
+import { RECIPES } from '../../shared/crafting.js';
 import { icon } from './icons.js';
 
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -59,12 +60,14 @@ export class NotePanel {
     this.el.setAttribute('aria-label', n ? n.title : 'Journal');
     const close = `<button type="button" class="wd-btn" data-act="close">Close <kbd>E</kbd></button>`;
     if (n) {
+      const learned = RECIPES.filter((r) => r.learn === n.id);   // (the recipes this note teaches: shared/crafting.js)
       this.el.innerHTML = `
         <article class="note-sheet note-${n.prop}">
           <h2>${esc(n.title)}</h2>
           ${n.text.map((t) => `<p>${esc(t)}</p>`).join('')}
           <p class="note-author">– ${esc(n.author)}</p>
         </article>
+        ${learned.length ? `<p class="note-learned">${icon('crate')} Teaches the team: ${learned.map((r) => esc(r.name)).join(', ')}</p>` : ''}
         <div class="note-actions">${this.fromJournal ? `<button type="button" class="wd-btn" data-act="back">Back to the journal</button>` : ''}${close}</div>`;
       return;
     }

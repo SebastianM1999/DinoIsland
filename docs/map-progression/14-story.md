@@ -80,13 +80,13 @@ Eine Plane über einem Felsvorsprung, eine Kiste, eine Feuerstelle. Daneben lieg
 >
 > Von hier oben sieht man alles: den Hain im Norden mit dem alten Riesen, die Nester, das Wrack am Ostufer. Jonas glaubt nicht mehr daran, dass wir hier wegkommen. Ich schon.
 >
-> Ich lasse hier, was ich gelernt habe: wie man Pfeile schnitzt, Fallen stellt und Köder legt. Und meinen Bogen. Jagt nicht, was ihr nicht braucht.
+> Ich lasse hier, was ich gelernt habe: wie man Pfeile schnitzt, Fallen stellt und eine Speerspitze härtet. Und meinen Bogen. Jagt nicht, was ihr nicht braucht.
 >
 > Ich baue ein Floß und folge den Flugechsen nach Süden, in den Nebel. Dort, glaube ich, beginnt die Spur.
 >
 > *– E. Brand*
 
-Lesen schaltet die **Tier-1-Rezepte** für das ganze Team frei: Pfeile, Falle, Köder, `bow1`, `spear1`, `quiver1`. Neue Quest: „Finde das Wrack am Ostufer.“
+Lesen schaltet die **Tier-1-Rezepte** für das ganze Team frei: Pfeile, Falle, Ersatzspeer, `bow1`, `spear1`, `quiver1` (ein Köder-Rezept gibt es im Spiel noch nicht). Neue Quest: „Finde das Wrack am Ostufer.“
 
 ### Das Boot (Teilplan 18)
 - Ist man in Sichtweite des Wracks, wird es als entdeckt markiert und der Quest-Text kommt: „Das Beiboot der Meridian. Mit den richtigen Teilen schwimmt es wieder.“

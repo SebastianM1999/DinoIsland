@@ -62,6 +62,7 @@ function setup() {
   const world = new ServerWorld({ send: (to, msg) => sent.push({ to, msg }) }, { level: 0, variant: levelDef(0).variant });
   const { id } = world.join('Gatherer');
   const player = world.players.get(id);
+  world.story.notesRead.add('peak');   // (the team has read Elias' note with the recipes: story-peak.test.js)
   const gather = (spot) => world.receive(id, { t: MSG.ACT, a: ACT.GATHER, spot });
   const stand = (s) => { player.x = s.x; player.z = s.z; player.y = s.y; };
   return { world, sent, id, player, gather, stand };
