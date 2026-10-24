@@ -39,7 +39,7 @@
  * together: a changed message, field or handshake, or a world rule both sides must agree on.
  * Save files have their own version (shared/saveSchema.js).
  */
-export const PROTOCOL_VERSION = 3;
+export const PROTOCOL_VERSION = 4;
 
 /** Why a client of protocol version `v` cannot join this host, or null when it can. */
 export function versionMismatch(v) {
@@ -109,6 +109,7 @@ export const ACT = {
   REVIVE: 'revive',     // { to } start reviving a downed teammate (hold E) | { stop: true }
   DASH: 'dash',         // {}                                   Dash skill used (client moves, server grants the distance + checks cooldown)
   LIGHT: 'light',       // { torch }                              light a Hollow Mountain wall torch with the lit hand torch (within reach)
+  READ: 'read',         // { note }                               read a story note lying in reach (shared/notes.js, sim/story.js)
   DEV_TP: 'devtp',      // { x, y, z }                            dev pin tool: jump there (only a solo world started with ?dev, creative)
 };
 
@@ -123,6 +124,7 @@ export const EV = {
   RESOURCE: 'res',          // { spot, up, by? }  a map resource was gathered (up: false, by) or grew back (up: true)
   BOW_FOUND: 'bow',         // { id }  a player took their bow from the hunter's camp (layout.bowCamp)
   WALL_TORCH: 'wtorch',     // { torch, by }  a wall torch was lit (it stays lit for the island)
+  NOTE: 'note',             // { id, by, first }  a story note was read (first: nobody in the team had read it; it joins the journal)
   SHOT: 'shot',             // { by, kind, o, end } remote gun effects
   FIRE: 'fire',             // { by, kind, o, v, pid }            remote projectile visuals
   HURT: 'hurt',             // { id, dmg, hp, kx, kz, down, src }

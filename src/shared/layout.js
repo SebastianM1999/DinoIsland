@@ -22,6 +22,7 @@ import { SUMP } from './caveMaze.js';
 import { WALL_TORCH, wallMount } from './torch.js';
 import { caveRock } from './caveVolume.js';
 import { SPRING_LIP_OFFSET, SPRING_FLOOR, springColliders } from './springShape.js';
+import { placeNotes } from './notes.js';
 import * as dmath from './dmath.js';
 
 const TAU = Math.PI * 2;
@@ -106,6 +107,8 @@ export function* buildLayoutSteps(terrain) {
     sumps: [],              // dive-only shortcuts: { tunnel, level, len, a:{x,z}, b:{x,z}, cache:{x,z,y,loot} } (see shared/caveMaze.js SUMP)
     arrivalBoat: null,      // the boat the team came on (west cove, decoration only): { x, y, z, rot }
     logs: [],               // fallen trees: { x, z, rot, len, r, yA, yB, roots, dead }
+    storyAnchors: {},       // story places by name ({ x, y, z, rot }), see the story section below
+    notes: [],              // the story's readable notes on this island: { id, prop, x, y, z, rot } (shared/notes.js)
   };
   const circles = layout.colliders.circles;
   const boxes = layout.colliders.boxes;
@@ -1444,6 +1447,17 @@ export function* buildLayoutSteps(terrain) {
       circles.push({ x: c.x, z: c.z, r: 0.55, top: layout.bowCamp.y + 0.68, stand: true, kind: 'stump' });   // (client/world/bowCamp.js draws it 1.25 x life size)
     }
   }
+
+  // -------------------------------------------------------- story notes
+  // The story's notes (shared/notes.js) lie at anchors the story places on each island; a note
+  // is there only when its anchor is. Placed last, so nothing above moves.
+  layout.storyAnchors = {};
+  if (plan.level.index === 0) {
+    // Jonas' message, beside the camp fire for now (the arrival beach takes it later)
+    const c = hut.campfire, x = c.x + 3, z = c.z - 3;
+    layout.storyAnchors.skeleton = { x, z, y: terrain.heightAt(x, z), rot: 0 };
+  }
+  layout.notes = placeNotes(plan.level.index, layout.storyAnchors);
 
   // ------------------------------------------------- walkable rock surface
   // Rocks are part of the ground for players: stand on them, jump over them;

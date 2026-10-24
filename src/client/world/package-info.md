@@ -24,6 +24,7 @@
 - `logs.js` — `buildLogs`: fallen trunks from `layout.logs`, merged into one mesh.
 - `resourceNodes.js` — `buildResourceNodes`: the map resources at `layout.resourceSpots` (one InstancedMesh per kind; resin on the visible bark of its tree), `setUp(spotId, up)` with pop-in, `isUp`, `getAnchor`, a soft glow pulse.
 - `bowCamp.js` — `buildBowCamp`: the hunter's camp at `layout.bowCamp` (stump, quiver, basket; the bow and a golden glow only while the local explorer has none: `setTaken`), `minimapMarkers`.
+- `notes.js` — `buildNotes`: the story notes at `layout.notes` (bottle, folded paper under a stone, book, charcoal writing on a wall); an unread one glimmers until the team has read it (`setRead`).
 - `fruitPlants.js` — `buildFruitPlants`: the fruit of every kind by its role (`KINDS`: bush, tree, glowing plant – berry/mango/dragon, swamp marshberry/swampfig/glowlotus, volcano emberchili/ashplum/obsidianfig); `setCount(spotId, n)` with pop-in.
 - `hut.js` — `buildHut` / `buildHutSteps` by `layout.hut.kind`: island 1's tent camp (tent, drop-off, flag, campfire, the camp table's building site until `setBench(true)`), the hunting hut (cabin, drop-off, workbench, mission board, wardrobe, flag, campfire, camp ground from `hutFloor`) on later islands without plots, or the small landing camp.
 - `base.js` — `buildBaseView`: the team base on islands 2+ (plot stakes, scaffolding, camp/lodge/fort stages, towers, raid damage); `setBase`, `shoot`; `stakePoint`.

@@ -35,6 +35,7 @@ import { freshBase, CAMP_BENCH, campStations, safeZone as baseSafeZone, hasBaseP
 import { updateTowers } from './towers.js';
 import { Raids } from './raids.js';
 import { Volcano } from './volcano.js';
+import { Story } from './story.js';
 import { insideGrove, mayEnterGrove } from '../shared/grove.js';
 import { RECIPE_BY_ID, upgradeMods, unlockIsland, canAfford } from '../shared/crafting.js';
 
@@ -87,6 +88,7 @@ export class ServerWorld {
     this.creativeUsed = false;          // creative mode was switched on in this expedition (shown on its save)
     this.store = Object.fromEntries(LOOT_KEYS.map((k) => [k, 0]));
     this.upgrades = new Set();          // team upgrades built at the workbench (survive islands)
+    this.story = new Story(this);       // the notes the team has read (sim/story.js; survives islands)
     this.fruitRng = makeRng((Math.random() * 0xffffffff) >>> 0);
     this.#loadLevel(opts.level ?? 0, opts.variant);
     this.mission = new Mission(this);
@@ -1331,6 +1333,7 @@ export class ServerWorld {
         this.event(EV.WALL_TORCH, { torch: wt.id, by: p.id });
         return;
       }
+      case ACT.READ: return this.story.read(p, m.note);
       case ACT.HARVEST: {
         if (!p.alive) return;
         const f = this.fruit[m.spot | 0];
@@ -1879,6 +1882,7 @@ export class ServerWorld {
       fruit: this.fruit.map((f) => f.count),
       resources: this.resources.filter((r) => !r.up).map((r) => r.spot),   // the spots gathered right now
       wallTorches: [...(this.wallTorchesLit ?? [])],
+      story: this.story.public(),
       spottedDinos: [...this.spottedDinos],
       traps: [...this.traps.values()],
       tracks: this.tracks.slice(-200),

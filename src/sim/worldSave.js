@@ -4,7 +4,7 @@
 // (sim/worker.js, server/saveCoordinator.js) wrap the result with shared/saveSchema.js.
 //
 // What is kept and what is deliberately rebuilt (see docs/todo/save-system-plan.md):
-// - kept: island, clock, id counter, team store/upgrades, mission, relics, base, raids'
+// - kept: island, clock, id counter, team store/upgrades, the story (notes read), mission, relics, base, raids'
 //   schedule, volcano cycle, fruit/resources and their regrowth, torches, items on the
 //   ground, traps, carcasses, living bosses (health), every explorer's roster record
 //   (profile = XP/skills, inventory, pose, health) keyed by a persistent roster key.
@@ -98,6 +98,7 @@ export function exportWorld(world) {
     creativeUsed: !!world.creativeUsed,
     store: { ...world.store },
     upgrades: [...world.upgrades],
+    story: world.story.export(),
     mission: {
       islandsDone: m.islandsDone, contracts: copy(m.contracts), stats: copy(m.stats),
       phase: m.phase, startedAt: m.startedAt, completedIn: m.completedIn, doneTimer: m.doneTimer,
@@ -206,6 +207,7 @@ export function restoreWorld(world, data) {
   world.creativeUsed = !!data.creativeUsed;
   for (const k of Object.keys(world.store)) world.store[k] = int(data.store[k], 0, 1e6, 0);
   world.upgrades = new Set(data.upgrades.filter((id) => typeof id === 'string'));
+  world.story.restore(data.story);
 
   const m = world.mission, sm = data.mission;
   m.islandsDone = int(sm.islandsDone, 0, 1000, 0);

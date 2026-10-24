@@ -13,6 +13,7 @@
 - `craftingPanel.js` — `CraftingPanel`: hut workbench dialog (supplies tab and team upgrades tab, refill).
 - `basePanel.js` — `BasePanel`: base dialog on islands 2+ (pick plot, upgrade stage, build/upgrade towers, repair).
 - `boatPanel.js` — `BoatPanel`: boat wreck dialog listing found/missing boat parts and the Repair button; once repaired, Set sail (Enter) and Inventory (Tab).
+- `notePanel.js` — `NotePanel`: a story note on a sheet of paper (E at the note, `showNote`) and the team's journal (J, `showJournal`: every note read, island by island; a note opens on the sheet, Back returns).
 - `grovePrompt.js` — `GrovePrompt`: Yes/No warning and hint shown at the giant's pen barrier.
 - `wardrobe.js` — `Wardrobe` (hat/top/pants picker with rotatable 3D preview) and `savedOutfit()` from localStorage.
 - `characterPreview.js` — `CharacterPreview(canvas, { slot, outfit, equipped })`: the rotatable explorer on a wooden platform (own WebGL renderer, created on first `start`, drag to turn, idle spin), `setOutfit`, `setEquipped`, `start/stop`, `dispose`. Used by the wardrobe (and through it the home explorer) and the inventory.
