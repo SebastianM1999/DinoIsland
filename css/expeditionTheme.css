@@ -258,12 +258,9 @@ body.island-theme :is(.home-panel, .home-dialog-card:not(.home-skills-card), .se
   border-right-color: #675338; border-bottom-color: #5a4b34;
 }
 body.island-theme .dialog-ornament {
-  position: fixed; pointer-events: none; user-select: none; padding: 30px;
-  border-radius: 28px;
-  /* Overlay extends 22 px outside the frame, but only 8 px inside. The
-     transparent center guarantees foliage cannot paint over any content. */
-  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-  mask-composite: exclude;
+  /* Overlay extends 22 px outside the frame and paints over everything,
+     dialog content included; it never takes clicks. */
+  position: fixed; pointer-events: none; user-select: none;
 }
 /* Vines are a seeded inline SVG per dialog (dialogVines.js); the corner
    clusters paint on top of them so stems sprout from the leaves. */

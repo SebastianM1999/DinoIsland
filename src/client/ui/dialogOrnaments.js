@@ -4,7 +4,7 @@ import { vineSvg } from './dialogVines.js';
 const PANELS = '.home-panel,.home-dialog-card:not(.home-skills-card),.settings-card,.pause-card,.friends-card,.hud-panel';
 const EXCLUDED = '#home-explorer-root .hud-panel';
 const OUTSET = 22;
-// Foliage paints above every other page layer; the transparent cutout keeps content usable.
+// Foliage paints above every other page layer, dialog content included; it never takes pointer events.
 export const ORNAMENT_Z = 2147483000;
 
 export function ornamentRect(rect) {
