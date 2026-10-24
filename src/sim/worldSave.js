@@ -220,7 +220,7 @@ export function restoreWorld(world, data) {
     }
   }
   if (plain(sm.stats)) m.stats = { ...m.stats, ...copy(sm.stats) };
-  m.phase = ['search', 'repaired', 'sailing'].includes(sm.phase) ? sm.phase : 'search';
+  m.phase = ['explore', 'search', 'repaired', 'sailing'].includes(sm.phase) ? sm.phase : 'search';
   m.startedAt = num(sm.startedAt, world.now);
   m.completedIn = num(sm.completedIn);
   m.doneTimer = num(sm.doneTimer);

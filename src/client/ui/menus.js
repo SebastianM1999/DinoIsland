@@ -158,14 +158,16 @@ export function renderPause(game) {
   const current = ul.querySelector('li:not(.done)');
   if (current) current.classList.add('current');
 
-  $('pause-contracts').replaceChildren(...CONTRACTS.map((contract, index) => {
+  // (island 1: the team contracts come with the boat quest, once the wreck is found)
+  const locked = !!m?.contracts?.some((c) => c.locked);
+  $('pause-contracts').replaceChildren(...(locked ? [Object.assign(document.createElement('li'), { textContent: 'Find the wreck first – the team contracts come with the boat' })] : CONTRACTS.map((contract, index) => {
     const progress = m?.contracts?.[index];
     const li = document.createElement('li');
     li.className = progress?.done ? 'done' : '';
     li.title = contract.text;
     li.textContent = contract.title + ' · ' + (progress?.progress || 0) + '/' + contract.goal + (progress?.done ? ' · Complete' : '');
     return li;
-  }));
+  })));
 
   renderTeam(game);
 }
