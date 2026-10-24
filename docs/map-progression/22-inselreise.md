@@ -36,3 +36,9 @@ Hollow Mountain ist die **Zusatzinsel von Map 3**. Man fährt von der Aschefeuer
 
 ## Nicht hier
 - Siegelkristall und Kristall-Upgrades (23), Tor (24).
+
+## Umsetzung (Abweichungen)
+- `world.destination()` bestimmt das Ziel. Eine Seiteninsel fährt zurück; eine Insel mit noch nicht besuchter Seiteninsel (`story.visited`) fährt erst dorthin; sonst geht es zur nächsten Hauptinsel; nach der letzten ist die Expedition vorbei.
+- Bis 23 läuft auf Hollow Mountain noch die normale Bootsquest (Teile suchen, Boot am Ostufer). Teilplan 23 ersetzt sie durch den Siegelkristall und das Boot in der Westbucht.
+- Der Save ist aufgeteilt in `exportIsland`/`restoreIsland` (Inselteil) und den Expeditionsteil. `world.parked` speichert die geparkte Insel im selben Format, das Save-Feld heißt `parked`. Eine neue Schema-Version war nicht nötig, das Feld ist optional.
+- Die Missionsanzeige nennt die Insel „3b“, und die Abfahrt nennt das Ziel beim Namen.

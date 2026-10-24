@@ -18,6 +18,7 @@ export class Story {
     this.steps = new Set();       // story step ids the team has done (shared/story.js)
     this.introSeen = false;       // the island 1 intro (client/core/storyShots.js) played for this expedition
     this.legacy = false;          // an expedition saved before the story: it knows every recipe
+    this.visited = new Set();     // island indices the team has been on (a side island is visited once: world.destination)
     this.nearT = 0;
   }
 
@@ -104,7 +105,7 @@ export class Story {
 
   /** Plain data for the expedition save. */
   export() {
-    return { notes: [...this.notesRead], steps: [...this.steps], introSeen: this.introSeen, ...(this.legacy ? { legacy: true } : {}) };
+    return { notes: [...this.notesRead], steps: [...this.steps], visited: [...this.visited], introSeen: this.introSeen, ...(this.legacy ? { legacy: true } : {}) };
   }
 
   /**
@@ -117,6 +118,8 @@ export class Story {
     this.notesRead = new Set(notes.filter((id) => typeof id === 'string' && NOTE_BY_ID[id]));
     const steps = Array.isArray(data?.steps) ? data.steps : [];
     this.steps = new Set(steps.filter((id) => STEP_IDS.includes(id)));
+    const visited = Array.isArray(data?.visited) ? data.visited : [];
+    this.visited = new Set([...visited.filter((i) => Number.isInteger(i) && i >= 0), this.world.levelIndex]);
     this.introSeen = typeof data?.introSeen === 'boolean' ? data.introSeen : true;
   }
 }

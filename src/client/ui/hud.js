@@ -1192,7 +1192,7 @@ export class Hud {
       : `<div class="hud-win-card brush">
       <span class="hud-win-ic">${icon('boat')}</span>
       <h2>Island complete!</h2>
-      <p>All aboard – sailing to island ${esc(info.next ?? '')}…</p>
+      <p>All aboard – sailing to ${typeof info.next === 'string' ? esc(info.next) : `island ${esc(info.next ?? '')}`}…</p>
       ${info.completedIn != null ? `<p class="hud-win-time">${icon('clock')} ${fmtTime(info.completedIn)}</p>` : ''}
     </div>`;
     this.$win.hidden = false;
@@ -1293,7 +1293,7 @@ export class Hud {
         ${pin('#ee4d5f')}
         <div class="board-quest-top">
           <div>
-            <p class="board-kicker">Main quest${m.level ? ` · Island ${m.level.number}: ${esc(m.level.name)}` : ''}</p>
+            <p class="board-kicker">Main quest${m.level ? ` · Island ${m.level.label ?? m.level.number}: ${esc(m.level.name)}` : ''}</p>
             <h3>${icon('boat')} ${m.complete ? 'All aboard – next island!' : 'Repair the boat and sail on'}</h3>
             <p>Find the ${relics.length} boat parts hidden on this island, fix the wreck on the east beach and set sail together.</p>
           </div>

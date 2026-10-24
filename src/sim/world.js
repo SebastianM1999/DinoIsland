@@ -25,12 +25,12 @@ import { makeRng } from '../shared/rng.js';
 import { lineBlocked, DINO_SIGHTING } from '../shared/visibility.js';
 import { sanitizeOutfit, sameOutfit } from '../shared/outfits.js';
 import { planIsland, islandSeed } from '../shared/island.js';
-import { levelDef, LEVEL_COUNT } from '../shared/levels.js';
+import { levelDef, sideIslandOf, nextMainIsland } from '../shared/levels.js';
 import { TORCH, WALL_TORCH, LANTERN } from '../shared/torch.js';
 import { inBlackmire } from '../shared/blackmire.js';
 import { CAVE_WALK_MAX } from '../shared/caveField.js';
 import { findUnstuckSpot, goodSpot } from './unstuck.js';
-import { rosterRecord, applyRosterRecord } from './worldSave.js';
+import { rosterRecord, applyRosterRecord, exportIsland, restoreIsland } from './worldSave.js';
 import { nearDino, plausibleZone } from './hitCheck.js';
 import { freshBase, CAMP_BENCH, CAMP_FIRE_REACH, campStations, safeZone as baseSafeZone, hasBasePlots, PLOT_REACH, MAX_STAGE, stageCost, BUILD_TIME, BASE_STAGES, applyBaseColliders, baseSpawnPoints, TOWERS, TOWER_SLOTS, towerCost, repairCost } from '../shared/base.js';
 import { updateTowers } from './towers.js';
@@ -92,6 +92,7 @@ export class ServerWorld {
     this.story = new Story(this);       // the notes the team has read (sim/story.js; survives islands)
     this.fruitRng = makeRng((Math.random() * 0xffffffff) >>> 0);
     this.#loadLevel(opts.level ?? 0, opts.variant);
+    this.story.visited.add(this.levelIndex);
     this.mission = new Mission(this);
     this.dinos.spawnAll();
   }
@@ -125,13 +126,40 @@ export class ServerWorld {
     this.log(`island ${level + 1} "${levelDef(level).name}" variant ${variant}`);
   }
 
-  /** The team set sail: build the next island, its fixed map (after the last one: the first island again). */
+  /**
+   * Where the boat takes the team from here: back from a side island to its island; from an island with a side
+   * island not yet visited, over there (docs/map-progression/22-inselreise.md); else on to the next main island.
+   * null: the expedition is over (after the last island the next voyage starts a new one on the first island).
+   */
+  destination() {
+    const L = levelDef(this.levelIndex);
+    if (L.sideOf != null) return L.sideOf;
+    const side = sideIslandOf(this.levelIndex);
+    if (side != null && !this.story.visited.has(side)) return side;
+    return nextMainIsland(this.levelIndex);
+  }
+
+  /**
+   * The team set sail: build the island the boat goes to, its fixed map (after the last one: the first island again).
+   * Leaving for a side island parks this island (sim/worldSave.js exportIsland); coming back restores it as it was.
+   */
   nextLevel() {
-    this.#loadLevel(this.levelIndex + 1 < LEVEL_COUNT ? this.levelIndex + 1 : 0);
+    const from = this.levelIndex;
+    const to = this.destination() ?? 0;
+    this.parked ??= {};
+    if (levelDef(to).sideOf === from) this.parked[from] = exportIsland(this);
+    const back = this.parked[to];
+    delete this.parked[to];
+    this.#loadLevel(to);
     this.mission.startIsland();
     this.dinos.spawnAll();
+    if (back) {
+      restoreIsland(this, back);
+      this.mission.onReturn();
+    }
+    this.story.visited.add(to);
     for (const p of this.players.values()) {
-      const sp = this.layout.spawnPoints[p.slot];
+      const sp = this.spawnPoint(p.slot);
       Object.assign(p, {
         x: sp.x, y: this.terrain.heightAt(sp.x, sp.z), z: sp.z, yaw: sp.yaw, pitch: 0, spd: 0,
         hp: p.maxHp, alive: true, deadT: 0, eating: null, hot: null,
