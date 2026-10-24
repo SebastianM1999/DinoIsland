@@ -139,6 +139,11 @@ export class ServerWorld {
     return nextMainIsland(this.levelIndex);
   }
 
+  /** Where this island's boat lies: a side island's is the one the team came in on (the west cove), else the wreck. */
+  boatSpot() {
+    return levelDef(this.levelIndex).sideOf != null && this.layout.arrivalBoat ? this.layout.arrivalBoat : this.layout.boat;
+  }
+
   /**
    * The team set sail: build the island the boat goes to, its fixed map (after the last one: the first island again).
    * Leaving for a side island parks this island (sim/worldSave.js exportIsland); coming back restores it as it was.

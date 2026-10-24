@@ -423,7 +423,7 @@ export class Game {
     // the Hollow Mountain: roof, cave air, decor, crystal lights, drips (world/caveWorld.js)
     this.caveWorld = this.layout.plan.cave ? buildCaveWorld(this.terrain, this.layout, this.gfx, terrainMesh, this.water) : null;
     if (this.caveWorld) { scene.add(this.caveWorld.group); this.caveWorld.audio = this.audio; }
-    this.worldUpdaters = [terrainMesh, this.sky, this.water, this.vegetation, this.rocks, this.fruitPlants, this.resourceNodes, this.bowCamp, this.notes, this.hut, this.baseView, this.sites, this.grove, this.bossArena, this.swampArena, this.swampFx, this.volcanoArena, this.volcanoFx, ...(this.caveWorld ? [this.caveWorld] : [])];
+    this.worldUpdaters = [terrainMesh, this.sky, this.water, this.vegetation, this.rocks, this.fruitPlants, this.resourceNodes, this.bowCamp, this.notes, this.storyProps, this.hut, this.baseView, this.sites, this.grove, this.bossArena, this.swampArena, this.swampFx, this.volcanoArena, this.volcanoFx, ...(this.caveWorld ? [this.caveWorld] : [])];
     yield;
     // under the water: tinted short fog, bubbles and motes (world/underwater.js, #underwaterView)
     this.underwater = buildUnderwater();
@@ -481,6 +481,7 @@ export class Game {
     this.caveWorld?.wallTorches.setLit(this.wallTorchesLit);
     this.notesRead = new Set(world.story?.notes ?? []);   // the team's journal (shared/notes.js)
     this.introSeen = world.story?.introSeen ?? true;
+    this.storyProps?.setSeal(!!world.story?.sealCrystal);
     this.storyLegacy = !!world.story?.legacy;   // (an expedition saved before the story knows every recipe)
     this.notes.setRead(this.notesRead);
     this.notePanel?.setRead(this.notesRead);
@@ -670,6 +671,10 @@ export class Game {
       this.caveWorld?.wallTorches.setLit(this.wallTorchesLit);
       const t = this.layout.wallTorches?.[m.torch];
       if (t) this.audio?.play('torchLight', { pos: { x: t.x, y: t.y, z: t.z } });
+    });
+    net.on(`ev:${EV.STORY}`, (m) => {
+      this.storyProps.setSeal(!!m.story.sealCrystal);
+      if (m.story.sealCrystal) this.audio.play('complete');
     });
     net.on(`ev:${EV.NOTE}`, (m) => {
       if (!m.first) return;

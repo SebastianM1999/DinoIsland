@@ -165,6 +165,8 @@ export const BIOMES = {
     id: 'cave',
     name: 'Hollow Mountain',
     sites: ['cave', 'lake', 'abyss'],
+    // crystal clusters in the halls (shared/layout.js resource spots: beside the halls' crystal decor)
+    resources: { crystal: 8 },
     river: 'water',
     shape: 'cave',
     vegetation: {
