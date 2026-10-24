@@ -16,6 +16,7 @@ import { buildLayout } from '../shared/layout.js';
 import { MSG, ACT, EV, EQUIP, PF, OWNER_KEY } from '../shared/protocol.js';
 import { sanitizeProfile, creativeProfile, skillMods, progress, buy, canBuy, SKILL_IDS, MAX_XP, MAX_BONUS_POINTS, RELIC_XP, RELIC_POINTS, DASH } from '../shared/skills.js';
 import { DinoSystem } from './dinos.js';
+import { trexBrain } from './ai/trex.js';
 import { NOISE } from './ai/senses.js';
 import { Mission } from './mission.js';
 import { resolveCircle, penetration } from '../shared/collision.js';
@@ -138,6 +139,25 @@ export class ServerWorld {
     const side = sideIslandOf(this.levelIndex);
     if (side != null && !this.story.visited.has(side)) return side;
     return nextMainIsland(this.levelIndex);
+  }
+
+  /**
+   * The great eruption's time ran out with the team still on Ashfall (sim/volcano.js): they wake at the camp, healed,
+   * and the king stands in his crater again – the fight before the eruption is to be won once more.
+   */
+  cataclysmLost() {
+    this.toast('The mountain swallowed the crater … you wake at the camp. The king roars again.', 'flame');
+    for (const d of [...this.dinos.list]) if (d.type === 'trex' && d.boss) this.dinos.remove(d);
+    trexBrain.spawnInitial(this.dinos);
+    this.story.steps.delete('king');
+    for (const p of this.players.values()) {
+      const sp = this.spawnPoint(p.slot);
+      Object.assign(p, { x: sp.x, y: this.terrain.heightAt(sp.x, sp.z), z: sp.z, yaw: sp.yaw, hp: p.maxHp, alive: true, downed: false, deadT: 0, invulnUntil: this.now + 3 });
+      this.correct(p, { unstuck: true });
+      this.event(EV.RESPAWN, { id: p.id, x: r2(p.x), z: r2(p.z), yaw: r3(p.yaw) });
+    }
+    this.mission.broadcast();
+    this.checkpoint('eruption');
   }
 
   /** Where this island's boat lies: a side island's is the one the team came in on (the west cove), else the wreck. */

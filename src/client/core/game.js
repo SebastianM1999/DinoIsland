@@ -482,7 +482,9 @@ export class Game {
     }
     this.setBase(world.base || freshBase());
     this.raid = world.raid || { phase: 'idle' };
-    this.volcanoFx.setState(world.volcano);
+    // (joining during the great eruption: its look and its countdown)
+    this.cataclysmUntil = world.volcano?.phase === 'cataclysm' ? this.time + world.volcano.left : null;
+    this.volcanoFx.setState(world.volcano?.phase === 'cataclysm' ? { ...world.volcano, phase: 'erupt' } : world.volcano);
     for (const c of world.volcano?.columns || []) this.volcanoArena.sink(c.id, c.left);
     if (world.volcano?.treasure) this.volcanoArena.openTreasure();
     this.fruitCounts = world.fruit.slice();
@@ -749,7 +751,10 @@ export class Game {
     });
     // the volcano (sim/volcano.js)
     net.on(`ev:${EV.VOLCANO}`, (m) => {
-      this.volcanoFx.setPhase(m.phase, m.left);
+      // the great eruption looks like an eruption that does not stop; the HUD counts down to the boat (#updateHud)
+      this.cataclysmUntil = m.phase === 'cataclysm' ? this.time + m.left : null;
+      this.volcanoFx.setPhase(m.phase === 'cataclysm' ? 'erupt' : m.phase, m.left);
+      if (m.phase === 'cataclysm') { this.audio.play('eruption', { vol: 2.5 }); this.shake = Math.max(this.shake, 1.6); this.hud.toast('The mountain wakes! Get to the boat and sail – now!', 'flame'); }
       const v = this.layout.volcano;
       const pos = v ? { x: v.x, y: v.craterY, z: v.z } : undefined;
       if (m.phase === 'rumble') { this.audio.play('rumble'); this.shake = Math.max(this.shake, 0.6); this.hud.toast('The volcano rumbles – an eruption is coming!', 'flame'); }
@@ -1341,6 +1346,7 @@ export class Game {
     hud.setSwamp(p.inBog && !p.flying);
     hud.setBreath(this.me.alive && !p.creative ? p.breath : CONFIG.player.dive.breath, CONFIG.player.dive.breath, p.diving || p.submerged);
     hud.setHeat(this.me.alive ? p.heat : 0, p.buffs.heatproof > 0);
+    hud.setCountdown(this.cataclysmUntil != null && !this.mission?.complete ? Math.max(0, this.cataclysmUntil - this.time) : null);
     this.#updateAsh(dt);
     hud.setBuffs(p.buffs);
     hud.setCompass(p.yaw, this.compassMarkers());

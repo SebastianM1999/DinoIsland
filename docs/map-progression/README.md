@@ -39,7 +39,7 @@ Dieser Ordner ist der Gesamtplan für Waffen-Freischaltung, Dino-Level, Craft-Ki
 | 22 | [Reise Ashfall ↔ Hollow Mountain](22-inselreise.md) | 18 | world.js (nextLevel/loadLevel) | umgesetzt (claude/island-trip) |
 | 23 | [Hollow Mountain: Kristall & Elias' Lager](23-hollow-mountain.md) | 15, 21, 22 | world.js (craft) | umgesetzt (claude/hollow-story) |
 | 24 | [Map 3: Boss-Tor und T-Rex-Boss](24-boss-tor.md) | 23 | world.js (Boss) | umgesetzt (claude/volcano-boss-gate) |
-| 25 | [Map 3: Großer Ausbruch (Finale)](25-grosser-ausbruch.md) | 17, 24 | world.js (Boss-Tod → Volcano) | offen |
+| 25 | [Map 3: Großer Ausbruch (Finale)](25-grosser-ausbruch.md) | 17, 24 | world.js (Boss-Tod → Volcano) | umgesetzt (claude/volcano-cataclysm) |
 
 ```
 01 ─┬─ 02 ─────────────┐

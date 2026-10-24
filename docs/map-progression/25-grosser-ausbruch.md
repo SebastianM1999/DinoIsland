@@ -48,3 +48,9 @@ Ablegen mit allen Lebenden beendet das Spiel mit dem Outro. Vorher läuft der Vu
 
 ## Nicht hier
 - Neue Inseln nach dem Ausbruch (Maps 4–8 bleiben geplant).
+
+## Umsetzung (Abweichungen)
+- Ausgelöst wird beim Tod des Königs (`mission.onDinoKilled` → `volcano.startCataclysm`). Die Phase `cataclysm`: alle 1 s eine Bombenwelle (2 je Spieler), Asche wie beim Ascheregen (Camp und Base schützen), Dinos sehen schlechter. Sie endet, sobald das Boot ablegt.
+- Läuft der Countdown (180 s) ab, kehrt die Insel nicht zu einem gespeicherten Checkpoint zurück. Stattdessen wacht das Team geheilt im Camp auf, der König steht wieder voll im Krater, der Schritt „König besiegen“ ist wieder offen. Das Tor bleibt offen. Das wirkt wie ein Neustart vor dem Bosskampf, ohne Save-Snapshot.
+- Kein eigener Lavastrom, der den kurzen Weg sperrt: Bombenhagel und Countdown tragen das Finale. Ein Lavastrom bräuchte dynamische Terrain-/Hitze-Änderungen und bleibt offen.
+- Der Countdown steht groß oben im HUD („To the boat! 2:57“). Ablegen ist der letzte Story-Schritt (`escape`), danach läuft das Outro aus 17.
