@@ -40,6 +40,13 @@ export class Mission {
   /** The island's boat gate step is done: the boat quest (and the contracts) start. */
   openBoat() {
     if (this.phase !== 'explore') return;
+    const side = levelDef(this.world.levelIndex).sideOf;
+    if (side != null) {
+      // a side island: the boat the team came in on is ready to go back
+      this.phase = 'repaired';
+      this.world.toast(`The boat in the west cove is ready – sail back to ${levelDef(side).name} together`, 'boat');
+      return;
+    }
     this.phase = 'search';
     const found = this.world.relics.filter((r) => r.found).length;
     this.world.toast(`The Meridian's dinghy! With the right parts she floats again${found ? ` – ${found} found already` : ''}.`, 'boat');
@@ -83,7 +90,10 @@ export class Mission {
     const relics = w.relics.map((r) => ({ id: r.id, kind: r.kind, site: r.site, found: r.found, by: r.byName || null, ...(r.hint ? { hint: r.hint } : {}) }));
     const found = relics.filter((r) => r.found).length;
     const repaired = this.phase !== 'search' && this.phase !== 'explore';
-    const boat = this.phase === 'explore' ? [] : [
+    const side = L.sideOf != null ? levelDef(L.sideOf) : null;
+    const boat = this.phase === 'explore' ? [] : side ? [
+      { text: `Sail back to ${side.name}: everyone at the boat in the west cove (${this.atBoat ?? 0}/${Math.max(1, this.alive ?? 0)})`, done: this.phase === 'sailing' },
+    ] : [
       ...relics.map((r) => {
         const def = RELICS[r.kind];
         return { text: r.found ? `${def.name} found` : `Find the ${def.name} – ${r.hint ?? def.hint}`, done: r.found, relic: r.kind };
@@ -129,6 +139,7 @@ export class Mission {
 
   /** Try to repair the boat; returns a reason string when it can't be done. */
   repair(p) {
+    if (levelDef(this.world.levelIndex).sideOf != null) return null;   // (a side island's boat needs no mending)
     if (this.phase === 'explore') this.world.story.onEvent('near:boat');   // (whoever stands at the wreck has found it)
     if (this.phase !== 'search') return null;
     // creative mode repairs the boat without the parts
@@ -148,7 +159,7 @@ export class Mission {
   sail(p) {
     const w = this.world;
     if (this.phase !== 'repaired' || !p.alive) return null;
-    const b = w.layout.boat;
+    const b = w.boatSpot();
     const atBoat = (q) => (q.x - b.x) ** 2 + (q.z - b.z) ** 2 < SAIL_RADIUS ** 2;
     if (!atBoat(p)) return null;
     const alive = [...w.players.values()].filter((q) => q.alive);
@@ -192,7 +203,7 @@ export class Mission {
   update(dt) {
     const w = this.world;
     if (this.phase === 'repaired') {
-      const b = w.layout.boat;
+      const b = w.boatSpot();
       let alive = 0, near = 0;
       for (const p of w.players.values()) {
         if (!p.alive) continue;

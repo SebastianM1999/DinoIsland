@@ -13,8 +13,8 @@ const matCache = new Map();
 const cached = (cache, k, fn) => retainResource(cache.has(k) ? cache.get(k) : (cache.set(k, fn()), cache.get(k)));
 
 /** Resting glow per kind (resourceMaterial pulses around it). */
-export const RESOURCE_GLOW = { resin: 0.45, ironwood: 0.12, herb: 0.14 };
-const EMISSIVE = { resin: '#ff8a10', ironwood: '#5a3a20', herb: '#2fd06a' };
+export const RESOURCE_GLOW = { resin: 0.45, ironwood: 0.12, herb: 0.14, crystal: 0.7 };
+const EMISSIVE = { resin: '#ff8a10', ironwood: '#5a3a20', herb: '#2fd06a', crystal: '#6fe3ff' };
 
 /** Small pointed leaf along +X from the origin (light top, darker underside). */
 function leaf(len, width, top, bottom) {
@@ -75,7 +75,19 @@ function herbGeometry() {
   return merge(parts);
 }
 
-const BUILD = { resin: resinGeometry, ironwood: ironwoodGeometry, herb: herbGeometry };
+/** Crystal (the Hollow Mountain): a cluster of pale blue prisms leaning out of a rocky foot. */
+function crystalGeometry() {
+  const parts = [place(paint(new THREE.DodecahedronGeometry(0.22, 0), '#5c5866'), [0, 0.05, 0], [0, 0, 0], [1.3, 0.45, 1.1])];
+  const prisms = [[0, 0.5, 0, 0], [0.13, 0.36, 0.05, 0.45], [-0.12, 0.3, 0.06, -0.5], [0.04, 0.26, -0.13, -0.35], [-0.05, 0.22, 0.14, 0.4]];
+  for (const [x, h, z, tilt] of prisms) {
+    let g = new THREE.CylinderGeometry(0, 0.07, h * 0.35, 6).translate(0, h * 0.5 + h * 0.175, 0);
+    g = merge([new THREE.CylinderGeometry(0.07, 0.07, h, 6).translate(0, h * 0.5, 0), g]);
+    parts.push(place(paint(g, (c) => (c.y > h * 0.7 ? '#e6fbff' : '#8fe6ff')), [x, 0.05, z], [tilt * 0.6, tilt, tilt]));
+  }
+  return merge(parts);
+}
+
+const BUILD = { resin: resinGeometry, ironwood: ironwoodGeometry, herb: herbGeometry, crystal: crystalGeometry };
 
 /** Shared geometry of a resource kind (null for an unknown kind). */
 export function resourceGeometry(kind) {

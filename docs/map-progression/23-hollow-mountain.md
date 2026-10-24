@@ -29,3 +29,10 @@ Auf Hollow Mountain sammelt das Team **Kristall** für die Tier-3-Upgrades. Es f
 
 ## Nicht hier
 - Tor und Boss (24).
+
+## Umsetzung (Abweichungen)
+- Elias' Lager liegt in der trockenen Sackgasse, die am weitesten vom Eingang entfernt ist. Die Schrift steht an der Wand der nächstgelegenen Kristallhalle ohne Bootsteil. Beides sind nur Props und Anker, das Cave-Feld bleibt unverändert (kein Rebake).
+- Der Siegelkristall ist ein Expeditions-Flag (`story.sealCrystal`) und wird wie Bootsteile durch Hingehen aufgenommen. `EV.STORY` lässt ihn bei allen verschwinden.
+- Hollow Mountain hat keine eigene Bootsquest mehr. Der Siegelkristall ist das Gate-Ziel, danach legt das Boot in der Westbucht (`arrivalBoat`) zurück nach Ashfall ab. Die drei Höhlen-Bootsteile bleiben als Fundstücke (XP).
+- Tier 3: `bow3`, `spear3`, `quiver3` (Kristall + Material, gelernt aus der Wandschrift). Gebaut wird an der Base-Werkbank auf Ashfall.
+- Kristall: 8 Cluster an den Kristallen der Hallen, sammeln mit E, nachwachsend.

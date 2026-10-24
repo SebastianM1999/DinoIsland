@@ -231,12 +231,14 @@ export const CONFIG = {
     herb:     { name: 'Healing herb', weight: 0.3 },
     // the Alpha Sarcosuchus' glowing blood (butchering the swamp boss): it burns in a lantern (shared/torch.js LANTERN)
     bossBlood: { name: 'Glowblood', weight: 0.5 },
+    // the Hollow Mountain's crystal, broken off the clusters in its halls: tier-3 upgrades (shared/crafting.js)
+    crystal: { name: 'Crystal', weight: 1 },
   },
   // Map resources: they lie at fixed spots (shared/layout.js resourceSpots), are
   // gathered with E (ACT.GATHER) like fruit and grow back after `regrow` seconds.
   // `spread`: least distance between two spots of the same kind.
   resources: {
-    regrow: { resin: 150, ironwood: 180, herb: 120 },
+    regrow: { resin: 150, ironwood: 180, herb: 120, crystal: 240 },
     reach: 3.2,
     spread: 18,
   },
