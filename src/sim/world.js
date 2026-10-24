@@ -1854,6 +1854,7 @@ export class ServerWorld {
     this.volcano.update(dt);
     this.dinos.recordHistory(this.now);
     for (const p of this.players.values()) this.resolvePlayerDinos(p);
+    this.story.update(dt);
     this.mission.update(dt);
   }
 
@@ -1918,7 +1919,7 @@ export class ServerWorld {
       store: this.store,
       level: { index: this.levelIndex, variant: this.variant },
       relics: this.relics.map((r) => ({ id: r.id, kind: r.kind, x: r.x, y: r.y, z: r.z, found: r.found })),
-      boat: { repaired: this.mission.phase !== 'search' },
+      boat: { repaired: this.mission.phase === 'repaired' || this.mission.phase === 'sailing' },
       base: this.publicBase(),
       raid: this.raids.public(),
       volcano: this.volcano.public(),

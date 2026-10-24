@@ -23,7 +23,9 @@ export class Mission {
 
   /** Called whenever a new island has been loaded. */
   startIsland() {
-    this.phase = 'search';        // search -> repaired -> sailing
+    // explore -> search -> repaired -> sailing; 'explore' only until the island's boat gate step
+    // (shared/story.js BOAT_GATE: island 1's wreck has to be found first)
+    this.phase = this.world.story.boatOpen() ? 'search' : 'explore';
     this.startedAt = this.world.now;
     this.completedIn = 0;
     this.doneTimer = 0;
@@ -31,8 +33,20 @@ export class Mission {
     this.alive = 0;
   }
 
+  /** The mission board's contracts are open (not before the boat quest started on island 1). */
+  contractsOpen() { return this.phase !== 'explore'; }
+
+  /** The island's boat gate step is done: the boat quest (and the contracts) start. */
+  openBoat() {
+    if (this.phase !== 'explore') return;
+    this.phase = 'search';
+    const found = this.world.relics.filter((r) => r.found).length;
+    this.world.toast(`The Meridian's dinghy! With the right parts she floats again${found ? ` – ${found} found already` : ''}.`, 'boat');
+  }
+
   /** A game event happened; advance matching contracts. */
   onEvent(event, n = 1) {
+    if (!this.contractsOpen()) return;
     let changed = false;
     CONTRACTS.forEach((def, i) => {
       const c = this.contracts[i];
@@ -60,8 +74,8 @@ export class Mission {
     const L = w.layout.level;
     const relics = w.relics.map((r) => ({ id: r.id, kind: r.kind, site: r.site, found: r.found, by: r.byName || null }));
     const found = relics.filter((r) => r.found).length;
-    const repaired = this.phase !== 'search';
-    const objectives = [
+    const repaired = this.phase !== 'search' && this.phase !== 'explore';
+    const boat = this.phase === 'explore' ? [] : [
       ...relics.map((r) => {
         const def = RELICS[r.kind];
         return { text: r.found ? `${def.name} found` : `Find the ${def.name} – ${def.hint}`, done: r.found, relic: r.kind };
@@ -69,6 +83,8 @@ export class Mission {
       { text: `Repair the boat on the east beach (${found}/${relics.length} parts)`, done: repaired },
       { text: `Set sail together at the boat: E, then Set sail (${this.atBoat ?? 0}/${Math.max(1, this.alive ?? 0)} at the boat)`, done: this.phase === 'sailing' },
     ];
+    // the story's steps of this island head the log (sim/story.js)
+    const objectives = [...w.story.objectives(), ...boat];
     const last = L.last;
     const won = this.phase === 'sailing' && last;
     return {
@@ -82,7 +98,7 @@ export class Mission {
       complete: this.phase === 'sailing',
       completedIn: this.completedIn,
       expeditionsDone: this.islandsDone,
-      contracts: this.contracts.map((c) => ({ ...c })),
+      contracts: this.contracts.map((c) => ({ ...c, locked: !this.contractsOpen() })),
       stats: this.stats,
     };
   }
@@ -102,6 +118,7 @@ export class Mission {
 
   /** Try to repair the boat; returns a reason string when it can't be done. */
   repair(p) {
+    if (this.phase === 'explore') this.world.story.onEvent('near:boat');   // (whoever stands at the wreck has found it)
     if (this.phase !== 'search') return null;
     // creative mode repairs the boat without the parts
     const missing = p.creative ? [] : this.world.relics.filter((r) => !r.found);
@@ -141,6 +158,7 @@ export class Mission {
   onDinoKilled(d) {
     this.stats.kills[d.type] = (this.stats.kills[d.type] || 0) + 1;
     this.onEvent(`kill:${d.type}`);
+    this.world.story.onEvent(`kill:${d.type}`);
   }
 
   onLootChanged() {}
