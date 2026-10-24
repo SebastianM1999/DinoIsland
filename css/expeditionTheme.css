@@ -251,8 +251,6 @@ body.island-theme .hud-panel:not(.hud-skills) .wd-foot { padding-top: 12px; bord
 body.island-theme {
   --dialog-leaves: url('../assets/ui/dialog-leaves.svg');
   --dialog-leaves-reversed: url('../assets/ui/dialog-leaves-reversed.svg');
-  --dialog-vine: url('../assets/ui/dialog-vine.svg');
-  --dialog-vine-horizontal: url('../assets/ui/dialog-vine-horizontal.svg');
 }
 body.island-theme :is(.home-panel, .home-dialog-card:not(.home-skills-card), .settings-card, .pause-card, .friends-card, .hud-panel) {
   border-width: 4px;
@@ -266,14 +264,17 @@ body.island-theme .dialog-ornament {
      transparent center guarantees foliage cannot paint over any content. */
   mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
   mask-composite: exclude;
-  background-image: var(--dialog-leaves), var(--dialog-leaves-reversed), var(--dialog-vine), var(--dialog-vine), var(--dialog-vine-horizontal), var(--dialog-vine-horizontal);
-  background-position: left top, right bottom, 5px 72px, right 5px top 110px, 75px 5px, right 68px bottom 5px;
-  background-size: 108px 108px, 96px 96px, 38px 228px, 38px 228px, 228px 38px, 228px 38px;
-  background-repeat: no-repeat, no-repeat, repeat-y, repeat-y, repeat-x, repeat-x;
+}
+/* Vines are a seeded inline SVG per dialog (dialogVines.js); the corner
+   clusters paint on top of them so stems sprout from the leaves. */
+body.island-theme .dialog-ornament > svg { position: absolute; inset: 0; display: block; }
+body.island-theme .dialog-ornament::after {
+  content: ''; position: absolute; inset: 0;
+  background-image: var(--dialog-leaves), var(--dialog-leaves-reversed);
+  background-position: left top, right bottom;
+  background-size: 108px 108px, 96px 96px;
+  background-repeat: no-repeat;
 }
 @media (max-width: 850px), (max-height: 650px) {
-  body.island-theme .dialog-ornament {
-    background-size: 72px 72px, 64px 64px, 25px 180px, 25px 180px, 180px 25px, 180px 25px;
-    background-position: left top, right bottom, 8px 60px, right 8px top 90px, 60px 8px, right 55px bottom 8px;
-  }
+  body.island-theme .dialog-ornament::after { background-size: 72px 72px, 64px 64px; }
 }
