@@ -183,6 +183,10 @@ export const CONFIG = {
     // (never below `floor` of their max) and refills stamina `staminaRegenCut` slower; the camp and
     // the base plots shelter. Dinosaurs see `sight` as far.
     ash: { first: 60, gapMin: 100, gapMax: 170, durMin: 45, durMax: 70, after: 8, dps: 1, floor: 0.25, sight: 0.6, staminaRegenCut: 0.5 },
+    // the great eruption when the king falls (docs/map-progression/25-grosser-ausbruch.md): `countdown` s to sail
+    // away, a bomb wave every `wave` s with `perPlayer` bombs near each player, ash all the while; if the time runs
+    // out the team wakes at the camp and the king stands in his crater again
+    cataclysm: { countdown: 180, wave: 1, perPlayer: 2 },
   },
 
   fruit: {

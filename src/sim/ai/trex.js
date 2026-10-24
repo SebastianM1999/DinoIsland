@@ -61,7 +61,7 @@ export const trexBrain = {
     // Ashfall's crater arena: one T-Rex, the king, leashed to it and pacing its floor behind the sealed gate
     const a = sys.world.layout.volcanoArena;
     if (a) {
-      if (sys.list.some((d) => d.type === 'trex' && d.boss)) return;
+      if (sys.list.some((d) => d.type === 'trex' && d.boss && d.alive)) return;
       const patrol = Array.from({ length: 6 }, (_, i) => ({ x: a.x + Math.cos((i / 6) * Math.PI * 2) * a.r * 0.55, z: a.z + Math.sin((i / 6) * Math.PI * 2) * a.r * 0.55 }));
       const d = sys.spawn('trex', a.spawn.x, a.spawn.z, { boss: true, title: KING.title, patrol, wp: 0,
         leash: { kind: 'crater', x: a.x, z: a.z, r: a.r - 3, bound: a.r + 1 } });

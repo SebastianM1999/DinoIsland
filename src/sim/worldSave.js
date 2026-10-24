@@ -272,7 +272,7 @@ export function restoreIsland(world, data) {
 
   const v = world.volcano, sv = data.volcano;
   if (v.active && plain(sv)) {
-    if (['calm', 'rumble', 'ash'].includes(sv.phase)) v.phase = sv.phase;
+    if (['calm', 'rumble', 'ash', 'cataclysm'].includes(sv.phase)) v.phase = sv.phase;
     v.until = num(sv.until, v.until); v.source = sv.source ?? null; v.nextAsh = num(sv.nextAsh, v.nextAsh);
     v.resume = num(sv.resume); v.nextWave = num(sv.nextWave);
     if (Array.isArray(sv.geysers)) sv.geysers.forEach((g, i) => { if (v.geysers[i] && plain(g)) Object.assign(v.geysers[i], { phase: g.phase, until: num(g.until), nextHit: num(g.nextHit) }); });
