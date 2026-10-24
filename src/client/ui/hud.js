@@ -593,7 +593,7 @@ export class Hud {
       <button type="button" class="hud-mission-toggle" aria-expanded="${!!this._missionExpanded}" aria-controls="hud-quest-details"><kbd>X</kbd> ${this._missionExpanded ? 'Collapse quests' : 'Expand quests'}</button>
       <div id="hud-quest-details" class="hud-quest-details" ${this._missionExpanded ? '' : 'hidden'}>
         <h3>Expedition</h3><ul class="hud-mission-list">${(mission.objectives || []).filter(o => o !== mission.trackedObjective && o.text !== mission.trackedObjective?.text).map(o => `<li class="${o.done ? 'is-done' : ''}"><span class="hud-check">${o.done ? icon('check') : ''}</span><span>${esc(o.text)}</span></li>`).join('')}</ul>
-        <h3>Team quests</h3><ul class="hud-mission-list">${BOARD_CONTRACTS.map((c, i) => { const q = mission.contracts?.[i]; return `<li class="${q?.done ? 'is-done' : ''}"><span class="hud-check">${q?.done ? icon('check') : ''}</span><span>${esc(c.title)} &middot; ${q?.progress || 0}/${c.goal}${c.id === this.trackedContract ? ' &middot; Tracked' : ''}</span></li>`; }).join('')}</ul>
+        <h3>Team quests</h3><ul class="hud-mission-list">${mission.contracts?.some((q) => q.locked) ? '<li><span class="hud-check"></span><span>Find the wreck first – the team quests come with the boat</span></li>' : BOARD_CONTRACTS.map((c, i) => { const q = mission.contracts?.[i]; return `<li class="${q?.done ? 'is-done' : ''}"><span class="hud-check">${q?.done ? icon('check') : ''}</span><span>${esc(c.title)} &middot; ${q?.progress || 0}/${c.goal}${c.id === this.trackedContract ? ' &middot; Tracked' : ''}</span></li>`; }).join('')}</ul>
       </div>`;
     m.querySelector('.hud-mission-toggle').addEventListener('click', () => this.toggleMissionDetails());
   }
@@ -1305,6 +1305,7 @@ export class Hud {
     const active = [], done = [];
     defs.forEach((d, i) => {
       const c = contracts[i] || { progress: 0, done: false };
+      if (c.locked) return;   // (island 1: the contracts come with the boat quest)
       (c.done ? done : active).push({ d, c, i });
     });
     const activeCards = active.map(({ d, c, i }) => {

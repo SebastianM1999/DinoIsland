@@ -486,7 +486,7 @@ export class Game {
     this.hud.setBoard(m);
     const id = this.hud.trackedContract;
     const i = CONTRACTS.findIndex((c) => c.id === id);
-    const c = i >= 0 ? m.contracts?.[i] : null;
+    const c = i >= 0 && !m.contracts?.[i]?.locked ? m.contracts?.[i] : null;   // (island 1: no contracts before the wreck is found)
     // (island 1: until you have your bow, finding it heads the list – only on this explorer's screen)
     const own = this.layout?.bowCamp && this.me?.inv?.bow === false ? [{ text: "Find your bow at the hunter's camp before the mountain", done: false }] : [];
     const objectives = c
