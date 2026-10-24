@@ -44,6 +44,7 @@
 - `skills.js` — skill trees, XP/levels (`LEVEL_CAP`, `xpForLevel`, `levelFromXp`), XP rewards, `DASH`, profile buy/validation (`sanitizeProfile`, `canBuy`, `buy`), `skillMods`, `creativeProfile`.
 - `missions.js` — team contracts (`CONTRACTS`) for the mission board: event key, goal, reward.
 - `relics.js` — boat-part relic kinds and which site type hides each (`RELICS`, `RELIC_KINDS`, `RELIC_FOR_SITE`); the cave level's sites are `cave` (crystal hall), `lake` (bell, a chamber with a flooded tunnel) and `abyss` (compass, the farthest chamber).
+- `notes.js` — the story's readable notes (docs/map-progression/14-story.md): `NOTES` (id, island, anchor `at`, look `prop`: bottle/paper/book/wall, title, author, text paragraphs), `NOTE_BY_ID`, `NOTE_REACH`, `placeNotes(level, anchors)` (the notes of that island whose anchor the layout placed). `layout.storyAnchors` (named story places) and `layout.notes` come from the story section at the end of `layout.js`.
 - `outfits.js` — hat/top/pants catalogs, `defaultOutfit`, `sanitizeOutfit`, `sameOutfit`.
 - `dinoContact.js` — player-vs-dinosaur body contact: `dinoBodyCircles` footprint and swept `resolveDinoContact`; `DINO_CONTACT` damage/knockback/cooldown.
 - `dinoRank.js` — ranks of dinosaurs: rare alphas (`ALPHA`: chance, scale, health, damage, loot), bosses (T-Rex, Alpha Sarcosuchus, leashed arena animals); `butcherTime` (3 / 5 / 10 s) and `carcassLoot` (all of a carcass's loot comes from butchering).

@@ -181,7 +181,7 @@ export class Hud {
     // ---------- bottom-left: key hints
     const bl = el('ul', 'hud-keys');
     bl.setAttribute('aria-label', 'Key hints');
-    for (const [ic, key, label] of [['bag', 'Tab', 'Inventory'], ['map', 'M', 'Map'], ['give', 'G', 'Give fruit'], ['eat', 'F', 'Eat'], ['knife', 'V', 'Butcher'], ['bolt', 'K', 'Skills'], ['map', 'X', 'Quests']]) {
+    for (const [ic, key, label] of [['bag', 'Tab', 'Inventory'], ['map', 'M', 'Map'], ['give', 'G', 'Give fruit'], ['eat', 'F', 'Eat'], ['knife', 'V', 'Butcher'], ['bolt', 'K', 'Skills'], ['map', 'X', 'Quests'], ['quest', 'J', 'Journal']]) {
       bl.insertAdjacentHTML('beforeend', `<li><span class="hud-keys-ic brush">${icon(ic)}</span><span class="hud-keys-lab brush"><kbd>${key}</kbd>${label}</span></li>`);
     }
 

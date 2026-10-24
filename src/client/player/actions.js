@@ -7,6 +7,7 @@ import * as THREE from 'three';
 import { CONFIG } from '../../shared/config.js';
 import { ACT, EV, PF, EQUIP } from '../../shared/protocol.js';
 import { WALL_TORCH } from '../../shared/torch.js';
+import { NOTE_BY_ID, NOTE_REACH } from '../../shared/notes.js';
 import { shotEnd } from '../../shared/gunshots.js';
 import { insideGrove } from '../../shared/grove.js';
 import { segmentColliders } from '../../shared/collision.js';
@@ -609,6 +610,13 @@ export class PlayerActions {
         return { text: inv.torch ? 'Wall torch – light your torch first (L)' : 'Wall torch – you need a burning torch', run: null };
       }
     }
+    // 0c. a story note (shared/notes.js): read it
+    let note = null, nd = NOTE_REACH;
+    for (const n of g.layout.notes ?? []) {
+      const d = Math.hypot(n.x - pos.x, n.z - pos.z);
+      if (d < nd && Math.abs(n.y - pos.y) < 2.5) { nd = d; note = n; }
+    }
+    if (note) return { text: `Read: ${NOTE_BY_ID[note.id].title}`, run: () => g.readNote(note.id) };
     // Dropping a carried item never picks it straight back up; retrieve it deliberately.
     let dropped = null, dropDistance = CONFIG.pickupRange;
     for (const { data: it } of g.items.items.values()) {

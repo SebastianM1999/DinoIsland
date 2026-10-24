@@ -18,7 +18,7 @@ Die Namen sind Vorschläge und können getauscht werden. Dann alle Nachrichtente
 - Kurze Texte. Ein Brief passt auf ein Panel ohne Scrollen, höchstens etwa 90 Wörter.
 - Jede Nachricht hat drei Teile: **Stimmung**, **ein konkreter Hinweis** (wohin, was tun) und **ein Haken zur nächsten Spur**.
 - Es gibt keine Dialoge und keine Sprachausgabe. Die Story läuft über Nachrichten, Quest-Texte, Orte und zwei Cutscenes.
-- Englische Texte kommen später mit dem i18n-Stand des Spiels. Hier steht die deutsche Fassung.
+- Im Spiel stehen die Nachrichten auf Englisch (wie alle Spieltexte) in `src/shared/notes.js`. Hier steht die deutsche Fassung; Änderungen an beiden Stellen nachziehen.
 
 ## Ablauf
 ```

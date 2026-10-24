@@ -51,6 +51,8 @@ import { PerfStats } from '../ui/perfStats.js';
 import { storageKey } from '../../shared/brand.js';
 import { Wardrobe } from '../ui/wardrobe.js';
 import { BoatPanel } from '../ui/boatPanel.js';
+import { NotePanel } from '../ui/notePanel.js';
+import { buildNotes } from '../world/notes.js';
 import { CraftingPanel } from '../ui/craftingPanel.js';
 import { Relics } from '../entities/relics.js';
 import { buildSites } from '../world/sites.js';
@@ -191,8 +193,14 @@ export class Game {
         return true;
       }
       if (action === 'interact') {
-        if (!(this.hud._boardOpen || this.hud.isExtraOpen('wardrobe') || this.hud.isExtraOpen('boat') || this.hud.isExtraOpen('crafting') || this.hud.isExtraOpen('base'))) return false;
+        if (!(this.hud._boardOpen || this.hud.isExtraOpen('wardrobe') || this.hud.isExtraOpen('boat') || this.hud.isExtraOpen('crafting') || this.hud.isExtraOpen('base') || this.hud.isExtraOpen('note'))) return false;
         action = 'close';
+      }
+      if (action === 'journal') {
+        // J: the journal; again (or on an open note) closes it
+        if (this.hud.isExtraOpen('note')) action = 'close';
+        else if (this.hud.isPanelOpen()) return true;
+        else { this.notePanel.showJournal(); action = 'note'; }
       }
       if (action === 'close' && !this.hud.isPanelOpen()) return false;
       if (action === 'close' && this.hud.inventoryBack()) return true;   // Esc on an item's stats: back to the explorer first
@@ -206,6 +214,7 @@ export class Game {
       else if (action === 'base') open = this.hud.togglePanel('base');
       else if (action === 'skills') open = this.hud.togglePanel('skills');
       else if (action === 'grove') open = this.hud.togglePanel('grove');
+      else if (action === 'note') open = this.hud.togglePanel('note');
       else {
         this.hud.toggleInventory(false);
         this.hud.toggleMap(false);
@@ -216,6 +225,7 @@ export class Game {
         this.hud.togglePanel('base', false);
         this.hud.togglePanel('skills', false);
         if (this.hud.isExtraOpen('grove')) this.hud.togglePanel('grove', false);
+        this.hud.togglePanel('note', false);
         open = false;
       }
       this.onPanelChange?.(open);
@@ -316,6 +326,9 @@ export class Game {
       speaker: () => this.me.name,
     });
     this.hud.addPanel('grove', { el: this.grovePrompt.el, onOpen: () => this.grovePrompt.onOpen() });
+    this.notePanel = new NotePanel({ onClose: () => this.input.onPanelToggle('close') });
+    this.notePanel.setRead(this.notesRead);
+    this.hud.addPanel('note', { el: this.notePanel.el, onOpen: () => this.notePanel.onOpen() });
     this.boatPanel.setMission(this.mission);
     this.sites.boat.setRepaired?.(!!w.world.boat?.repaired);
     this.sites.boat.setParts?.((w.world.relics || []).filter((r) => r.found).map((r) => r.kind));
@@ -354,6 +367,8 @@ export class Game {
     this.bowCamp = buildBowCamp(this.terrain, this.layout);
     this.bowCamp.setTaken(this.net.welcome.inv?.bow !== false);   // (built before this.me exists)
     scene.add(this.bowCamp.group);
+    this.notes = buildNotes(this.terrain, this.layout);
+    scene.add(this.notes.group);
     yield;
     // islands with building plots start at a small landing camp; the team builds its own base
     this.hut = yield* buildHutSteps(this.terrain, this.layout, { landing: hasBasePlots(this.layout) });
@@ -391,7 +406,7 @@ export class Game {
     // the Hollow Mountain: roof, cave air, decor, crystal lights, drips (world/caveWorld.js)
     this.caveWorld = this.layout.plan.cave ? buildCaveWorld(this.terrain, this.layout, this.gfx, terrainMesh, this.water) : null;
     if (this.caveWorld) { scene.add(this.caveWorld.group); this.caveWorld.audio = this.audio; }
-    this.worldUpdaters = [terrainMesh, this.sky, this.water, this.vegetation, this.rocks, this.fruitPlants, this.resourceNodes, this.bowCamp, this.hut, this.baseView, this.sites, this.grove, this.bossArena, this.swampArena, this.swampFx, this.volcanoArena, this.volcanoFx, ...(this.caveWorld ? [this.caveWorld] : [])];
+    this.worldUpdaters = [terrainMesh, this.sky, this.water, this.vegetation, this.rocks, this.fruitPlants, this.resourceNodes, this.bowCamp, this.notes, this.hut, this.baseView, this.sites, this.grove, this.bossArena, this.swampArena, this.swampFx, this.volcanoArena, this.volcanoFx, ...(this.caveWorld ? [this.caveWorld] : [])];
     yield;
     // under the water: tinted short fog, bubbles and motes (world/underwater.js, #underwaterView)
     this.underwater = buildUnderwater();
@@ -447,6 +462,9 @@ export class Game {
     this.fruitCounts = world.fruit.slice();
     this.wallTorchesLit = new Set(world.wallTorches ?? []);   // Hollow Mountain wall torches the team has lit
     this.caveWorld?.wallTorches.setLit(this.wallTorchesLit);
+    this.notesRead = new Set(world.story?.notes ?? []);   // the team's journal (shared/notes.js)
+    this.notes.setRead(this.notesRead);
+    this.notePanel?.setRead(this.notesRead);
     world.fruit.forEach((count, id) => this.fruitPlants.setCount(id, count));
     for (const id of world.resources ?? []) this.resourceNodes.setUp(id, false);
     this.hud.setPlayer({ name: this.me.name, slot: this.me.slot });
@@ -495,6 +513,14 @@ export class Game {
   /** E at the wrecked boat. */
   openBoat() {
     if (!this.hud.isPanelOpen()) this.input.onPanelToggle('boat');
+  }
+
+  /** E at a story note: the sheet opens at once, the server adds it to the team's journal. */
+  readNote(id) {
+    if (this.hud.isPanelOpen()) return;
+    this.notePanel.showNote(id);
+    this.input.onPanelToggle('note');
+    this.net.act(ACT.READ, { note: id });
   }
 
   /** E at the hut workbench. */
@@ -622,6 +648,13 @@ export class Game {
       this.caveWorld?.wallTorches.setLit(this.wallTorchesLit);
       const t = this.layout.wallTorches?.[m.torch];
       if (t) this.audio?.play('torchLight', { pos: { x: t.x, y: t.y, z: t.z } });
+    });
+    net.on(`ev:${EV.NOTE}`, (m) => {
+      if (!m.first) return;
+      this.notesRead.add(m.id);
+      this.notes.setRead(this.notesRead);
+      this.notePanel.markRead(m.id);
+      this.audio.play('quest');
     });
     net.on(`ev:${EV.FRUIT}`, (m) => {
       this.fruitCounts[m.spot] = m.count;

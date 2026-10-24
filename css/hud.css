@@ -1124,6 +1124,46 @@
 .hud-boat .wd-btn:disabled { opacity: 0.5; cursor: default; }
 .hud-boat button { cursor: url('../assets/cursor-hand.svg') 12 3, pointer; }
 
+/* ---------------------------------------------------------------- story notes and journal */
+.hud-note { width: min(34em, 94vw); }
+.hud-note[data-mode="journal"] { width: min(38em, 94vw); }
+.hud-note .hud-panel-head h2 { display: flex; align-items: center; gap: 0.4em; }
+.hud-note .hud-panel-head h2 svg { width: 1.2em; height: 1.2em; }
+.note-sheet {
+  position: relative;
+  max-height: 62vh;
+  overflow-y: auto;
+  margin: 0 0 1em;
+  padding: 1.4em 1.6em 1.2em;
+  border-radius: 0.3em;
+  background: linear-gradient(170deg, #f3e6c4, #e6d3a6 70%, #d9c28f);
+  box-shadow: inset 0 0 2.2em rgba(120, 82, 36, 0.35), 0 0.3em 1em rgba(0, 0, 0, 0.4);
+  color: #3b2a17;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 1.05em;
+  line-height: 1.5;
+  transform: rotate(-0.6deg);
+}
+.note-sheet h2 { margin: 0 0 0.6em; font-size: 1.25em; font-style: italic; font-weight: 700; color: #4a3218; }
+.note-sheet p { margin: 0 0 0.7em; }
+.note-sheet .note-author { margin: 1em 0 0; text-align: right; font-style: italic; }
+.note-sheet.note-wall { background: linear-gradient(170deg, #5c5560, #47414b); color: #ece6f1; box-shadow: inset 0 0 2.2em rgba(0, 0, 0, 0.5); }
+.note-sheet.note-wall h2 { color: #ece6f1; }
+.note-actions { display: flex; justify-content: flex-end; gap: 0.6em; }
+.note-journal { max-height: 58vh; overflow-y: auto; margin-bottom: 1em; }
+.note-journal h3 { margin: 0.6em 0 0.4em; color: var(--ink-dim); font-size: 0.95em; text-transform: uppercase; letter-spacing: 0.05em; }
+.note-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.45em; }
+.note-list button {
+  display: grid; width: 100%; text-align: left; gap: 0.1em;
+  padding: 0.55em 0.8em; border-radius: 0.7em;
+  border: 0.12em solid rgba(255, 255, 255, 0.12); background: rgba(10, 15, 28, 0.45);
+  color: var(--ink); font: inherit; cursor: url('../assets/cursor-hand.svg') 12 3, pointer;
+}
+.note-list button:hover, .note-list button:focus-visible { border-color: #ffe7a3; }
+.note-list small { color: var(--ink-dim); font-weight: 700; }
+.note-empty { color: var(--ink-dim); font-weight: 700; }
+.hud-note button { cursor: url('../assets/cursor-hand.svg') 12 3, pointer; }
+
 /* ---------------------------------------------------------------- crafting box */
 .hud-craft { width: min(44em, 94vw); }
 .hud-craft .hud-panel-head h2 { display: flex; align-items: center; gap: 0.4em; }

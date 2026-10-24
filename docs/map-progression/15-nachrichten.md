@@ -11,7 +11,7 @@ Briefe, Notizen und Tagebücher liegen als Props in der Welt. Mit E öffnet sich
    - Platzierung über eine Site oder einen Layout-Anker (`at: 'skeleton'|'peakCamp'|'raft'|…`), aufgelöst in `layout.js` (Abschnitt neu: `notes`) zu `layout.notes = [{ id, x, z, y, rot }]`.
 2. `src/shared/protocol.js`
    - `ACT.READ` (Note-ID), `EV.NOTE` (wer hat was zuerst gelesen, Freischaltungen).
-3. `src/sim/notes.js` (neu, klein)
+3. `src/sim/story.js` (neu, umgesetzt als `Story`: hält später auch die übrigen Story-Zustände der Expedition)
    - Hält `world.notesRead` (Set, Team).
    - `read(p, id)` prüft Reichweite (wie andere Interaktionen), wendet beim ersten Lesen `unlocks` an und feuert `EV.NOTE`.
    - Einbinden in `world.js` `onAct`, nur die Weiterleitung.
@@ -20,7 +20,7 @@ Briefe, Notizen und Tagebücher liegen als Props in der Welt. Mit E öffnet sich
    - `src/client/world/notes.js`: Props (Flasche, Papierrolle, Wandschrift, Buch). Ein ungelesenes Prop hat einen leichten Glanz.
    - `src/client/ui/notePanel.js`: Brief-Panel im Papier-Look (`dialogOrnaments.js`). Schließen mit E oder Esc, Pointer-Lock zurück. Integration in `hud.js` ist eine Zeile.
    - Interaktions-Hint „[E] Lesen“.
-   - Pause-Menü (`menus.js`): Reiter **Tagebuch** mit allen gelesenen Nachrichten, sortiert nach Insel.
+   - **Tagebuch** als eigenes Panel auf **J** (statt eines Reiters im Pause-Menü): alle gelesenen Nachrichten nach Insel, Klick öffnet den Brief, „Zurück“ führt zur Liste.
 6. `package-info.md` in `src/shared`, `src/sim`, `src/client/ui`, `src/client/world` und die Feature-Map in `src/package-info.md`.
 
 ## Akzeptanz
