@@ -35,3 +35,9 @@ Auf Map 1 werden die Bootsquest und die Contracts erst mit der **Entdeckung des 
 
 ## Nicht hier
 - Die Inhalte, die einzelne Schritte brauchen (Laterne 21, Tor 24, Ausbruch 25). Diese Teilpläne liefern nur ihre Events.
+
+## Umsetzung (Abweichungen)
+- Story-Schritte werden in beliebiger Reihenfolge abgehakt, das Log zeigt sie in ihrer Reihenfolge. So blockiert ein noch nicht baubarer Schritt (z. B. der Gipfel vor 19) nichts.
+- Die Schritte gehören der Expedition (`world.story.steps`, Save). `STORY` enthält vorerst nur Map 1; die Teilpläne 21–25 tragen ihre Schritte selbst ein.
+- Vor dem Wrack zählen Contracts nicht mit und werden im HUD, auf dem Board und im Pause-Menü als „kommen mit dem Boot“ ausgeblendet.
+- Wer am Wrack „Reparieren“ drückt, hat es auch gefunden: Die Bootsquest öffnet sich, sie kann also nie hängen bleiben.
