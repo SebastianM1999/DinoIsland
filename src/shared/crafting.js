@@ -24,6 +24,10 @@ export const RECIPES = [
   { id: 'bow2',    kind: 'upgrade', tier: 2, line: 'bow',   icon: 'bow',    name: 'Longbow', text: 'Faster arrows and +15% arrow damage.', cost: { claws: 2, plates: 2, teeth: 3 }, requires: 'bow1', mods: { bowDamage: 0.15, bowSpeed: 8 } },
   { id: 'spear2',  kind: 'upgrade', tier: 2, line: 'spear', icon: 'spear',  name: 'Barbed spear', text: 'Farther throws and a quicker next throw.', cost: { claws: 2, teeth: 2 }, requires: 'spear1', mods: { throwSpeed: 0.15, throwCooldown: -0.25 } },
   { id: 'traps2',  kind: 'upgrade', tier: 2, line: 'gear',  icon: 'trap',   name: 'Trap crate', text: 'Carry one more trap.', cost: { plates: 2, hide: 1 }, mods: { traps: 1 } },
+  // ---- tier 3 (Ashfall and its side island): Hollow Mountain crystal, taught by Elias' writing in a crystal hall
+  { id: 'bow3',    kind: 'upgrade', learn: 'wall', tier: 3, line: 'bow',   icon: 'bow',    name: 'Crystal-tipped arrows', text: "+25% arrow damage – they bite through a king's hide.", cost: { crystal: 3, teeth: 2 }, requires: 'bow2', mods: { bowDamage: 0.25 } },
+  { id: 'spear3',  kind: 'upgrade', learn: 'wall', tier: 3, line: 'spear', icon: 'spear',  name: 'Crystal spearhead', text: '+30% stab and throw damage.', cost: { crystal: 3, ironwood: 1 }, requires: 'spear2', mods: { spearDamage: 0.3 } },
+  { id: 'quiver3', kind: 'upgrade', learn: 'wall', tier: 3, line: 'gear',  icon: 'quiver', name: 'Crystal-bound quiver', text: '+4 arrows in the quiver.', cost: { crystal: 2, hide: 2 }, requires: 'quiver1', mods: { quiver: 4 } },
 ];
 
 export const RECIPE_BY_ID = Object.fromEntries(RECIPES.map((r) => [r.id, r]));

@@ -128,6 +128,7 @@ export const EV = {
   SPEAR_FOUND: 'spear',     // { id }  a player took Jonas' spear at island 1's cold camp fire (layout.arrival.spear)
   WALL_TORCH: 'wtorch',     // { torch, by }  a wall torch was lit (it stays lit for the island)
   NOTE: 'note',             // { id, by, first }  a story note was read (first: nobody in the team had read it; it joins the journal)
+  STORY: 'story',           // { story }  the expedition's story state changed (sim/story.js public: e.g. the seal crystal was taken)
   SHOT: 'shot',             // { by, kind, o, end } remote gun effects
   FIRE: 'fire',             // { by, kind, o, v, pid }            remote projectile visuals
   HURT: 'hurt',             // { id, dmg, hp, kx, kz, down, src }

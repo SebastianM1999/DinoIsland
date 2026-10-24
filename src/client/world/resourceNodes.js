@@ -12,7 +12,7 @@ import { instanced, finishInstanced } from './veg/shapes.js';
 
 const POP_TIME = 0.35;
 /** Visual scale per kind (the models are life-size; a little bigger is easier to spot). */
-const SCALE = { resin: 1.5, ironwood: 1.25, herb: 1.7 };
+const SCALE = { resin: 1.5, ironwood: 1.25, herb: 1.7, crystal: 1.6 };
 /** Height of the resin on the bark, above the ground (m). */
 const RESIN_HEIGHT = 1.15;
 

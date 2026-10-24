@@ -688,8 +688,15 @@ export class PlayerActions {
         }
       }
     }
+    // a side island (the Hollow Mountain): the boat the team came in on takes it back once the seal crystal is taken
+    const back = g.mission?.level?.sideOf != null ? g.layout.arrivalBoat : null;
+    if (back && Math.hypot(back.x - pos.x, back.z - pos.z) < 7) {
+      const m = g.mission;
+      if (m?.boat?.repaired && !m.complete) return { text: `Sail back to ${m.next?.name ?? 'the island'}`, run: () => net.act(ACT.SAIL) };
+      return { text: m?.complete ? 'All aboard!' : "The boat back – take the seal crystal from Elias' camp first", run: null };
+    }
     const boat = g.layout.boat;
-    if (boat && Math.hypot(boat.interact.x - pos.x, boat.interact.z - pos.z) < 5.5) {
+    if (!back && boat && Math.hypot(boat.interact.x - pos.x, boat.interact.z - pos.z) < 5.5) {
       const m = g.mission;
       const found = (m?.relics || []).filter((r) => r.found).length;
       const text = m?.boat?.repaired ? 'Check the boat' : `Inspect the wreck (${found}/${m?.relics?.length ?? 3} parts)`;
