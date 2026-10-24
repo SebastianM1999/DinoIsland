@@ -229,6 +229,8 @@ export const CONFIG = {
     resin:    { name: 'Resin',        weight: 0.5 },
     ironwood: { name: 'Ironwood',     weight: 1.5 },
     herb:     { name: 'Healing herb', weight: 0.3 },
+    // the Alpha Sarcosuchus' glowing blood (butchering the swamp boss): it burns in a lantern (shared/torch.js LANTERN)
+    bossBlood: { name: 'Glowblood', weight: 0.5 },
   },
   // Map resources: they lie at fixed spots (shared/layout.js resourceSpots), are
   // gathered with E (ACT.GATHER) like fruit and grow back after `regrow` seconds.
@@ -256,7 +258,7 @@ export const CONFIG = {
       body: [[0, 2.2], [1.8, 2.6], [3.6, 1.15], [5.4, .8], [6.75, .6], [7.35, .4],
         [-1.8, 2.6], [-3.6, 1.1], [-5.4, .78], [-7.2, .5], [-8.4, .35], [-9.1, .2]],
       loot: { meat: 8, hide: 6, teeth: 6 },
-      butcher: { loot: { bones: 10, skull: 1, plates: 6 } },
+      butcher: { loot: { bones: 10, skull: 1, plates: 6, bossBlood: 3 } },   // (glowblood: the lantern's fuel, docs/map-progression/21-laterne.md)
       respawn: 0, // The arena boss is unique and stays defeated.
     },
     brachio: {

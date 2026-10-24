@@ -54,6 +54,7 @@ import { BoatPanel } from '../ui/boatPanel.js';
 import { NotePanel } from '../ui/notePanel.js';
 import { buildNotes } from '../world/notes.js';
 import { buildArrival } from '../world/arrival.js';
+import { buildStoryProps } from '../world/storyProps.js';
 import { Cutscene } from './cutscene.js';
 import { introShots, outroShots } from './storyShots.js';
 import { PlayerModel } from '../models/playerModel.js';
@@ -66,7 +67,8 @@ import { GrovePrompt } from '../ui/grovePrompt.js';
 import { mayEnterGrove, GROVE_STONE_REACH } from '../../shared/grove.js';
 import { buildBossArena } from '../world/bossArena.js';
 import { buildSwampArena } from '../world/swampArena.js';
-import { buildSwampFx, thickSky } from '../world/swampFx.js';
+import { buildSwampFx, thickSky, lerpSky, mireSky } from '../world/swampFx.js';
+import { blackmireDepth } from '../../shared/blackmire.js';
 import { buildVolcanoArena } from '../world/volcanoArena.js';
 import { ashShelter } from '../../shared/volcanoArena.js';
 import { buildVolcanoFx, ashSky } from '../world/volcanoFx.js';
@@ -374,7 +376,8 @@ export class Game {
     this.notes = buildNotes(this.terrain, this.layout);
     this.arrival = buildArrival(this.terrain, this.layout);
     this.arrival.setTaken(this.net.welcome.inv?.spear !== false);
-    scene.add(this.notes.group, this.arrival.group);
+    this.storyProps = buildStoryProps(this.terrain, this.layout);
+    scene.add(this.notes.group, this.arrival.group, this.storyProps.group);
     yield;
     // islands with building plots start at a small landing camp; the team builds its own base
     this.hut = yield* buildHutSteps(this.terrain, this.layout, { landing: hasBasePlots(this.layout) });
@@ -396,7 +399,15 @@ export class Game {
     yield;
     // the swamp's fog draws in where the mist is thick (swampFx.js mistiness)
     const swampSky = this.layout.biome.sky, swampThick = thickSky(swampSky || {});
-    this.swampFx = buildSwampFx(this.terrain, this.layout, this.gfx.camera, (k) => this.gfx.blendBiome(swampSky, swampThick, k));
+    // (the Blackmire darkens the air on top of the mist: #mireAir)
+    this.swampMistK = 0;
+    this.mireK = 0;
+    this.applySwampAir = () => {
+      if (this.mireK <= 0) { this.gfx.blendBiome(swampSky, swampThick, this.swampMistK); return; }
+      const misty = this.swampMistK > 0 ? lerpSky(swampSky, swampThick, this.swampMistK) : swampSky;
+      this.gfx.blendBiome(misty, mireSky(swampSky, this.mireLantern), this.mireK);
+    };
+    this.swampFx = buildSwampFx(this.terrain, this.layout, this.gfx.camera, (k) => { this.swampMistK = k; this.applySwampAir(); });
     this.volcanoArena = buildVolcanoArena(this.terrain, this.layout);
     // the volcano: ash rain thickens the air; a lava bomb landing nearby shakes the view
     const ashBase = this.layout.biome.sky, ashThick = ashSky(ashBase || {});
@@ -847,7 +858,7 @@ export class Game {
       yaw: +p.yaw.toFixed(3), pitch: +p.pitch.toFixed(3),
       spd: +p.moveSpeed.toFixed(2),
       eq: this.eq,
-      fl: this.flags | (p.sprinting ? PF.SPRINT : 0) | (p.onGround ? PF.GROUND : 0) | (p.knockTimer > 0 ? PF.KNOCKED : 0) | (p.dash.active ? PF.DASH : 0) | (this.torchLit && this.me.inv.torch ? PF.TORCH : 0),
+      fl: this.flags | (p.sprinting ? PF.SPRINT : 0) | (p.onGround ? PF.GROUND : 0) | (p.knockTimer > 0 ? PF.KNOCKED : 0) | (p.dash.active ? PF.DASH : 0) | (this.torchLit && this.lanternMode ? PF.TORCH | PF.LANTERN : this.torchLit && this.me.inv.torch ? PF.TORCH : 0),
     };
     this.flags &= ~PF.ATTACK; // one-shot animation pulse
     return state;
@@ -1059,6 +1070,7 @@ export class Game {
     WIND.uTime.value = this.time;
     const cam = this.gfx.camera.position;
     this.#mood(dt, cam);
+    this.#mireAir(dt, cam);
     const corner = Math.sqrt(1 + (Math.tan(this.gfx.camera.fov * Math.PI / 360) * this.gfx.camera.aspect) ** 2);
     this.terrainView.range = (this.gfx.scene.fog?.far ?? this.layout.biome.sky.fogFar) * corner;
     for (const u of this.worldUpdaters) u.update?.(dt, this.time, cam);
@@ -1072,6 +1084,18 @@ export class Game {
     this.hudTimer -= dt;
     if (this.hudTimer <= 0) { this.hudTimer += 1 / 30; this.#updateHud(dt); }
     this.#updateAudio(dt);
+  }
+
+  /** The Blackmire (shared/blackmire.js): the air turns black-green as the camera goes in; a burning lantern pushes it back. */
+  #mireAir(dt, cam) {
+    if (!this.layout.blackmire) return;
+    const want = blackmireDepth(this.layout, cam.x, cam.z);
+    const k = Math.abs(want - this.mireK) < 1e-3 ? want : this.mireK + (want - this.mireK) * Math.min(1, dt * 2);
+    const lantern = !!(this.torchLit && this.lanternMode);
+    if (k === this.mireK && lantern === this.mireLantern) return;
+    this.mireK = k;
+    this.mireLantern = lantern;
+    this.applySwampAir();
   }
 
   /**

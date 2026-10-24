@@ -72,13 +72,13 @@ export class Mission {
   state() {
     const w = this.world;
     const L = w.layout.level;
-    const relics = w.relics.map((r) => ({ id: r.id, kind: r.kind, site: r.site, found: r.found, by: r.byName || null }));
+    const relics = w.relics.map((r) => ({ id: r.id, kind: r.kind, site: r.site, found: r.found, by: r.byName || null, ...(r.hint ? { hint: r.hint } : {}) }));
     const found = relics.filter((r) => r.found).length;
     const repaired = this.phase !== 'search' && this.phase !== 'explore';
     const boat = this.phase === 'explore' ? [] : [
       ...relics.map((r) => {
         const def = RELICS[r.kind];
-        return { text: r.found ? `${def.name} found` : `Find the ${def.name} – ${def.hint}`, done: r.found, relic: r.kind };
+        return { text: r.found ? `${def.name} found` : `Find the ${def.name} – ${r.hint ?? def.hint}`, done: r.found, relic: r.kind };
       }),
       { text: `Repair the boat on the east beach (${found}/${relics.length} parts)`, done: repaired },
       { text: `Set sail together at the boat: E, then Set sail (${this.atBoat ?? 0}/${Math.max(1, this.alive ?? 0)} at the boat)`, done: this.phase === 'sailing' },
