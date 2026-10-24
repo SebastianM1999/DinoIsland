@@ -149,6 +149,15 @@ export class Game {
     this.reviveTarget = null;   // { id, name, progress } downed teammate in reach (set by PlayerActions)
     this.medicTarget = null;    // { id, name } hurt teammate we could heal with fruit (Field Medic)
     // Primeval Grove: an invisible wall until the player may enter (TODO(grove-unlock) in shared/grove.js)
+    // Ashfall's crater: closed until the seal crystal sits in its gate (sim/world.js gateBlocks)
+    const crater = this.layout.volcanoArena;
+    if (crater) {
+      this.player.barrier = {
+        x: crater.x, z: crater.z, r: crater.craterR + 1,
+        mayEnter: () => !!this.gateOpen || this.player.creative,
+        onBlocked: () => { if (!this.gateHintAt || this.time - this.gateHintAt > 6) { this.gateHintAt = this.time; this.hud.toast('The crater is sealed – its gate needs the seal crystal', 'quest'); } },
+      };
+    }
     const grove = this.layout.grove;
     if (grove) {
       this.groveArmed = true;
@@ -482,6 +491,9 @@ export class Game {
     this.notesRead = new Set(world.story?.notes ?? []);   // the team's journal (shared/notes.js)
     this.introSeen = world.story?.introSeen ?? true;
     this.storyProps?.setSeal(!!world.story?.sealCrystal);
+    this.storyProps?.setGate(!!world.story?.gateOpen);
+    this.sealCrystal = !!world.story?.sealCrystal;
+    this.gateOpen = !!world.story?.gateOpen;
     this.storyLegacy = !!world.story?.legacy;   // (an expedition saved before the story knows every recipe)
     this.notes.setRead(this.notesRead);
     this.notePanel?.setRead(this.notesRead);
@@ -673,8 +685,12 @@ export class Game {
       if (t) this.audio?.play('torchLight', { pos: { x: t.x, y: t.y, z: t.z } });
     });
     net.on(`ev:${EV.STORY}`, (m) => {
-      this.storyProps.setSeal(!!m.story.sealCrystal);
-      if (m.story.sealCrystal) this.audio.play('complete');
+      if (m.story.gateOpen && !this.gateOpen) { this.audio.play('rumble'); this.shake = Math.max(this.shake, 0.7); }
+      else if (m.story.sealCrystal && !this.sealCrystal) this.audio.play('complete');
+      this.sealCrystal = !!m.story.sealCrystal;
+      this.gateOpen = !!m.story.gateOpen;
+      this.storyProps.setSeal(this.sealCrystal);
+      this.storyProps.setGate(this.gateOpen);
     });
     net.on(`ev:${EV.NOTE}`, (m) => {
       if (!m.first) return;

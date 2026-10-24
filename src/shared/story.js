@@ -21,6 +21,13 @@ export const STORY = {
     { id: 'fill', text: 'Fill the lantern with glowblood (L)', done: { event: 'lantern:filled' } },
     { id: 'blackmire', text: 'Cross the Blackmire with a burning lantern', done: { note: 'blackmire' } },
   ],
+  // Ashfall (docs/map-progression/24-boss-tor.md): the station, the sealed gate, over to the hollow mountain and back
+  2: [
+    { id: 'station', text: "Find Elias' research station on the mountain path", done: { note: 'station' } },
+    { id: 'gate', text: 'Find the gate to the crater', done: { near: 'gate', r: 10 } },
+    { id: 'unseal', text: 'Set the seal crystal into the gate (from the hollow mountain)', done: { event: 'gate:open' } },
+    { id: 'king', text: 'Defeat the king of the crater', done: { event: 'kill:trex' } },
+  ],
   // the Hollow Mountain, Ashfall's side island (docs/map-progression/23-hollow-mountain.md)
   3: [
     { id: 'hall', text: "Find Elias' writing in a crystal hall (a lantern lights the dark)", done: { note: 'wall' } },
