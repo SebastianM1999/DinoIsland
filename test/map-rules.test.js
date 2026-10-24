@@ -83,13 +83,13 @@ test('first-island waterfall stays central and faces the western spawn across va
   }
 });
 
-test('first island has four separated raptor territories and keeps three pteranodons', () => {
+test('first island has four separated raptor territories of two and keeps three pteranodons', () => {
   for (const { level, variant, layout } of islands) {
     if (level !== 0) continue;
     assert.equal(layout.level.dinos.ptera, 3);
     const zones = layout.dinoZones.raptor;
     assert.equal(zones.length, 4, `variant ${variant}: four packs`);
-    assert.equal(zones.reduce((n, z) => n + z.size, 0), 11);
+    assert.equal(zones.reduce((n, z) => n + z.size, 0), 8, 'pairs: raptor-pairs.test.js');
     for (let i = 0; i < zones.length; i++) {
       for (let j = 0; j < i; j++) {
         assert.ok(Math.hypot(zones[i].x - zones[j].x, zones[i].z - zones[j].z) >= 48, `variant ${variant}: packs ${i}/${j} have separate territory`);
