@@ -106,6 +106,7 @@ export function* buildLayoutSteps(terrain) {
     caveExit: null,         // { x, y, z, dir, hall } just outside the exit tunnel (east beach)
     falseExits: [],         // tunnels that end in daylight at a sea cliff: { x, y, z, a }
     wallTorches: [],        // Hollow Mountain sconces the team lights: { id, x, y, z, nx, nz (facing out of the wall), tunnel } (shared/torch.js WALL_TORCH)
+    blackmire: null,        // the swamp's darkest bog: { x, z, r } (shared/blackmire.js, story section below)
     sumps: [],              // dive-only shortcuts: { tunnel, level, len, a:{x,z}, b:{x,z}, cache:{x,z,y,loot} } (see shared/caveMaze.js SUMP)
     arrivalBoat: null,      // the boat the team came on (west cove, decoration only): { x, y, z, rot }
     logs: [],               // fallen trees: { x, z, rot, len, r, yA, yB, roots, dead }
@@ -1526,6 +1527,47 @@ export function* buildLayoutSteps(terrain) {
     const c = layout.bowCamp, lx = 1.1, lz = -0.8;
     const x = c.x + lx * dmath.cos(c.rot) + lz * dmath.sin(c.rot), z = c.z - lx * dmath.sin(c.rot) + lz * dmath.cos(c.rot);
     layout.storyAnchors.peakCamp = { x, z, y: terrain.heightAt(x, z), rot: c.rot + 0.4 };
+  }
+  if (biome.id === 'swamp' && hut.kind === 'landing') {
+    // Elias' raft, run aground at the landing beach west of the camp: the first dry ground short of the water
+    const c = hut.campfire;
+    let wet = null;
+    for (let dx = 0; dx >= -60; dx -= 1) if (terrain.waterLevelAt(c.x + dx, c.z + 5) !== null || terrain.heightAt(c.x + dx, c.z + 5) < 0.2) { wet = dx; break; }
+    if (wet !== null) {
+      const rx = c.x + wet + 1.5, rz = c.z + 5;
+      layout.storyAnchors.raft = { x: rx, z: rz, y: terrain.heightAt(rx, rz), rot: 0.35, raft: { x: c.x + wet - 0.5, z: rz + 0.4, y: terrain.heightAt(c.x + wet - 0.5, rz + 0.4) } };
+    }
+    // the Blackmire (shared/blackmire.js): the biggest bog far from the camp and the building plots;
+    // the egg boat part lies in it (Elias' clutches without nests), his note from the mire beside it
+    const far = (b) => dmath.hypot(b.x - hut.x, b.z - hut.z);
+    const bog = (plan.bogs || []).filter((b) => !b.arena && b.r >= 20 && far(b) > 110 &&
+      layout.basePlots.every((p) => dmath.hypot(p.x - b.x, p.z - b.z) > b.r + p.r + 10) &&
+      !insideSwampArena(plan.swampArena, b.x, b.z, b.r))
+      .sort((a, b) => b.r * 2 + far(b) * 0.2 - (a.r * 2 + far(a) * 0.2))[0];
+    if (bog) {
+      // a dry knoll by the bog for the egg (boat parts never lie in the mud: map rules), as near its middle as there is
+      // one, the note a few steps from it; no bush grows on them. The dark is centred on the egg.
+      const r = bog.r + 18;
+      const firm = (x, z) => terrain.waterDepthAt(x, z) === 0 && terrain.bogAt(x, z) < 0.015 && terrain.heightAt(x, z) > 0.5 &&
+        terrain.slopeAt(x, z) < 0.25 && penetration(x, z, 1.2, layout.colliders, -1e9, 1e9, 0) <= 0 &&
+        layout.trees.every((t) => dmath.hypot(t.x - x, t.z - z) > 2.8);
+      let spot = null, note = null;
+      for (let k = 0; k < 400 && !(spot && note); k++) {
+        const a = k * 2.399, d = 1 + k * (r - 2) / 400;
+        const x = bog.x + dmath.cos(a) * d, z = bog.z + dmath.sin(a) * d;
+        if (!firm(x, z)) continue;
+        if (!spot) spot = { x, z };
+        else if (dmath.hypot(x - spot.x, z - spot.z) > 2.5 && dmath.hypot(x - spot.x, z - spot.z) < 8) note = { x, z };
+      }
+      if (spot) {
+        const egg = layout.relics.find((q) => q.kind === 'egg') ?? layout.relics[layout.relics.length - 1];
+        if (egg) Object.assign(egg, { x: spot.x, z: spot.z, y: terrain.heightAt(spot.x, spot.z), site: 'blackmire', hint: 'deep in the Blackmire – bring a burning lantern' });
+        layout.blackmire = { x: spot.x, z: spot.z, r: 24 };
+        note ??= { x: spot.x + 2.5, z: spot.z + 1.5 };
+        layout.storyAnchors.blackmire = { x: note.x, z: note.z, y: terrain.heightAt(note.x, note.z), rot: 1.1 };
+        layout.bushes = layout.bushes.filter((b) => dmath.hypot(b.x - spot.x, b.z - spot.z) > 2.5 && dmath.hypot(b.x - note.x, b.z - note.z) > 2);
+      }
+    }
   }
   layout.notes = placeNotes(plan.level.index, layout.storyAnchors);
 

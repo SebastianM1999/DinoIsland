@@ -13,6 +13,14 @@ export const STORY = {
     { id: 'peak', text: "Explore the island – follow Elias' trail up the mountain", done: { note: 'peak' } },
     { id: 'wreck', text: 'Find the wreck on the east shore', done: { near: 'boat', r: 25 } },
   ],
+  // the swamp: a light in the mist (docs/map-progression/21-laterne.md)
+  1: [
+    { id: 'raft', text: "Look at Elias' raft on the landing beach", done: { note: 'raft' } },
+    { id: 'lantern', text: 'Build a lantern at the workbench', done: { event: 'craft:lantern' } },
+    { id: 'glowblood', text: 'Slay the Alpha Sarcosuchus and take its glowblood (butcher it)', done: { event: 'item:bossBlood' } },
+    { id: 'fill', text: 'Fill the lantern with glowblood (L)', done: { event: 'lantern:filled' } },
+    { id: 'blackmire', text: 'Cross the Blackmire with a burning lantern', done: { note: 'blackmire' } },
+  ],
 };
 
 export const BOAT_GATE = { 0: 'wreck' };

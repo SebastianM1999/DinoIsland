@@ -98,3 +98,21 @@ export function pointIrradiance({ intensity, distance, decay }, d) {
   const w = distance > 0 ? Math.min(1, Math.max(0, 1 - dmath.pow(d / distance, 4))) ** 2 : 1;   // (three's getDistanceAttenuation window)
   return intensity * f * w;
 }
+
+/**
+ * The lantern (docs/map-progression/21-laterne.md): built at the workbench on the swamp island (recipe `lantern`,
+ * taught by Elias' note at his raft), it burns only on the Alpha Sarcosuchus' glowblood (loot `bossBlood`):
+ * one vial gives `burnTime` seconds, up to `maxFuel`. Lit, it is the off-hand light (PF.TORCH | PF.LANTERN):
+ * brighter and greener than the torch, and it does not choke in the Blackmire's mist (shared/blackmire.js).
+ */
+export const LANTERN = {
+  burnTime: 360,
+  maxFuel: 720,
+  light: { color: '#c9ff8a', distance: 30, decay: 1.2, intensity: 17 },
+};
+
+/** Does this player carry a lit lantern (not just a torch)? `fl` number or anything with `fl`. */
+export function carriesLantern(player) {
+  const fl = typeof player === 'number' ? player : player?.fl;
+  return ((fl | 0) & PF.LANTERN) !== 0;
+}

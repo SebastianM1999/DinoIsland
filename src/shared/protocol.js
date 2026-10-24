@@ -111,6 +111,7 @@ export const ACT = {
   LIGHT: 'light',       // { torch }                              light a Hollow Mountain wall torch with the lit hand torch (within reach)
   READ: 'read',         // { note }                               read a story note lying in reach (shared/notes.js, sim/story.js)
   INTRO: 'intro',       // {}                                     this client finished or skipped the island 1 intro (sim/story.js introSeen)
+  FUEL: 'fuel',         // {}                                     pour a vial of glowblood (loot bossBlood) into the lantern (shared/torch.js LANTERN)
   DEV_TP: 'devtp',      // { x, y, z }                            dev pin tool: jump there (only a solo world started with ?dev, creative)
 };
 
@@ -188,6 +189,7 @@ export const PF = {
   DOWNED: 64,   // lying downed (server ORs it into snapshots)
   DASH: 128,
   TORCH: 256,   // carrying a lit torch in the off hand (only accepted while the server inventory has one)
+  LANTERN: 512, // that light is the lantern (with TORCH; only while the lantern has glowblood: shared/torch.js LANTERN)
 };
 
 /** Equipment slot ids (`eq`). */

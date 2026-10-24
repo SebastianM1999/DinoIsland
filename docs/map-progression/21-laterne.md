@@ -41,3 +41,11 @@ Im Nebelsumpf baut das Team eine **Laterne**. Sie brennt nur mit **Glutblut** vo
 
 ## Nicht hier
 - Die Laterne als Höhlenlicht (23).
+
+## Umsetzung (Abweichungen)
+- Die Laterne ist kein eigenes Werkzeug, sondern das Licht in der linken Hand (Fackel-Rig, Taste L) mit einem Eisenkäfig um die Flamme. Hat sie Glutblut, ersetzt sie die Fackel; leer und mit Glutblut im Rucksack füllt L sie zuerst (`ACT.FUEL`) und zündet sie dann an.
+- Das Rezept ist ein Supply (`lantern`, Kosten: 2 Haut, 1 Klaue, 1 Harz, gelernt aus der Floß-Notiz). Jeder baut seine eigene. Der Sumpf hat noch keine Sammel-Ressourcen, daher Material aus Map 1 und der Jagd.
+- Glutblut: 3 Fläschchen pro Alpha Sarcosuchus (Butchern). Eins brennt 6 Minuten, voll sind es 12.
+- Schwarzmoor: Die Map-Regeln verbieten Bootsteile im Schlamm. Das Ei (sonst das letzte Teil) liegt deshalb auf einer trockenen Kuppe am größten fernen Moor, und das Schwarzmoor (24 m) ist um diese Kuppe gelegt. Das Teil hat einen eigenen Hinweis („deep in the Blackmire“).
+- Im Schwarzmoor erstickt eine Fackel (Server und Client). Die Sicht zieht sich auf wenige Meter zu; mit Laterne auf etwa 15 m. Die Dino-Sicht bleibt unverändert.
+- Creative-Modus trägt eine volle Laterne (zum Testen).
