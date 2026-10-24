@@ -53,6 +53,7 @@ import { Wardrobe } from '../ui/wardrobe.js';
 import { BoatPanel } from '../ui/boatPanel.js';
 import { NotePanel } from '../ui/notePanel.js';
 import { buildNotes } from '../world/notes.js';
+import { buildArrival } from '../world/arrival.js';
 import { CraftingPanel } from '../ui/craftingPanel.js';
 import { Relics } from '../entities/relics.js';
 import { buildSites } from '../world/sites.js';
@@ -368,7 +369,9 @@ export class Game {
     this.bowCamp.setTaken(this.net.welcome.inv?.bow !== false);   // (built before this.me exists)
     scene.add(this.bowCamp.group);
     this.notes = buildNotes(this.terrain, this.layout);
-    scene.add(this.notes.group);
+    this.arrival = buildArrival(this.terrain, this.layout);
+    this.arrival.setTaken(this.net.welcome.inv?.spear !== false);
+    scene.add(this.notes.group, this.arrival.group);
     yield;
     // islands with building plots start at a small landing camp; the team builds its own base
     this.hut = yield* buildHutSteps(this.terrain, this.layout, { landing: hasBasePlots(this.layout) });
@@ -545,6 +548,7 @@ export class Game {
     applyBaseColliders(this.layout, base);
     this.baseView.setBase(base);
     this.hut?.setBench(!!base.bench);
+    this.hut?.setFire(!this.layout.arrival || !!base.fireLit);
     this.#syncBase();
   }
 
@@ -610,6 +614,7 @@ export class Game {
       const found = this.me.inv?.bow === false && m.inv.bow !== false;
       this.me.inv = m.inv;
       this.bowCamp?.setTaken(m.inv.bow !== false);
+      this.arrival?.setTaken(m.inv.spear !== false);
       if (found) this.#showMission();
       this.player?.setBuffs?.(m.inv.buffs);
       this.#syncCrafting();
@@ -670,6 +675,11 @@ export class Game {
       if (m.id !== this.me.id) return;
       const c = this.layout.bowCamp;
       this.audio.play('pickup', c ? { pos: { x: c.x, y: c.y + 0.6, z: c.z } } : {});
+    });
+    net.on(`ev:${EV.SPEAR_FOUND}`, (m) => {
+      if (m.id !== this.me.id) return;
+      const s = this.layout.arrival?.spear;
+      this.audio.play('pickup', s ? { pos: { x: s.x, y: s.y + 0.8, z: s.z } } : {});
     });
     net.on(`ev:${EV.TOAST}`, (m) => this.hud.toast(m.text, m.icon));
     // expedition saves happen quietly; only a failure is worth interrupting play for (the pause menu shows the details)

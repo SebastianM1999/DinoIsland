@@ -90,7 +90,7 @@ export const refundOf = (profile) => spentPoints(profile.skills);
 
 /** Every point of a campStations() result a player can stand at (null entries are stations that do not exist yet). */
 export function campStationPoints(st) {
-  return [st?.home, st?.fire, st?.workbench, st?.wardrobe, st?.board, ...(st?.dropOff ?? []), ...(st?.refill ?? [])]
+  return [st?.home, st?.fire, st?.safe, st?.workbench, st?.wardrobe, st?.board, ...(st?.dropOff ?? []), ...(st?.refill ?? [])]
     .filter((p) => p && Number.isFinite(p.x) && Number.isFinite(p.z));
 }
 

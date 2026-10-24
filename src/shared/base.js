@@ -107,11 +107,15 @@ export function repairCost(base, levelIndex) {
 
 /**
  * Fresh (unbuilt) base state, replicated to clients as-is. `bench`: island 1's camp table
- * stands (the team builds it at the tent, CAMP_BENCH; tier-1 recipes only).
+ * stands (the team builds it at the tent, CAMP_BENCH; tier-1 recipes only). `fireLit`: island 1's
+ * camp fire burns (cold on arrival; someone lights it: it heals and the team respawns round it).
  */
 export function freshBase() {
-  return { plot: null, stage: 0, building: null, hp: 0, maxHp: 0, damaged: false, towers: [], bench: false };
+  return { plot: null, stage: 0, building: null, hp: 0, maxHp: 0, damaged: false, towers: [], bench: false, fireLit: false };
 }
+
+/** Island 1: how close to the cold camp fire an explorer stands to light it (base.fireLit). */
+export const CAMP_FIRE_REACH = 3;
 
 /** Island 1's camp table: what it costs and how close to its site the builder stands. */
 export const CAMP_BENCH = { cost: { ironwood: 3, resin: 2 }, reach: 4.5, maxTier: 1 };
@@ -235,7 +239,7 @@ export function applyBaseColliders(layout, base) {
  * on `benchSite`, tier-1 recipes only: `miniBench`). Plotless later islands: the
  * hunting hut. Islands with plots: the landing camp (drop-off, free resupply),
  * plus everything the base offers once a stage stands.
- * @returns {{ fire: {x,z,y}|null, healR: number, healRate: number, dropOff: object[], refill: object[],
+ * @returns {{ fire: {x,z,y}|null, safe?: {x,z}, healR: number, healRate: number, dropOff: object[], refill: object[],
  *   workbench: object|null, wardrobe: object|null, board: object|null, home: {x,z},
  *   benchSite?: object|null, miniBench?: boolean }}
  */
@@ -243,8 +247,10 @@ export function campStations(layout, base, levelIndex) {
   const h = layout.hut;
   if (h.kind === 'tent') {
     const built = !!base?.bench;
+    // (the fire is cold when the explorers wash ashore: it heals once someone lit it, base.fireLit;
+    // the camp is a safe place either way)
     return {
-      fire: h.campfire, healR: CONFIG.player.hutHealRadius, healRate: 1,
+      fire: base?.fireLit ? h.campfire : null, safe: h.campfire, healR: CONFIG.player.hutHealRadius, healRate: 1,
       dropOff: [h.dropOff], refill: [h.arrowRack, h], workbench: built ? h.arrowRack : null,
       wardrobe: null, board: null, home: h,
       benchSite: built ? null : h.arrowRack, miniBench: true,
@@ -291,7 +297,8 @@ export const SAFE_MARGIN = 8;
 /** The area dinosaurs keep out of (and leave players alone in): { x, z, r } or null. */
 export function safeZone(layout, base, levelIndex) {
   const st = campStations(layout, base, levelIndex);
-  return st.fire ? { x: st.fire.x, z: st.fire.z, r: st.healR } : null;
+  const at = st.safe ?? st.fire;
+  return at ? { x: at.x, z: at.z, r: st.healR } : null;
 }
 
 /** Nearest plot index whose stake `p` stands at (within PLOT_REACH of its edge), or -1. */

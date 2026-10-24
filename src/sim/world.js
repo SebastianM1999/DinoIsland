@@ -31,7 +31,7 @@ import { CAVE_WALK_MAX } from '../shared/caveField.js';
 import { findUnstuckSpot, goodSpot } from './unstuck.js';
 import { rosterRecord, applyRosterRecord } from './worldSave.js';
 import { nearDino, plausibleZone } from './hitCheck.js';
-import { freshBase, CAMP_BENCH, campStations, safeZone as baseSafeZone, hasBasePlots, PLOT_REACH, MAX_STAGE, stageCost, BUILD_TIME, BASE_STAGES, applyBaseColliders, baseSpawnPoints, TOWERS, TOWER_SLOTS, towerCost, repairCost } from '../shared/base.js';
+import { freshBase, CAMP_BENCH, CAMP_FIRE_REACH, campStations, safeZone as baseSafeZone, hasBasePlots, PLOT_REACH, MAX_STAGE, stageCost, BUILD_TIME, BASE_STAGES, applyBaseColliders, baseSpawnPoints, TOWERS, TOWER_SLOTS, towerCost, repairCost } from '../shared/base.js';
 import { updateTowers } from './towers.js';
 import { Raids } from './raids.js';
 import { Volcano } from './volcano.js';
@@ -159,7 +159,7 @@ export class ServerWorld {
       p.inv.arrowUses = Array(caps.arrows).fill(W.bow.uses);
     }
     p.inv.traps = Math.max(p.inv.traps, caps.traps);
-    p.inv.spear = true;
+    p.inv.spear = p.inv.spearFound = true;
     p.inv.spearHealth = W.spear.durability;
     p.inv.guns = this.gunInventory(); p.inv.reloading = null;
     p.inv.caps = caps;
@@ -278,14 +278,17 @@ export class ServerWorld {
   freshInventory() {
     // (island 1: each explorer finds the bow at the hunter's camp; elsewhere it was found on island 1)
     const bow = !this.layout.bowCamp;
+    // (island 1: the explorers wash ashore empty-handed; Jonas' spear stands at the cold camp fire)
+    const armed = !this.layout.arrival;
     return {
       guns: this.gunInventory(), reloading: null,
       bow,
       arrows: bow ? W.bow.startArrows : 0,
       arrowUses: Array(bow ? W.bow.startArrows : 0).fill(W.bow.uses),
-      spear: true,
-      spearHealth: W.spear.durability,
-      traps: W.trap.startCount,
+      spear: armed,
+      spearHealth: armed ? W.spear.durability : 0,
+      spearFound: armed,     // has had a spear: only then does the free resupply hand out a new one
+      traps: armed ? W.trap.startCount : 0,
       fruit: [],
       torch: false,          // owns the hand-held torch (picked up at the island's torch spots)
       loot: Object.fromEntries(LOOT_KEYS.map((k) => [k, 0])),
@@ -641,7 +644,7 @@ export class ServerWorld {
       p.prof.skills = buy(p.prof, m.id);
     } else if (m.op === 'reset') {
       const st = this.stations();
-      if (!p.alive || !this.nearAny(p, [st.fire, st.workbench, st.wardrobe, st.board, ...st.dropOff, ...st.refill], 6)) {
+      if (!p.alive || !this.nearAny(p, [st.fire, st.safe, st.workbench, st.wardrobe, st.board, ...st.dropOff, ...st.refill], 6)) {
         return this.toast('Skills can only be reset at your camp', 'info', p.id);
       }
       if (!Object.keys(p.prof.skills).length) return;
@@ -711,10 +714,10 @@ export class ServerWorld {
   /** Is `p` within `range` of any of the points? */
   nearAny(p, points, range) { return points.some((s) => s && this.near(p, s.x, s.z, range)); }
 
-  /** Where players (re)spawn: around the base campfire once one stands, else the landing beach. */
+  /** Where players (re)spawn: around the base campfire once one stands (island 1: its camp fire once lit), else the landing beach. */
   spawnPoint(slot) {
     const plot = this.base.stage > 0 ? this.layout.basePlots[this.base.plot] : null;
-    const pts = plot ? baseSpawnPoints(plot) : this.layout.spawnPoints;
+    const pts = plot ? baseSpawnPoints(plot) : this.base.fireLit && this.layout.campSpawnPoints ? this.layout.campSpawnPoints : this.layout.spawnPoints;
     return pts[slot % pts.length];
   }
 
@@ -743,6 +746,7 @@ export class ServerWorld {
     }
     set('bow', true);
     set('spear', true);
+    set('spearFound', true);
     set('spearHealth', W.spear.durability);
     set('traps', Math.max(inv.traps, caps.traps));
     for (const [k, ammo] of Object.entries(inv.guns)) {
@@ -764,11 +768,22 @@ export class ServerWorld {
     this.toast(`${p.name} built the camp table – craft supplies and first upgrades`, 'crate');
   }
 
+  /** Island 1: light the cold camp fire the team washed ashore beside (ACT.BASE op 'kindle'): from now on it heals, and the team respawns round it. */
+  kindleCampFire(p) {
+    const fire = this.layout.arrival?.fire;
+    if (!p.alive || !fire || this.base.fireLit || !this.near(p, fire.x, fire.z, CAMP_FIRE_REACH + 1)) return;
+    this.base.fireLit = true;
+    this.event(EV.BASE, { base: this.publicBase() });
+    this.toast(`${p.name} lit the camp fire – here you are safe`, 'flame');
+    this.checkpoint('fire');
+  }
+
   /** Build (op 'build' on a plot) or grow (op 'upgrade') the team's base from the hut store. */
   baseAction(p, m) {
     const b = this.base;
     const deny = (text) => this.toast(text, 'crate', p.id);
     if (m.op === 'bench') return this.buildCampBench(p);
+    if (m.op === 'kindle') return this.kindleCampFire(p);
     if (!p.alive || !hasBasePlots(this.layout)) return;
     if (m.op === 'tower' || m.op === 'towerUp') return this.towerAction(p, m);
     if (m.op === 'repair') return this.repairBase(p);
@@ -1496,8 +1511,11 @@ export class ServerWorld {
         // free basic resupply only; everything else is crafted (ACT.CRAFT)
         if (inv.bow) inv.arrows = Math.max(inv.arrows, Math.min(W.bow.startArrows, this.caps().arrows));
         this.normalizeArrows(inv);
-        if (!inv.spear) inv.spearHealth = W.spear.durability;
-        inv.spear = true;
+        // (a spear only for whoever has had one: island 1's explorers take Jonas' first)
+        if (inv.spearFound) {
+          if (!inv.spear) inv.spearHealth = W.spear.durability;
+          inv.spear = true;
+        }
         inv.guns = this.gunInventory(); inv.reloading = null;
         this.sendInv(p);
         this.toast('Basic ammunition resupplied', 'arrow', p.id);
@@ -1783,6 +1801,15 @@ export class ServerWorld {
         this.normalizeArrows(p.inv);
         this.event(EV.BOW_FOUND, { id: p.id });
         this.toast(`${p.name} found a bow`, 'bow');
+        this.sendInv(p);
+      }
+      // island 1's arrival: walk up to Jonas' spear in the sand to take it (whoever has none)
+      const spear = this.layout.arrival?.spear;
+      if (spear && !p.inv.spear && (spear.x - p.x) ** 2 + (spear.z - p.z) ** 2 <= W.spear.pickupRange ** 2 && Math.abs(spear.y - p.y) < 3) {
+        p.inv.spear = p.inv.spearFound = true;
+        p.inv.spearHealth = W.spear.durability;
+        this.event(EV.SPEAR_FOUND, { id: p.id });
+        this.toast(`${p.name} took Jonas' spear`, 'spear');
         this.sendInv(p);
       }
       // the hut / the base campfire is a safe, healing place

@@ -140,6 +140,12 @@ export function* buildHutSteps(terrain, layout, { landing = false } = {}) {
     siteMesh.visible = !built;
   };
   setBench(false);
+  // island 1's camp fire is cold when the explorers wash ashore (base.fireLit): only a thin wisp of smoke
+  let fireLit = true;
+  const setFire = (lit) => {
+    fireLit = !!lit;
+    if (fire) fire.group.visible = fireLit;
+  };
 
   const center = new THREE.Vector3(hut.x, hut.y, hut.z);
 
@@ -149,10 +155,11 @@ export function* buildHutSteps(terrain, layout, { landing = false } = {}) {
     update(dt, time, camPos) {
       if (camPos && camPos.distanceToSquared(center) > ANIM_RANGE * ANIM_RANGE) return;
       flag.update(time);
-      fire?.update(time);
-      smoke?.update(Math.min(dt, 0.1));
+      if (fireLit) fire?.update(time);
+      smoke?.update(Math.min(dt, 0.1) * (fireLit ? 1 : 0.35));
     },
     setBench,
+    setFire,
     /** Show n arrows in the barrel (clamped to arrowSlots). */
     setArrowStock(n) {
       arrows.setStock(n);

@@ -88,6 +88,7 @@ test('traps are limited by the carry cap', () => {
 test('a lost spear can be crafted again, but not while you hold one', () => {
   const { world, player, craft, stock } = setup();
   stock({ teeth: 2, hide: 2 });
+  Object.assign(player.inv, { spear: true, spearFound: true });   // (island 1: Jonas' spear, taken at the cold camp fire)
   craft('spear');
   assert.equal(world.store.teeth, 2);
   player.inv.spear = false;

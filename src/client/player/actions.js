@@ -12,7 +12,7 @@ import { shotEnd } from '../../shared/gunshots.js';
 import { insideGrove } from '../../shared/grove.js';
 import { segmentColliders } from '../../shared/collision.js';
 import { dinoBodyCircles } from '../../shared/dinoContact.js';
-import { PLOT_KINDS, MAX_STAGE, CAMP_BENCH, plotPoint } from '../../shared/base.js';
+import { PLOT_KINDS, MAX_STAGE, CAMP_BENCH, CAMP_FIRE_REACH, plotPoint } from '../../shared/base.js';
 import { stakePoint } from '../world/base.js';
 import { upgradeMods } from '../../shared/crafting.js';
 import { GunEffects } from '../entities/gunEffects.js';
@@ -610,12 +610,15 @@ export class PlayerActions {
         return { text: inv.torch ? 'Wall torch – light your torch first (L)' : 'Wall torch – you need a burning torch', run: null };
       }
     }
-    // 0c. a story note (shared/notes.js): read it
+    // 0c. a story note (shared/notes.js): read it; island 1's cold camp fire (shared/base.js): light it (the nearer of the two)
     let note = null, nd = NOTE_REACH;
     for (const n of g.layout.notes ?? []) {
       const d = Math.hypot(n.x - pos.x, n.z - pos.z);
       if (d < nd && Math.abs(n.y - pos.y) < 2.5) { nd = d; note = n; }
     }
+    const coldFire = g.layout.arrival && !g.base?.fireLit ? g.layout.arrival.fire : null;
+    const fireD = coldFire ? Math.hypot(coldFire.x - pos.x, coldFire.z - pos.z) : Infinity;
+    if (fireD < CAMP_FIRE_REACH && fireD < nd) return { text: 'Light the camp fire', run: () => net.act(ACT.BASE, { op: 'kindle' }) };
     if (note) return { text: `Read: ${NOTE_BY_ID[note.id].title}`, run: () => g.readNote(note.id) };
     // Dropping a carried item never picks it straight back up; retrieve it deliberately.
     let dropped = null, dropDistance = CONFIG.pickupRange;

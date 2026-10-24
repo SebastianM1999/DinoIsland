@@ -30,7 +30,7 @@ Dieser Ordner ist der Gesamtplan für Waffen-Freischaltung, Dino-Level, Craft-Ki
 | 13 | [Base: Türme](13-base-tuerme.md) | 10 | – | offen |
 | 14 | [Story (Bibel)](14-story.md) | – | – | fertig (Doku) |
 | 15 | [Lesbare Nachrichten](15-nachrichten.md) | – | hud.js (Panel), world.js (onAct) | umgesetzt (claude/story-notes) |
-| 16 | [Map 1: Ankunft am Strand](16-map1-ankunft.md) | 15 | world.js (Inventar, Lagerfeuer, Spawn) | offen |
+| 16 | [Map 1: Ankunft am Strand](16-map1-ankunft.md) | 15 | world.js (Inventar, Lagerfeuer, Spawn) | umgesetzt (claude/story-arrival) |
 | 17 | [Intro-/Outro-Cutscene](17-cutscene.md) | – | game.js (Start, Spielende) | offen |
 | 18 | [Story-Quests](18-story-quests.md) | 15 | world.js (Mission-Events) | offen |
 | 19 | [Map 1: Elias' Lager am Gipfel](19-map1-gipfel.md) | 15, 16 | world.js (craft) | offen |
