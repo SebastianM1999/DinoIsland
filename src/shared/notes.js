@@ -29,7 +29,7 @@ export const NOTES = [
     title: 'Note, day 41', author: 'E. Brand',
     text: [
       'From up here you see everything: the grove to the north with the old giant, the nests, the wreck on the east shore. Jonas no longer believes we will get away. I still do.',
-      'I leave here what I have learned: how to carve arrows, set traps and lay bait. And my bow. Do not hunt what you do not need.',
+      'I leave here what I have learned: how to carve arrows, set traps and harden a spearhead. And my bow. Do not hunt what you do not need.',
       'I am building a raft and will follow the flying lizards south, into the mist. That is where the trail begins, I think.',
     ],
   },

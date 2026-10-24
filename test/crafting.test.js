@@ -14,6 +14,7 @@ function setup() {
   const player = world.players.get(id);
   Object.assign(player.inv, { bow: true, arrows: 12, arrowUses: Array(12).fill(3) });   // (island 1: the bow is found at the hunter's camp – bow-find.test.js)
   world.base.bench = true;   // island 1: the team's camp table stands (building it: below)
+  world.story.notesRead.add('peak');   // and the team has read Elias' note with the recipes (story-peak below)
   const rack = world.layout.hut.arrowRack;
   player.x = rack.x; player.z = rack.z; player.y = world.terrain.heightAt(rack.x, rack.z);
   const craft = (recipe) => world.receive(player.id, { t: MSG.ACT, a: ACT.CRAFT, recipe });

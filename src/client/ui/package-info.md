@@ -10,7 +10,7 @@
 - `minimap.js` — `buildMapBase` (`buildMapBaseSteps`, the same painted in row bands for the loading sequence) paints the island once to an offscreen canvas (swamp bogs and the swamp arena ring, the volcano's lava craters and crater rim included); `drawMap` blits a region plus markers each frame.
 - `icons.js` — `ICONS`, `icon(id)`, `portraitSvg()`: inline 32x32 SVG item/HUD icons with distinct equipment/material silhouettes at small sizes (every fruit kind, the map resources `resin`, `ironwood`, `herb`, `flame` for heat and the volcano's warnings, `ash` for the ash rain).
 - `itemInfo.js` — `ITEM_INFO`: names and tooltip texts for inventory items, numbers taken from `CONFIG` (no fixed slot numbers: pockets are rearrangeable); `itemStats(kind, count)`: the inventory's [label, value] stat rows (damage, range, magazine, heal, weight per unit and stack weight).
-- `craftingPanel.js` — `CraftingPanel`: hut workbench dialog (supplies tab and team upgrades tab, refill).
+- `craftingPanel.js` — `CraftingPanel`: hut workbench dialog (supplies tab and team upgrades tab, refill). A recipe the team has not learned from the story's notes shows as Unknown (`notesRead`, `legacy`; creative knows all).
 - `basePanel.js` — `BasePanel`: base dialog on islands 2+ (pick plot, upgrade stage, build/upgrade towers, repair).
 - `boatPanel.js` — `BoatPanel`: boat wreck dialog listing found/missing boat parts and the Repair button; once repaired, Set sail (Enter) and Inventory (Tab).
 - `notePanel.js` — `NotePanel`: a story note on a sheet of paper (E at the note, `showNote`) and the team's journal (J, `showJournal`: every note read, island by island; a note opens on the sheet, Back returns).

@@ -6,6 +6,7 @@
 import { EV } from '../shared/protocol.js';
 import { NOTE_BY_ID, NOTE_REACH } from '../shared/notes.js';
 import { storySteps, BOAT_GATE, STEP_IDS } from '../shared/story.js';
+import { RECIPES, recipeKnown } from '../shared/crafting.js';
 
 /** Seconds between two looks at who stands near a story place. */
 const NEAR_EVERY = 0.5;
@@ -16,6 +17,7 @@ export class Story {
     this.notesRead = new Set();   // note ids, in the order the team found them
     this.steps = new Set();       // story step ids the team has done (shared/story.js)
     this.introSeen = false;       // the island 1 intro (client/core/storyShots.js) played for this expedition
+    this.legacy = false;          // an expedition saved before the story: it knows every recipe
     this.nearT = 0;
   }
 
@@ -29,10 +31,17 @@ export class Story {
     if (first) {
       this.notesRead.add(id);
       w.toast(`${p.name} found a note: ${note.title}`, 'quest');
+      const learned = RECIPES.filter((r) => r.learn === id);
+      if (learned.length) w.toast(`The team learned: ${learned.map((r) => r.name).join(', ')}`, 'crate');
       w.checkpoint('note');
     }
     w.event(EV.NOTE, { id, by: p.id, first });
     this.onEvent(`note:${id}`);
+  }
+
+  /** Does the team know how to craft recipe `r` (shared/crafting.js `learn`)? */
+  knowsRecipe(r) {
+    return recipeKnown(r, this.notesRead, this.legacy);
   }
 
   /** ACT.INTRO: a client finished (or skipped) the intro; later joiners of this expedition start without it. */
@@ -90,16 +99,20 @@ export class Story {
 
   /** For the welcome (fullState): the journal, and whether the intro still plays. */
   public() {
-    return { notes: [...this.notesRead], introSeen: this.introSeen };
+    return { notes: [...this.notesRead], introSeen: this.introSeen, legacy: this.legacy };
   }
 
   /** Plain data for the expedition save. */
   export() {
-    return { notes: [...this.notesRead], steps: [...this.steps], introSeen: this.introSeen };
+    return { notes: [...this.notesRead], steps: [...this.steps], introSeen: this.introSeen, ...(this.legacy ? { legacy: true } : {}) };
   }
 
-  /** Back from a save (missing or older data: nothing read or done yet; unknown ids are dropped; an older save has seen the intro). */
+  /**
+   * Back from a save (unknown ids are dropped). A save from before the story (no `story` at all) has seen the
+   * intro and knows every recipe (`legacy`), so no running expedition loses what it could craft.
+   */
   restore(data) {
+    this.legacy = !data || data.legacy === true;
     const notes = Array.isArray(data?.notes) ? data.notes : [];
     this.notesRead = new Set(notes.filter((id) => typeof id === 'string' && NOTE_BY_ID[id]));
     const steps = Array.isArray(data?.steps) ? data.steps : [];
