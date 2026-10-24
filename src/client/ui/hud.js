@@ -518,6 +518,20 @@ export class Hud {
     this.$torch.innerHTML = `<span class="hud-pill-ic">${icon(lantern ? 'lantern' : 'torch')}</span><kbd>L</kbd><span class="hud-torch-state">${state}</span><span class="sr"> ${lantern ? 'lantern' : 'torch'}</span>`;
   }
 
+  /** The great eruption's countdown to the boat (seconds), or null: a big red clock at the top. */
+  setCountdown(seconds) {
+    const text = seconds == null ? '' : `${Math.floor(seconds / 60)}:${String(Math.floor(seconds % 60)).padStart(2, '0')}`;
+    if (this._c.countdown === text) return;
+    this._c.countdown = text;
+    if (!this.$countdown) {
+      this.$countdown = el('div', 'hud-countdown brush');
+      this.$countdown.setAttribute('role', 'timer');
+      this.root.append(this.$countdown);
+    }
+    this.$countdown.hidden = !text;
+    if (text) this.$countdown.innerHTML = `<span class="hud-countdown-ic">${icon('flame')}</span><span>To the boat!</span><b>${text}</b>`;
+  }
+
   setSwamp(on) {
     if (this._c.swamp === !!on) return;
     this._c.swamp = !!on;
