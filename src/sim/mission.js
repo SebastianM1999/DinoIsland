@@ -172,6 +172,7 @@ export class Mission {
     this.doneTimer = last ? SAIL_DELAY * 2.5 : SAIL_DELAY;
     w.toast(last ? `All aboard! You escaped ${BRAND.name} – well done!` : `${p.name} casts off – setting sail for the next island…`, 'quest');
     this.onEvent('island');
+    w.story.onEvent('sail');
     this.broadcast();
     return null;
   }
@@ -179,6 +180,8 @@ export class Mission {
   /** Called by the dinosaur system. */
   onDinoKilled(d) {
     this.stats.kills[d.type] = (this.stats.kills[d.type] || 0) + 1;
+    // the king of Ashfall falls: the mountain wakes (sim/volcano.js startCataclysm)
+    if (d.type === 'trex' && d.boss) this.world.volcano.startCataclysm();
     this.onEvent(`kill:${d.type}`);
     this.world.story.onEvent(`kill:${d.type}`);
   }

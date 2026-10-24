@@ -27,6 +27,7 @@ export const STORY = {
     { id: 'gate', text: 'Find the gate to the crater', done: { near: 'gate', r: 10 } },
     { id: 'unseal', text: 'Set the seal crystal into the gate (from the hollow mountain)', done: { event: 'gate:open' } },
     { id: 'king', text: 'Defeat the king of the crater', done: { event: 'kill:trex' } },
+    { id: 'escape', text: 'The mountain wakes – get to the boat and sail away!', done: { event: 'sail' } },
   ],
   // the Hollow Mountain, Ashfall's side island (docs/map-progression/23-hollow-mountain.md)
   3: [
