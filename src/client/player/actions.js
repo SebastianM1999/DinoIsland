@@ -688,6 +688,11 @@ export class PlayerActions {
         }
       }
     }
+    // Ashfall's crater gate (sim/story.js openGate): set the seal crystal
+    const gate = g.layout.storyAnchors?.gate;
+    if (gate && !g.gateOpen && Math.hypot(gate.x - pos.x, gate.z - pos.z) < 4) {
+      return g.sealCrystal ? { text: 'Set the seal crystal into the gate', run: () => net.act(ACT.GATE) } : { text: 'A sealed gate – its crystal socket is empty', run: null };
+    }
     // a side island (the Hollow Mountain): the boat the team came in on takes it back once the seal crystal is taken
     const back = g.mission?.level?.sideOf != null ? g.layout.arrivalBoat : null;
     if (back && Math.hypot(back.x - pos.x, back.z - pos.z) < 7) {

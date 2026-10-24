@@ -12,6 +12,8 @@ import { RECIPES, recipeKnown } from '../shared/crafting.js';
 const NEAR_EVERY = 0.5;
 /** Metres from the seal crystal at Elias' camp within which an explorer takes it. */
 export const SEAL_REACH = 2.4;
+/** Metres from the crater gate within which the seal crystal is set (shared/volcanoArena.js gates[0]). */
+export const GATE_REACH = 4;
 
 export class Story {
   constructor(world) {
@@ -22,6 +24,7 @@ export class Story {
     this.legacy = false;          // an expedition saved before the story: it knows every recipe
     this.visited = new Set();     // island indices the team has been on (a side island is visited once: world.destination)
     this.sealCrystal = false;     // the team carries the seal crystal from Elias' last camp (the Hollow Mountain; opens Ashfall's boss gate)
+    this.gateOpen = false;        // the crystal sits in the gate: the crater arena is open (sim/world.js gateBlocks)
     this.nearT = 0;
   }
 
@@ -46,6 +49,19 @@ export class Story {
   /** Does the team know how to craft recipe `r` (shared/crafting.js `learn`)? */
   knowsRecipe(r) {
     return recipeKnown(r, this.notesRead, this.legacy);
+  }
+
+  /** ACT.GATE: `p` sets the seal crystal into the crater gate (Ashfall's `volcanoArena.gates[0]`) and the king's arena opens. */
+  openGate(p) {
+    const w = this.world;
+    const g = w.layout.volcanoArena?.gates?.[0];
+    if (!p.alive || !g || this.gateOpen || !w.near(p, g.x, g.z, GATE_REACH + 1)) return;
+    if (!this.sealCrystal) return w.toast('The gate is sealed – its crystal is missing. Elias took it to the hollow mountain', 'quest', p.id);
+    this.gateOpen = true;
+    w.toast(`${p.name} set the seal crystal – the gate to the crater grinds open`, 'quest');
+    w.event(EV.STORY, { story: this.public() });
+    this.onEvent('gate:open');
+    w.checkpoint('gate');
   }
 
   /** ACT.INTRO: a client finished (or skipped) the intro; later joiners of this expedition start without it. */
@@ -113,12 +129,12 @@ export class Story {
 
   /** For the welcome (fullState): the journal, and whether the intro still plays. */
   public() {
-    return { notes: [...this.notesRead], introSeen: this.introSeen, legacy: this.legacy, sealCrystal: this.sealCrystal };
+    return { notes: [...this.notesRead], introSeen: this.introSeen, legacy: this.legacy, sealCrystal: this.sealCrystal, gateOpen: this.gateOpen };
   }
 
   /** Plain data for the expedition save. */
   export() {
-    return { notes: [...this.notesRead], steps: [...this.steps], visited: [...this.visited], introSeen: this.introSeen, sealCrystal: this.sealCrystal, ...(this.legacy ? { legacy: true } : {}) };
+    return { notes: [...this.notesRead], steps: [...this.steps], visited: [...this.visited], introSeen: this.introSeen, sealCrystal: this.sealCrystal, gateOpen: this.gateOpen, ...(this.legacy ? { legacy: true } : {}) };
   }
 
   /**
@@ -135,5 +151,6 @@ export class Story {
     this.visited = new Set([...visited.filter((i) => Number.isInteger(i) && i >= 0), this.world.levelIndex]);
     this.introSeen = typeof data?.introSeen === 'boolean' ? data.introSeen : true;
     this.sealCrystal = data?.sealCrystal === true;
+    this.gateOpen = data?.gateOpen === true;
   }
 }
