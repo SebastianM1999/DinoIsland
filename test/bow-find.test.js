@@ -10,6 +10,7 @@ import { levelDef } from '../src/shared/levels.js';
 import { buildBowCamp } from '../src/client/world/bowCamp.js';
 
 const W = CONFIG.weapons;
+
 const trailShare = (plan, x, z) => {
   // how far along the trail (0 hut .. 1 boat) its point nearest to (x, z) lies
   const tr = plan.trail, len = [0];
@@ -19,21 +20,33 @@ const trailShare = (plan, x, z) => {
   return len[best] / len[len.length - 1];
 };
 
-test('island 1 has the hunter\'s camp by the trail before the mountain, on dry, flat, clear ground', () => {
+test("island 1 has Elias' camp just below the summit by the mountain path (else by the trail), with his note, on dry, flat, clear ground", () => {
+  const summits = [];
   for (const variant of [levelDef(0).variant, 2, 3, 4, 5, 6]) {
     const plan = planIsland(0, variant), terrain = new Terrain(plan), layout = buildLayout(terrain);
     const c = layout.bowCamp;
     assert.ok(c, `v${variant}: a camp`);
     assert.equal(terrain.waterLevelAt(c.x, c.z), null, `v${variant}: dry`);
     assert.ok(terrain.slopeAt(c.x, c.z) < 0.3, `v${variant}: flat`);
-    const path = layout.distToPath(c.x, c.z);
-    assert.ok(path > 5.5 && path < 14, `v${variant}: beside the trail (${path.toFixed(1)} m)`);
-    const share = trailShare(plan, c.x, c.z);
-    assert.ok(share > 0.3 && share < 0.55, `v${variant}: between the hut and the mountain (${share.toFixed(2)})`);
+    const pk = plan.sites.peak, d = Math.hypot(pk.x - c.x, pk.z - c.z), path = layout.distToPath(c.x, c.z);
+    if (d <= 26.5) {
+      summits.push(variant);
+      assert.ok(d >= 8, `v${variant}: clear of the nest on the summit (${d.toFixed(1)} m)`);
+      assert.ok(c.y > terrain.heightAt(pk.x, pk.z) - 14, `v${variant}: high up`);
+      assert.ok(path >= 1.9 && path <= 7.1, `v${variant}: a few metres off the mountain path (${path.toFixed(1)} m)`);
+    } else {
+      assert.ok(path > 5.5 && path < 14, `v${variant}: beside the trail (${path.toFixed(1)} m)`);
+      const share = trailShare(plan, c.x, c.z);
+      assert.ok(share > 0.3 && share < 0.55, `v${variant}: between the hut and the mountain (${share.toFixed(2)})`);
+    }
+    const note = layout.notes.find((n) => n.id === 'peak');
+    assert.ok(note && Math.hypot(note.x - c.x, note.z - c.z) < 2, `v${variant}: Elias' note lies at the camp`);
     assert.ok(layout.trees.every((t) => Math.hypot(t.x - c.x, t.z - c.z) > 2 * t.scale), `v${variant}: no tree in the camp`);
     assert.ok(layout.bushes.every((b) => Math.hypot(b.x - c.x, b.z - c.z) > 2.6), `v${variant}: no bush on it`);
     assert.ok(layout.groundAt(c.x, c.z) > c.y + 0.4, `v${variant}: the stump stands there`);
   }
+  assert.ok(summits.includes(levelDef(0).variant), 'the fixed map has it on the summit');
+  assert.ok(summits.length >= 4, `mostly on the summit (${summits.join(', ')})`);
 });
 
 test('the other islands have no camp', () => {

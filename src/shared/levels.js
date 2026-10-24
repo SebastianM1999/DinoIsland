@@ -49,7 +49,7 @@ export const BIOMES = {
     music: 'calm',
     // map resources: how many spots of each (shared/layout.js resourceSpots, config.js resources)
     resources: { resin: 12, ironwood: 10, herb: 14 },
-    // an abandoned hunter's camp by the trail before the mountain: each explorer finds the bow there
+    // Elias' abandoned camp just below the summit (the hunter's camp of the story): each explorer finds a bow there
     // (shared/layout.js bowCamp); on islands without one everybody has the bow from the start
     bowCamp: true,
   },
