@@ -1227,7 +1227,7 @@ export function* buildLayoutSteps(terrain) {
     const separated = (x, z) => layout.dinoZones.raptor.every((zone) => dmath.hypot(x - zone.x, z - zone.z) >= 48);
     const c = i === 0 && layout.nest && !volcanic ? { x: layout.nest.x, z: layout.nest.z }
       : plan.level.index === 0 ? randomZoneCenter(90, separated) : randomZoneCenter(100 + i * 10);
-    layout.dinoZones.raptor.push({ x: c.x, z: c.z, radius: 34, spawns: pickDry(c.x, c.z, 14, 5), size: i === 0 ? 3 : 2 + (i % 2) });
+    layout.dinoZones.raptor.push({ x: c.x, z: c.z, radius: 34, spawns: pickDry(c.x, c.z, 14, 5), size: plan.level.raptorPack ?? (i === 0 ? 3 : 2 + (i % 2)) });
   }
 
   // Pteranodon nests: the peak, tall hill tops and sea stacks.
