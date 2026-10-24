@@ -7,6 +7,7 @@ import { EV } from '../shared/protocol.js';
 import { CONTRACTS } from '../shared/missions.js';
 import { RELICS } from '../shared/relics.js';
 import { BRAND } from '../shared/brand.js';
+import { levelDef } from '../shared/levels.js';
 
 const SAIL_RADIUS = 18;          // everyone alive must stand this close to the boat
 const SAIL_DELAY = 7;            // seconds of "island complete" before the next island loads
@@ -42,6 +43,13 @@ export class Mission {
     this.phase = 'search';
     const found = this.world.relics.filter((r) => r.found).length;
     this.world.toast(`The Meridian's dinghy! With the right parts she floats again${found ? ` – ${found} found already` : ''}.`, 'boat');
+  }
+
+  /** Back on an island the team had sailed away from (sim/world.js nextLevel): the boat waits, repaired. */
+  onReturn() {
+    if (this.phase === 'sailing') this.phase = 'repaired';
+    this.startedAt = this.world.now;
+    this.doneTimer = 0;
   }
 
   /** A game event happened; advance matching contracts. */
@@ -85,12 +93,15 @@ export class Mission {
     ];
     // the story's steps of this island head the log (sim/story.js)
     const objectives = [...w.story.objectives(), ...boat];
-    const last = L.last;
+    // (the last island's voyage ends the expedition, unless it goes to the side island first: world.destination)
+    const last = L.last && w.destination() === null;
     const won = this.phase === 'sailing' && last;
     return {
-      level: { index: L.index, number: L.number, name: L.name, biome: L.biome.id, last },
+      level: { index: L.index, number: L.number, label: L.label, name: L.name, biome: L.biome.id, last, sideOf: L.sideOf },
+      // where the boat goes from here (sim/world.js destination; null: the expedition ends)
+      next: ((d) => (d == null ? null : { index: d, label: levelDef(d).label, name: levelDef(d).name }))(w.destination()),
       step: this.phase,
-      title: won ? `You escaped ${BRAND.name}!` : this.phase === 'sailing' ? 'Island complete!' : `Island ${L.number}: ${L.name}`,
+      title: won ? `You escaped ${BRAND.name}!` : this.phase === 'sailing' ? 'Island complete!' : `Island ${L.label}: ${L.name}`,
       won,
       objectives,
       relics,
@@ -146,7 +157,7 @@ export class Mission {
     this.phase = 'sailing';
     this.completedIn = Math.round(w.now - this.startedAt);
     this.islandsDone++;
-    const last = w.layout.level.last;
+    const last = w.layout.level.last && w.destination() === null;
     this.doneTimer = last ? SAIL_DELAY * 2.5 : SAIL_DELAY;
     w.toast(last ? `All aboard! You escaped ${BRAND.name} – well done!` : `${p.name} casts off – setting sail for the next island…`, 'quest');
     this.onEvent('island');
