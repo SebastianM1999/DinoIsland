@@ -54,6 +54,9 @@ import { BoatPanel } from '../ui/boatPanel.js';
 import { NotePanel } from '../ui/notePanel.js';
 import { buildNotes } from '../world/notes.js';
 import { buildArrival } from '../world/arrival.js';
+import { Cutscene } from './cutscene.js';
+import { introShots, outroShots } from './storyShots.js';
+import { PlayerModel } from '../models/playerModel.js';
 import { CraftingPanel } from '../ui/craftingPanel.js';
 import { Relics } from '../entities/relics.js';
 import { buildSites } from '../world/sites.js';
@@ -466,6 +469,7 @@ export class Game {
     this.wallTorchesLit = new Set(world.wallTorches ?? []);   // Hollow Mountain wall torches the team has lit
     this.caveWorld?.wallTorches.setLit(this.wallTorchesLit);
     this.notesRead = new Set(world.story?.notes ?? []);   // the team's journal (shared/notes.js)
+    this.introSeen = world.story?.introSeen ?? true;
     this.notes.setRead(this.notesRead);
     this.notePanel?.setRead(this.notesRead);
     world.fruit.forEach((count, id) => this.fruitPlants.setCount(id, count));
@@ -695,7 +699,12 @@ export class Game {
       this.mission = m.mission;
       this.#showMission();
       this.boatPanel.setMission(m.mission);
-      this.hud.missionComplete(m.mission.complete, { completedIn: m.mission.completedIn, won: m.mission.won, next: m.mission.level?.number + 1 });
+      const info = { completedIn: m.mission.completedIn, won: m.mission.won, next: m.mission.level?.number + 1 };
+      // the escape: the outro rides out first, then the card (core/storyShots.js)
+      if (m.mission.won && m.mission.complete && !this.outroPlayed) {
+        this.outroPlayed = true;
+        this.#playCutscene(outroShots(this.terrain, this.layout, 'Elias Brand was never found.'), () => this.hud.missionComplete(true, info));
+      } else if (!this.cutscene) this.hud.missionComplete(m.mission.complete, info);
     });
     net.on(`ev:${EV.STORE}`, (m) => { this.store = m.store; this.#syncCrafting(); this.#syncBase(); });
     net.on(`ev:${EV.BASE}`, (m) => this.setBase(m.base));
@@ -872,6 +881,39 @@ export class Game {
     this.hud.show(true);
     this.clock.start();
     requestAnimationFrame(this.loop);
+    // a new expedition on island 1: washed ashore (core/storyShots.js); the host remembers it was seen
+    if (this.layout.arrival && !this.introSeen) this.#playIntro();
+  }
+
+  #playIntro() {
+    const p = this.player;
+    const sp = { x: p.pos.x, z: p.pos.z, yaw: p.yaw };
+    // the explorer lies in the shallows while the camera glides in
+    const body = new PlayerModel(this.me.slot, this.me.outfit);
+    body.root.position.set(sp.x, this.terrain.heightAt(sp.x, sp.z), sp.z);
+    body.root.rotation.y = sp.yaw + 2.2;
+    body.animate(5, { spd: 0, pitch: 0, eq: 'none', alive: false, grounded: true, carry: 0 });
+    this.gfx.scene.add(body.root);
+    this.#playCutscene(introShots(this.terrain, this.layout, sp, CONFIG.player.eyeHeight), () => {
+      this.net.act(ACT.INTRO);
+      this.hud.toast('Where am I?', 'info');
+    }, [body.root]);
+  }
+
+  /** Play shots on the camera (core/cutscene.js): no HUD, no hands, no moving; `then` after the end or a skip. */
+  #playCutscene(shots, then, actors = []) {
+    this.cutscene?.end(true);
+    this.hud.show(false);
+    this.gfx.viewScene.visible = false;
+    this.cutscene = new Cutscene(this.gfx.camera, shots, {
+      actors,
+      onEnd: () => {
+        this.cutscene = null;
+        this.hud.show(true);
+        this.gfx.viewScene.visible = true;
+        then?.();
+      },
+    });
   }
 
   stop() {
@@ -886,6 +928,7 @@ export class Game {
    */
   dispose() {
     this.stop();
+    if (this.cutscene) { this.cutscene.onEnd = null; this.cutscene.end(true); this.gfx.viewScene.visible = true; }
     this.unsubSettings?.();
     this.unsubGraphics?.();
     this.dinos?.dispose();
@@ -964,7 +1007,7 @@ export class Game {
       this.debugGroup.visible = this.debug;
     }
     if (input.wasPressed('stats')) setSetting('stats', (settings.stats + 1) % 3);   // compact → detailed → off
-    const canMove = this.me.alive && !this.downed && !this.hud.isPanelOpen();
+    const canMove = this.me.alive && !this.downed && !this.hud.isPanelOpen() && !this.cutscene;
     p.hpFrac = this.me.hp / this.maxHp;
     if (this.downed) {
       const d = this.downed;
@@ -996,6 +1039,7 @@ export class Game {
     if (gv && !this.groveArmed && Math.hypot(p.pos.x - gv.x, p.pos.z - gv.z) > gv.r + GROVE_STONE_REACH + 2.5) this.groveArmed = true;
     this.stuck.update(dt, p, canMove && ['forward', 'back', 'left', 'right'].some((a) => input.isHeld(a)), canMove);
     this.#updateCamera(dt);
+    this.cutscene?.update(dt, input.isHeld('jump'));
 
     // network
     this.sendTimer -= dt;

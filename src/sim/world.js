@@ -1349,6 +1349,7 @@ export class ServerWorld {
         return;
       }
       case ACT.READ: return this.story.read(p, m.note);
+      case ACT.INTRO: return this.story.seeIntro();
       case ACT.HARVEST: {
         if (!p.alive) return;
         const f = this.fruit[m.spot | 0];
