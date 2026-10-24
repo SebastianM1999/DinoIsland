@@ -2,7 +2,7 @@
 > Client-side views of server-owned things in the world (dinosaurs, other players, loot, traps, relics, tracks, projectiles, shot tracers), driven by snapshots and events from `client/net`.
 
 ## Files
-- `torches.js` — `Torches`: world light of torches. Owns a pool of 4 point lights (slot 0 local flame, 1-3 remote players with `PF.TORCH`), created via `gfx.addLightPool` only on islands with `layout.torchSpots` or with `?torch` in the URL; intensity-only, layered-noise flicker. `items.js` shows the ground torch (burning, warm-up copy included); `remotePlayers.js` passes `torch` to `PlayerModel.animate`.
+- `torches.js` — `Torches`: world light of torches. Owns a pool of 4 point lights (slot 0 local flame, 1-3 remote players with `PF.TORCH`), created via `gfx.addLightPool` only on islands with `layout.torchSpots` or with `?torch` in the URL; intensity-only, layered-noise flicker. `items.js` shows the ground torch (burning, warm-up copy included); `remotePlayers.js` passes `torch` to `PlayerModel.animate`. Also on an island with a Blackmire (the lantern); a lantern (`PF.LANTERN`, `game.lanternMode`) shines at `LANTERN.light.intensity`.
 - `dinoViews.js` — `SPECIES` table and `DinoView`/`DinoViews`: interpolated, animated dinosaurs (culled by hand: the skinned meshes opt out of Three's frustum culling, so a view that is off screen and further than `SHADOW_REACH` or past the fog is hidden) with hit spheres, health bars, spotting, raycast and minimap markers.
 - `sarcoEffects.js` — server-triggered water ambush warning eye glints, silt burst and swimming wakes (the Sump Lurker uses it without glints and with weaker wakes).
 - `gunEffects.js` — `GunEffects`: short-lived bullet tracer lines plus the shot sound, from `EV.SHOT` events.

@@ -79,6 +79,17 @@ export const ICONS = {
   teeth: svg(`<path d="M9 4.5c4-1.5 10-1.5 14 0 .8 5-1 12-4.5 18.5-.8 1.6-1.6 3.8-2.5 5-.9-1.2-1.7-3.4-2.5-5C10 16.5 8.2 9.5 9 4.5z" fill="#fbf4e2" stroke="${OUT}" stroke-width="1"/>
     <path d="M12 7c.2 4.5 1.4 9.5 3.4 14" stroke="#e1d3b2" stroke-width="1.6" stroke-linecap="round" fill="none"/>`),
 
+  // the swamp boss' glowing blood in a stoppered vial, and the lantern it burns in (docs/map-progression/21-laterne.md)
+  bossBlood: svg(`<path d="M13 4h6v5.5c3.8 1.6 6 4.8 6 8.5a9 9 0 0 1-18 0c0-3.7 2.2-6.9 6-8.5z" fill="#2b3a2a" stroke="${OUT}" stroke-width="1.2" stroke-linejoin="round"/>
+    <path d="M9.4 18.5c2 1.6 4.4 2.1 6.6 1.3s4.6-.6 6.6 1A7 7 0 0 1 9.4 18.5z" fill="#b6ff6a"/>
+    <ellipse cx="16" cy="22.5" rx="5.5" ry="3" fill="#7cf04a" opacity="0.85"/>
+    <rect x="12" y="2.5" width="8" height="3" rx="1" fill="#a8814f" stroke="${OUT}" stroke-width="1"/>`),
+  lantern: svg(`<path d="M11 5h10M16 2v3" stroke="${OUT}" stroke-width="1.6" stroke-linecap="round"/>
+    <path d="M9 9h14l-1.5 16h-11z" fill="#ffe79a" stroke="${OUT}" stroke-width="1.2" stroke-linejoin="round"/>
+    <ellipse cx="16" cy="18" rx="3.2" ry="4.6" fill="#b6ff6a"/>
+    <path d="M8 8h16v2.5H8zM9.5 25h13v3h-13z" fill="#5a4636" stroke="${OUT}" stroke-width="1"/>
+    <path d="M12 10v15M20 10v15" stroke="#5a4636" stroke-width="1.2"/>`),
+
   // map resources (config.js loot): amber resin drops, a dark ironwood branch, a healing herb
   resin: svg(`<path d="M16 3c4.5 6 8 10.5 8 15a8 8 0 0 1-16 0c0-4.5 3.5-9 8-15z" fill="#f5a524" stroke="${OUT}" stroke-width="1.2" stroke-linejoin="round"/>
     <path d="M16 8c2.6 3.8 4.6 6.8 4.6 9.8" stroke="#ffd166" stroke-width="2" stroke-linecap="round" fill="none"/>

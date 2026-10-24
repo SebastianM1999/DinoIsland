@@ -8,6 +8,7 @@ import { CONFIG } from '../../shared/config.js';
 import { ACT, EV, PF, EQUIP } from '../../shared/protocol.js';
 import { WALL_TORCH } from '../../shared/torch.js';
 import { NOTE_BY_ID, NOTE_REACH } from '../../shared/notes.js';
+import { inBlackmire } from '../../shared/blackmire.js';
 import { shotEnd } from '../../shared/gunshots.js';
 import { insideGrove } from '../../shared/grove.js';
 import { segmentColliders } from '../../shared/collision.js';
@@ -272,10 +273,18 @@ export class PlayerActions {
       }
     }
 
-    // --- off-hand torch (L): lit or put out, independent of the selected tool; it goes out under water
-    const ownsTorch = !!this.inv.torch;
-    const torch = torchState({ owns: ownsTorch, alive, submerged: g.player.submerged, lit: !!g.torchLit, toggle: !panel && input.wasPressed('torch') });
-    if (torch.extinguished) { g.audio?.play('plop', { vol: 0.5 }); g.hud.toast('The torch went out', 'torch'); }
+    // --- off-hand light (L): the torch, or the lantern while it has glowblood (shared/torch.js LANTERN); lit or put
+    // out, independent of the selected tool; it goes out under water, and a torch chokes in the Blackmire.
+    // An empty lantern is filled first when there is glowblood in the pack (ACT.FUEL).
+    const lantern = !!this.inv.lantern && this.inv.lanternFuel > 0;
+    g.lanternMode = lantern;
+    const ownsTorch = !!this.inv.torch || lantern;
+    let toggle = !panel && input.wasPressed('torch');
+    if (toggle && alive && this.inv.lantern && !lantern && this.inv.loot?.bossBlood > 0) { net.act(ACT.FUEL); toggle = false; this.lightAfterFuel = true; }
+    if (this.lightAfterFuel && lantern) { this.lightAfterFuel = false; toggle = !g.torchLit; }   // (filled: it lights at once)
+    const choked = !lantern && inBlackmire(g.layout, g.player.pos.x, g.player.pos.z);
+    const torch = torchState({ owns: ownsTorch, alive, submerged: g.player.submerged || choked, lit: !!g.torchLit, toggle });
+    if (torch.extinguished) { g.audio?.play('plop', { vol: 0.5 }); g.hud.toast(choked ? 'The mist chokes the torch – only a lantern burns in the Blackmire' : 'The torch went out', 'torch'); }
     else if (torch.lit !== !!g.torchLit && ownsTorch && alive) g.audio?.play('switch');
     g.torchLit = torch.lit;
 
@@ -306,7 +315,7 @@ export class PlayerActions {
     this.vm.setTool(tool, { hasSpear: this.inv.spear, fruitType, hasArrow: this.inv.arrows > 0 });
     const knifeProgress = this.knifeProgress();
     this.vm.setKnife(knifeProgress != null, knifeProgress ?? 0);
-    this.vm.setTorch(ownsTorch && alive, !!g.torchLit);
+    this.vm.setTorch(ownsTorch && alive, !!g.torchLit, lantern);
     this.vm.root.visible = alive && (knifeProgress != null || eating || this.inv.guns?.[tool]?.owned !== false);
     this.vm.update(dt, { speed: g.player.moveSpeed, sprint: g.player.sprinting, grounded: g.player.onGround, lookX: g.lastMouse?.x || 0, lookY: g.lastMouse?.y || 0 });
 
@@ -821,7 +830,7 @@ export class PlayerActions {
       pockets: this.pockets.map((eq) => this.pocketState(eq)),
       slots: this.slots,
     });
-    hud.setTorch(!!inv.torch, !!g.torchLit);
+    hud.setTorch(!!inv.torch || !!inv.lantern, !!g.torchLit, inv.lantern ? { fuel: inv.lanternFuel ?? 0, blood: inv.loot?.bossBlood ?? 0 } : null);
     const tool = this.tool;
     hud.setCrosshair({
       draw: this.drawing ? this.drawT / W.bow.maxDrawTime : 0,

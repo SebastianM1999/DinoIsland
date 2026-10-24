@@ -5,10 +5,11 @@
 // Everything is driven by intensity only (0 = off) and a layered-noise flicker.
 //
 // Created only on islands that have torch spots (`layout.torchSpots`, the Hollow
-// Mountain) or with `?torch` in the page address (testing on other islands).
+// Mountain), a Blackmire for the lantern (the swamp) or with `?torch` in the page address
+// (testing on other islands). A lantern (PF.LANTERN) shines brighter (shared/torch.js LANTERN).
 
 import * as THREE from 'three';
-import { TORCH, carriesLight } from '../../shared/torch.js';
+import { TORCH, LANTERN, carriesLight, carriesLantern } from '../../shared/torch.js';
 import { torchFlicker } from '../models/torch.js';
 
 const _p = new THREE.Vector3();
@@ -17,6 +18,7 @@ const L = TORCH.light;
 /** Does this island need torch lights at all? */
 export function wantsTorchLights(layout) {
   if ((layout.torchSpots?.length ?? 0) > 0) return true;
+  if (layout.blackmire) return true;   // (the swamp: the lantern's light in the Blackmire)
   try { return new URLSearchParams(globalThis.location?.search ?? '').has('torch'); } catch { return false; }
 }
 
@@ -41,7 +43,7 @@ export class Torches {
     const vm = g.actions.vm;
     if (vm.torchLevel > 0) {
       vm.torchHeadWorld(_p, g.gfx.camera);
-      pool.set(0, _p.x, _p.y, _p.z, L.intensity * vm.torchLevel * vm.torchFlicker);
+      pool.set(0, _p.x, _p.y, _p.z, (g.lanternMode ? LANTERN.light.intensity : L.intensity) * vm.torchLevel * vm.torchFlicker);
     } else pool.off(0);
 
     // slots 1-3: remote players with a lit torch keep their slot while it burns
@@ -61,7 +63,7 @@ export class Torches {
       if (!rp) { pool.off(s); continue; }
       const m = rp.model;
       m.torchHead(_p);
-      pool.set(s, _p.x, _p.y, _p.z, L.intensity * 0.9 * m.torchLevel * m.torchFlicker);
+      pool.set(s, _p.x, _p.y, _p.z, (carriesLantern(rp.fl) ? LANTERN.light.intensity : L.intensity) * 0.9 * m.torchLevel * m.torchFlicker);
     }
   }
 }

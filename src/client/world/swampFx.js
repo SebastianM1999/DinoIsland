@@ -172,3 +172,26 @@ export function buildSwampFx(terrain, layout, camera, onFog = null) {
     },
   };
 }
+
+/** A sky part way from `a` to `b` (0..1): numbers blended, colours mixed (for stacking two blends: the mist and the Blackmire). */
+export function lerpSky(a, b, k) {
+  const out = { ...a };
+  for (const key of Object.keys(b)) {
+    const x = a[key], y = b[key];
+    if (typeof x === 'number' && typeof y === 'number') out[key] = x + (y - x) * k;
+    else if (typeof x === 'string' && typeof y === 'string' && x.startsWith('#') && y.startsWith('#')) out[key] = `#${new THREE.Color(x).lerp(new THREE.Color(y), k).getHexString()}`;
+  }
+  return out;
+}
+
+/**
+ * The air deep in the Blackmire (shared/blackmire.js): black-green and a few metres of sight; a burning lantern
+ * (shared/torch.js LANTERN) pushes the dark back to about 15 m.
+ */
+export function mireSky(sky, lantern) {
+  return {
+    ...sky, fog: '#141a12', background: '#10150e',
+    fogNear: lantern ? 4 : 0.5, fogFar: lantern ? 22 : 7,
+    sunIntensity: (sky.sunIntensity ?? 1.3) * 0.18, hemiIntensity: (sky.hemiIntensity ?? 1.6) * 0.3, exposure: (sky.exposure ?? 0.85) * 0.75,
+  };
+}

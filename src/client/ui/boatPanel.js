@@ -61,7 +61,7 @@ export class BoatPanel {
       return `<li class="boat-part${r.found ? ' is-found' : ''}" style="--c:${def.color}">
         <span class="boat-part-ic">${icon(r.kind)}</span>
         <span class="boat-part-txt"><b>${esc(def.name)}</b>
-          <small>${r.found ? `Found${r.by ? ` by ${esc(r.by)}` : ''}` : `Missing – look ${esc(def.hint)}`}</small></span>
+          <small>${r.found ? `Found${r.by ? ` by ${esc(r.by)}` : ''}` : `Missing – look ${esc(r.hint ?? def.hint)}`}</small></span>
         <span class="boat-part-state">${r.found ? icon('check') : '?'}</span>
       </li>`;
     }).join('');

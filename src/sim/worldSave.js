@@ -21,6 +21,7 @@ import { sanitizeProfile } from '../shared/skills.js';
 import { sanitizeOutfit } from '../shared/outfits.js';
 import { applyBaseColliders, freshBase } from '../shared/base.js';
 import { DS } from '../shared/protocol.js';
+import { LANTERN } from '../shared/torch.js';
 import { goodSpot } from './unstuck.js';
 
 const W = CONFIG.weapons;
@@ -162,6 +163,8 @@ export function sanitizeInventory(world, raw) {
   inv.traps = int(raw.traps, 0, caps.traps, inv.traps);
   inv.fruit = (Array.isArray(raw.fruit) ? raw.fruit : []).filter((f) => FRUIT_TYPES.includes(f)).slice(0, caps.fruit);
   inv.torch = !!raw.torch;
+  inv.lantern = !!raw.lantern;
+  inv.lanternFuel = inv.lantern ? int(raw.lanternFuel, 0, LANTERN.maxFuel, 0) : 0;
   for (const k of LOOT_KEYS) inv.loot[k] = int(raw.loot?.[k], 0, 9999, 0);
   return inv;
 }
