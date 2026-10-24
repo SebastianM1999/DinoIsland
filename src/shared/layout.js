@@ -1577,6 +1577,26 @@ export function* buildLayoutSteps(terrain) {
       }
     }
   }
+  if (layout.volcanoArena) {
+    // Ashfall (docs/map-progression/24-boss-tor.md): the crater's sealed gate, and Elias' research station beside the
+    // mountain path halfway up, on cool, flat ground (the first such spot from the foot)
+    const g = layout.volcanoArena.gates[0];
+    layout.storyAnchors.gate = { x: g.x, z: g.z, y: g.y, rot: dmath.atan2(g.x - layout.volcanoArena.x, g.z - layout.volcanoArena.z) };
+    const ramp = plan.ramps.find((r) => r.caldera) ?? plan.ramps[0];
+    for (let i = 1; ramp && i < ramp.pts.length - 1 && !layout.storyAnchors.station; i++) {
+      const p = ramp.pts[i], q = ramp.pts[i + 1], h = terrain.heightAt(p.x, p.z);
+      if (h < 8 || h > 36) continue;
+      const l = dmath.hypot(q.x - p.x, q.z - p.z) || 1, nx = -(q.z - p.z) / l, nz = (q.x - p.x) / l;
+      for (const [side, off] of [[1, 5], [-1, 5], [1, 7], [-1, 7], [1, 3.5], [-1, 3.5]]) {
+        const x = p.x + nx * side * off, z = p.z + nz * side * off;
+        if (terrain.slopeAt(x, z) < 0.35 && terrain.heatAt(x, z) < 0.1 && terrain.lavaLevelAt(x, z) === null && terrain.waterLevelAt(x, z) === null &&
+          penetration(x, z, 2, layout.colliders, -1e9, 1e9, 0) <= 0) {
+          layout.storyAnchors.station = { x, z, y: terrain.heightAt(x, z), rot: dmath.atan2(-nx * side, -nz * side) };
+          break;
+        }
+      }
+    }
+  }
   if (caveLevel) {
     // the Hollow Mountain (docs/map-progression/23-hollow-mountain.md): Elias' writing on the wall of a crystal hall
     // (not the relic's), and his last camp in the dead end farthest from the entrance, the seal crystal beside it

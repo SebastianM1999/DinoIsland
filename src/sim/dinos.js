@@ -11,6 +11,7 @@ import { angleDiff, clamp } from '../shared/rng.js';
 import { insideGrove } from '../shared/grove.js';
 import { insideBossArena } from '../shared/bossArena.js';
 import { insideSwampArena } from '../shared/swampArena.js';
+import { insideVolcanoArena } from '../shared/volcanoArena.js';
 import { brachioBrain } from './ai/brachio.js';
 import { stegoBrain } from './ai/stego.js';
 import { raptorBrain } from './ai/raptor.js';
@@ -641,7 +642,7 @@ export class DinoSystem {
     // shots, throws and stabs from outside stop at the boundary.
     if (d.leash) {
       const p = this.world.players.get(byId);
-      const inside = d.leash.kind === 'swamp' ? insideSwampArena : insideGrove;
+      const inside = d.leash.kind === 'swamp' ? insideSwampArena : d.leash.kind === 'crater' ? insideVolcanoArena : insideGrove;
       if (!p || !inside(this.world.layout, p.x, p.z)) return;
     }
     const Z = CONFIG.hitZones;
