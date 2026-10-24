@@ -23,3 +23,7 @@ Auf Map 1 jagen Raptoren **zu zweit**, so wie es Jonas' Brief sagt. Ein Paar spa
 
 ## Nicht hier
 - Gruppen auf anderen Maps (die nutzen die Level und Alphas aus 02).
+
+## Umsetzung (Abweichungen)
+- Raptoren spawnen schon als Packs mit gemeinsamer Jagd, Flanken und Respawn ins eigene Pack (`spawnPack`, `packHunterBrain`). Es reicht daher die Pack-Größe: `LEVELS[0].raptorPack = 2` setzt jede Raptor-Zone von Map 1 auf zwei Tiere (vorher 3 und 2 gemischt).
+- Kein eigenes Gruppen- oder Flanken-System.
