@@ -807,6 +807,7 @@ export class PlayerActions {
       arrows: inv.arrows,
       arrowUses: inv.arrowUses,
       spear: inv.spear,
+      spearFound: inv.spearFound,
       spearHealth: inv.spearHealth,
       maxArrows: caps.arrows,
       fruit: inv.fruit,
