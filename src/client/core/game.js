@@ -470,6 +470,7 @@ export class Game {
     this.caveWorld?.wallTorches.setLit(this.wallTorchesLit);
     this.notesRead = new Set(world.story?.notes ?? []);   // the team's journal (shared/notes.js)
     this.introSeen = world.story?.introSeen ?? true;
+    this.storyLegacy = !!world.story?.legacy;   // (an expedition saved before the story knows every recipe)
     this.notes.setRead(this.notesRead);
     this.notePanel?.setRead(this.notesRead);
     world.fruit.forEach((count, id) => this.fruitPlants.setCount(id, count));
@@ -488,7 +489,7 @@ export class Game {
     const i = CONTRACTS.findIndex((c) => c.id === id);
     const c = i >= 0 && !m.contracts?.[i]?.locked ? m.contracts?.[i] : null;   // (island 1: no contracts before the wreck is found)
     // (island 1: until you have your bow, finding it heads the list – only on this explorer's screen)
-    const own = this.layout?.bowCamp && this.me?.inv?.bow === false ? [{ text: "Find your bow at the hunter's camp before the mountain", done: false }] : [];
+    const own = this.layout?.bowCamp && this.me?.inv?.bow === false ? [{ text: "Find a bow at Elias' camp below the summit", done: false }] : [];
     const objectives = c
       ? [...own, ...m.objectives, { text: `${CONTRACTS[i].title}: ${c.progress}/${CONTRACTS[i].goal}`, done: c.done }]
       : [...own, ...m.objectives];
@@ -543,6 +544,7 @@ export class Game {
       island: this.mission?.level?.number ?? 1,
       maxTier: this.stations().miniBench ? CAMP_BENCH.maxTier : Infinity,
       creative: this.player.creative,
+      notesRead: this.notesRead, legacy: !!this.storyLegacy,   // (recipes taught by the story's notes)
     });
   }
 
@@ -663,6 +665,7 @@ export class Game {
       this.notesRead.add(m.id);
       this.notes.setRead(this.notesRead);
       this.notePanel.markRead(m.id);
+      this.#syncCrafting();   // (a note may teach recipes)
       this.audio.play('quest');
     });
     net.on(`ev:${EV.FRUIT}`, (m) => {

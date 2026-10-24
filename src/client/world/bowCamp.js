@@ -1,4 +1,4 @@
-// The abandoned hunter's camp on island 1 (shared/layout.js bowCamp): a cut stump
+// Elias' abandoned camp on island 1, just below the summit (shared/layout.js bowCamp): a cut stump
 // with a bow lying on it, a quiver leaning against it and a tipped-over basket. The
 // bow (and a soft golden glow round the stump) shows only while the local explorer
 // still has no bow of their own – each explorer takes their own (sim/world.js).

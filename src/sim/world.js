@@ -1545,6 +1545,7 @@ export class ServerWorld {
     if (!r || !p.alive || !this.near(p, h.x, h.z, 6)) return;
     const inv = p.inv;
     if (unlockIsland(r) > this.levelIndex + 1) return deny(`${r.name} unlocks on island ${unlockIsland(r)}`);
+    if (!p.creative && !this.story.knowsRecipe(r)) return deny(`You don't know how to make ${r.name} yet – Elias' notes will tell you`);
     if (st.miniBench && (r.tier || 0) > CAMP_BENCH.maxTier) return deny('The camp table only makes tier-1 recipes');
     if (r.kind === 'upgrade') {
       if (this.upgrades.has(r.id)) return deny(`${r.name} is already built`);
@@ -1801,7 +1802,7 @@ export class ServerWorld {
         p.inv.arrows = Math.max(p.inv.arrows, Math.min(W.bow.startArrows, this.caps().arrows));
         this.normalizeArrows(p.inv);
         this.event(EV.BOW_FOUND, { id: p.id });
-        this.toast(`${p.name} found a bow`, 'bow');
+        this.toast(`${p.name} took a bow from Elias' camp`, 'bow');
         this.sendInv(p);
       }
       // island 1's arrival: walk up to Jonas' spear in the sand to take it (whoever has none)

@@ -1431,11 +1431,11 @@ export function* buildLayoutSteps(terrain) {
   }
 
   // ---------------------------------------------------------- bow camp
-  // An abandoned hunter's camp (biome.bowCamp): a stump with the bow on it, a quiver
-  // and a basket, a few metres off the trail where it nears the main mountain's foot
-  // (35-50 % of the way from the hut). Placed last with its own random stream, clear of
-  // trees, rocks and the rest, so everything above keeps its spot; only the (visual)
-  // bushes right on it make way.
+  // Elias' abandoned camp (biome.bowCamp): a stump with his bow on it, a quiver and a basket,
+  // on a flat spot just below the summit (the story's peak camp, with his note). Without one
+  // there: a few metres off the trail where it nears the main mountain's foot (35-50 % of the
+  // way from the hut). Placed last with its own random stream, clear of trees, rocks and the
+  // rest, so everything above keeps its spot; only the (visual) bushes right on it make way.
   if (biome.bowCamp && plan.trail.length > 4 && plan.mainPeak) {
     const rb = makeRng(S ^ 0xb0c4);
     const pk = plan.mainPeak, tr = plan.trail;
@@ -1465,10 +1465,46 @@ export function* buildLayoutSteps(terrain) {
       }
     }
     cands.sort((u, v) => u.foot - v.foot);
-    const c = cands.find(({ x, z }) => dry(x, z, 0.8) && terrain.slopeAt(x, z) < 0.3 && distToPath(x, z) > 5.5 &&
-      outsideGrove(x, z, 4) && !nearHut(x, z, 6) && clear(x, z));
+    // Elias' camp (docs/map-progression/14-story.md): just below the summit, on a flat spot clear of the
+    // pteranodon nest on top, facing the summit; the trail spot only when the summit has none
+    const pkSite = plan.sites.peak;
+    const summit = [];
+    if (pkSite) {
+      for (let r = 8.5; r <= 26; r += 1) {
+        for (let k = 0; k < 36; k++) {
+          const a = (k / 36) * TAU, x = pkSite.x + dmath.cos(a) * r, z = pkSite.z + dmath.sin(a) * r;
+          summit.push({ x, z, nx: (pkSite.x - x) / r, nz: (pkSite.z - z) / r, top: r - terrain.heightAt(x, z) * 0.25 });
+        }
+      }
+      summit.sort((u, v) => u.top - v.top);
+    }
+    const flatAndClear = ({ x, z }) => dry(x, z, 0.8) && terrain.slopeAt(x, z) < 0.3 && outsideGrove(x, z, 4) && !nearHut(x, z, 6) && clear(x, z);
+    // (it has to be reachable: a few metres off the mountain path near the top, gentle ground in between;
+    // the stump faces the path)
+    const pathPoint = (x, z) => {
+      let best = null, bd = Infinity;
+      for (const line of layout.path) {
+        for (let i = 0; i < line.length - 1; i++) {
+          const [ax, az] = line[i], [bx, bz] = line[i + 1], vx = bx - ax, vz = bz - az;
+          const t = Math.max(0, Math.min(1, ((x - ax) * vx + (z - az) * vz) / (vx * vx + vz * vz || 1)));
+          const px = ax + vx * t, pz = az + vz * t, d = dmath.hypot(px - x, pz - z);
+          if (d < bd) { bd = d; best = { x: px, z: pz, d }; }
+        }
+      }
+      return best;
+    };
+    const topH = pkSite ? terrain.heightAt(pkSite.x, pkSite.z) : 0;
+    const reachable = (s) => {
+      const p = pathPoint(s.x, s.z);
+      if (!p || p.d < 2 || p.d > 7 || terrain.heightAt(p.x, p.z) < topH - 14) return false;
+      for (const k of [0.25, 0.5, 0.75]) if (terrain.slopeAt(s.x + (p.x - s.x) * k, s.z + (p.z - s.z) * k) > 0.55) return false;
+      s.nx = (s.x - p.x) / p.d; s.nz = (s.z - p.z) / p.d;
+      return true;
+    };
+    const c = summit.find((s) => flatAndClear(s) && reachable(s)) ??
+      cands.find((s) => flatAndClear(s) && distToPath(s.x, s.z) > 5.5);
     if (c) {
-      // (the stump faces the trail)
+      // (the stump faces the path)
       layout.bowCamp = { x: c.x, z: c.z, y: terrain.heightAt(c.x, c.z), rot: dmath.atan2(-c.nx, -c.nz) };
       reserve(c.x, c.z, 3);
       layout.bushes = layout.bushes.filter((bu) => dmath.hypot(bu.x - c.x, bu.z - c.z) > 2.6);
@@ -1484,6 +1520,12 @@ export function* buildLayoutSteps(terrain) {
     // Jonas' message in a bottle lies in his lap, in front of the skeleton
     const s = layout.arrival.skeleton, x = s.x + dmath.sin(s.rot) * 0.45, z = s.z + dmath.cos(s.rot) * 0.45;
     layout.storyAnchors.skeleton = { x, z, y: terrain.heightAt(x, z), rot: s.rot + Math.PI / 2 };
+  }
+  if (layout.bowCamp && plan.sites.peak) {
+    // Elias' note lies beside the stump of his camp (client/world/bowCamp.js draws it 1.25 x life size)
+    const c = layout.bowCamp, lx = 1.1, lz = -0.8;
+    const x = c.x + lx * dmath.cos(c.rot) + lz * dmath.sin(c.rot), z = c.z - lx * dmath.sin(c.rot) + lz * dmath.cos(c.rot);
+    layout.storyAnchors.peakCamp = { x, z, y: terrain.heightAt(x, z), rot: c.rot + 0.4 };
   }
   layout.notes = placeNotes(plan.level.index, layout.storyAnchors);
 
