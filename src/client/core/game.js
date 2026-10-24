@@ -54,6 +54,10 @@ import { BoatPanel } from '../ui/boatPanel.js';
 import { NotePanel } from '../ui/notePanel.js';
 import { buildNotes } from '../world/notes.js';
 import { buildArrival } from '../world/arrival.js';
+import { buildStoryProps } from '../world/storyProps.js';
+import { Cutscene } from './cutscene.js';
+import { introShots, outroShots } from './storyShots.js';
+import { PlayerModel } from '../models/playerModel.js';
 import { CraftingPanel } from '../ui/craftingPanel.js';
 import { Relics } from '../entities/relics.js';
 import { buildSites } from '../world/sites.js';
@@ -63,7 +67,8 @@ import { GrovePrompt } from '../ui/grovePrompt.js';
 import { mayEnterGrove, GROVE_STONE_REACH } from '../../shared/grove.js';
 import { buildBossArena } from '../world/bossArena.js';
 import { buildSwampArena } from '../world/swampArena.js';
-import { buildSwampFx, thickSky } from '../world/swampFx.js';
+import { buildSwampFx, thickSky, lerpSky, mireSky } from '../world/swampFx.js';
+import { blackmireDepth } from '../../shared/blackmire.js';
 import { buildVolcanoArena } from '../world/volcanoArena.js';
 import { ashShelter } from '../../shared/volcanoArena.js';
 import { buildVolcanoFx, ashSky } from '../world/volcanoFx.js';
@@ -144,6 +149,15 @@ export class Game {
     this.reviveTarget = null;   // { id, name, progress } downed teammate in reach (set by PlayerActions)
     this.medicTarget = null;    // { id, name } hurt teammate we could heal with fruit (Field Medic)
     // Primeval Grove: an invisible wall until the player may enter (TODO(grove-unlock) in shared/grove.js)
+    // Ashfall's crater: closed until the seal crystal sits in its gate (sim/world.js gateBlocks)
+    const crater = this.layout.volcanoArena;
+    if (crater) {
+      this.player.barrier = {
+        x: crater.x, z: crater.z, r: crater.craterR + 1,
+        mayEnter: () => !!this.gateOpen || this.player.creative,
+        onBlocked: () => { if (!this.gateHintAt || this.time - this.gateHintAt > 6) { this.gateHintAt = this.time; this.hud.toast('The crater is sealed – its gate needs the seal crystal', 'quest'); } },
+      };
+    }
     const grove = this.layout.grove;
     if (grove) {
       this.groveArmed = true;
@@ -371,7 +385,8 @@ export class Game {
     this.notes = buildNotes(this.terrain, this.layout);
     this.arrival = buildArrival(this.terrain, this.layout);
     this.arrival.setTaken(this.net.welcome.inv?.spear !== false);
-    scene.add(this.notes.group, this.arrival.group);
+    this.storyProps = buildStoryProps(this.terrain, this.layout);
+    scene.add(this.notes.group, this.arrival.group, this.storyProps.group);
     yield;
     // islands with building plots start at a small landing camp; the team builds its own base
     this.hut = yield* buildHutSteps(this.terrain, this.layout, { landing: hasBasePlots(this.layout) });
@@ -393,7 +408,15 @@ export class Game {
     yield;
     // the swamp's fog draws in where the mist is thick (swampFx.js mistiness)
     const swampSky = this.layout.biome.sky, swampThick = thickSky(swampSky || {});
-    this.swampFx = buildSwampFx(this.terrain, this.layout, this.gfx.camera, (k) => this.gfx.blendBiome(swampSky, swampThick, k));
+    // (the Blackmire darkens the air on top of the mist: #mireAir)
+    this.swampMistK = 0;
+    this.mireK = 0;
+    this.applySwampAir = () => {
+      if (this.mireK <= 0) { this.gfx.blendBiome(swampSky, swampThick, this.swampMistK); return; }
+      const misty = this.swampMistK > 0 ? lerpSky(swampSky, swampThick, this.swampMistK) : swampSky;
+      this.gfx.blendBiome(misty, mireSky(swampSky, this.mireLantern), this.mireK);
+    };
+    this.swampFx = buildSwampFx(this.terrain, this.layout, this.gfx.camera, (k) => { this.swampMistK = k; this.applySwampAir(); });
     this.volcanoArena = buildVolcanoArena(this.terrain, this.layout);
     // the volcano: ash rain thickens the air; a lava bomb landing nearby shakes the view
     const ashBase = this.layout.biome.sky, ashThick = ashSky(ashBase || {});
@@ -409,7 +432,7 @@ export class Game {
     // the Hollow Mountain: roof, cave air, decor, crystal lights, drips (world/caveWorld.js)
     this.caveWorld = this.layout.plan.cave ? buildCaveWorld(this.terrain, this.layout, this.gfx, terrainMesh, this.water) : null;
     if (this.caveWorld) { scene.add(this.caveWorld.group); this.caveWorld.audio = this.audio; }
-    this.worldUpdaters = [terrainMesh, this.sky, this.water, this.vegetation, this.rocks, this.fruitPlants, this.resourceNodes, this.bowCamp, this.notes, this.hut, this.baseView, this.sites, this.grove, this.bossArena, this.swampArena, this.swampFx, this.volcanoArena, this.volcanoFx, ...(this.caveWorld ? [this.caveWorld] : [])];
+    this.worldUpdaters = [terrainMesh, this.sky, this.water, this.vegetation, this.rocks, this.fruitPlants, this.resourceNodes, this.bowCamp, this.notes, this.storyProps, this.hut, this.baseView, this.sites, this.grove, this.bossArena, this.swampArena, this.swampFx, this.volcanoArena, this.volcanoFx, ...(this.caveWorld ? [this.caveWorld] : [])];
     yield;
     // under the water: tinted short fog, bubbles and motes (world/underwater.js, #underwaterView)
     this.underwater = buildUnderwater();
@@ -459,13 +482,21 @@ export class Game {
     }
     this.setBase(world.base || freshBase());
     this.raid = world.raid || { phase: 'idle' };
-    this.volcanoFx.setState(world.volcano);
+    // (joining during the great eruption: its look and its countdown)
+    this.cataclysmUntil = world.volcano?.phase === 'cataclysm' ? this.time + world.volcano.left : null;
+    this.volcanoFx.setState(world.volcano?.phase === 'cataclysm' ? { ...world.volcano, phase: 'erupt' } : world.volcano);
     for (const c of world.volcano?.columns || []) this.volcanoArena.sink(c.id, c.left);
     if (world.volcano?.treasure) this.volcanoArena.openTreasure();
     this.fruitCounts = world.fruit.slice();
     this.wallTorchesLit = new Set(world.wallTorches ?? []);   // Hollow Mountain wall torches the team has lit
     this.caveWorld?.wallTorches.setLit(this.wallTorchesLit);
     this.notesRead = new Set(world.story?.notes ?? []);   // the team's journal (shared/notes.js)
+    this.introSeen = world.story?.introSeen ?? true;
+    this.storyProps?.setSeal(!!world.story?.sealCrystal);
+    this.storyProps?.setGate(!!world.story?.gateOpen);
+    this.sealCrystal = !!world.story?.sealCrystal;
+    this.gateOpen = !!world.story?.gateOpen;
+    this.storyLegacy = !!world.story?.legacy;   // (an expedition saved before the story knows every recipe)
     this.notes.setRead(this.notesRead);
     this.notePanel?.setRead(this.notesRead);
     world.fruit.forEach((count, id) => this.fruitPlants.setCount(id, count));
@@ -482,9 +513,9 @@ export class Game {
     this.hud.setBoard(m);
     const id = this.hud.trackedContract;
     const i = CONTRACTS.findIndex((c) => c.id === id);
-    const c = i >= 0 ? m.contracts?.[i] : null;
+    const c = i >= 0 && !m.contracts?.[i]?.locked ? m.contracts?.[i] : null;   // (island 1: no contracts before the wreck is found)
     // (island 1: until you have your bow, finding it heads the list – only on this explorer's screen)
-    const own = this.layout?.bowCamp && this.me?.inv?.bow === false ? [{ text: "Find your bow at the hunter's camp before the mountain", done: false }] : [];
+    const own = this.layout?.bowCamp && this.me?.inv?.bow === false ? [{ text: "Find a bow at Elias' camp below the summit", done: false }] : [];
     const objectives = c
       ? [...own, ...m.objectives, { text: `${CONTRACTS[i].title}: ${c.progress}/${CONTRACTS[i].goal}`, done: c.done }]
       : [...own, ...m.objectives];
@@ -539,6 +570,7 @@ export class Game {
       island: this.mission?.level?.number ?? 1,
       maxTier: this.stations().miniBench ? CAMP_BENCH.maxTier : Infinity,
       creative: this.player.creative,
+      notesRead: this.notesRead, legacy: !!this.storyLegacy,   // (recipes taught by the story's notes)
     });
   }
 
@@ -654,11 +686,20 @@ export class Game {
       const t = this.layout.wallTorches?.[m.torch];
       if (t) this.audio?.play('torchLight', { pos: { x: t.x, y: t.y, z: t.z } });
     });
+    net.on(`ev:${EV.STORY}`, (m) => {
+      if (m.story.gateOpen && !this.gateOpen) { this.audio.play('rumble'); this.shake = Math.max(this.shake, 0.7); }
+      else if (m.story.sealCrystal && !this.sealCrystal) this.audio.play('complete');
+      this.sealCrystal = !!m.story.sealCrystal;
+      this.gateOpen = !!m.story.gateOpen;
+      this.storyProps.setSeal(this.sealCrystal);
+      this.storyProps.setGate(this.gateOpen);
+    });
     net.on(`ev:${EV.NOTE}`, (m) => {
       if (!m.first) return;
       this.notesRead.add(m.id);
       this.notes.setRead(this.notesRead);
       this.notePanel.markRead(m.id);
+      this.#syncCrafting();   // (a note may teach recipes)
       this.audio.play('quest');
     });
     net.on(`ev:${EV.FRUIT}`, (m) => {
@@ -695,7 +736,12 @@ export class Game {
       this.mission = m.mission;
       this.#showMission();
       this.boatPanel.setMission(m.mission);
-      this.hud.missionComplete(m.mission.complete, { completedIn: m.mission.completedIn, won: m.mission.won, next: m.mission.level?.number + 1 });
+      const info = { completedIn: m.mission.completedIn, won: m.mission.won, next: m.mission.next?.name ?? m.mission.level?.number + 1 };
+      // the escape: the outro rides out first, then the card (core/storyShots.js)
+      if (m.mission.won && m.mission.complete && !this.outroPlayed) {
+        this.outroPlayed = true;
+        this.#playCutscene(outroShots(this.terrain, this.layout, 'Elias Brand was never found.'), () => this.hud.missionComplete(true, info));
+      } else if (!this.cutscene) this.hud.missionComplete(m.mission.complete, info);
     });
     net.on(`ev:${EV.STORE}`, (m) => { this.store = m.store; this.#syncCrafting(); this.#syncBase(); });
     net.on(`ev:${EV.BASE}`, (m) => this.setBase(m.base));
@@ -705,7 +751,10 @@ export class Game {
     });
     // the volcano (sim/volcano.js)
     net.on(`ev:${EV.VOLCANO}`, (m) => {
-      this.volcanoFx.setPhase(m.phase, m.left);
+      // the great eruption looks like an eruption that does not stop; the HUD counts down to the boat (#updateHud)
+      this.cataclysmUntil = m.phase === 'cataclysm' ? this.time + m.left : null;
+      this.volcanoFx.setPhase(m.phase === 'cataclysm' ? 'erupt' : m.phase, m.left);
+      if (m.phase === 'cataclysm') { this.audio.play('eruption', { vol: 2.5 }); this.shake = Math.max(this.shake, 1.6); this.hud.toast('The mountain wakes! Get to the boat and sail – now!', 'flame'); }
       const v = this.layout.volcano;
       const pos = v ? { x: v.x, y: v.craterY, z: v.z } : undefined;
       if (m.phase === 'rumble') { this.audio.play('rumble'); this.shake = Math.max(this.shake, 0.6); this.hud.toast('The volcano rumbles – an eruption is coming!', 'flame'); }
@@ -835,7 +884,7 @@ export class Game {
       yaw: +p.yaw.toFixed(3), pitch: +p.pitch.toFixed(3),
       spd: +p.moveSpeed.toFixed(2),
       eq: this.eq,
-      fl: this.flags | (p.sprinting ? PF.SPRINT : 0) | (p.onGround ? PF.GROUND : 0) | (p.knockTimer > 0 ? PF.KNOCKED : 0) | (p.dash.active ? PF.DASH : 0) | (this.torchLit && this.me.inv.torch ? PF.TORCH : 0),
+      fl: this.flags | (p.sprinting ? PF.SPRINT : 0) | (p.onGround ? PF.GROUND : 0) | (p.knockTimer > 0 ? PF.KNOCKED : 0) | (p.dash.active ? PF.DASH : 0) | (this.torchLit && this.lanternMode ? PF.TORCH | PF.LANTERN : this.torchLit && this.me.inv.torch ? PF.TORCH : 0),
     };
     this.flags &= ~PF.ATTACK; // one-shot animation pulse
     return state;
@@ -872,6 +921,39 @@ export class Game {
     this.hud.show(true);
     this.clock.start();
     requestAnimationFrame(this.loop);
+    // a new expedition on island 1: washed ashore (core/storyShots.js); the host remembers it was seen
+    if (this.layout.arrival && !this.introSeen) this.#playIntro();
+  }
+
+  #playIntro() {
+    const p = this.player;
+    const sp = { x: p.pos.x, z: p.pos.z, yaw: p.yaw };
+    // the explorer lies in the shallows while the camera glides in
+    const body = new PlayerModel(this.me.slot, this.me.outfit);
+    body.root.position.set(sp.x, this.terrain.heightAt(sp.x, sp.z), sp.z);
+    body.root.rotation.y = sp.yaw + 2.2;
+    body.animate(5, { spd: 0, pitch: 0, eq: 'none', alive: false, grounded: true, carry: 0 });
+    this.gfx.scene.add(body.root);
+    this.#playCutscene(introShots(this.terrain, this.layout, sp, CONFIG.player.eyeHeight), () => {
+      this.net.act(ACT.INTRO);
+      this.hud.toast('Where am I?', 'info');
+    }, [body.root]);
+  }
+
+  /** Play shots on the camera (core/cutscene.js): no HUD, no hands, no moving; `then` after the end or a skip. */
+  #playCutscene(shots, then, actors = []) {
+    this.cutscene?.end(true);
+    this.hud.show(false);
+    this.gfx.viewScene.visible = false;
+    this.cutscene = new Cutscene(this.gfx.camera, shots, {
+      actors,
+      onEnd: () => {
+        this.cutscene = null;
+        this.hud.show(true);
+        this.gfx.viewScene.visible = true;
+        then?.();
+      },
+    });
   }
 
   stop() {
@@ -886,6 +968,7 @@ export class Game {
    */
   dispose() {
     this.stop();
+    if (this.cutscene) { this.cutscene.onEnd = null; this.cutscene.end(true); this.gfx.viewScene.visible = true; }
     this.unsubSettings?.();
     this.unsubGraphics?.();
     this.dinos?.dispose();
@@ -964,7 +1047,7 @@ export class Game {
       this.debugGroup.visible = this.debug;
     }
     if (input.wasPressed('stats')) setSetting('stats', (settings.stats + 1) % 3);   // compact → detailed → off
-    const canMove = this.me.alive && !this.downed && !this.hud.isPanelOpen();
+    const canMove = this.me.alive && !this.downed && !this.hud.isPanelOpen() && !this.cutscene;
     p.hpFrac = this.me.hp / this.maxHp;
     if (this.downed) {
       const d = this.downed;
@@ -996,6 +1079,7 @@ export class Game {
     if (gv && !this.groveArmed && Math.hypot(p.pos.x - gv.x, p.pos.z - gv.z) > gv.r + GROVE_STONE_REACH + 2.5) this.groveArmed = true;
     this.stuck.update(dt, p, canMove && ['forward', 'back', 'left', 'right'].some((a) => input.isHeld(a)), canMove);
     this.#updateCamera(dt);
+    this.cutscene?.update(dt, input.isHeld('jump'));
 
     // network
     this.sendTimer -= dt;
@@ -1012,6 +1096,7 @@ export class Game {
     WIND.uTime.value = this.time;
     const cam = this.gfx.camera.position;
     this.#mood(dt, cam);
+    this.#mireAir(dt, cam);
     const corner = Math.sqrt(1 + (Math.tan(this.gfx.camera.fov * Math.PI / 360) * this.gfx.camera.aspect) ** 2);
     this.terrainView.range = (this.gfx.scene.fog?.far ?? this.layout.biome.sky.fogFar) * corner;
     for (const u of this.worldUpdaters) u.update?.(dt, this.time, cam);
@@ -1025,6 +1110,18 @@ export class Game {
     this.hudTimer -= dt;
     if (this.hudTimer <= 0) { this.hudTimer += 1 / 30; this.#updateHud(dt); }
     this.#updateAudio(dt);
+  }
+
+  /** The Blackmire (shared/blackmire.js): the air turns black-green as the camera goes in; a burning lantern pushes it back. */
+  #mireAir(dt, cam) {
+    if (!this.layout.blackmire) return;
+    const want = blackmireDepth(this.layout, cam.x, cam.z);
+    const k = Math.abs(want - this.mireK) < 1e-3 ? want : this.mireK + (want - this.mireK) * Math.min(1, dt * 2);
+    const lantern = !!(this.torchLit && this.lanternMode);
+    if (k === this.mireK && lantern === this.mireLantern) return;
+    this.mireK = k;
+    this.mireLantern = lantern;
+    this.applySwampAir();
   }
 
   /**
@@ -1249,6 +1346,7 @@ export class Game {
     hud.setSwamp(p.inBog && !p.flying);
     hud.setBreath(this.me.alive && !p.creative ? p.breath : CONFIG.player.dive.breath, CONFIG.player.dive.breath, p.diving || p.submerged);
     hud.setHeat(this.me.alive ? p.heat : 0, p.buffs.heatproof > 0);
+    hud.setCountdown(this.cataclysmUntil != null && !this.mission?.complete ? Math.max(0, this.cataclysmUntil - this.time) : null);
     this.#updateAsh(dt);
     hud.setBuffs(p.buffs);
     hud.setCompass(p.yaw, this.compassMarkers());

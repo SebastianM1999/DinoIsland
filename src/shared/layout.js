@@ -106,6 +106,7 @@ export function* buildLayoutSteps(terrain) {
     caveExit: null,         // { x, y, z, dir, hall } just outside the exit tunnel (east beach)
     falseExits: [],         // tunnels that end in daylight at a sea cliff: { x, y, z, a }
     wallTorches: [],        // Hollow Mountain sconces the team lights: { id, x, y, z, nx, nz (facing out of the wall), tunnel } (shared/torch.js WALL_TORCH)
+    blackmire: null,        // the swamp's darkest bog: { x, z, r } (shared/blackmire.js, story section below)
     sumps: [],              // dive-only shortcuts: { tunnel, level, len, a:{x,z}, b:{x,z}, cache:{x,z,y,loot} } (see shared/caveMaze.js SUMP)
     arrivalBoat: null,      // the boat the team came on (west cove, decoration only): { x, y, z, rot }
     logs: [],               // fallen trees: { x, z, rot, len, r, yA, yB, roots, dead }
@@ -1227,7 +1228,7 @@ export function* buildLayoutSteps(terrain) {
     const separated = (x, z) => layout.dinoZones.raptor.every((zone) => dmath.hypot(x - zone.x, z - zone.z) >= 48);
     const c = i === 0 && layout.nest && !volcanic ? { x: layout.nest.x, z: layout.nest.z }
       : plan.level.index === 0 ? randomZoneCenter(90, separated) : randomZoneCenter(100 + i * 10);
-    layout.dinoZones.raptor.push({ x: c.x, z: c.z, radius: 34, spawns: pickDry(c.x, c.z, 14, 5), size: i === 0 ? 3 : 2 + (i % 2) });
+    layout.dinoZones.raptor.push({ x: c.x, z: c.z, radius: 34, spawns: pickDry(c.x, c.z, 14, 5), size: plan.level.raptorPack ?? (i === 0 ? 3 : 2 + (i % 2)) });
   }
 
   // Pteranodon nests: the peak, tall hill tops and sea stacks.
@@ -1413,6 +1414,14 @@ export function* buildLayoutSteps(terrain) {
       if (!open(x, z) || terrain.slopeAt(x, z) > 0.6 || !apart('resin', x, z)) continue;
       add('resin', x, z, { host: 'tree:' + t.id, side });
     }
+    // crystal (the Hollow Mountain): a cluster at the foot of a crystal of the halls' decor, on dry floor under the roof
+    for (const c of caveLevel ? layout.caveDecor?.crystals ?? [] : []) {
+      if (count('crystal') >= (want.crystal || 0)) break;
+      if (c.wall) continue;
+      const x = c.x + (c.nx ?? 0) * 1.2, z = c.z + (c.nz ?? 0) * 1.2;
+      if (terrain.waterDepthAt(x, z) > 0 || terrain.slopeAt(x, z) > 0.4 || !apart('crystal', x, z) || terrain.ceilingAt(x, z) - terrain.heightAt(x, z) < 2.5) continue;
+      add('crystal', x, z);
+    }
     // ironwood: a dark branch on the hillsides, beside a rock (anywhere on a hillside if those run out)
     // healing herb: on the meadows and the river banks (any flat ground if those run out)
     const loose = [
@@ -1431,11 +1440,11 @@ export function* buildLayoutSteps(terrain) {
   }
 
   // ---------------------------------------------------------- bow camp
-  // An abandoned hunter's camp (biome.bowCamp): a stump with the bow on it, a quiver
-  // and a basket, a few metres off the trail where it nears the main mountain's foot
-  // (35-50 % of the way from the hut). Placed last with its own random stream, clear of
-  // trees, rocks and the rest, so everything above keeps its spot; only the (visual)
-  // bushes right on it make way.
+  // Elias' abandoned camp (biome.bowCamp): a stump with his bow on it, a quiver and a basket,
+  // on a flat spot just below the summit (the story's peak camp, with his note). Without one
+  // there: a few metres off the trail where it nears the main mountain's foot (35-50 % of the
+  // way from the hut). Placed last with its own random stream, clear of trees, rocks and the
+  // rest, so everything above keeps its spot; only the (visual) bushes right on it make way.
   if (biome.bowCamp && plan.trail.length > 4 && plan.mainPeak) {
     const rb = makeRng(S ^ 0xb0c4);
     const pk = plan.mainPeak, tr = plan.trail;
@@ -1465,10 +1474,46 @@ export function* buildLayoutSteps(terrain) {
       }
     }
     cands.sort((u, v) => u.foot - v.foot);
-    const c = cands.find(({ x, z }) => dry(x, z, 0.8) && terrain.slopeAt(x, z) < 0.3 && distToPath(x, z) > 5.5 &&
-      outsideGrove(x, z, 4) && !nearHut(x, z, 6) && clear(x, z));
+    // Elias' camp (docs/map-progression/14-story.md): just below the summit, on a flat spot clear of the
+    // pteranodon nest on top, facing the summit; the trail spot only when the summit has none
+    const pkSite = plan.sites.peak;
+    const summit = [];
+    if (pkSite) {
+      for (let r = 8.5; r <= 26; r += 1) {
+        for (let k = 0; k < 36; k++) {
+          const a = (k / 36) * TAU, x = pkSite.x + dmath.cos(a) * r, z = pkSite.z + dmath.sin(a) * r;
+          summit.push({ x, z, nx: (pkSite.x - x) / r, nz: (pkSite.z - z) / r, top: r - terrain.heightAt(x, z) * 0.25 });
+        }
+      }
+      summit.sort((u, v) => u.top - v.top);
+    }
+    const flatAndClear = ({ x, z }) => dry(x, z, 0.8) && terrain.slopeAt(x, z) < 0.3 && outsideGrove(x, z, 4) && !nearHut(x, z, 6) && clear(x, z);
+    // (it has to be reachable: a few metres off the mountain path near the top, gentle ground in between;
+    // the stump faces the path)
+    const pathPoint = (x, z) => {
+      let best = null, bd = Infinity;
+      for (const line of layout.path) {
+        for (let i = 0; i < line.length - 1; i++) {
+          const [ax, az] = line[i], [bx, bz] = line[i + 1], vx = bx - ax, vz = bz - az;
+          const t = Math.max(0, Math.min(1, ((x - ax) * vx + (z - az) * vz) / (vx * vx + vz * vz || 1)));
+          const px = ax + vx * t, pz = az + vz * t, d = dmath.hypot(px - x, pz - z);
+          if (d < bd) { bd = d; best = { x: px, z: pz, d }; }
+        }
+      }
+      return best;
+    };
+    const topH = pkSite ? terrain.heightAt(pkSite.x, pkSite.z) : 0;
+    const reachable = (s) => {
+      const p = pathPoint(s.x, s.z);
+      if (!p || p.d < 2 || p.d > 7 || terrain.heightAt(p.x, p.z) < topH - 14) return false;
+      for (const k of [0.25, 0.5, 0.75]) if (terrain.slopeAt(s.x + (p.x - s.x) * k, s.z + (p.z - s.z) * k) > 0.55) return false;
+      s.nx = (s.x - p.x) / p.d; s.nz = (s.z - p.z) / p.d;
+      return true;
+    };
+    const c = summit.find((s) => flatAndClear(s) && reachable(s)) ??
+      cands.find((s) => flatAndClear(s) && distToPath(s.x, s.z) > 5.5);
     if (c) {
-      // (the stump faces the trail)
+      // (the stump faces the path)
       layout.bowCamp = { x: c.x, z: c.z, y: terrain.heightAt(c.x, c.z), rot: dmath.atan2(-c.nx, -c.nz) };
       reserve(c.x, c.z, 3);
       layout.bushes = layout.bushes.filter((bu) => dmath.hypot(bu.x - c.x, bu.z - c.z) > 2.6);
@@ -1484,6 +1529,108 @@ export function* buildLayoutSteps(terrain) {
     // Jonas' message in a bottle lies in his lap, in front of the skeleton
     const s = layout.arrival.skeleton, x = s.x + dmath.sin(s.rot) * 0.45, z = s.z + dmath.cos(s.rot) * 0.45;
     layout.storyAnchors.skeleton = { x, z, y: terrain.heightAt(x, z), rot: s.rot + Math.PI / 2 };
+  }
+  if (layout.bowCamp && plan.sites.peak) {
+    // Elias' note lies beside the stump of his camp (client/world/bowCamp.js draws it 1.25 x life size)
+    const c = layout.bowCamp, lx = 1.1, lz = -0.8;
+    const x = c.x + lx * dmath.cos(c.rot) + lz * dmath.sin(c.rot), z = c.z - lx * dmath.sin(c.rot) + lz * dmath.cos(c.rot);
+    layout.storyAnchors.peakCamp = { x, z, y: terrain.heightAt(x, z), rot: c.rot + 0.4 };
+  }
+  if (biome.id === 'swamp' && hut.kind === 'landing') {
+    // Elias' raft, run aground at the landing beach west of the camp: the first dry ground short of the water
+    const c = hut.campfire;
+    let wet = null;
+    for (let dx = 0; dx >= -60; dx -= 1) if (terrain.waterLevelAt(c.x + dx, c.z + 5) !== null || terrain.heightAt(c.x + dx, c.z + 5) < 0.2) { wet = dx; break; }
+    if (wet !== null) {
+      const rx = c.x + wet + 1.5, rz = c.z + 5;
+      layout.storyAnchors.raft = { x: rx, z: rz, y: terrain.heightAt(rx, rz), rot: 0.35, raft: { x: c.x + wet - 0.5, z: rz + 0.4, y: terrain.heightAt(c.x + wet - 0.5, rz + 0.4) } };
+    }
+    // the Blackmire (shared/blackmire.js): the biggest bog far from the camp and the building plots;
+    // the egg boat part lies in it (Elias' clutches without nests), his note from the mire beside it
+    const far = (b) => dmath.hypot(b.x - hut.x, b.z - hut.z);
+    const bog = (plan.bogs || []).filter((b) => !b.arena && b.r >= 20 && far(b) > 110 &&
+      layout.basePlots.every((p) => dmath.hypot(p.x - b.x, p.z - b.z) > b.r + p.r + 10) &&
+      !insideSwampArena(plan.swampArena, b.x, b.z, b.r))
+      .sort((a, b) => b.r * 2 + far(b) * 0.2 - (a.r * 2 + far(a) * 0.2))[0];
+    if (bog) {
+      // a dry knoll by the bog for the egg (boat parts never lie in the mud: map rules), as near its middle as there is
+      // one, the note a few steps from it; no bush grows on them. The dark is centred on the egg.
+      const r = bog.r + 18;
+      const firm = (x, z) => terrain.waterDepthAt(x, z) === 0 && terrain.bogAt(x, z) < 0.015 && terrain.heightAt(x, z) > 0.5 &&
+        terrain.slopeAt(x, z) < 0.25 && penetration(x, z, 1.2, layout.colliders, -1e9, 1e9, 0) <= 0 &&
+        layout.trees.every((t) => dmath.hypot(t.x - x, t.z - z) > 2.8);
+      let spot = null, note = null;
+      for (let k = 0; k < 400 && !(spot && note); k++) {
+        const a = k * 2.399, d = 1 + k * (r - 2) / 400;
+        const x = bog.x + dmath.cos(a) * d, z = bog.z + dmath.sin(a) * d;
+        if (!firm(x, z)) continue;
+        if (!spot) spot = { x, z };
+        else if (dmath.hypot(x - spot.x, z - spot.z) > 2.5 && dmath.hypot(x - spot.x, z - spot.z) < 8) note = { x, z };
+      }
+      if (spot) {
+        const egg = layout.relics.find((q) => q.kind === 'egg') ?? layout.relics[layout.relics.length - 1];
+        if (egg) Object.assign(egg, { x: spot.x, z: spot.z, y: terrain.heightAt(spot.x, spot.z), site: 'blackmire', hint: 'deep in the Blackmire – bring a burning lantern' });
+        layout.blackmire = { x: spot.x, z: spot.z, r: 24 };
+        note ??= { x: spot.x + 2.5, z: spot.z + 1.5 };
+        layout.storyAnchors.blackmire = { x: note.x, z: note.z, y: terrain.heightAt(note.x, note.z), rot: 1.1 };
+        layout.bushes = layout.bushes.filter((b) => dmath.hypot(b.x - spot.x, b.z - spot.z) > 2.5 && dmath.hypot(b.x - note.x, b.z - note.z) > 2);
+      }
+    }
+  }
+  if (layout.volcanoArena) {
+    // Ashfall (docs/map-progression/24-boss-tor.md): the crater's sealed gate, and Elias' research station beside the
+    // mountain path halfway up, on cool, flat ground (the first such spot from the foot)
+    const g = layout.volcanoArena.gates[0];
+    layout.storyAnchors.gate = { x: g.x, z: g.z, y: g.y, rot: dmath.atan2(g.x - layout.volcanoArena.x, g.z - layout.volcanoArena.z) };
+    const ramp = plan.ramps.find((r) => r.caldera) ?? plan.ramps[0];
+    for (let i = 1; ramp && i < ramp.pts.length - 1 && !layout.storyAnchors.station; i++) {
+      const p = ramp.pts[i], q = ramp.pts[i + 1], h = terrain.heightAt(p.x, p.z);
+      if (h < 8 || h > 36) continue;
+      const l = dmath.hypot(q.x - p.x, q.z - p.z) || 1, nx = -(q.z - p.z) / l, nz = (q.x - p.x) / l;
+      for (const [side, off] of [[1, 5], [-1, 5], [1, 7], [-1, 7], [1, 3.5], [-1, 3.5]]) {
+        const x = p.x + nx * side * off, z = p.z + nz * side * off;
+        if (terrain.slopeAt(x, z) < 0.35 && terrain.heatAt(x, z) < 0.1 && terrain.lavaLevelAt(x, z) === null && terrain.waterLevelAt(x, z) === null &&
+          penetration(x, z, 2, layout.colliders, -1e9, 1e9, 0) <= 0) {
+          layout.storyAnchors.station = { x, z, y: terrain.heightAt(x, z), rot: dmath.atan2(-nx * side, -nz * side) };
+          break;
+        }
+      }
+    }
+  }
+  if (caveLevel) {
+    // the Hollow Mountain (docs/map-progression/23-hollow-mountain.md): Elias' writing on the wall of a crystal hall
+    // (not the relic's), and his last camp in the dead end farthest from the entrance, the seal crystal beside it
+    const nodes = plan.cave.maze.nodes;
+    const entry = nodes.find((n) => n.tags?.includes('entrance')) ?? nodes[0];
+    const fromEntry = (n) => dmath.hypot(n.x - entry.x, n.z - entry.z);
+    const dry = (x, z) => terrain.waterDepthAt(x, z) === 0 && terrain.ceilingAt(x, z) - terrain.heightAt(x, z) > 2.6;
+    const hall = nodes.filter((n) => n.tags?.includes('crystal') && !n.tags.includes('relic')).sort((a, b) => fromEntry(a) - fromEntry(b))[0];
+    if (hall) {
+      // march out from the middle to the wall in 16 directions; the writing goes where the wall is nearest and the floor dry
+      const floor = terrain.heightAt(hall.x, hall.z);
+      let best = null;
+      for (let k = 0; k < 16; k++) {
+        const a = (k / 16) * TAU, dx = dmath.cos(a), dz = dmath.sin(a);
+        for (let d = 2; d < hall.r + 8; d += 0.5) {
+          const x = hall.x + dx * d, z = hall.z + dz * d;
+          if (terrain.heightAt(x, z) > floor + 1.2 || terrain.ceilingAt(x, z) - terrain.heightAt(x, z) < 2.2) {
+            const sx = hall.x + dx * (d - 0.9), sz = hall.z + dz * (d - 0.9);
+            if (dry(sx, sz) && (!best || d < best.d)) best = { x: sx, z: sz, d, rot: dmath.atan2(-dx, -dz) };
+            break;
+          }
+        }
+      }
+      if (best) layout.storyAnchors.crystalHall = { x: best.x, z: best.z, y: terrain.heightAt(best.x, best.z) + 1.3, rot: best.rot };
+    }
+    const end = nodes.filter((n) => n.tags?.includes('deadend') && dry(n.x, n.z)).sort((a, b) => fromEntry(b) - fromEntry(a))[0];
+    if (end) {
+      const rot = dmath.atan2(entry.x - end.x, entry.z - end.z);   // (the camp faces the way the team comes in)
+      const at = (lx, lz) => {
+        const x = end.x + lx * dmath.cos(rot) + lz * dmath.sin(rot), z = end.z - lx * dmath.sin(rot) + lz * dmath.cos(rot);
+        return { x, z, y: terrain.heightAt(x, z), rot };
+      };
+      layout.storyAnchors.eliasCamp = { ...at(0.8, 1.2), camp: at(0, 0), seal: at(-1.4, 1.4) };
+    }
   }
   layout.notes = placeNotes(plan.level.index, layout.storyAnchors);
 

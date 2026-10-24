@@ -16,6 +16,7 @@ import { buildLayout } from '../shared/layout.js';
 import { MSG, ACT, EV, EQUIP, PF, OWNER_KEY } from '../shared/protocol.js';
 import { sanitizeProfile, creativeProfile, skillMods, progress, buy, canBuy, SKILL_IDS, MAX_XP, MAX_BONUS_POINTS, RELIC_XP, RELIC_POINTS, DASH } from '../shared/skills.js';
 import { DinoSystem } from './dinos.js';
+import { trexBrain } from './ai/trex.js';
 import { NOISE } from './ai/senses.js';
 import { Mission } from './mission.js';
 import { resolveCircle, penetration } from '../shared/collision.js';
@@ -25,11 +26,12 @@ import { makeRng } from '../shared/rng.js';
 import { lineBlocked, DINO_SIGHTING } from '../shared/visibility.js';
 import { sanitizeOutfit, sameOutfit } from '../shared/outfits.js';
 import { planIsland, islandSeed } from '../shared/island.js';
-import { levelDef, LEVEL_COUNT } from '../shared/levels.js';
-import { TORCH, WALL_TORCH } from '../shared/torch.js';
+import { levelDef, sideIslandOf, nextMainIsland } from '../shared/levels.js';
+import { TORCH, WALL_TORCH, LANTERN } from '../shared/torch.js';
+import { inBlackmire } from '../shared/blackmire.js';
 import { CAVE_WALK_MAX } from '../shared/caveField.js';
 import { findUnstuckSpot, goodSpot } from './unstuck.js';
-import { rosterRecord, applyRosterRecord } from './worldSave.js';
+import { rosterRecord, applyRosterRecord, exportIsland, restoreIsland } from './worldSave.js';
 import { nearDino, plausibleZone } from './hitCheck.js';
 import { freshBase, CAMP_BENCH, CAMP_FIRE_REACH, campStations, safeZone as baseSafeZone, hasBasePlots, PLOT_REACH, MAX_STAGE, stageCost, BUILD_TIME, BASE_STAGES, applyBaseColliders, baseSpawnPoints, TOWERS, TOWER_SLOTS, towerCost, repairCost } from '../shared/base.js';
 import { updateTowers } from './towers.js';
@@ -37,6 +39,7 @@ import { Raids } from './raids.js';
 import { Volcano } from './volcano.js';
 import { Story } from './story.js';
 import { insideGrove, mayEnterGrove } from '../shared/grove.js';
+import { insideVolcanoArena } from '../shared/volcanoArena.js';
 import { RECIPE_BY_ID, upgradeMods, unlockIsland, canAfford } from '../shared/crafting.js';
 
 const P = CONFIG.player;
@@ -91,6 +94,7 @@ export class ServerWorld {
     this.story = new Story(this);       // the notes the team has read (sim/story.js; survives islands)
     this.fruitRng = makeRng((Math.random() * 0xffffffff) >>> 0);
     this.#loadLevel(opts.level ?? 0, opts.variant);
+    this.story.visited.add(this.levelIndex);
     this.mission = new Mission(this);
     this.dinos.spawnAll();
   }
@@ -124,13 +128,64 @@ export class ServerWorld {
     this.log(`island ${level + 1} "${levelDef(level).name}" variant ${variant}`);
   }
 
-  /** The team set sail: build the next island, its fixed map (after the last one: the first island again). */
+  /**
+   * Where the boat takes the team from here: back from a side island to its island; from an island with a side
+   * island not yet visited, over there (docs/map-progression/22-inselreise.md); else on to the next main island.
+   * null: the expedition is over (after the last island the next voyage starts a new one on the first island).
+   */
+  destination() {
+    const L = levelDef(this.levelIndex);
+    if (L.sideOf != null) return L.sideOf;
+    const side = sideIslandOf(this.levelIndex);
+    if (side != null && !this.story.visited.has(side)) return side;
+    return nextMainIsland(this.levelIndex);
+  }
+
+  /**
+   * The great eruption's time ran out with the team still on Ashfall (sim/volcano.js): they wake at the camp, healed,
+   * and the king stands in his crater again – the fight before the eruption is to be won once more.
+   */
+  cataclysmLost() {
+    this.toast('The mountain swallowed the crater … you wake at the camp. The king roars again.', 'flame');
+    for (const d of [...this.dinos.list]) if (d.type === 'trex' && d.boss) this.dinos.remove(d);
+    trexBrain.spawnInitial(this.dinos);
+    this.story.steps.delete('king');
+    for (const p of this.players.values()) {
+      const sp = this.spawnPoint(p.slot);
+      Object.assign(p, { x: sp.x, y: this.terrain.heightAt(sp.x, sp.z), z: sp.z, yaw: sp.yaw, hp: p.maxHp, alive: true, downed: false, deadT: 0, invulnUntil: this.now + 3 });
+      this.correct(p, { unstuck: true });
+      this.event(EV.RESPAWN, { id: p.id, x: r2(p.x), z: r2(p.z), yaw: r3(p.yaw) });
+    }
+    this.mission.broadcast();
+    this.checkpoint('eruption');
+  }
+
+  /** Where this island's boat lies: a side island's is the one the team came in on (the west cove), else the wreck. */
+  boatSpot() {
+    return levelDef(this.levelIndex).sideOf != null && this.layout.arrivalBoat ? this.layout.arrivalBoat : this.layout.boat;
+  }
+
+  /**
+   * The team set sail: build the island the boat goes to, its fixed map (after the last one: the first island again).
+   * Leaving for a side island parks this island (sim/worldSave.js exportIsland); coming back restores it as it was.
+   */
   nextLevel() {
-    this.#loadLevel(this.levelIndex + 1 < LEVEL_COUNT ? this.levelIndex + 1 : 0);
+    const from = this.levelIndex;
+    const to = this.destination() ?? 0;
+    this.parked ??= {};
+    if (levelDef(to).sideOf === from) this.parked[from] = exportIsland(this);
+    const back = this.parked[to];
+    delete this.parked[to];
+    this.#loadLevel(to);
     this.mission.startIsland();
     this.dinos.spawnAll();
+    if (back) {
+      restoreIsland(this, back);
+      this.mission.onReturn();
+    }
+    this.story.visited.add(to);
     for (const p of this.players.values()) {
-      const sp = this.layout.spawnPoints[p.slot];
+      const sp = this.spawnPoint(p.slot);
       Object.assign(p, {
         x: sp.x, y: this.terrain.heightAt(sp.x, sp.z), z: sp.z, yaw: sp.yaw, pitch: 0, spd: 0,
         hp: p.maxHp, alive: true, deadT: 0, eating: null, hot: null,
@@ -291,6 +346,8 @@ export class ServerWorld {
       traps: armed ? W.trap.startCount : 0,
       fruit: [],
       torch: false,          // owns the hand-held torch (picked up at the island's torch spots)
+      lantern: false,        // owns the lantern (crafted on the swamp island: shared/torch.js LANTERN)
+      lanternFuel: 0,        // seconds of glowblood left in it
       loot: Object.fromEntries(LOOT_KEYS.map((k) => [k, 0])),
     };
   }
@@ -367,6 +424,7 @@ export class ServerWorld {
     }
     p.inv.loot[kind] += n;
     this.toast(`${CONFIG.loot[kind].name} +${n}`, kind, p.id);
+    this.story.onEvent(`item:${kind}`);   // (e.g. the swamp boss' glowblood: shared/story.js)
     return true;
   }
 
@@ -747,6 +805,8 @@ export class ServerWorld {
     set('bow', true);
     set('spear', true);
     set('spearFound', true);
+    set('lantern', true);
+    if (inv.lanternFuel < LANTERN.maxFuel - LANTERN.burnTime) set('lanternFuel', LANTERN.maxFuel);
     set('spearHealth', W.spear.durability);
     set('traps', Math.max(inv.traps, caps.traps));
     for (const [k, ammo] of Object.entries(inv.guns)) {
@@ -1010,7 +1070,7 @@ export class ServerWorld {
     const lim = CONFIG.world.size / 2 - 5;
     const ground = this.layout.groundAt(x, z, y + P.stepHeight);
     resolveCircle(x, z, P.radius, this.layout.playerColliders, collisionResult, y + 0.05, y + P.height, P.stepHeight - 0.05);
-    const blocked = Math.hypot(collisionResult.x - x, collisionResult.z - z) > 0.6 || this.groveBlocks(p, x, z);
+    const blocked = Math.hypot(collisionResult.x - x, collisionResult.z - z) > 0.6 || this.groveBlocks(p, x, z) || this.gateBlocks(p, x, z);
     // diving: wholly under the surface a body swims at DIVE.vertical m/s up or down at most and never below the bottom
     const wet = !creative && this.terrain.waterDepthAt(x, z) > P.swim.depth - 0.2 && this.terrain.waterDepthAt(p.x, p.z) > P.swim.depth - 0.2;
     const diveBad = wet && (y < ground - 0.35 || Math.abs(y - p.y) > DIVE.vertical * 1.5 * sinceLast + 1.2);
@@ -1029,8 +1089,12 @@ export class ServerWorld {
     p.pitch = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, num(m.pitch, p.pitch)));
     p.spd = Math.max(0, Math.min(20, num(m.spd, 0)));
     p.eq = Math.max(0, Math.min(EQUIP.length - 1, m.eq | 0));
-    p.fl = (m.fl | 0) & (63 | PF.DASH | (p.inv.torch ? PF.TORCH : 0));   // DOWNED is the server's to set; a lit torch only with one in the pack
-    if (this.terrain.headUnderwater(p.x, p.y, p.z)) p.fl &= ~PF.TORCH;     // ... and it goes out under water
+    // DOWNED is the server's to set; a lit torch only with one in the pack, a lit lantern only with glowblood in it
+    const lantern = p.inv.lantern && p.inv.lanternFuel > 0;
+    p.fl = (m.fl | 0) & (63 | PF.DASH | (p.inv.torch || lantern ? PF.TORCH : 0) | (lantern ? PF.LANTERN : 0));
+    if (!(p.fl & PF.TORCH)) p.fl &= ~PF.LANTERN;
+    if (this.terrain.headUnderwater(p.x, p.y, p.z)) p.fl &= ~(PF.TORCH | PF.LANTERN);     // ... it goes out under water
+    else if ((p.fl & PF.TORCH) && !(p.fl & PF.LANTERN) && inBlackmire(this.layout, p.x, p.z)) p.fl &= ~PF.TORCH;   // ... and a torch chokes in the Blackmire
     if (p.fl & PF.SPRINT) {
       if (!p.sprinting) p.sprintArmed = true;   // Sprint Strike arms when a sprint starts
       p.sprinting = true;
@@ -1134,6 +1198,13 @@ export class ServerWorld {
    * lead further out is refused unless the player may enter (mayEnterGrove –
    * TODO(grove-unlock): becomes the skill check). Walking out always works.
    */
+  /** Ashfall's crater is closed until the seal crystal sits in its gate (sim/story.js gateOpen): no step that ends inside and doesn't lead out. */
+  gateBlocks(p, x, z) {
+    const a = this.layout.volcanoArena;
+    if (!a || this.story.gateOpen || p.creative || !insideVolcanoArena(this.layout, x, z, P.radius + 1)) return false;
+    return dist2(x, z, a.x, a.z) <= dist2(p.x, p.z, a.x, a.z);
+  }
+
   groveBlocks(p, x, z) {
     const g = this.layout.grove;
     if (!g || mayEnterGrove(p) || !insideGrove(this.layout, x, z, P.radius)) return false;
@@ -1349,6 +1420,9 @@ export class ServerWorld {
         return;
       }
       case ACT.READ: return this.story.read(p, m.note);
+      case ACT.INTRO: return this.story.seeIntro();
+      case ACT.GATE: return this.story.openGate(p);
+      case ACT.FUEL: return this.fuelLantern(p);
       case ACT.HARVEST: {
         if (!p.alive) return;
         const f = this.fruit[m.spot | 0];
@@ -1544,6 +1618,7 @@ export class ServerWorld {
     if (!r || !p.alive || !this.near(p, h.x, h.z, 6)) return;
     const inv = p.inv;
     if (unlockIsland(r) > this.levelIndex + 1) return deny(`${r.name} unlocks on island ${unlockIsland(r)}`);
+    if (!p.creative && !this.story.knowsRecipe(r)) return deny(`You don't know how to make ${r.name} yet – Elias' notes will tell you`);
     if (st.miniBench && (r.tier || 0) > CAMP_BENCH.maxTier) return deny('The camp table only makes tier-1 recipes');
     if (r.kind === 'upgrade') {
       if (this.upgrades.has(r.id)) return deny(`${r.name} is already built`);
@@ -1553,6 +1628,7 @@ export class ServerWorld {
       if (r.give.arrows && inv.arrows >= caps.arrows) return deny('Your quiver is full');
       if (r.give.traps && inv.traps >= caps.traps) return deny('You carry as many traps as you can');
       if (r.give.spear && inv.spear) return deny('You still have your spear');
+      if (r.give.lantern && inv.lantern) return deny('You already carry a lantern');
     }
     if (!this.pay(p, r.cost)) return deny('Not enough loot in the hut store');
     if (r.kind === 'upgrade') {
@@ -1564,10 +1640,24 @@ export class ServerWorld {
       if (r.give.arrows) { inv.arrows = Math.min(caps.arrows, inv.arrows + r.give.arrows); this.normalizeArrows(inv); }
       if (r.give.traps) inv.traps = Math.min(caps.traps, inv.traps + r.give.traps);
       if (r.give.spear) { inv.spear = true; inv.spearHealth = W.spear.durability; }
+      if (r.give.lantern) { inv.lantern = true; this.story.onEvent('craft:lantern'); }
       this.sendInv(p);
       this.toast(`Crafted: ${r.name}`, 'crate', p.id);
     }
     this.event(EV.STORE, { store: this.store });
+  }
+
+  /** ACT.FUEL: pour a vial of glowblood from the pack into the lantern (shared/torch.js LANTERN). */
+  fuelLantern(p) {
+    const inv = p.inv;
+    if (!p.alive || !inv.lantern) return;
+    if (!(inv.loot.bossBlood > 0)) return this.toast('No glowblood – the swamp boss carries it', 'bossBlood', p.id);
+    if (inv.lanternFuel > LANTERN.maxFuel - LANTERN.burnTime * 0.5) return this.toast('The lantern is full', 'lantern', p.id);
+    inv.loot.bossBlood--;
+    inv.lanternFuel = Math.min(LANTERN.maxFuel, inv.lanternFuel + LANTERN.burnTime);
+    this.sendInv(p);
+    this.toast('The lantern is filled with glowblood – light it with L', 'lantern', p.id);
+    this.story.onEvent('lantern:filled');
   }
 
   /** pose: where the attacker saw the dinosaur (hitPose); default its current position. */
@@ -1747,6 +1837,11 @@ export class ServerWorld {
         continue;
       }
       if (p.reviving) this.updateRevive(p);
+      // a burning lantern uses up its glowblood; empty, it goes out
+      if ((p.fl & PF.LANTERN) && p.inv.lantern) {
+        p.inv.lanternFuel = Math.max(0, p.inv.lanternFuel - dt);
+        if (p.inv.lanternFuel === 0) { p.fl &= ~(PF.TORCH | PF.LANTERN); this.sendInv(p); this.toast('The lantern is out of glowblood', 'lantern', p.id); }
+      }
       // eating
       if (p.eating) {
         p.eating.t -= dt;
@@ -1800,7 +1895,7 @@ export class ServerWorld {
         p.inv.arrows = Math.max(p.inv.arrows, Math.min(W.bow.startArrows, this.caps().arrows));
         this.normalizeArrows(p.inv);
         this.event(EV.BOW_FOUND, { id: p.id });
-        this.toast(`${p.name} found a bow`, 'bow');
+        this.toast(`${p.name} took a bow from Elias' camp`, 'bow');
         this.sendInv(p);
       }
       // island 1's arrival: walk up to Jonas' spear in the sand to take it (whoever has none)
@@ -1853,6 +1948,7 @@ export class ServerWorld {
     this.volcano.update(dt);
     this.dinos.recordHistory(this.now);
     for (const p of this.players.values()) this.resolvePlayerDinos(p);
+    this.story.update(dt);
     this.mission.update(dt);
   }
 
@@ -1917,7 +2013,7 @@ export class ServerWorld {
       store: this.store,
       level: { index: this.levelIndex, variant: this.variant },
       relics: this.relics.map((r) => ({ id: r.id, kind: r.kind, x: r.x, y: r.y, z: r.z, found: r.found })),
-      boat: { repaired: this.mission.phase !== 'search' },
+      boat: { repaired: this.mission.phase === 'repaired' || this.mission.phase === 'sailing' },
       base: this.publicBase(),
       raid: this.raids.public(),
       volcano: this.volcano.public(),

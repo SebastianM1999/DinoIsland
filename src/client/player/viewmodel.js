@@ -17,7 +17,7 @@ import { spearGeometry, bowGeometry, arrowGeometry, trapGeometry, knifeGeometry,
 import { SPEAR_THROW, spearReleaseRotation, cameraPlaneScale } from './spearThrow.js';
 import { makeFirearm } from '../models/firearms/index.js';
 import { makeFruitMesh } from '../models/fruit.js';
-import { makeTorch, torchFlicker } from '../models/torch.js';
+import { makeTorch, makeLanternCage, torchFlicker } from '../models/torch.js';
 import { TORCH, leftHandBusy } from '../../shared/torch.js';
 import {
   HAND_SCALE, makeCartoonArm, restyleSleeves, handBasis, scaledGrip, cylinderGrip, fitCylinderPose, fitTriggerFinger, wristTarget,
@@ -404,6 +404,10 @@ export class Viewmodel {
     }
     this.torch = makeTorch();
     this.torch.scale.setScalar(SCALE.torch);
+    // the lantern (shared/torch.js LANTERN) is the same light in a cage of iron bars and greenish glass round the flame
+    this.lanternCage = makeLanternCage();
+    this.lanternCage.visible = false;
+    this.torch.userData.head.add(this.lanternCage);
     this.torch.traverse((o) => { o.castShadow = false; });
     this.root.add(this.spear, this.bow, this.trap, this.knife, this.fruitHolder, this.guns.pistol, this.guns.rifle, this.guns.mpx, this.guns.sniper, this.torch);
 
@@ -484,10 +488,11 @@ export class Viewmodel {
     this.armT.root.visible = false;
   }
 
-  /** The torch is owned / lit (from the inventory and the L key). */
-  setTorch(owned, lit) {
+  /** The torch is owned / lit (from the inventory and the L key); `lantern`: it is the lantern (a cage round the flame). */
+  setTorch(owned, lit, lantern = false) {
     this.torchOwned = !!owned;
     this.torchLit = !!owned && !!lit;
+    this.lanternCage.visible = !!lantern;
   }
 
   /** The torch flame's position in the world (for the light pool); updates the cached matrices. */

@@ -34,7 +34,8 @@ test('every island has a hut beach, a boat beach and three reachable relic spots
   assert.ok(levelDef(2).difficulty > levelDef(1).difficulty);
   assert.ok(levelDef(3).difficulty > levelDef(2).difficulty);
   assert.deepEqual([0, 1, 2, 3].map((i) => levelDef(i).biome.id), ['jungle', 'swamp', 'volcano', 'cave']);
-  assert.deepEqual([0, 1, 2, 3].map((i) => levelDef(i).last), [false, false, false, true]);
+  assert.deepEqual([0, 1, 2, 3].map((i) => levelDef(i).last), [false, false, true, false], 'Ashfall is the last island; the Hollow Mountain is its side island');
+  assert.deepEqual([0, 1, 2, 3].map((i) => levelDef(i).sideOf), [null, null, null, 2]);
   assert.equal(levelDef(5).index, 3);
 });
 
@@ -102,11 +103,13 @@ test('lava burns players', () => {
   assert.ok(p.hp < hp);
 });
 
-test('sailing away from the last island wins and starts a fresh first island', () => {
-  const world = makeWorld({ send() {} }, { level: 3, variant: 4 });
+test('sailing away from the last island wins and starts a fresh first island (once its side island was visited)', () => {
+  const world = makeWorld({ send() {} }, { level: 2, variant: 4 });
   const a = world.join('Cy');
   world.players.get(a.id).creative = true;
   world.mission.phase = 'sailing';
+  assert.equal(world.mission.state().won, false, 'first over to the Hollow Mountain (island-trip.test.js)');
+  world.story.visited.add(3);
   assert.equal(world.mission.state().won, true);
   world.nextLevel();
   assert.equal(world.levelIndex, 0);

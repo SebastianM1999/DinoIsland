@@ -110,6 +110,9 @@ export const ACT = {
   DASH: 'dash',         // {}                                   Dash skill used (client moves, server grants the distance + checks cooldown)
   LIGHT: 'light',       // { torch }                              light a Hollow Mountain wall torch with the lit hand torch (within reach)
   READ: 'read',         // { note }                               read a story note lying in reach (shared/notes.js, sim/story.js)
+  INTRO: 'intro',       // {}                                     this client finished or skipped the island 1 intro (sim/story.js introSeen)
+  GATE: 'gate',         // {}                                     set the seal crystal into Ashfall's crater gate (sim/story.js openGate)
+  FUEL: 'fuel',         // {}                                     pour a vial of glowblood (loot bossBlood) into the lantern (shared/torch.js LANTERN)
   DEV_TP: 'devtp',      // { x, y, z }                            dev pin tool: jump there (only a solo world started with ?dev, creative)
 };
 
@@ -126,6 +129,7 @@ export const EV = {
   SPEAR_FOUND: 'spear',     // { id }  a player took Jonas' spear at island 1's cold camp fire (layout.arrival.spear)
   WALL_TORCH: 'wtorch',     // { torch, by }  a wall torch was lit (it stays lit for the island)
   NOTE: 'note',             // { id, by, first }  a story note was read (first: nobody in the team had read it; it joins the journal)
+  STORY: 'story',           // { story }  the expedition's story state changed (sim/story.js public: e.g. the seal crystal was taken)
   SHOT: 'shot',             // { by, kind, o, end } remote gun effects
   FIRE: 'fire',             // { by, kind, o, v, pid }            remote projectile visuals
   HURT: 'hurt',             // { id, dmg, hp, kx, kz, down, src }
@@ -187,6 +191,7 @@ export const PF = {
   DOWNED: 64,   // lying downed (server ORs it into snapshots)
   DASH: 128,
   TORCH: 256,   // carrying a lit torch in the off hand (only accepted while the server inventory has one)
+  LANTERN: 512, // that light is the lantern (with TORCH; only while the lantern has glowblood: shared/torch.js LANTERN)
 };
 
 /** Equipment slot ids (`eq`). */

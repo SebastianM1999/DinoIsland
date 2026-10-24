@@ -4,7 +4,7 @@
 // the shared hut store; the server validates each craft.
 
 import { CONFIG } from '../../shared/config.js';
-import { RECIPES, unlockIsland, canAfford } from '../../shared/crafting.js';
+import { RECIPES, unlockIsland, canAfford, recipeKnown } from '../../shared/crafting.js';
 import { icon } from './icons.js';
 
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -53,18 +53,21 @@ export class CraftingPanel {
     const built = new Set(this.state.upgrades);
     // island 1's camp table makes tier-1 recipes only (shared/base.js CAMP_BENCH)
     const benchLocked = (r.tier || 0) > (this.state.maxTier ?? Infinity);
-    const locked = unlockIsland(r) > this.state.island || benchLocked;
+    // (a recipe from the story's notes: the team has to read it first, shared/crafting.js learn)
+    const unknown = !this.state.creative && !recipeKnown(r, this.state.notesRead, this.state.legacy);
+    const locked = unlockIsland(r) > this.state.island || benchLocked || unknown;
     const isUpgrade = r.kind === 'upgrade';
     const done = isUpgrade && built.has(r.id);
     const needsPrev = isUpgrade && r.requires && !built.has(r.requires);
     const afford = this.afford(r);
     let label = 'Craft';
     if (done) label = 'Built';
+    else if (unknown) label = 'Unknown';
     else if (locked) label = benchLocked && unlockIsland(r) <= this.state.island ? 'Camp table' : `Island ${unlockIsland(r)}`;
     else if (needsPrev) label = 'Needs previous';
     const disabled = done || locked || needsPrev || !afford;
     const cls = done ? ' is-done' : locked || needsPrev ? ' is-locked' : '';
-    const sub = !locked ? esc(r.text) : unlockIsland(r) > this.state.island ? `Unlocks on island ${unlockIsland(r)}` : 'Needs a bigger workbench than the camp table';
+    const sub = !locked ? esc(r.text) : unknown ? "Not learned yet – Elias' notes will tell you how" : unlockIsland(r) > this.state.island ? `Unlocks on island ${unlockIsland(r)}` : 'Needs a bigger workbench than the camp table';
     return `<li class="craft-row${cls}">
       <span class="craft-ic">${icon(r.icon)}</span>
       <span class="craft-txt"><b>${esc(r.name)}${isUpgrade ? ` <em>${LINE_NAME[r.line]} · tier ${r.tier}</em>` : ''}</b><small>${sub}</small></span>

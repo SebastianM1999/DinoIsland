@@ -82,7 +82,7 @@ test('the journal survives a save and an island change; a save without one start
   Object.assign(p, { x: n.x + 1, z: n.z, y: n.y });
   read('jonas');
   const data = exportWorld(world);
-  assert.deepEqual(data.story, { notes: ['jonas'] });
+  assert.deepEqual(data.story.notes, ['jonas']);
   const restored = restoreWorld(new ServerWorld({ send() {} }, worldOptions(data)), JSON.parse(JSON.stringify(data)));
   assert.deepEqual([...restored.story.notesRead], ['jonas']);
   const old = { ...JSON.parse(JSON.stringify(data)), story: undefined };

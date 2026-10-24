@@ -31,15 +31,15 @@ Dieser Ordner ist der Gesamtplan für Waffen-Freischaltung, Dino-Level, Craft-Ki
 | 14 | [Story (Bibel)](14-story.md) | – | – | fertig (Doku) |
 | 15 | [Lesbare Nachrichten](15-nachrichten.md) | – | hud.js (Panel), world.js (onAct) | umgesetzt (claude/story-notes) |
 | 16 | [Map 1: Ankunft am Strand](16-map1-ankunft.md) | 15 | world.js (Inventar, Lagerfeuer, Spawn) | umgesetzt (claude/story-arrival) |
-| 17 | [Intro-/Outro-Cutscene](17-cutscene.md) | – | game.js (Start, Spielende) | offen |
-| 18 | [Story-Quests](18-story-quests.md) | 15 | world.js (Mission-Events) | offen |
-| 19 | [Map 1: Elias' Lager am Gipfel](19-map1-gipfel.md) | 15, 16 | world.js (craft) | offen |
-| 20 | [Map 1: Raptoren in Paaren](20-raptoren-paare.md) | – | – | offen |
-| 21 | [Map 2: Laterne und Glutblut](21-laterne.md) | 15, 18 | world.js (Inventar, Butchern) | offen |
-| 22 | [Reise Ashfall ↔ Hollow Mountain](22-inselreise.md) | 18 | world.js (nextLevel/loadLevel) | offen |
-| 23 | [Hollow Mountain: Kristall & Elias' Lager](23-hollow-mountain.md) | 15, 21, 22 | world.js (craft) | offen |
-| 24 | [Map 3: Boss-Tor und T-Rex-Boss](24-boss-tor.md) | 23 | world.js (Boss) | offen |
-| 25 | [Map 3: Großer Ausbruch (Finale)](25-grosser-ausbruch.md) | 17, 24 | world.js (Boss-Tod → Volcano) | offen |
+| 17 | [Intro-/Outro-Cutscene](17-cutscene.md) | – | game.js (Start, Spielende) | umgesetzt (claude/story-cutscene) |
+| 18 | [Story-Quests](18-story-quests.md) | 15 | world.js (Mission-Events) | umgesetzt (claude/story-quests) |
+| 19 | [Map 1: Elias' Lager am Gipfel](19-map1-gipfel.md) | 15, 16 | world.js (craft) | umgesetzt (claude/story-peak) |
+| 20 | [Map 1: Raptoren in Paaren](20-raptoren-paare.md) | – | – | umgesetzt (claude/raptor-pairs) |
+| 21 | [Map 2: Laterne und Glutblut](21-laterne.md) | 15, 18 | world.js (Inventar, Butchern) | umgesetzt (claude/swamp-lantern) |
+| 22 | [Reise Ashfall ↔ Hollow Mountain](22-inselreise.md) | 18 | world.js (nextLevel/loadLevel) | umgesetzt (claude/island-trip) |
+| 23 | [Hollow Mountain: Kristall & Elias' Lager](23-hollow-mountain.md) | 15, 21, 22 | world.js (craft) | umgesetzt (claude/hollow-story) |
+| 24 | [Map 3: Boss-Tor und T-Rex-Boss](24-boss-tor.md) | 23 | world.js (Boss) | umgesetzt (claude/volcano-boss-gate) |
+| 25 | [Map 3: Großer Ausbruch (Finale)](25-grosser-ausbruch.md) | 17, 24 | world.js (Boss-Tod → Volcano) | umgesetzt (claude/volcano-cataclysm) |
 
 ```
 01 ─┬─ 02 ─────────────┐

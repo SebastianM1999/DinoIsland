@@ -504,13 +504,32 @@ export class Hud {
 
   /** Show the "Swamp: slowed" tag while the local player wades through a bog. */
   /** The off-hand torch: hidden until owned, then its state and key. */
-  setTorch(owned, lit) {
-    const sig = owned ? (lit ? 'lit' : 'out') : '';
+  /** The off-hand light: torch, or lantern (`lantern`: { fuel (seconds of glowblood), blood (vials in the pack) }). */
+  setTorch(owned, lit, lantern = null) {
+    const fuel = lantern ? Math.ceil(lantern.fuel / 30) / 2 : 0;   // (minutes, in half-minute steps)
+    const sig = owned ? `${lit ? 'lit' : 'out'}${lantern ? `:${fuel}:${lantern.blood}` : ''}` : '';
     if (this._c.torch === sig) return;
     this._c.torch = sig;
     this.$torch.hidden = !owned;
     this.$torch.classList.toggle('is-lit', !!lit);
-    if (owned) this.$torch.innerHTML = `<span class="hud-pill-ic">${icon('torch')}</span><kbd>L</kbd><span class="hud-torch-state">${lit ? 'Lit' : 'Out'}</span><span class="sr"> torch</span>`;
+    if (!owned) return;
+    const state = !lantern ? (lit ? 'Lit' : 'Out')
+      : lantern.fuel > 0 ? `${lit ? 'Lit' : 'Out'} · ${fuel} min` : lantern.blood > 0 ? 'Empty · L fills' : 'No glowblood';
+    this.$torch.innerHTML = `<span class="hud-pill-ic">${icon(lantern ? 'lantern' : 'torch')}</span><kbd>L</kbd><span class="hud-torch-state">${state}</span><span class="sr"> ${lantern ? 'lantern' : 'torch'}</span>`;
+  }
+
+  /** The great eruption's countdown to the boat (seconds), or null: a big red clock at the top. */
+  setCountdown(seconds) {
+    const text = seconds == null ? '' : `${Math.floor(seconds / 60)}:${String(Math.floor(seconds % 60)).padStart(2, '0')}`;
+    if (this._c.countdown === text) return;
+    this._c.countdown = text;
+    if (!this.$countdown) {
+      this.$countdown = el('div', 'hud-countdown brush');
+      this.$countdown.setAttribute('role', 'timer');
+      this.root.append(this.$countdown);
+    }
+    this.$countdown.hidden = !text;
+    if (text) this.$countdown.innerHTML = `<span class="hud-countdown-ic">${icon('flame')}</span><span>To the boat!</span><b>${text}</b>`;
   }
 
   setSwamp(on) {
@@ -593,7 +612,7 @@ export class Hud {
       <button type="button" class="hud-mission-toggle" aria-expanded="${!!this._missionExpanded}" aria-controls="hud-quest-details"><kbd>X</kbd> ${this._missionExpanded ? 'Collapse quests' : 'Expand quests'}</button>
       <div id="hud-quest-details" class="hud-quest-details" ${this._missionExpanded ? '' : 'hidden'}>
         <h3>Expedition</h3><ul class="hud-mission-list">${(mission.objectives || []).filter(o => o !== mission.trackedObjective && o.text !== mission.trackedObjective?.text).map(o => `<li class="${o.done ? 'is-done' : ''}"><span class="hud-check">${o.done ? icon('check') : ''}</span><span>${esc(o.text)}</span></li>`).join('')}</ul>
-        <h3>Team quests</h3><ul class="hud-mission-list">${BOARD_CONTRACTS.map((c, i) => { const q = mission.contracts?.[i]; return `<li class="${q?.done ? 'is-done' : ''}"><span class="hud-check">${q?.done ? icon('check') : ''}</span><span>${esc(c.title)} &middot; ${q?.progress || 0}/${c.goal}${c.id === this.trackedContract ? ' &middot; Tracked' : ''}</span></li>`; }).join('')}</ul>
+        <h3>Team quests</h3><ul class="hud-mission-list">${mission.contracts?.some((q) => q.locked) ? '<li><span class="hud-check"></span><span>Find the wreck first – the team quests come with the boat</span></li>' : BOARD_CONTRACTS.map((c, i) => { const q = mission.contracts?.[i]; return `<li class="${q?.done ? 'is-done' : ''}"><span class="hud-check">${q?.done ? icon('check') : ''}</span><span>${esc(c.title)} &middot; ${q?.progress || 0}/${c.goal}${c.id === this.trackedContract ? ' &middot; Tracked' : ''}</span></li>`; }).join('')}</ul>
       </div>`;
     m.querySelector('.hud-mission-toggle').addEventListener('click', () => this.toggleMissionDetails());
   }
@@ -752,7 +771,7 @@ export class Hud {
     const name = ITEM_INFO[slot.id === 'fruit' ? slot.sub : slot.id]?.name || slot.label || slot.id;
     const gun = inv.guns?.[slot.id];
     let detail = slot.id === 'spear' ? (slot.enabled === false ? (inv.spearFound === false ? "No spear yet · take Jonas' spear at the cold fire" : 'Spear missing · replace at camp') : `Durability ${slot.count ?? `${inv.spearHealth ?? 100}%`}`)
-      : slot.id === 'bow' && inv.bow === false ? 'No bow yet · find it at the hunter\'s camp by the trail, before the mountain'
+      : slot.id === 'bow' && inv.bow === false ? "No bow yet · find one at Elias' camp below the summit"
       : slot.id === 'bow' ? `${slot.count ?? inv.arrows ?? 0} arrows · next arrow lasts ${inv.arrows ? Math.min(...(inv.arrowUses?.length ? inv.arrowUses : [CONFIG.weapons.bow.uses])) : 0} shots`
       : slot.id === 'trap' ? `${slot.count ?? 0} traps available`
       : slot.id === 'fruit' ? `${slot.count ?? 0} fruit carried · F to eat`
@@ -1187,7 +1206,7 @@ export class Hud {
       : `<div class="hud-win-card brush">
       <span class="hud-win-ic">${icon('boat')}</span>
       <h2>Island complete!</h2>
-      <p>All aboard – sailing to island ${esc(info.next ?? '')}…</p>
+      <p>All aboard – sailing to ${typeof info.next === 'string' ? esc(info.next) : `island ${esc(info.next ?? '')}`}…</p>
       ${info.completedIn != null ? `<p class="hud-win-time">${icon('clock')} ${fmtTime(info.completedIn)}</p>` : ''}
     </div>`;
     this.$win.hidden = false;
@@ -1279,7 +1298,7 @@ export class Hud {
       const def = RELICS[r.kind];
       return `<li class="board-part${r.found ? ' is-found' : ''}" style="--c:${def.color}">
         <span class="board-part-ic">${icon(r.kind)}</span>
-        <span class="board-part-txt"><b>${esc(def.name)}</b><small>${r.found ? `Found${r.by ? ` by ${esc(r.by)}` : ''}` : esc(def.hint)}</small></span>
+        <span class="board-part-txt"><b>${esc(def.name)}</b><small>${r.found ? `Found${r.by ? ` by ${esc(r.by)}` : ''}` : esc(r.hint ?? def.hint)}</small></span>
         <span class="board-part-state">${r.found ? icon('check') : '?'}</span>
       </li>`;
     }).join('');
@@ -1288,7 +1307,7 @@ export class Hud {
         ${pin('#ee4d5f')}
         <div class="board-quest-top">
           <div>
-            <p class="board-kicker">Main quest${m.level ? ` · Island ${m.level.number}: ${esc(m.level.name)}` : ''}</p>
+            <p class="board-kicker">Main quest${m.level ? ` · Island ${m.level.label ?? m.level.number}: ${esc(m.level.name)}` : ''}</p>
             <h3>${icon('boat')} ${m.complete ? 'All aboard – next island!' : 'Repair the boat and sail on'}</h3>
             <p>Find the ${relics.length} boat parts hidden on this island, fix the wreck on the east beach and set sail together.</p>
           </div>
@@ -1305,6 +1324,7 @@ export class Hud {
     const active = [], done = [];
     defs.forEach((d, i) => {
       const c = contracts[i] || { progress: 0, done: false };
+      if (c.locked) return;   // (island 1: the contracts come with the boat quest)
       (c.done ? done : active).push({ d, c, i });
     });
     const activeCards = active.map(({ d, c, i }) => {

@@ -21,6 +21,7 @@ import { sanitizeProfile } from '../shared/skills.js';
 import { sanitizeOutfit } from '../shared/outfits.js';
 import { applyBaseColliders, freshBase } from '../shared/base.js';
 import { DS } from '../shared/protocol.js';
+import { LANTERN } from '../shared/torch.js';
 import { goodSpot } from './unstuck.js';
 
 const W = CONFIG.weapons;
@@ -80,12 +81,35 @@ const pick = (o, fields) => Object.fromEntries(fields.filter((f) => o[f] !== und
 
 /** The world section of an expedition save (wrap it with shared/saveSchema.js `sealSave`). */
 export function exportWorld(world) {
-  const living = new Set(world.dinos.list.filter((d) => d.alive).map((d) => d.id));
   // explorers present now, then the most recently seen dormant ones (a long-running world meets many guests)
   const roster = new Map();
   for (const p of world.players.values()) if (p.key) roster.set(p.key, rosterRecord(world, p));
   const dormant = [...world.roster.values()].filter((r) => !roster.has(r.key)).sort((a, b) => (b.seen ?? 0) - (a.seen ?? 0));
   for (const r of dormant.slice(0, Math.max(0, ROSTER_KEEP - roster.size))) roster.set(r.key, r);
+  const m = world.mission;
+  const island = exportIsland(world);
+  return {
+    now: r3(world.now),
+    nextId: world.nextId,
+    creativeUsed: !!world.creativeUsed,
+    store: { ...world.store },
+    upgrades: [...world.upgrades],
+    story: world.story.export(),
+    ...island,
+    mission: { islandsDone: m.islandsDone, contracts: copy(m.contracts), stats: copy(m.stats), ...island.mission },
+    // an island the team sailed away from and will come back to (sim/world.js travel: Ashfall during the trip to its side island)
+    parked: copy(world.parked ?? {}),
+    roster: [...roster.values()],
+  };
+}
+
+/**
+ * What belongs to the island the team is on (also what `world.parked` keeps while the team is away on a side
+ * trip): the map, its boat quest, base, raids, volcano, regrowth, torches, things on the ground, traps,
+ * carcasses and the bosses still alive.
+ */
+export function exportIsland(world) {
+  const living = new Set(world.dinos.list.filter((d) => d.alive).map((d) => d.id));
   const m = world.mission;
   const v = world.volcano;
   const r = world.raids;
@@ -93,16 +117,7 @@ export function exportWorld(world) {
   return {
     level: world.levelIndex,
     variant: world.variant,
-    now: r3(world.now),
-    nextId: world.nextId,
-    creativeUsed: !!world.creativeUsed,
-    store: { ...world.store },
-    upgrades: [...world.upgrades],
-    story: world.story.export(),
-    mission: {
-      islandsDone: m.islandsDone, contracts: copy(m.contracts), stats: copy(m.stats),
-      phase: m.phase, startedAt: m.startedAt, completedIn: m.completedIn, doneTimer: m.doneTimer,
-    },
+    mission: { phase: m.phase, startedAt: m.startedAt, completedIn: m.completedIn, doneTimer: m.doneTimer },
     relics: world.relics.map((x) => ({ id: x.id, found: !!x.found, byName: x.byName ?? null })),
     base: copy(world.base),
     // a raid in progress is called off (its raiders are not saved) and comes back later
@@ -125,7 +140,6 @@ export function exportWorld(world) {
     traps: [...world.traps.values()].filter((t) => !t.sprung).map((t) => ({ id: t.id, x: t.x, y: t.y, z: t.z, yaw: t.yaw, t: t.t })),
     carcasses: world.dinos.list.filter((d) => !d.alive && d.deadT > 0 && (d.type !== 'ptera' || d.grounded)).map((d) => pick(d, CARCASS_FIELDS)),
     bosses: world.dinos.list.filter((d) => d.alive && d.boss).map((d) => ({ type: d.type, hp: Math.ceil(d.hp) })),
-    roster: [...roster.values()],
   };
 }
 
@@ -162,6 +176,8 @@ export function sanitizeInventory(world, raw) {
   inv.traps = int(raw.traps, 0, caps.traps, inv.traps);
   inv.fruit = (Array.isArray(raw.fruit) ? raw.fruit : []).filter((f) => FRUIT_TYPES.includes(f)).slice(0, caps.fruit);
   inv.torch = !!raw.torch;
+  inv.lantern = !!raw.lantern;
+  inv.lanternFuel = inv.lantern ? int(raw.lanternFuel, 0, LANTERN.maxFuel, 0) : 0;
   for (const k of LOOT_KEYS) inv.loot[k] = int(raw.loot?.[k], 0, 9999, 0);
   return inv;
 }
@@ -196,14 +212,7 @@ export function applyRosterRecord(world, p, rec) {
  * whose references do not fit the island (a content mismatch); the caller then refuses the load.
  */
 export function restoreWorld(world, data) {
-  const fit = (list, saved, what) => {
-    if (saved.length !== list.length) throw new Error(`saved ${what} do not match this island (${saved.length} vs ${list.length})`);
-  };
-  fit(world.fruit, data.fruit, 'fruit spots');
-  fit(world.resources, data.resources, 'resource spots');
-  fit(world.relics, data.relics, 'boat parts');
-  fit(world.torchSpawns, data.torchSpawns, 'torch spots');
-
+  checkIsland(world, data);
   world.now = num(data.now);
   world.nextId = Math.max(world.nextId, int(data.nextId, 1, Number.MAX_SAFE_INTEGER, 1));
   world.creativeUsed = !!data.creativeUsed;
@@ -220,7 +229,36 @@ export function restoreWorld(world, data) {
     }
   }
   if (plain(sm.stats)) m.stats = { ...m.stats, ...copy(sm.stats) };
-  m.phase = ['search', 'repaired', 'sailing'].includes(sm.phase) ? sm.phase : 'search';
+  restoreIsland(world, data);
+
+  world.roster = new Map();
+  for (const rec of data.roster) if (plain(rec) && typeof rec.key === 'string' && rec.key) world.roster.set(rec.key, rec);
+  // islands the team will come back to (Ashfall while on its side island): kept as saved
+  world.parked = {};
+  if (plain(data.parked)) for (const [k, v] of Object.entries(data.parked)) if (plain(v) && Number.isInteger(v.level)) world.parked[k] = v;
+  world.worldEpoch++;   // nothing sent before the load may be mistaken for this world
+  return world;
+}
+
+/** Throws when saved island data do not fit the island built for it (a content mismatch). */
+function checkIsland(world, data) {
+  const fit = (list, saved, what) => {
+    if (saved.length !== list.length) throw new Error(`saved ${what} do not match this island (${saved.length} vs ${list.length})`);
+  };
+  fit(world.fruit, data.fruit, 'fruit spots');
+  fit(world.resources, data.resources, 'resource spots');
+  fit(world.relics, data.relics, 'boat parts');
+  fit(world.torchSpawns, data.torchSpawns, 'torch spots');
+}
+
+/**
+ * Fill the island the world has just built (`exportIsland` data of the same level and variant): its boat quest,
+ * base, raids, volcano, regrowth, torches, ground items, traps, carcasses and bosses. The clock is the world's.
+ */
+export function restoreIsland(world, data) {
+  checkIsland(world, data);
+  const m = world.mission, sm = data.mission ?? {};
+  m.phase = ['explore', 'search', 'repaired', 'sailing'].includes(sm.phase) ? sm.phase : 'search';
   m.startedAt = num(sm.startedAt, world.now);
   m.completedIn = num(sm.completedIn);
   m.doneTimer = num(sm.doneTimer);
@@ -234,7 +272,7 @@ export function restoreWorld(world, data) {
 
   const v = world.volcano, sv = data.volcano;
   if (v.active && plain(sv)) {
-    if (['calm', 'rumble', 'ash'].includes(sv.phase)) v.phase = sv.phase;
+    if (['calm', 'rumble', 'ash', 'cataclysm'].includes(sv.phase)) v.phase = sv.phase;
     v.until = num(sv.until, v.until); v.source = sv.source ?? null; v.nextAsh = num(sv.nextAsh, v.nextAsh);
     v.resume = num(sv.resume); v.nextWave = num(sv.nextWave);
     if (Array.isArray(sv.geysers)) sv.geysers.forEach((g, i) => { if (v.geysers[i] && plain(g)) Object.assign(v.geysers[i], { phase: g.phase, until: num(g.until), nextHit: num(g.nextHit) }); });
@@ -284,9 +322,4 @@ export function restoreWorld(world, data) {
     sys.list.push(d);
     sys.byId.set(d.id, d);
   }
-
-  world.roster = new Map();
-  for (const rec of data.roster) if (plain(rec) && typeof rec.key === 'string' && rec.key) world.roster.set(rec.key, rec);
-  world.worldEpoch++;   // nothing sent before the load may be mistaken for this world
-  return world;
 }

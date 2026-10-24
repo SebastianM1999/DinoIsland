@@ -60,8 +60,18 @@ export class Volcano {
     };
   }
 
-  /** Dinosaurs see this much less far (ash rain). */
-  sightMul() { return this.active && this.phase === 'ash' ? V.ash.sight : 1; }
+  /** Dinosaurs see this much less far (ash rain, the great eruption). */
+  sightMul() { return this.active && (this.phase === 'ash' || this.phase === 'cataclysm') ? V.ash.sight : 1; }
+
+  /**
+   * The king fell (sim/world.js onBossDown): the mountain wakes for good. Bombs and ash until the team sails away;
+   * after `cataclysm.countdown` s whoever is still here is overwhelmed (world.cataclysmLost).
+   */
+  startCataclysm() {
+    if (!this.active || this.phase === 'cataclysm') return;
+    this.#setPhase('cataclysm', V.cataclysm.countdown);
+    this.nextWave = this.world.now;
+  }
 
   #setPhase(phase, seconds, source = null) {
     this.phase = phase;
@@ -73,9 +83,15 @@ export class Volcano {
   update(dt) {
     if (!this.active) return;
     const w = this.world, now = w.now;
+    // --- the great eruption: no cycle any more, only the countdown (once the boat is away the sea is calm)
+    if (this.phase === 'cataclysm') {
+      if (w.mission.phase === 'sailing') this.#setPhase('calm', V.cycle.calmMax);
+      else if (now >= this.until) { this.#setPhase('calm', V.cycle.calmMax); w.cataclysmLost(); return; }
+      else if (now >= this.nextWave) { this.nextWave = now + V.cataclysm.wave; for (let i = 0; i < V.cataclysm.perPlayer; i++) this.#wave(); }
+    }
     // --- the cycle
     if (w.mission.phase === 'sailing' && this.phase !== 'calm') this.#setPhase('calm', V.cycle.calmMax);
-    if (now >= this.until) {
+    if (this.phase !== 'cataclysm' && now >= this.until) {
       const C = V.cycle;
       if (this.phase === 'calm') this.#setPhase('rumble', C.rumble);
       else if (this.phase === 'rumble') { this.#setPhase('erupt', C.erupt); this.nextWave = now; }
@@ -115,7 +131,7 @@ export class Volcano {
     for (const p of w.players.values()) {
       if (!p.alive || p.creative) { p.heatT = 0; p.ashT = 0; continue; }
       // out in the ash rain: after a while it starts to hurt (never below the floor)
-      if (this.phase === 'ash' && !ashShelter(w.layout, p.x, p.z)) {
+      if ((this.phase === 'ash' || this.phase === 'cataclysm') && !ashShelter(w.layout, p.x, p.z)) {
         p.ashT = (p.ashT ?? 0) + dt;
         const A = V.ash, floor = p.maxHp * A.floor;
         if (p.ashT >= A.after + 1 && p.hp > floor) {

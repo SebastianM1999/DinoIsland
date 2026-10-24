@@ -1150,6 +1150,8 @@
 .note-sheet.note-wall { background: linear-gradient(170deg, #5c5560, #47414b); color: #ece6f1; box-shadow: inset 0 0 2.2em rgba(0, 0, 0, 0.5); }
 .note-sheet.note-wall h2 { color: #ece6f1; }
 .note-actions { display: flex; justify-content: flex-end; gap: 0.6em; }
+.note-learned { display: flex; align-items: center; gap: 0.4em; margin: 0 0 0.9em; color: #ffe7a3; font-weight: 800; }
+.note-learned svg { width: 1.4em; height: 1.4em; flex: none; }
 .note-journal { max-height: 58vh; overflow-y: auto; margin-bottom: 1em; }
 .note-journal h3 { margin: 0.6em 0 0.4em; color: var(--ink-dim); font-size: 0.95em; text-transform: uppercase; letter-spacing: 0.05em; }
 .note-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.45em; }
@@ -1492,3 +1494,30 @@
 .hud-quest-details .hud-mission-list { grid-row: 2; align-content: start; }
 .hud-quest-details h3:nth-of-type(2), .hud-quest-details ul:nth-of-type(2) { grid-column: 2; }
 @media (max-width: 700px) { .hud-mission.is-expanded { width: 86vw; max-width: 86vw; } }
+
+/* ---------------------------------------------------------------- cutscenes (core/cutscene.js) */
+.cutscene { position: fixed; inset: 0; z-index: 40; pointer-events: none; }
+.cutscene-black { position: absolute; inset: 0; background: #000; opacity: 0; }
+.cutscene-text {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  margin: 0; max-width: 80vw; text-align: center;
+  color: #f3e6c4; font-family: Georgia, 'Times New Roman', serif; font-style: italic; font-size: clamp(1.2rem, 3vw, 2rem);
+  opacity: 0; transition: opacity 1.2s ease;
+}
+.cutscene-text.is-on { opacity: 1; }
+.cutscene-skip {
+  position: absolute; right: 2rem; bottom: 2rem; width: 13rem; padding: 0.45rem 0.7rem 0.6rem; border-radius: 0.6rem;
+  background: rgba(10, 15, 28, 0.55); color: #f1ead9; font-weight: 700; font-size: 0.9rem;
+}
+.cutscene-skip i { position: absolute; left: 0.7rem; bottom: 0.3rem; height: 0.18rem; width: 0; max-width: calc(100% - 1.4rem); background: #ffd36a; border-radius: 1rem; }
+
+/* ---------------------------------------------------------------- the great eruption's countdown (hud.setCountdown) */
+.hud-countdown {
+  position: absolute; left: 50%; top: 5.6em; transform: translateX(-50%);
+  display: flex; align-items: center; gap: 0.5em; padding: 0.35em 0.9em;
+  color: #ffd9c7; font-weight: 800; font-size: 1.15em; pointer-events: none;
+}
+.hud-countdown.brush::before { background: rgba(120, 20, 10, 0.85); }
+.hud-countdown > * { position: relative; }
+.hud-countdown b { font-size: 1.35em; color: #fff; font-variant-numeric: tabular-nums; }
+.hud-countdown-ic svg { width: 1.3em; height: 1.3em; }

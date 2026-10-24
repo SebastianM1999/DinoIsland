@@ -248,3 +248,29 @@ export function makeTorch({ flame = true } = {}) {
   state.time = () => time;
   return root;
 }
+
+/**
+ * The lantern's cage (shared/torch.js LANTERN): iron bars, a cap and a ring round the torch's flame, with greenish
+ * glass between them. Local origin at the flame (`torch.userData.head`); the viewmodel shows it while the off-hand
+ * light is the lantern.
+ */
+export function makeLanternCage() {
+  const g = new THREE.Group();
+  const iron = '#3a3430';
+  const parts = [
+    part(new THREE.CylinderGeometry(0.075, 0.085, 0.02, 10), iron, [0, -0.06, 0]),
+    part(new THREE.ConeGeometry(0.09, 0.07, 10), iron, [0, 0.27, 0]),
+    part(new THREE.TorusGeometry(0.012, 0.004, 4, 10), iron, [0, 0.32, 0]),
+  ];
+  for (let i = 0; i < 4; i++) {
+    const a = (i / 4) * Math.PI * 2 + Math.PI / 4;
+    parts.push(part(new THREE.CylinderGeometry(0.006, 0.006, 0.3, 4), iron, [Math.cos(a) * 0.078, 0.1, Math.sin(a) * 0.078]));
+  }
+  g.add(mesh(merge(parts), MAT.standard, { cast: false }));
+  const glass = new THREE.Mesh(new THREE.CylinderGeometry(0.074, 0.08, 0.3, 12, 1, true),
+    new THREE.MeshBasicMaterial({ color: '#c9ff8a', transparent: true, opacity: 0.18, depthWrite: false, side: THREE.DoubleSide }));
+  glass.position.y = 0.1;
+  glass.renderOrder = 7;
+  g.add(glass);
+  return g;
+}
