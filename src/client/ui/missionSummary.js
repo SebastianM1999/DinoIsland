@@ -8,6 +8,6 @@ export function missionSummary(mission) {
   if (mission.complete) goal = mission.won ? 'Expedition complete · You escaped!' : 'Island complete · Sailing onward';
   else if (relics.length && mission.step === 'search' && found < relics.length) goal = `Find boat parts · ${found}/${relics.length}`;
   else goal = objectives.find(objective => !objective.done && objective !== mission.trackedObjective)?.text || 'Ready for the next expedition';
-  return { title: mission.level ? `Island ${mission.level.number}: ${mission.level.name}` : mission.title || 'Expedition', goal,
+  return { title: mission.level ? `Island ${mission.level.label ?? mission.level.number}: ${mission.level.name}` : mission.title || 'Expedition', goal,
     tracked: mission.trackedObjective && !mission.trackedObjective.done ? mission.trackedObjective.text : null };
 }

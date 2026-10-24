@@ -227,10 +227,11 @@ export const LEVELS = [
   // arena in the waist waits for its boss (shared/swampArena.js)
   { name: 'Misty Swamp', biome: 'swamp', scale: 0.86, swampArena: true, seedIndex: 2, variant: 1 },
   // round, about 1.3 times the swamp's land area; the crater arena on top waits
-  // for its boss (shared/volcanoArena.js)
-  { name: 'Ashfall Isle', biome: 'volcano', scale: 0.65, seedIndex: 1, variant: 1 },
-  // the last level: through the mountain from the west cove to the east beach (shared/caveMaze.js)
-  { name: 'Hollow Mountain', biome: 'cave', scale: 1, seedIndex: 3, variant: 7 },
+  // for its boss (shared/volcanoArena.js). The last island: sailing away from it ends the expedition.
+  { name: 'Ashfall Isle', biome: 'volcano', scale: 0.65, seedIndex: 1, variant: 1, last: true },
+  // Ashfall's side island (docs/map-progression/22-inselreise.md): the team sails over from Ashfall and back
+  // (sideOf); through the mountain from the west cove to the east beach (shared/caveMaze.js)
+  { name: 'Hollow Mountain', biome: 'cave', scale: 1, seedIndex: 3, variant: 7, sideOf: 2 },
 ];
 
 export const LEVEL_COUNT = LEVELS.length;
@@ -262,6 +263,24 @@ export function levelDef(index) {
     variant: base.variant ?? 1,
     // island size: the first island is a small tutorial island, later ones full size
     scale: base.scale ?? (i === 0 ? 0.52 : 0.87),
-    last: i === LEVEL_COUNT - 1,
+    // sailing away from the last island ends the expedition (unless its side island is still to visit)
+    last: !!base.last,
+    // a side island: the team comes over from island `sideOf` (an index) and sails back there
+    sideOf: base.sideOf ?? null,
+    // what the islands are called on screen ('3b' for Ashfall's side island)
+    label: base.sideOf != null ? `${base.sideOf + 1}b` : String(i + 1),
   };
+}
+
+/** The side island of island `index` (its index), or null. */
+export function sideIslandOf(index) {
+  const i = LEVELS.findIndex((L) => L.sideOf === index);
+  return i >= 0 ? i : null;
+}
+
+/** The main island after island `index` (side islands are only reached from their own island), or null after the last. */
+export function nextMainIsland(index) {
+  if (LEVELS[index]?.last) return null;
+  for (let i = index + 1; i < LEVEL_COUNT; i++) if (LEVELS[i].sideOf == null) return i;
+  return null;
 }

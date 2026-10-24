@@ -713,7 +713,7 @@ export class Game {
       this.mission = m.mission;
       this.#showMission();
       this.boatPanel.setMission(m.mission);
-      const info = { completedIn: m.mission.completedIn, won: m.mission.won, next: m.mission.level?.number + 1 };
+      const info = { completedIn: m.mission.completedIn, won: m.mission.won, next: m.mission.next?.name ?? m.mission.level?.number + 1 };
       // the escape: the outro rides out first, then the card (core/storyShots.js)
       if (m.mission.won && m.mission.complete && !this.outroPlayed) {
         this.outroPlayed = true;

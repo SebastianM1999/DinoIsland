@@ -88,12 +88,14 @@ function flood(terrain, starts, { block = () => false, depth = 0.3 } = {}) {
 }
 const spawnOf = (layout) => layout.spawnPoints;
 
-test('level 4 is the last level, a cave biome with a dark palette and no flyers or giants', () => {
+test("level 4 is Ashfall's side island 3b, a cave biome with a dark palette and no flyers or giants", () => {
   const def = levelDef(LEVEL);
   assert.equal(def.biome.id, 'cave');
-  assert.equal(def.last, true);
+  assert.equal(def.last, false);
+  assert.equal(def.sideOf, 2);
+  assert.equal(def.label, '3b');
   assert.equal(def.number, 4);
-  assert.equal(levelDef(2).last, false);
+  assert.equal(levelDef(2).last, true);
   assert.equal(levelDef(9).index, LEVEL);
   for (const kind of ['brachio', 'stego', 'ptera', 'trex']) assert.equal(def.dinos[kind], 0, kind);
   assert.ok(def.dinos.raptor > 0);
@@ -511,7 +513,7 @@ test('a server world on the cave level spawns pack hunters, hall grazers and lur
     assert.ok(world.dinos.list.every((d) => Math.hypot(d.x - s.x, d.z - s.z) > s.radius), 'entrance and exit halls stay empty');
   }
   assert.equal(world.relics.length, 3);
-  assert.ok(world.layout.level.last);
+  assert.equal(world.layout.level.sideOf, 2, 'its boat sails back to Ashfall');
 });
 
 test('the outside is a real mountain: ragged shore, steep flanks, two summits far above every roof', () => {
