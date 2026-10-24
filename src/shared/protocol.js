@@ -111,6 +111,7 @@ export const ACT = {
   LIGHT: 'light',       // { torch }                              light a Hollow Mountain wall torch with the lit hand torch (within reach)
   READ: 'read',         // { note }                               read a story note lying in reach (shared/notes.js, sim/story.js)
   INTRO: 'intro',       // {}                                     this client finished or skipped the island 1 intro (sim/story.js introSeen)
+  GATE: 'gate',         // {}                                     set the seal crystal into Ashfall's crater gate (sim/story.js openGate)
   FUEL: 'fuel',         // {}                                     pour a vial of glowblood (loot bossBlood) into the lantern (shared/torch.js LANTERN)
   DEV_TP: 'devtp',      // { x, y, z }                            dev pin tool: jump there (only a solo world started with ?dev, creative)
 };

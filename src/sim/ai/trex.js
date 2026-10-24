@@ -53,8 +53,21 @@ function givesUp(d, sys) {
   sys.director?.release(d);
 }
 
+/** The king of Ashfall (docs/map-progression/24-boss-tor.md): the crater arena's boss, this many times a T-Rex's health. */
+export const KING = { title: 'The King', hpMul: 3 };
+
 export const trexBrain = {
   spawnInitial(sys) {
+    // Ashfall's crater arena: one T-Rex, the king, leashed to it and pacing its floor behind the sealed gate
+    const a = sys.world.layout.volcanoArena;
+    if (a) {
+      if (sys.list.some((d) => d.type === 'trex' && d.boss)) return;
+      const patrol = Array.from({ length: 6 }, (_, i) => ({ x: a.x + Math.cos((i / 6) * Math.PI * 2) * a.r * 0.55, z: a.z + Math.sin((i / 6) * Math.PI * 2) * a.r * 0.55 }));
+      const d = sys.spawn('trex', a.spawn.x, a.spawn.z, { boss: true, title: KING.title, patrol, wp: 0,
+        leash: { kind: 'crater', x: a.x, z: a.z, r: a.r - 3, bound: a.r + 1 } });
+      d.maxHp = d.hp = Math.round(d.hp * KING.hpMul);
+      return;
+    }
     const pts = sys.world.layout.trexPatrol;
     const count = sys.world.layout.level.dinos.trex;
     if (pts.length < 3) return;
@@ -81,7 +94,7 @@ export const trexBrain = {
 
   /** Nudged free by the dino system: skip the unreachable patrol point. */
   onStuck(d, sys) {
-    const n = sys.world.layout.trexPatrol.length;
+    const n = (d.patrol ?? sys.world.layout.trexPatrol).length;
     if (d.mode === 'patrol' && n) d.wp = (d.wp + 1) % n;
   },
 
@@ -100,7 +113,7 @@ export const trexBrain = {
     d.modeT += dt;
     d.cool = Math.max(0, d.cool - dt);
     d.rest = Math.max(0, d.rest - dt);
-    const pts = sys.world.layout.trexPatrol;
+    const pts = d.patrol ?? sys.world.layout.trexPatrol;   // (the king paces his arena)
 
     // its target went down: it never finishes them off - a reviver it perceives, the next player, or nobody
     if (d.targetId != null && sys.world.players.get(d.targetId)?.downed && d.mode !== 'bite') {

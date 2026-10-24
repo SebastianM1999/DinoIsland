@@ -38,6 +38,7 @@ import { Raids } from './raids.js';
 import { Volcano } from './volcano.js';
 import { Story } from './story.js';
 import { insideGrove, mayEnterGrove } from '../shared/grove.js';
+import { insideVolcanoArena } from '../shared/volcanoArena.js';
 import { RECIPE_BY_ID, upgradeMods, unlockIsland, canAfford } from '../shared/crafting.js';
 
 const P = CONFIG.player;
@@ -1049,7 +1050,7 @@ export class ServerWorld {
     const lim = CONFIG.world.size / 2 - 5;
     const ground = this.layout.groundAt(x, z, y + P.stepHeight);
     resolveCircle(x, z, P.radius, this.layout.playerColliders, collisionResult, y + 0.05, y + P.height, P.stepHeight - 0.05);
-    const blocked = Math.hypot(collisionResult.x - x, collisionResult.z - z) > 0.6 || this.groveBlocks(p, x, z);
+    const blocked = Math.hypot(collisionResult.x - x, collisionResult.z - z) > 0.6 || this.groveBlocks(p, x, z) || this.gateBlocks(p, x, z);
     // diving: wholly under the surface a body swims at DIVE.vertical m/s up or down at most and never below the bottom
     const wet = !creative && this.terrain.waterDepthAt(x, z) > P.swim.depth - 0.2 && this.terrain.waterDepthAt(p.x, p.z) > P.swim.depth - 0.2;
     const diveBad = wet && (y < ground - 0.35 || Math.abs(y - p.y) > DIVE.vertical * 1.5 * sinceLast + 1.2);
@@ -1177,6 +1178,13 @@ export class ServerWorld {
    * lead further out is refused unless the player may enter (mayEnterGrove –
    * TODO(grove-unlock): becomes the skill check). Walking out always works.
    */
+  /** Ashfall's crater is closed until the seal crystal sits in its gate (sim/story.js gateOpen): no step that ends inside and doesn't lead out. */
+  gateBlocks(p, x, z) {
+    const a = this.layout.volcanoArena;
+    if (!a || this.story.gateOpen || p.creative || !insideVolcanoArena(this.layout, x, z, P.radius + 1)) return false;
+    return dist2(x, z, a.x, a.z) <= dist2(p.x, p.z, a.x, a.z);
+  }
+
   groveBlocks(p, x, z) {
     const g = this.layout.grove;
     if (!g || mayEnterGrove(p) || !insideGrove(this.layout, x, z, P.radius)) return false;
@@ -1393,6 +1401,7 @@ export class ServerWorld {
       }
       case ACT.READ: return this.story.read(p, m.note);
       case ACT.INTRO: return this.story.seeIntro();
+      case ACT.GATE: return this.story.openGate(p);
       case ACT.FUEL: return this.fuelLantern(p);
       case ACT.HARVEST: {
         if (!p.alive) return;

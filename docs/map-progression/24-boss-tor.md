@@ -34,3 +34,9 @@ Die Kraterarena (`volcanoArena.js`, heute „Boss kommt später“) ist mit eine
 
 ## Nicht hier
 - Was nach dem Bosstod passiert (25).
+
+## Umsetzung (Abweichungen)
+- Das Tor ist kein Collider. Der Krater als Ganzes ist gesperrt (Server `gateBlocks`, Client-Barriere wie am Hain), solange der Kristall fehlt. Das Tor-Modell (Säulen, Gitter, leerer Sockel) steht auf dem Pfad an der Kerbe; offen verschwindet das Gitter und der Kristall leuchtet im Sockel.
+- Der König ist der einzige T-Rex auf Ashfall: Boss mit 3-facher T-Rex-Gesundheit, an die Arena geleint, nur von innen verwundbar, mit eigener Patrouille im Krater. Der frühere herumstreifende T-Rex entfällt.
+- Story-Schritte auf Ashfall: Station → Tor finden → Kristall einsetzen → König besiegen.
+- Elias' Station steht auf kühlem, flachem Boden neben dem Bergpfad (Unterstand aus Treibholz, Tisch, Messstäbe).
