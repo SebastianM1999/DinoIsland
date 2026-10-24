@@ -22,8 +22,8 @@ function fixture(options = {}) {
       compareCommits: wrap('compare', { ahead_by: options.behind ? 1 : 0 })
     },
     pulls: {
-      list: wrap('list', [pr, ...(options.otherPrs || [])]), get: wrap('get', args => args.pull_number === pr.number ? (options.getPr ? options.getPr(pr, calls) : pr) : options.otherPrs.find(p => p.number === args.pull_number)), listFiles: wrap('files', options.files || [{ filename: 'src/sim/world.js' }]),
-      updateBranch: wrap('update', {}), merge: wrap('merge', { merged: true })
+      list: wrap('list', args => args.base === 'main' ? [pr, ...(options.otherPrs || [])] : (options.stacked || [])), get: wrap('get', args => args.pull_number === pr.number ? (options.getPr ? options.getPr(pr, calls) : pr) : options.otherPrs.find(p => p.number === args.pull_number)), listFiles: wrap('files', options.files || [{ filename: 'src/sim/world.js' }]),
+      updateBranch: wrap('update', {}), update: wrap('retarget', {}), merge: wrap('merge', { merged: true })
     },
     issues: {
       addLabels: wrap('labels', {}), createComment: wrap('comment', {}), removeLabel: wrap('removeLabel', {}),
@@ -291,6 +291,23 @@ test('successful API merge deletes only its unchanged integrated feature ref', a
   const deletion = f.calls.find(c => c.name === 'deleteRef' && c.args.ref === 'heads/codex/task');
   assert.ok(deletion);
   assert.ok(f.calls.indexOf(deletion) > f.calls.findIndex(c => c.name === 'merge'));
+});
+
+test('PRs stacked on a merged feature branch move to main before the branch is deleted', async () => {
+  const f = fixture({ taskRefSha: 'feature-sha', stacked: [{ number: 8 }, { number: 9 }] }); await f.run();
+  assert.equal(f.calls.find(c => c.name === 'list' && c.args.base === 'codex/task').args.state, 'open');
+  const retargets = f.calls.filter(c => c.name === 'retarget');
+  assert.deepEqual(retargets.map(c => [c.args.pull_number, c.args.base]), [[8, 'main'], [9, 'main']]);
+  const deletion = f.calls.findIndex(c => c.name === 'deleteRef' && c.args.ref === 'heads/codex/task');
+  assert.ok(deletion > f.calls.indexOf(retargets[1]));
+});
+
+test('a failed retarget keeps the merged branch so stacked PRs are not closed', async () => {
+  const f = fixture({ taskRefSha: 'feature-sha', stacked: [{ number: 8 }], errors: { retarget: Object.assign(new Error('nope'), { status: 422 }) } });
+  await f.run();
+  assert.ok(f.calls.some(c => c.name === 'retarget'));
+  assert.ok(!f.calls.some(c => c.name === 'deleteRef' && c.args.ref === 'heads/codex/task'));
+  assert.ok(f.calls.some(c => c.name === 'deleteRef' && c.args.ref.startsWith('heads/integration/ci-pr-7-')));
 });
 
 test('advanced feature refs survive post-merge cleanup', async () => {

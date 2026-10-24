@@ -224,8 +224,23 @@ module.exports = async function integrate({ github, context, core }) {
           try {
             const taskRef = (await api.git.getRef({ ...repo, ref: `heads/${pr.head.ref}` })).data;
             if (taskRef.object.sha === pr.head.sha) {
-              await api.git.deleteRef({ ...repo, ref: `heads/${pr.head.ref}` });
-              core.info(`PR ${pr.number}: deleted the merged feature branch.`);
+              // Deleting a ref through the API closes PRs stacked on it instead of retargeting them
+              // like GitHub's own auto-delete does. Move them to main first; keep the ref if one fails.
+              const stacked = await github.paginate(api.pulls.list, { ...repo, state: 'open', base: pr.head.ref, per_page: 100 });
+              let retargeted = true;
+              for (const dependent of stacked) {
+                try {
+                  await api.pulls.update({ ...repo, pull_number: dependent.number, base: 'main' });
+                  core.info(`PR ${dependent.number}: retargeted to main after its base PR ${pr.number} merged.`);
+                } catch (error) {
+                  retargeted = false;
+                  core.warning(`PR ${dependent.number}: retarget to main failed (${error.status || 'request error'}).`);
+                }
+              }
+              if (retargeted) {
+                await api.git.deleteRef({ ...repo, ref: `heads/${pr.head.ref}` });
+                core.info(`PR ${pr.number}: deleted the merged feature branch.`);
+              } else core.info(`PR ${pr.number}: preserved the merged feature branch for its stacked PRs.`);
             } else core.info(`PR ${pr.number}: preserved a feature branch that advanced after validation.`);
           } catch (error) {
             if (error.status !== 404) core.warning(`PR ${pr.number}: feature branch cleanup deferred (${error.status || 'request error'}).`);
