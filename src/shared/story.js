@@ -21,9 +21,17 @@ export const STORY = {
     { id: 'fill', text: 'Fill the lantern with glowblood (L)', done: { event: 'lantern:filled' } },
     { id: 'blackmire', text: 'Cross the Blackmire with a burning lantern', done: { note: 'blackmire' } },
   ],
+  // the Hollow Mountain, Ashfall's side island (docs/map-progression/23-hollow-mountain.md)
+  3: [
+    { id: 'hall', text: "Find Elias' writing in a crystal hall (a lantern lights the dark)", done: { note: 'wall' } },
+    { id: 'crystal', text: 'Break crystal off the clusters for better weapons', done: { event: 'item:crystal' } },
+    { id: 'diary', text: "Find Elias' last camp, deep in the mountain", done: { note: 'diary' } },
+    { id: 'seal', text: 'Take the seal crystal from his camp', done: { event: 'item:sealCrystal' } },
+  ],
 };
 
-export const BOAT_GATE = { 0: 'wreck' };
+// (the Hollow Mountain: no boat to mend; once the seal crystal is taken the boat in the west cove sails back)
+export const BOAT_GATE = { 0: 'wreck', 3: 'seal' };
 
 /** Every step id on every island (ids are unique across the story). */
 export const STEP_IDS = Object.values(STORY).flat().map((s) => s.id);

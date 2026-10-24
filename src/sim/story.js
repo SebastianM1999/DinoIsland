@@ -10,6 +10,8 @@ import { RECIPES, recipeKnown } from '../shared/crafting.js';
 
 /** Seconds between two looks at who stands near a story place. */
 const NEAR_EVERY = 0.5;
+/** Metres from the seal crystal at Elias' camp within which an explorer takes it. */
+export const SEAL_REACH = 2.4;
 
 export class Story {
   constructor(world) {
@@ -19,6 +21,7 @@ export class Story {
     this.introSeen = false;       // the island 1 intro (client/core/storyShots.js) played for this expedition
     this.legacy = false;          // an expedition saved before the story: it knows every recipe
     this.visited = new Set();     // island indices the team has been on (a side island is visited once: world.destination)
+    this.sealCrystal = false;     // the team carries the seal crystal from Elias' last camp (the Hollow Mountain; opens Ashfall's boss gate)
     this.nearT = 0;
   }
 
@@ -76,12 +79,22 @@ export class Story {
     w.checkpoint('story');
   }
 
-  /** Each tick: is someone near a story place an open step waits for? (looked at every NEAR_EVERY s) */
+  /** Each tick: is someone near a story place an open step waits for, or at the seal crystal? (looked at every NEAR_EVERY s) */
   update(dt) {
     this.nearT -= dt;
     if (this.nearT > 0) return;
     this.nearT = NEAR_EVERY;
     const w = this.world;
+    const seal = w.layout.storyAnchors?.eliasCamp?.seal;
+    if (seal && !this.sealCrystal) {
+      const p = [...w.players.values()].find((q) => q.alive && w.near(q, seal.x, seal.z, SEAL_REACH) && Math.abs(q.y - seal.y) < 3);
+      if (p) {
+        this.sealCrystal = true;
+        w.toast(`${p.name} took the seal crystal – it opens the king's gate on Ashfall`, 'quest');
+        w.event(EV.STORY, { story: this.public() });
+        this.onEvent('item:sealCrystal');
+      }
+    }
     for (const s of storySteps(w.levelIndex)) {
       if (this.steps.has(s.id) || !s.done.near) continue;
       const at = s.done.near === 'boat' ? w.layout.boat : w.layout.storyAnchors?.[s.done.near];
@@ -100,12 +113,12 @@ export class Story {
 
   /** For the welcome (fullState): the journal, and whether the intro still plays. */
   public() {
-    return { notes: [...this.notesRead], introSeen: this.introSeen, legacy: this.legacy };
+    return { notes: [...this.notesRead], introSeen: this.introSeen, legacy: this.legacy, sealCrystal: this.sealCrystal };
   }
 
   /** Plain data for the expedition save. */
   export() {
-    return { notes: [...this.notesRead], steps: [...this.steps], visited: [...this.visited], introSeen: this.introSeen, ...(this.legacy ? { legacy: true } : {}) };
+    return { notes: [...this.notesRead], steps: [...this.steps], visited: [...this.visited], introSeen: this.introSeen, sealCrystal: this.sealCrystal, ...(this.legacy ? { legacy: true } : {}) };
   }
 
   /**
@@ -121,5 +134,6 @@ export class Story {
     const visited = Array.isArray(data?.visited) ? data.visited : [];
     this.visited = new Set([...visited.filter((i) => Number.isInteger(i) && i >= 0), this.world.levelIndex]);
     this.introSeen = typeof data?.introSeen === 'boolean' ? data.introSeen : true;
+    this.sealCrystal = data?.sealCrystal === true;
   }
 }

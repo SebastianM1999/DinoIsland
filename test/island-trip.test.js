@@ -35,9 +35,11 @@ test('Ashfall -> Hollow Mountain -> Ashfall: the team comes back to the island a
   assert.equal(world.levelIndex, 3);
   assert.equal(world.destination(), 2, 'its boat sails back to Ashfall');
   assert.ok(world.parked[2], 'Ashfall waits');
-  assert.equal(world.mission.phase, 'search', 'a boat quest of its own');
-  // the expedition goes on meanwhile
+  assert.equal(world.mission.phase, 'explore', 'no boat quest of its own: the seal crystal first (hollow-story.test.js)');
+  // the expedition goes on meanwhile; with the seal crystal the boat in the west cove takes them back
   world.store.teeth = 9;
+  world.mission.openBoat();
+  assert.equal(world.mission.phase, 'repaired');
   world.mission.phase = 'sailing';
   world.nextLevel();
   assert.equal(world.levelIndex, 2);

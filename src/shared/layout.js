@@ -1414,6 +1414,14 @@ export function* buildLayoutSteps(terrain) {
       if (!open(x, z) || terrain.slopeAt(x, z) > 0.6 || !apart('resin', x, z)) continue;
       add('resin', x, z, { host: 'tree:' + t.id, side });
     }
+    // crystal (the Hollow Mountain): a cluster at the foot of a crystal of the halls' decor, on dry floor under the roof
+    for (const c of caveLevel ? layout.caveDecor?.crystals ?? [] : []) {
+      if (count('crystal') >= (want.crystal || 0)) break;
+      if (c.wall) continue;
+      const x = c.x + (c.nx ?? 0) * 1.2, z = c.z + (c.nz ?? 0) * 1.2;
+      if (terrain.waterDepthAt(x, z) > 0 || terrain.slopeAt(x, z) > 0.4 || !apart('crystal', x, z) || terrain.ceilingAt(x, z) - terrain.heightAt(x, z) < 2.5) continue;
+      add('crystal', x, z);
+    }
     // ironwood: a dark branch on the hillsides, beside a rock (anywhere on a hillside if those run out)
     // healing herb: on the meadows and the river banks (any flat ground if those run out)
     const loose = [
@@ -1567,6 +1575,41 @@ export function* buildLayoutSteps(terrain) {
         layout.storyAnchors.blackmire = { x: note.x, z: note.z, y: terrain.heightAt(note.x, note.z), rot: 1.1 };
         layout.bushes = layout.bushes.filter((b) => dmath.hypot(b.x - spot.x, b.z - spot.z) > 2.5 && dmath.hypot(b.x - note.x, b.z - note.z) > 2);
       }
+    }
+  }
+  if (caveLevel) {
+    // the Hollow Mountain (docs/map-progression/23-hollow-mountain.md): Elias' writing on the wall of a crystal hall
+    // (not the relic's), and his last camp in the dead end farthest from the entrance, the seal crystal beside it
+    const nodes = plan.cave.maze.nodes;
+    const entry = nodes.find((n) => n.tags?.includes('entrance')) ?? nodes[0];
+    const fromEntry = (n) => dmath.hypot(n.x - entry.x, n.z - entry.z);
+    const dry = (x, z) => terrain.waterDepthAt(x, z) === 0 && terrain.ceilingAt(x, z) - terrain.heightAt(x, z) > 2.6;
+    const hall = nodes.filter((n) => n.tags?.includes('crystal') && !n.tags.includes('relic')).sort((a, b) => fromEntry(a) - fromEntry(b))[0];
+    if (hall) {
+      // march out from the middle to the wall in 16 directions; the writing goes where the wall is nearest and the floor dry
+      const floor = terrain.heightAt(hall.x, hall.z);
+      let best = null;
+      for (let k = 0; k < 16; k++) {
+        const a = (k / 16) * TAU, dx = dmath.cos(a), dz = dmath.sin(a);
+        for (let d = 2; d < hall.r + 8; d += 0.5) {
+          const x = hall.x + dx * d, z = hall.z + dz * d;
+          if (terrain.heightAt(x, z) > floor + 1.2 || terrain.ceilingAt(x, z) - terrain.heightAt(x, z) < 2.2) {
+            const sx = hall.x + dx * (d - 0.9), sz = hall.z + dz * (d - 0.9);
+            if (dry(sx, sz) && (!best || d < best.d)) best = { x: sx, z: sz, d, rot: dmath.atan2(-dx, -dz) };
+            break;
+          }
+        }
+      }
+      if (best) layout.storyAnchors.crystalHall = { x: best.x, z: best.z, y: terrain.heightAt(best.x, best.z) + 1.3, rot: best.rot };
+    }
+    const end = nodes.filter((n) => n.tags?.includes('deadend') && dry(n.x, n.z)).sort((a, b) => fromEntry(b) - fromEntry(a))[0];
+    if (end) {
+      const rot = dmath.atan2(entry.x - end.x, entry.z - end.z);   // (the camp faces the way the team comes in)
+      const at = (lx, lz) => {
+        const x = end.x + lx * dmath.cos(rot) + lz * dmath.sin(rot), z = end.z - lx * dmath.sin(rot) + lz * dmath.cos(rot);
+        return { x, z, y: terrain.heightAt(x, z), rot };
+      };
+      layout.storyAnchors.eliasCamp = { ...at(0.8, 1.2), camp: at(0, 0), seal: at(-1.4, 1.4) };
     }
   }
   layout.notes = placeNotes(plan.level.index, layout.storyAnchors);
