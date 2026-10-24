@@ -504,13 +504,18 @@ export class Hud {
 
   /** Show the "Swamp: slowed" tag while the local player wades through a bog. */
   /** The off-hand torch: hidden until owned, then its state and key. */
-  setTorch(owned, lit) {
-    const sig = owned ? (lit ? 'lit' : 'out') : '';
+  /** The off-hand light: torch, or lantern (`lantern`: { fuel (seconds of glowblood), blood (vials in the pack) }). */
+  setTorch(owned, lit, lantern = null) {
+    const fuel = lantern ? Math.ceil(lantern.fuel / 30) / 2 : 0;   // (minutes, in half-minute steps)
+    const sig = owned ? `${lit ? 'lit' : 'out'}${lantern ? `:${fuel}:${lantern.blood}` : ''}` : '';
     if (this._c.torch === sig) return;
     this._c.torch = sig;
     this.$torch.hidden = !owned;
     this.$torch.classList.toggle('is-lit', !!lit);
-    if (owned) this.$torch.innerHTML = `<span class="hud-pill-ic">${icon('torch')}</span><kbd>L</kbd><span class="hud-torch-state">${lit ? 'Lit' : 'Out'}</span><span class="sr"> torch</span>`;
+    if (!owned) return;
+    const state = !lantern ? (lit ? 'Lit' : 'Out')
+      : lantern.fuel > 0 ? `${lit ? 'Lit' : 'Out'} · ${fuel} min` : lantern.blood > 0 ? 'Empty · L fills' : 'No glowblood';
+    this.$torch.innerHTML = `<span class="hud-pill-ic">${icon(lantern ? 'lantern' : 'torch')}</span><kbd>L</kbd><span class="hud-torch-state">${state}</span><span class="sr"> ${lantern ? 'lantern' : 'torch'}</span>`;
   }
 
   setSwamp(on) {
@@ -1279,7 +1284,7 @@ export class Hud {
       const def = RELICS[r.kind];
       return `<li class="board-part${r.found ? ' is-found' : ''}" style="--c:${def.color}">
         <span class="board-part-ic">${icon(r.kind)}</span>
-        <span class="board-part-txt"><b>${esc(def.name)}</b><small>${r.found ? `Found${r.by ? ` by ${esc(r.by)}` : ''}` : esc(def.hint)}</small></span>
+        <span class="board-part-txt"><b>${esc(def.name)}</b><small>${r.found ? `Found${r.by ? ` by ${esc(r.by)}` : ''}` : esc(r.hint ?? def.hint)}</small></span>
         <span class="board-part-state">${r.found ? icon('check') : '?'}</span>
       </li>`;
     }).join('');
