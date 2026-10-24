@@ -30,3 +30,9 @@ Eine kurze, überspringbare Kamerafahrt beim ersten Betreten von Map 1 (angespü
 
 ## Nicht hier
 - Keine Zwischensequenzen mitten im Spiel. Die Story läuft sonst über Nachrichten und Quests.
+
+## Umsetzung (Abweichungen)
+- Die Kamera gleitet pro Shot geglättet (smoothstep) von Pose zu Pose statt über eine Catmull-Rom-Kurve. Das reicht für die kurzen Fahrten und ist leicht zu testen (`shotPose`).
+- Übersprungen wird mit gehaltener Leertaste (0,8 s).
+- `introSeen` gilt für die ganze Expedition (`world.story`). Wer später beitritt, sieht kein Intro mehr. Ältere Saves gelten als „gesehen“.
+- Shot-Listen stehen in `src/client/core/storyShots.js`. Das Outro endet mit „Elias Brand was never found.“ und läuft, bevor die Sieg-Karte erscheint.
