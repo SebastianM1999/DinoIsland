@@ -25,9 +25,9 @@
 
 ### Areas inside `world.js` (~1500 lines, find by the `// ----- <area>` banners)
 - constructor / `#loadLevel` / `nextLevel`: builds terrain + layout from `shared/` (`planIsland`, `buildLayout`), resets per-island state; `worldEpoch` bumps per island.
-- players: `join`, `leave`, `freshInventory` (`inv.bow`: false on an island with a hunter's camp – no arrows, no arrow shots, no arrow refills until found; `nextLevel` to a camp-less island hands it out), `caps` (`slots`: backpack size), `addLoot` (the only way loot comes in: refused with a FULL alert when too heavy or when a new kind finds none of the `CONFIG.player.backpackSlots` free; more of a carried kind always fits by slots), `lootStacks`, `carryWeight`, `hurtPlayer`.
+- players: `join`, `leave`, `freshInventory` (`inv.bow`: false on an island with a hunter's camp – no arrows, no arrow shots, no arrow refills until found; `nextLevel` to a camp-less island hands it out; island 1 (`layout.arrival`) starts empty-handed: no spear, no traps, `inv.spearFound` false – the free resupply hands out a spear only to whoever has had one), `caps` (`slots`: backpack size), `addLoot` (the only way loot comes in: refused with a FULL alert when too heavy or when a new kind finds none of the `CONFIG.player.backpackSlots` free; more of a carried kind always fits by slots), `lootStacks`, `carryWeight`, `hurtPlayer`.
 - knife: butchering carcasses (`startButcher`/`updateButcher`): one player per carcass, 3 / 5 / 10 s by rank, the carcass's whole loot (`carcassLoot`); successful completion emits `EV.BUTCHER` with `done: true`, cancellation (moving off, getting hurt, letting go) omits it.
-- camp: `buildCampBench` (`ACT.BASE` op `bench`) puts up island 1's camp table; `craft` refuses tier 2+ at it.
+- camp: `kindleCampFire` (`ACT.BASE` op `kindle`: island 1's cold camp fire, `base.fireLit`; then it heals and `spawnPoint` uses `layout.campSpawnPoints`), `buildCampBench` (`ACT.BASE` op `bench`) puts up island 1's camp table; `craft` refuses tier 2+ at it.
 - downed/revive/death: `killPlayer`, `downPlayer`, `defeatPlayer` (drops the carried loot and fruit at the body via `dropCarried`), `startRevive`/`updateRevive`, `updateDowned`, `respawnPlayer`.
 - noise: `playerNoise(p, kind, x?, z?)` (ai/senses.js `NOISE`: walking and sprinting from `onState`, bow/spear throws, spear hits, gunfire from `firearms.js`, a revive at the body; Stalker hushes it, repeats within the kind's interval are one noise). `aiRng` (seeded per island) feeds the new AI layers.
 - skills / XP: `awardXp`, `skillAction`, `refreshMods`, `grantDash`, `damageMul`, `sendProf`.
@@ -36,7 +36,7 @@
 - `craft`, `validMeleeHit`, `validProjectileLanding`, `canSpotDino`, `groveBlocks`, `unstuck`.
 - items: `spawnItem`, `removeItem`, `dropInventoryItem`, `dropLoot`, `addTrack`.
 - fruit: `applyFruit` (heal, heal over time, fruit buffs in `p.buffs`, e.g. Lotus Skin's lower damage in `hurtPlayer`), `buffsLeft` (sent with every inventory), `bestFruitIndex`.
-- tick: `step(dt)` (player upkeep, eating/regen/aura, lava, relic pickup, the hunter's camp (per-explorer `inv.bow`, starting arrows and `EV.BOW_FOUND`), campfire healing, fruit regrowth, map resource regrowth, item/projectile/track expiry, then dinos, towers, raids, volcano, dino history, player-dino contact, mission), `snapshotDue`, `hitPose`, `snapshot`, `fullState`.
+- tick: `step(dt)` (player upkeep, eating/regen/aura, lava, relic pickup, the hunter's camp (per-explorer `inv.bow`, starting arrows and `EV.BOW_FOUND`), Jonas' spear at island 1's arrival (per explorer without a spear, `EV.SPEAR_FOUND`), campfire healing, fruit regrowth, map resource regrowth, item/projectile/track expiry, then dinos, towers, raids, volcano, dino history, player-dino contact, mission), `snapshotDue`, `hitPose`, `snapshot`, `fullState`.
 
 - MPX (`mpx`) shares authoritative firearm ownership, shots, reload, refill, drop/pickup and gun skill multipliers.
 

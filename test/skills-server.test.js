@@ -22,7 +22,7 @@ function setup(...profiles) {
     return world.players.get(id);
   });
   // park everybody on dry land well away from the camp fire (it would heal them)
-  const fire = world.stations().fire;
+  const fire = world.layout.hut.campfire;
   const at = world.dinos.findFreeSpot({ type: 'raptor', radius: 0.7 }, fire.x + 60, fire.z);
   const put = (p, x, z) => { p.x = x; p.z = z; p.y = world.terrain.heightAt(x, z); };
   players.forEach((p, i) => put(p, at.x + i * 0.8, at.z));
@@ -115,7 +115,7 @@ test('buying is validated on the server; reset only works at camp', () => {
   run(0.2); act(p, { a: ACT.SKILL, op: 'reset' });
   assert.equal(p.prof.skills.bruteForce, 3);
   // at the hut fire: allowed
-  const fire = world.stations().fire;
+  const fire = world.layout.hut.campfire;
   p.x = fire.x; p.z = fire.z;
   run(0.2); act(p, { a: ACT.SKILL, op: 'reset' });
   assert.deepEqual(p.prof.skills, {});

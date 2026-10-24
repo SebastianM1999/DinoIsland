@@ -157,6 +157,8 @@ export function sanitizeInventory(world, raw) {
   inv.arrowUses = Array.from({ length: inv.arrows }, (_, i) => int(uses[i], 1, W.bow.uses, W.bow.uses));
   inv.spear = raw.spear !== false;
   inv.spearHealth = int(raw.spearHealth, 1, W.spear.durability, W.spear.durability);
+  // (an older save knows no spearFound: whoever carries a spear, or is past island 1, has had one)
+  inv.spearFound = typeof raw.spearFound === 'boolean' ? raw.spearFound || inv.spearFound : inv.spearFound || inv.spear;
   inv.traps = int(raw.traps, 0, caps.traps, inv.traps);
   inv.fruit = (Array.isArray(raw.fruit) ? raw.fruit : []).filter((f) => FRUIT_TYPES.includes(f)).slice(0, caps.fruit);
   inv.torch = !!raw.torch;

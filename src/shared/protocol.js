@@ -103,7 +103,7 @@ export const ACT = {
   UNSTUCK: 'unstuck',   // { manual? }                         move me to the nearest free spot (auto: client stuck detector,
                         //                                     manual: U key); server-validated and rate-limited
   BUTCHER: 'butcher',   // { dino, stop? }                     start (hold V) / stop butchering a carcass with the knife
-  BASE: 'base',         // { op: 'build', plot } | { op: 'upgrade' } | { op: 'tower', slot, kind } | { op: 'towerUp', slot } | { op: 'repair' } | { op: 'bench' } (island 1's camp table)
+  BASE: 'base',         // { op: 'build', plot } | { op: 'upgrade' } | { op: 'tower', slot, kind } | { op: 'towerUp', slot } | { op: 'repair' } | { op: 'bench' } (island 1's camp table) | { op: 'kindle' } (island 1's cold camp fire)
                         //                                     build / grow the team's base and its towers (islands 2+)
   SKILL: 'skill',       // { op: 'buy', id } | { op: 'reset' }  spend a point / reset all points (only at camp)
   REVIVE: 'revive',     // { to } start reviving a downed teammate (hold E) | { stop: true }
@@ -123,6 +123,7 @@ export const EV = {
   FRUIT: 'fruit',           // { spot, count } (0..4 fruit left on the plant)
   RESOURCE: 'res',          // { spot, up, by? }  a map resource was gathered (up: false, by) or grew back (up: true)
   BOW_FOUND: 'bow',         // { id }  a player took their bow from the hunter's camp (layout.bowCamp)
+  SPEAR_FOUND: 'spear',     // { id }  a player took Jonas' spear at island 1's cold camp fire (layout.arrival.spear)
   WALL_TORCH: 'wtorch',     // { torch, by }  a wall torch was lit (it stays lit for the island)
   NOTE: 'note',             // { id, by, first }  a story note was read (first: nobody in the team had read it; it joins the journal)
   SHOT: 'shot',             // { by, kind, o, end } remote gun effects

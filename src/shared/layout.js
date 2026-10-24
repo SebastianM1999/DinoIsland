@@ -68,6 +68,8 @@ export function* buildLayoutSteps(terrain) {
     hut: null,
     boat: null,
     spawnPoints: [],
+    campSpawnPoints: null,  // island 1: round the camp fire once it burns (spawnPoints is then the arrival beach)
+    arrival: null,          // island 1's arrival: { fire, skeleton, spear } ({ x, y, z, rot }), see the hut section
     trees: [],
     rocks: [],
     bushes: [],
@@ -155,6 +157,22 @@ export function* buildLayoutSteps(terrain) {
     // face east, toward the island and the boat
     layout.spawnPoints.push({ x: hf.x + dmath.cos(a) * 4.5 - 1, z: hf.z - 2 + dmath.sin(a) * 4.5 - 1.5, yaw: -Math.PI / 2 });
   }
+  // Island 1's arrival (docs/map-progression/14-story.md): the explorers wash ashore on the beach west
+  // of the camp, its fire cold in front of them; Jonas' skeleton sits at it, his spear stuck in the
+  // sand beside him. They start there; once the fire burns (base.fireLit) they respawn round it.
+  if (hut.kind === 'tent') {
+    const c = hut.campfire;
+    const at = (dx, dz, rot = 0) => ({ x: c.x + dx, z: c.z + dz, y: terrain.heightAt(c.x + dx, c.z + dz), rot });
+    layout.arrival = {
+      fire: c,
+      // (he leans against a driftwood log, facing the fire; the spear stands on his left)
+      skeleton: at(-2.4, -1.8, dmath.atan2(2.4, 1.8)),
+      spear: at(-3.3, -0.4, 0.3),
+    };
+    layout.campSpawnPoints = layout.spawnPoints;
+    layout.spawnPoints = [-1.5, -0.5, 0.5, 1.5].map((k) => ({ x: c.x - 21 + Math.abs(k) * 0.6, z: c.z + k * 1.6, yaw: -Math.PI / 2 }));
+    circles.push({ x: layout.arrival.skeleton.x, z: layout.arrival.skeleton.z, r: 0.45, top: layout.arrival.skeleton.y + 0.9 });
+  }
 
   // ---------------------------------------------------------------- boat
   {
@@ -236,6 +254,16 @@ export function* buildLayoutSteps(terrain) {
     return best;
   };
   const poolDist = (x, z) => Math.min(Infinity, ...plan.pools.map((p) => dmath.hypot(x - p.x, z - p.z) - p.r));
+  // island 1's arrival: the beach where the explorers wake, their view of the cold fire, Jonas and his spear stay clear
+  if (layout.arrival) {
+    const { fire, skeleton, spear } = layout.arrival;
+    for (const sp of layout.spawnPoints) {
+      const run = dmath.hypot(fire.x - sp.x, fire.z - sp.z);
+      for (let d = 0; d < run; d += 2) reserve(sp.x + (fire.x - sp.x) * d / run, sp.z + (fire.z - sp.z) * d / run, d < 3 ? 3 : 2);
+    }
+    reserve(skeleton.x, skeleton.z, 2.5);
+    reserve(spear.x, spear.z, 1.2);
+  }
   // the falling water's way down the cliff stays clear of trees and rocks
   for (const wf of layout.waterfalls) {
     const run = dmath.hypot(wf.impact.x - wf.top.x, wf.impact.z - wf.top.z);
@@ -1452,10 +1480,10 @@ export function* buildLayoutSteps(terrain) {
   // The story's notes (shared/notes.js) lie at anchors the story places on each island; a note
   // is there only when its anchor is. Placed last, so nothing above moves.
   layout.storyAnchors = {};
-  if (plan.level.index === 0) {
-    // Jonas' message, beside the camp fire for now (the arrival beach takes it later)
-    const c = hut.campfire, x = c.x + 3, z = c.z - 3;
-    layout.storyAnchors.skeleton = { x, z, y: terrain.heightAt(x, z), rot: 0 };
+  if (layout.arrival) {
+    // Jonas' message in a bottle lies in his lap, in front of the skeleton
+    const s = layout.arrival.skeleton, x = s.x + dmath.sin(s.rot) * 0.45, z = s.z + dmath.cos(s.rot) * 0.45;
+    layout.storyAnchors.skeleton = { x, z, y: terrain.heightAt(x, z), rot: s.rot + Math.PI / 2 };
   }
   layout.notes = placeNotes(plan.level.index, layout.storyAnchors);
 

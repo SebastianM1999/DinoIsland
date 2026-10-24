@@ -41,3 +41,9 @@ Neue Spieler auf Map 1 werden am Strand angespült.
 
 ## Nicht hier
 - Cutscene (17), Quest-Text „Erkunde die Insel“ (18), Bogen (19).
+
+## Umsetzung (Abweichungen)
+- Das erloschene Feuer ist das Lagerfeuer des Zelt-Camps. Der Spawn liegt rund 20 m davor am Strand, noch im sicheren Ring des Camps; der Weg dorthin bleibt frei von Büschen.
+- Anzünden läuft über `ACT.BASE` op `kindle` und setzt `base.fireLit`. Das Base-Event verteilt den Zustand, der Save hält ihn. Vor dem Anzünden ist das Camp sicher, heilt aber nicht.
+- Der Speer ist wie der Bogen ein Pickup pro Spieler: Jeder ohne Speer nimmt beim Hingehen einen (`EV.SPEAR_FOUND`). Die Gratis-Nachfüllung gibt nur dem einen Speer, der schon einen hatte (`inv.spearFound`).
+- Skelett, Treibholz und Speer im Sand liegen in `src/client/world/arrival.js`.

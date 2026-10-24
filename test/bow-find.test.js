@@ -52,12 +52,12 @@ function solo(level = 0) {
 const fire = (world, p, pid = 1) => world.receive(p.id, { t: MSG.ACT, a: ACT.FIRE, kind: 'arrow', pid, o: [p.x, p.y + CONFIG.player.eyeHeight, p.z], v: [0, 0, -30], pw: 1 });
 const toCamp = (world, p) => { const c = world.layout.bowCamp; p.x = c.x + 1; p.z = c.z; p.y = c.y; };
 
-test('on island 1 you start with the spear only: no bow, no arrows, no arrow shot', () => {
+test('on island 1 you start empty-handed: no bow, no arrows, no arrow shot', () => {
   const { world, join } = solo();
   const p = join('Hunter');
   assert.equal(p.inv.bow, false);
   assert.equal(p.inv.arrows, 0);
-  assert.equal(p.inv.spear, true);
+  assert.equal(p.inv.spear, false, "Jonas' spear waits at the cold camp fire (arrival.test.js)");
   Object.assign(p.inv, { arrows: 3, arrowUses: [3, 3, 3] });   // (arrows picked up from the ground)
   fire(world, p);
   assert.equal(p.inv.arrows, 3, 'no shot without a bow');
