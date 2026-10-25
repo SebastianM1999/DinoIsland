@@ -23,7 +23,7 @@ const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
 test('a saved expedition comes back in the solo worker with the explorer\'s character', async (t) => {
   const world = new ServerWorld({ send() {} }, { level: 1 });
-  const { id } = world.join('Ada', null, undefined, { xp: 777, bonus: 0, skills: {} }, 'owner');
+  const { id } = world.join('Ada', null, undefined, { xp: 777, skills: {} }, 'owner');
   world.players.get(id).inv.loot.hide = 3;
   world.store.meat = 6;
   const save = JSON.parse(JSON.stringify(exportWorld(world)));

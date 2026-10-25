@@ -28,7 +28,7 @@
 //   pong    { c, now }
 //   snap    { now, p: [...PLAYER_FIELDS], d: [...DINO_FIELDS] }
 //   inv     { inv }                                     your private inventory changed (inv.torch: owns the hand-held torch)
-//   prof    { prof }                                    your private progression changed: { xp, bonus, skills } (client saves it)
+//   prof    { prof }                                    your private progression changed: { xp, skills } (client saves it)
 //   correct { x, y, z, k, unstuck? }                    rejected movement / unstuck move; reset prediction, k = new epoch
 //   ev      { e: <event>, ...fields }                   see EV below
 
@@ -107,6 +107,7 @@ export const ACT = {
                         //                                     build / grow the team's base and its towers (islands 2+)
   SKILL: 'skill',       // { op: 'buy', id } | { op: 'reset' }  spend a point / reset all points (only at camp)
   REVIVE: 'revive',     // { to } start reviving a downed teammate (hold E) | { stop: true }
+  CARRY: 'carry',       // { to } pick up a downed teammate's body | { drop: true } put it down (carry it to camp to revive it there)
   DASH: 'dash',         // {}                                   Dash skill used (client moves, server grants the distance + checks cooldown)
   LIGHT: 'light',       // { torch }                              light a Hollow Mountain wall torch with the lit hand torch (within reach)
   READ: 'read',         // { note }                               read a story note lying in reach (shared/notes.js, sim/story.js)
@@ -120,7 +121,7 @@ export const ACT = {
 export const EV = {
   PLAYER_JOIN: 'pjoin',     // { player }
   PLAYER_LEAVE: 'pleave',   // { id }
-  LOBBY: 'lobby',           // { members: [{ id, slot, name, outfit, host, prof: { xp, bonus, skills } }] } who waits in the lobby (before Start)
+  LOBBY: 'lobby',           // { members: [{ id, slot, name, outfit, host, prof: { xp, skills } }] } who waits in the lobby (before Start)
   ITEM_ADD: 'item+',        // { item }
   ITEM_REMOVE: 'item-',     // { id, by }
   FRUIT: 'fruit',           // { spot, count } (0..4 fruit left on the plant)
@@ -133,7 +134,7 @@ export const EV = {
   SHOT: 'shot',             // { by, kind, o, end } remote gun effects
   FIRE: 'fire',             // { by, kind, o, v, pid }            remote projectile visuals
   HURT: 'hurt',             // { id, dmg, hp, kx, kz, down, src }
-  DINO_HIT: 'dhit',         // { id, zone, dmg, by, weak }
+  DINO_HIT: 'dhit',         // { id, zone, dmg, by, weak, armor, aim? } (aim: the species' weak spot after an armoured hit, shared/weakSpots.js)
   DINO_DIE: 'ddie',         // { id, by }
   DINO_ADD: 'd+',           // { dino }
   DINO_REMOVE: 'd-',        // { id }
@@ -164,8 +165,9 @@ export const EV = {
   XP: 'xp',                 // { amount, why, level?, free }     PRIVATE: you gained XP (level = new level when you levelled up, free = unspent points)
   DOWN: 'down',             // { id, secs, by }                  player id is downed and bleeds out in secs seconds (teammates can revive)
   REVIVE: 'revive',         // { id, by, secs }                  by started reviving id (secs = seconds; 0 = stopped)
-  REVIVED: 'revived',       // { id, by, x, z }                  id was revived (replaces a respawn)
-  HEAL: 'heal',             // { id, by, hp }                    Field Medic healed id
+  REVIVED: 'revived',       // { id, by, x, z, tonic? }          id was revived (replaces a respawn; tonic: by their own revival tonic)
+  CARRY: 'carry',           // { id, by }                        by picked up id's body (by: null = put down)
+  FIELD_REVIVE: 'frevive',  // { secs }                          the team's next field revive is possible in secs seconds (0 = now)
   VOLCANO: 'volcano',       // { phase, left, source? }          eruption cycle (sim/volcano.js): calm | rumble | erupt | ash (source: eruption | wind)
   BOMB: 'bomb',             // { x, y, z, eta, r }               a lava bomb lands at (x, z) in eta seconds (radius r)
   GEYSER: 'geyser',         // { id, eta }                       lava geyser id spouts in eta seconds (it bubbles till then)
@@ -192,6 +194,7 @@ export const PF = {
   DASH: 128,
   TORCH: 256,   // carrying a lit torch in the off hand (only accepted while the server inventory has one)
   LANTERN: 512, // that light is the lantern (with TORCH; only while the lantern has glowblood: shared/torch.js LANTERN)
+  CARRIED: 1024, // a downed body a teammate carries (server ORs it into snapshots)
 };
 
 /** Equipment slot ids (`eq`). */

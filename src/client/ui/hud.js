@@ -108,14 +108,12 @@ export class Hud {
     this.$br = mkBar('is-br', 'breath', 'Breath');
     this.$br.row.hidden = true;
     this.$name = el('div', 'hud-name');
-    // perk chips under the stamina bar (Dash cooldown, Adrenaline); hidden until the skill is owned
+    // perk chip under the stamina bar (Dash cooldown); hidden until the skill is owned
     this.$perks = el('div', 'hud-perks');
     this.$perks.hidden = true;
     this.$dash = el('span', 'hud-perk is-dash', '<kbd>Q</kbd><span>Dash</span><i class="hud-perk-fill"></i>');
     this.$dash.hidden = true;
-    this.$adren = el('span', 'hud-perk is-adren', `${icon('bolt')}<span>Adrenaline</span><i class="hud-perk-fill"></i>`);
-    this.$adren.hidden = true;
-    this.$perks.append(this.$dash, this.$adren);
+    this.$perks.append(this.$dash);
     bars.prepend(this.$name);
     bars.append(this.$perks);
     status.append(this.$portraitWrap, bars);
@@ -172,7 +170,7 @@ export class Hud {
     this.$threat = el('div', 'hud-threat brush');
     this.$threat.setAttribute('role', 'status');
     this.$threat.hidden = true;
-    // revive / medic prompt with a progress bar (the plain prompt slot belongs to the interaction hints)
+    // revive prompt with a progress bar, or the carry prompt (the plain prompt slot belongs to the interaction hints)
     this.$assist = el('div', 'hud-prompt hud-assist brush');
     this.$assist.setAttribute('role', 'status');
     this.$assist.hidden = true;
@@ -213,7 +211,10 @@ export class Hud {
     // the off-hand torch: shown once picked up (L lights or puts it out)
     this.$torch = el('div', 'hud-pill hud-torch brush');
     this.$torch.hidden = true;
-    this.$carry.append(this.$torch, this.$quiver, this.$fruitRow, this.$loot, this.$swamp, this.$heat, this.$ash, this.$buffs);
+    // a carried revival tonic (solo revive: shared/crafting.js 'tonic')
+    this.$tonic = el('div', 'hud-pill hud-tonic brush');
+    this.$tonic.hidden = true;
+    this.$carry.append(this.$torch, this.$tonic, this.$quiver, this.$fruitRow, this.$loot, this.$swamp, this.$heat, this.$ash, this.$buffs);
     this.$hotbar = el('ol', 'hud-hotbar brush');
     this.$hotbar.setAttribute('aria-label', 'Equipment');
     this._slots = [];
@@ -254,6 +255,7 @@ export class Hud {
     this.$downed.hidden = true;
     this.$downed.setAttribute('role', 'alert');
     this.$downed.innerHTML = `<div class="hud-downed-card brush"><h2>You are downed</h2><p class="hud-downed-sub">A teammate can revive you</p><p class="hud-downed-count"></p><p class="hud-downed-key"></p></div>`;
+    this.$downedSub = this.$downed.querySelector('.hud-downed-sub');
     this.$downedCount = this.$downed.querySelector('.hud-downed-count');
     this.$downedKey = this.$downed.querySelector('.hud-downed-key');
 
@@ -503,6 +505,16 @@ export class Hud {
   }
 
   /** Show the "Swamp: slowed" tag while the local player wades through a bog. */
+  /** Revival tonics carried (0 hides the pill). */
+  setTonic(n) {
+    const sig = n | 0;
+    if (this._c.tonic === sig) return;
+    this._c.tonic = sig;
+    this.$tonic.hidden = !sig;
+    this.$tonic.title = 'Revival tonic: if you fall and nobody can revive you, you drink it and get back up';
+    this.$tonic.innerHTML = `<span class="hud-pill-ic">${icon('herb')}</span><span>Tonic${sig > 1 ? ` ×${sig}` : ''}</span>`;
+  }
+
   /** The off-hand torch: hidden until owned, then its state and key. */
   /** The off-hand light: torch, or lantern (`lantern`: { fuel (seconds of glowblood), blood (vials in the pack) }). */
   setTorch(owned, lit, lantern = null) {
@@ -960,7 +972,7 @@ export class Hud {
   }
 
   // ================================================================ XP / skills
-  /** XP ring, level badge and unspent-points dot from a profile ({ xp, bonus, skills }). */
+  /** XP ring, level badge and unspent-points dot from a profile ({ xp, skills }). */
   setXp(profile) {
     if (!profile) return;
     const p = progress(profile);
@@ -1008,8 +1020,8 @@ export class Hud {
     }
   }
 
-  /** Perk chips: dash = { ready, frac } (frac = cooldown elapsed 0..1), adren = { state: 'ready'|'active'|'cooldown', frac }; null hides one. */
-  setPerks({ dash = null, adren = null } = {}) {
+  /** Perk chips: dash = { ready, frac } (frac = cooldown elapsed 0..1); null hides it. */
+  setPerks({ dash = null } = {}) {
     const dSig = dash ? `${dash.ready}|${Math.round(dash.frac * 20)}` : '-';
     if (this._c.dash !== dSig) {
       this._c.dash = dSig;
@@ -1019,36 +1031,28 @@ export class Hud {
         this.$dash.lastElementChild.style.transform = `scaleX(${dash.ready ? 1 : Math.max(0, Math.min(1, dash.frac))})`;
       }
     }
-    const aSig = adren ? `${adren.state}|${Math.round(adren.frac * 20)}` : '-';
-    if (this._c.adren !== aSig) {
-      this._c.adren = aSig;
-      this.$adren.hidden = !adren;
-      if (adren) {
-        this.$adren.dataset.state = adren.state;
-        this.$adren.lastElementChild.style.transform = `scaleX(${Math.max(0, Math.min(1, adren.frac))})`;
-        this.$adren.title = adren.state === 'active' ? 'Adrenaline: stamina is free' : adren.state === 'cooldown' ? 'Adrenaline recharging' : 'Adrenaline ready: triggers below 30% HP';
-      }
-    }
-    this.$perks.hidden = !dash && !adren;
+    this.$perks.hidden = !dash;
   }
 
   /** Downed overlay: info = { left (s), key? } or null. */
   setDowned(info) {
     const s = info ? Math.max(0, Math.ceil(info.left ?? 0)) : -1;
     const key = info?.key || '';
-    const sig = `${s}|${key}`;
+    const sub = info?.sub || 'A teammate can revive you';
+    const sig = `${s}|${key}|${sub}|${!!info?.carried}`;
     if (this._c.downed === sig) return;
     this._c.downed = sig;
     this.$downed.hidden = !info;
     if (!info) return;
-    this.$downedCount.textContent = `Bleeding out in ${s} s`;
+    this.$downedSub.textContent = sub;
+    this.$downedCount.textContent = info.carried ? 'You will not bleed out while carried' : `Bleeding out in ${s} s`;
     this.$downedKey.hidden = !key;
     this.$downedKey.innerHTML = key ? `<kbd>${esc(key)}</kbd> Give up` : '';
   }
 
-  /** Revive / medic prompt. `a` = { kind: 'revive', name, progress 0..1 } | { kind: 'medic', name } | null. */
+  /** Revive / carry prompt. `a` = { kind: 'revive', name, progress 0..1 } | { kind: 'carry', name, text } | null. */
   setAssist(a) {
-    const shape = a ? `${a.kind}|${a.name}` : null;
+    const shape = a ? `${a.kind}|${a.name}|${a.text ?? ''}` : null;
     const sig = a ? `${shape}|${a.kind === 'revive' ? Math.round((a.progress ?? 0) * 50) : ''}` : null;
     if (this._c.assist === sig) return;
     const rebuild = this._c.assistShape !== shape;
@@ -1059,7 +1063,7 @@ export class Hud {
     if (rebuild) {
       this.$assist.innerHTML = a.kind === 'revive'
         ? `<kbd>E</kbd><span>Hold - Reviving ${esc(a.name)}</span><span class="hud-assist-bar"><i></i></span>`
-        : `<kbd>G</kbd><span>Heal ${esc(a.name)} with a fruit</span>`;
+        : `<kbd>E</kbd><span>${esc(a.text)}</span>`;
     }
     if (a.kind === 'revive') this.$assist.querySelector('i').style.transform = `scaleX(${Math.max(0, Math.min(1, a.progress ?? 0))})`;
   }

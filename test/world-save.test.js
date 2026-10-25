@@ -7,7 +7,7 @@ import { exportWorld, restoreWorld, worldOptions, sanitizeInventory, RAID_RESUME
 import { sealSave, checkSave, saveSummary, cleanSaveName, migrateSave, SAVE_SCHEMA, SAVE_CONTENT, validSaveId } from '../src/shared/saveSchema.js';
 import { MSG, ACT, EV } from '../src/shared/protocol.js';
 import { CONFIG } from '../src/shared/config.js';
-import { MAX_XP, MAX_BONUS_POINTS } from '../src/shared/skills.js';
+import { MAX_XP } from '../src/shared/skills.js';
 import { LEVELS } from '../src/shared/levels.js';
 
 const ID = '0f8fad5b-d9cb-469f-a165-70867728950e';
@@ -69,7 +69,7 @@ test('the expedition keeps going after a load: regrowth, torches and the clock r
 
 test('an explorer gets their character back by roster key, never by name', () => {
   const world = new ServerWorld(quiet(), { level: 1 });
-  const { id } = world.join('Ada', null, undefined, { xp: MAX_XP, bonus: MAX_BONUS_POINTS, skills: { thickSkin: 1 } }, 'owner');
+  const { id } = world.join('Ada', null, undefined, { xp: MAX_XP, skills: { thickSkin: 1 } }, 'owner');
   const p = world.players.get(id);
   p.inv.loot.meat = 4;
   p.inv.fruit = ['berry'];
@@ -317,4 +317,27 @@ test('a long-running expedition keeps everyone present and only the most recentl
   assert.ok(keys.includes(`guest-${ROSTER_KEEP + 9}`), 'the most recent guest stays');
   assert.ok(!keys.includes('guest-0'), 'the longest gone is pruned');
   assert.equal(doc.world.roster.find((r) => r.key === 'owner').level, 0, 'records know their island');
+});
+
+test('the team field revive cooldown and a carried revival tonic survive a reload', () => {
+  const world = new ServerWorld(quiet(), { level: 1 });
+  const { id } = world.join('Ada', null, undefined, undefined, 'owner');
+  world.players.get(id).inv.tonic = 1;
+  for (let i = 0; i < 20; i++) world.step(0.05);
+  world.fieldReviveAt = world.now + 420;
+  const { world: back } = reload(world);
+  assert.ok(Math.abs(back.fieldReviveAt - back.now - 420) < 0.01, 'the cooldown keeps running from where it was');
+  assert.equal(back.fieldReviveReady(), false);
+  const { id: again } = back.join('Ada', null, undefined, undefined, 'owner');
+  assert.equal(back.players.get(again).inv.tonic, 1);
+  // an older save without the field: ready; a forged one cannot exceed the cooldown
+  const data = exportWorld(world);
+  delete data.fieldReviveAt;
+  const old = new ServerWorld(quiet(), worldOptions(data));
+  restoreWorld(old, data);
+  assert.equal(old.fieldReviveReady(), true);
+  const forged = { ...exportWorld(world), fieldReviveAt: world.now + 1e9 };
+  restoreWorld(old, forged);
+  assert.ok(old.fieldReviveAt <= old.now + CONFIG.player.fieldReviveCooldown);
+  assert.equal(sanitizeInventory(old, { tonic: 7 }).tonic, CONFIG.player.tonicMax);
 });

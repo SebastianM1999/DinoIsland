@@ -85,7 +85,7 @@ export function pickTarget(sys, d) {
     if (!p.alive || sys.inSafeZone(p, d)) continue;
     const dist = Math.hypot(p.x - area.x, p.z - area.z);
     const near = Math.hypot(p.x - d.x, p.z - d.z);
-    const notice = C.targetRadius * p.mods.stalkerMul;   // Stalker: noticed later
+    const notice = C.targetRadius;
     if (dist > notice && near > notice) continue;
     let alone = true;
     for (const q of sys.world.players.values()) if (q !== p && q.alive && Math.hypot(q.x - p.x, q.z - p.z) < 14) alone = false;

@@ -9,30 +9,21 @@ const LEAF = '<path fill="currentColor" stroke="none" d="M12 1C10 6 4 7 4 13a8 8
 
 export const SKILL_ICONS = {
   // fighting
-  bruteForce: svg(CLAWS),
-  marksman: svg('<circle cx="12" cy="12" r="7"/><path d="M12 2v5M12 17v5M2 12h5M17 12h5"/>'),
+  weaponMastery: svg(CLAWS),
   steadyHands: svg('<rect x="3" y="9" width="18" height="6" rx="3"/><circle cx="12" cy="12" r="1.4"/><path d="M8 9v2M16 9v2"/>'),
   weakSpot: svg('<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r=".6"/>'),
-  executioner: svg('<path d="M12 4a7 7 0 0 0-4 12.7V19h8v-2.3A7 7 0 0 0 12 4z"/><path d="M9.5 11.5h.01M14.5 11.5h.01M10.5 19v-2M13.5 19v-2"/>'),
-  sprintStrike: svg('<path d="M3 17h8M8 14l3 3-3 3"/><path d="M17 3l-4 7h5l-4 8"/>'),
   butchersEye: svg('<path fill="currentColor" stroke="none" d="M1 12C7 3 17 3 23 12c-6 9-16 9-22 0Z"/><circle cx="12" cy="12" r="4" fill="#14252c" stroke="none"/><circle cx="12" cy="12" r="1.8" fill="currentColor" stroke="none"/>'),
   bloodlust: svg('<path d="M12 3s6 6.5 6 11a6 6 0 0 1-12 0c0-4.5 6-11 6-11z"/><path d="M9.5 15a2.5 2.5 0 0 0 2 2.2"/>'),
   // endurance
   deepLungs: svg('<path d="M12 4v8"/><path d="M12 8C9 8 6 12 6 17c0 2 1 3 3 3 2 0 3-1 3-3"/><path d="M12 8c3 0 6 4 6 9 0 2-1 3-3 3-2 0-3-1-3-3"/>'),
   secondWind: svg('<path d="M20 12a8 8 0 0 1-14 5.3"/><path d="M4 12A8 8 0 0 1 18 6.7"/><path d="M18 3v4h-4M6 21v-4h4"/>'),
-  efficientStride: svg('<path d="M4 16v-3l4-1 3-6h3l1 5 5 2v3z"/><path d="M4 19.5h16"/>'),
   lightFeet: svg('<path d="M20 4C10 4 5 9 5 16l-1 4 4-1c7 0 12-5 12-15z"/><path d="M5 19 14 10"/>'),
-  stalker: svg('<path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>'),
   springyLegs: svg('<path d="M7 8l10 2-10 2 10 2-10 2"/><path d="M12 3v3M7 21h10"/>'),
-  adrenaline: svg('<path d="M3 12h4l2-5 3 10 2-5h7"/>'),
   dash: svg('<path d="M5 6l6 6-6 6M12 6l6 6-6 6"/>'),
   // durability
   thickSkin: svg('<path d="M12 3 5 6v6c0 4.5 3 7.5 7 9 4-1.5 7-4.5 7-9V6z"/>'),
   regeneration: svg(`${HEART}<path d="M12 10.5v5M9.5 13h5"/>`),
-  heartyAppetite: svg('<path d="M12 8c-3-2-7 0-7 5 0 4 3 8 5 8 1 0 1.5-.5 2-.5s1 .5 2 .5c2 0 5-4 5-8 0-5-4-7-7-5z"/><path d="M12 8c0-2 1-4 3-5"/>'),
   healingAura: svg('<circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/>'),
-  fieldMedic: svg('<rect x="3" y="9" width="18" height="6" rx="3" transform="rotate(-45 12 12)"/><path d="M10.6 10.6h.01M13.4 13.4h.01"/>'),
-  unshakable: svg('<path d="M3 20 10 7l4 7 2-3 5 9z"/>'),
   rescuer: svg('<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3.5"/><path d="M5.6 5.6l3.9 3.9M14.5 14.5l3.9 3.9M18.4 5.6l-3.9 3.9M9.5 14.5l-3.9 3.9"/>'),
   lastStand: svg(`${HEART}<path d="M12.5 7.5 10.5 11l3 1.8-2 3.7"/>`),
 };

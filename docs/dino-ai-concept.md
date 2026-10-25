@@ -23,7 +23,7 @@ Ground rules that do not change:
 
 | Technique | Source / model | What we take from it |
 |---|---|---|
-| **Perception: sight cone + line of sight** | Stealth games (Thief, Splinter Cell, Far Cry "awareness meter") | A player is seen only inside a view cone, within range, with a clear line (`lineBlocked`). Distance, light, movement and the Stalker skill change how fast awareness grows instead of a yes/no circle. |
+| **Perception: sight cone + line of sight** | Stealth games (Thief, Splinter Cell, Far Cry "awareness meter") | A player is seen only inside a view cone, within range, with a clear line (`lineBlocked`). Distance, light and movement change how fast awareness grows instead of a yes/no circle (the Stalker skill was removed with the skill tree rework, 2026-10). |
 | **Hearing as noise events** | Same family; the gloom raptor already does a cut-down version | The world emits noise *events* (`{x, z, radius, kind, t}`) for shots, sprinting, melee, trap snaps and falls. Every dino within the radius hears them, so a gunshot draws a T-Rex from far away. Events cost nothing between shots, unlike a per-tick loudness check. |
 | **Gradual awareness states** | Awareness meters | Per dino and player: `unaware → suspicious → alert → hunting`. Awareness rises with stimulus and decays without it, with hysteresis between thresholds. "Suspicious" is the window where a careful player can still back off, which makes the game fair. |
 | **Memory** | Standard last-known-position model (e.g. *F.E.A.R.*, *The Last of Us*) | `lastSeen {x, z, vx, vz, t}`. When sight is lost, the dino goes to the predicted spot and searches with expanding points, then forgets after a timeout. Breaking line of sight therefore matters, and hiding works. |
@@ -55,7 +55,7 @@ Verified on `origin/main` at `6ab2a0d`.
 Other observations that shape the design:
 - **Determinism.** AI code in `src/sim/ai/*.js` and `dinos.js` calls `Math.random()` 26 times. The only seeded generator in the sim is `fruitRng` (`world.js:86`), and even that is seeded from `Math.random()`. Lockstep is not needed (clients never run the AI), but the new layers must be testable and reproducible, see 3.6.
 - **Line of sight cost.** `lineBlocked` (`src/shared/visibility.js:6`) samples the terrain 16 times and then loops over **every** tree and rock of the island. On island 1 (697 trees, 1,466 rocks) one call took about **0.23 ms** in Node (rough measurement, 400 calls). A naive check of 20 dinos × 4 players × 20 Hz would be 1,600 calls per second, about **370 ms of CPU per second**. That is not affordable; see 3.1.
-- `sys.world.sightMul()` (`world.js:670`, the volcano ash) and `p.mods.stalkerMul` (the Stalker skill) already scale sight. Both must keep working under the new model.
+- `sys.world.sightMul()` (`world.js:670`, the volcano ash) already scales sight and must keep working under the new model. (`p.mods.stalkerMul`, the Stalker skill, was removed with the skill tree rework, 2026-10.)
 
 ---
 
@@ -82,7 +82,7 @@ Per dino, in `d.senses`:
 - `noise: []`, the inbox filled by `world` noise events this tick.
 
 **Sight**, checked in order from cheap to expensive, stopping at the first fail:
-1. Range: `sightRange * world.sightMul() * p.mods.stalkerMul` (keeps the Stalker skill and the ash).
+1. Range: `sightRange * world.sightMul()` (keeps the ash).
 2. View cone: a dot product against `d.yaw`, with half-angle `fov`. A narrow peripheral band only adds a little awareness.
 3. Line of sight: `lineBlocked(eye, chest, terrain, layout)`. The eye sits at the species' eye height (from `height`,
    scaled), and the target is the player's chest. Only when that ray is blocked and the player is close is a second
@@ -141,6 +141,9 @@ The new layers must keep it explicit:
   (phase 4) adds no new hunters during the revive; only predators already engaged may switch.
 - **Herbivores** calm down when their attacker goes down and return within their leash. They do not go after revivers
   unless a reviver hurts the herd.
+- **Carried bodies** (revive rules of 2026-10: one field revive per 10 minutes for the team, otherwise the body is
+  carried to camp, `world.js` carry section): the body stays downed, so it is still never a target; its carrier is a
+  living player like any other and can be hunted on the way (they cannot fight while carrying).
 
 ### 3.3 `src/sim/ai/utility.js` (phase 2)
 
@@ -275,7 +278,7 @@ Tests:
 - A predator whose target goes down switches to a perceived reviver, or else to the next perceived player. With
   nobody left, it leaves the body's area and does not orbit it.
 - Memory: lose sight → go to the predicted spot → search → forget after `memoryTime`.
-- Stalker and ash rain still shorten sight.
+- Ash rain still shortens sight.
 - A torch makes the gloom raptor notice from further.
 - Safe zone: no reachable-but-targetable ring.
 - Perf: the senses step stays under budget with 4 players on the busiest island (ray cap respected).

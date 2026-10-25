@@ -3,7 +3,7 @@
 
 import {
   SKILLS, TREES, TREE_NAMES, TIER_GATE, treeSkills, maxRank, canBuy, progress, spentPoints,
-  XP_BY_TYPE, RELIC_XP, RELIC_POINTS,
+  XP_BY_TYPE, RELIC_XP,
 } from '../../shared/skills.js';
 import { CONFIG } from '../../shared/config.js';
 
@@ -73,7 +73,7 @@ const SHORT_NAME = { raptor: 'Raptor', 'gloom-raptor': 'Gloom Raptor', 'sump-lur
 /** Footer line: what gives XP. */
 export function xpTableText() {
   const dinos = Object.entries(XP_BY_TYPE).map(([k, xp]) => `${SHORT_NAME[k] ?? CONFIG.dinos?.[k]?.name ?? k} ${xp} XP`);
-  return `${dinos.join(', ')}, boat part ${RELIC_XP} XP + ${RELIC_POINTS} point`;
+  return `${dinos.join(', ')}, boat part ${RELIC_XP} XP. Every level is one skill point`;
 }
 
 /**

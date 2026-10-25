@@ -102,12 +102,14 @@ test('Lotus Skin takes a quarter off every hit while it lasts', () => {
   assert.equal(a.hp, 60, 'the buff is over');
 });
 
-test('a Field Medic feeding swamp fruit passes its buff on; death clears buffs', () => {
-  const { world, players: [a, b], act, lastInv } = swampWorld();
-  a.mods = { ...a.mods, fieldMedic: true };
+test('a swamp fruit handed over and eaten passes its buff on; death clears buffs', () => {
+  const { world, players: [a, b], act, run, lastInv } = swampWorld();
   b.hp = 30;
   a.inv.fruit = ['marshberry'];
-  act(a, { a: ACT.GIVE, to: b.id, heal: true });
+  act(a, { a: ACT.GIVE, to: b.id });
+  assert.deepEqual(b.inv.fruit, ['marshberry']);
+  act(b, { a: ACT.EAT });
+  run(F.eatTime + 0.1);
   assert.ok(b.buffs.mudwalker > world.now, 'b got Mud Walker');
   assert.ok(lastInv(b)?.buffs?.mudwalker > 0);
   world.hurtPlayer(b, 10000, { src: 'raptor' });

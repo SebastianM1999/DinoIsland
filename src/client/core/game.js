@@ -13,6 +13,7 @@ import { skillMods, DASH, freshProfile } from '../../shared/skills.js';
 import { readItem, writeItem } from './persistence.js';
 import { SkillPanel } from '../ui/skillPanel.js';
 import { nearCamp } from '../ui/skillModel.js';
+import { clockText } from '../../shared/revive.js';
 import { CONTRACTS } from '../../shared/missions.js';
 import { Renderer } from './renderer.js';
 import { Input } from '../input/input.js';
@@ -149,7 +150,8 @@ export class Game {
     this.player.onDash = () => this.net.act(ACT.DASH, {});
     this.downed = null;         // { left, t, canGiveUp, reviveBy?, reviveT? } while the server has us downed (bleeding out)
     this.reviveTarget = null;   // { id, name, progress } downed teammate in reach (set by PlayerActions)
-    this.medicTarget = null;    // { id, name } hurt teammate we could heal with fruit (Field Medic)
+    this.carrying = null;       // id of the downed teammate whose body we carry (EV.CARRY)
+    this.fieldReviveAt = 0;     // game time of the team's next revive out in the field (EV.FIELD_REVIVE)
     // Primeval Grove: an invisible wall until the player may enter (TODO(grove-unlock) in shared/grove.js)
     // Ashfall's crater: closed until the seal crystal sits in its gate (sim/world.js gateBlocks)
     const crater = this.layout.volcanoArena;
@@ -483,6 +485,7 @@ export class Game {
       }
     }
     this.setBase(world.base || freshBase());
+    this.fieldReviveAt = this.time + (world.fieldRevive ?? 0);
     this.raid = world.raid || { phase: 'idle' };
     // (joining during the great eruption: its look and its countdown)
     this.cataclysmUntil = world.volcano?.phase === 'cataclysm' ? this.time + world.volcano.left : null;
@@ -638,6 +641,8 @@ export class Game {
           this.me.hp = row[9];
           if (row[12] > 0) this.me.mhp = row[12];
           this.#syncDowned(row[8]);
+          // a teammate carries our body: the camera goes along with the server's position
+          if (this.downed) this.downed.follow = (row[8] & PF.CARRIED) ? { x: row[1], y: row[2], z: row[3] } : null;
           continue;
         }
         this.remotes.onRow(m.now, row);
@@ -806,13 +811,20 @@ export class Game {
           this.hud.damageSource(`${name} · ${direction}`);
         }
         this.audio.play('hurt');
-        // Unshakable: the server scales the knockback; the knockdown time shrinks with it (0 = no knock at all)
-        const km = this.mods.knockMul;
-        if ((m.kx || m.kz) && km > 0) this.player.knock(m.kx, m.kz, m.down ? 5 : 3, m.down ? CONFIG.player.knockdownTime * km : 0.15);
+        if (m.kx || m.kz) this.player.knock(m.kx, m.kz, m.down ? 5 : 3, m.down ? CONFIG.player.knockdownTime : 0.15);
       }
     });
+    // revive rules: one field revive per cooldown for the team, else carry the body to camp
+    net.on(`ev:${EV.FIELD_REVIVE}`, (m) => { this.fieldReviveAt = this.time + (m.secs || 0); });
+    net.on(`ev:${EV.CARRY}`, (m) => {
+      if (m.by === this.me.id) this.carrying = m.id;
+      else if (this.carrying === m.id) this.carrying = null;
+      if (m.id === this.me.id && this.downed) this.downed.carriedBy = m.by ?? null;
+    });
     net.on(`ev:${EV.DEATH}`, (m) => {
+      if (m.id === this.carrying) this.carrying = null;
       if (m.id === this.me.id) {
+        this.carrying = null;
         this.me.alive = false;
         this.me.deathT = CONFIG.player.respawnDelay;
         this.audio.play('death');
@@ -823,6 +835,7 @@ export class Game {
     // downed: frozen and lying, teammates may revive us until the countdown ends (then DEATH follows)
     net.on(`ev:${EV.DOWN}`, (m) => {
       if (m.id !== this.me.id) return;
+      this.carrying = null;
       this.#setDowned(m.secs);
     });
     net.on(`ev:${EV.REVIVE}`, (m) => {
@@ -832,6 +845,7 @@ export class Game {
       this.downed.reviveAt = this.time;
     });
     net.on(`ev:${EV.REVIVED}`, (m) => {
+      if (m.id === this.carrying) this.carrying = null;
       if (m.id !== this.me.id) return;
       this.me.alive = true;
       this.downed = null;
@@ -861,6 +875,14 @@ export class Game {
     this.hud.setXp(profile);
     this.skillPanel.setProfile(profile);
   }
+
+  /** Is the team's field revive ready (else downed bodies are carried to camp)? */
+  fieldReviveReady() { return this.time >= this.fieldReviveAt; }
+  /** Seconds until the team's next field revive. */
+  fieldReviveIn() { return Math.max(0, this.fieldReviveAt - this.time); }
+
+  /** Is `pos` close enough to a camp station to revive a body there (sim/world.js atCamp)? */
+  campReviveAt(pos) { return nearCamp(this.stations(), pos, CONFIG.player.campReviveRadius); }
 
   /** Near a camp station (hut / landing camp / base): skills can only be reset there. The server decides in the end. */
   #atCamp() {
@@ -894,7 +916,7 @@ export class Game {
 
   #setDowned(left) {
     if (this.downed) { this.downed.left = left; return; }
-    this.downed = { left, t: 0, canGiveUp: false, reviveBy: null, reviveT: 0, reviveAt: 0 };
+    this.downed = { left, t: 0, canGiveUp: false, reviveBy: null, reviveT: 0, reviveAt: 0, carriedBy: null, follow: null };
     this.player.frozen = true;
     this.player.vel.x = this.player.vel.z = 0;
     this.audio.play('hurt');
@@ -1050,11 +1072,16 @@ export class Game {
     }
     if (input.wasPressed('stats')) setSetting('stats', (settings.stats + 1) % 3);   // compact → detailed → off
     const canMove = this.me.alive && !this.downed && !this.hud.isPanelOpen() && !this.cutscene;
-    p.hpFrac = this.me.hp / this.maxHp;
     if (this.downed) {
       const d = this.downed;
       d.t += dt;
-      d.left = Math.max(0, d.left - dt);
+      if (!d.carriedBy) d.left = Math.max(0, d.left - dt);   // a carried body does not bleed out
+      if (d.follow) {
+        const k = Math.min(1, dt * 10);
+        p.pos.x += (d.follow.x - p.pos.x) * k;
+        p.pos.y += (d.follow.y - p.pos.y) * k;
+        p.pos.z += (d.follow.z - p.pos.z) * k;
+      }
       d.canGiveUp = d.t >= CONFIG.player.respawnDelay;
       // give up (Space) once the delay has passed; the server enforces the delay as well
       if (d.canGiveUp && input.wasPressed('jump') && !d.gaveUp) { d.gaveUp = true; this.net.act(ACT.RESPAWN, {}); }
@@ -1369,21 +1396,25 @@ export class Game {
     }
   }
 
-  /** XP-tree extras of the HUD: perk chips, downed overlay, revive / medic prompts, the panel's camp state. */
+  /** XP-tree extras of the HUD: perk chips, downed overlay, revive / carry prompts, the panel's camp state. */
   #updateSkillHud(hud, p) {
     const m = this.mods;
     const dash = m.dash && p.dash ? { ready: p.dash.ready ?? p.dash.cooldownLeft <= 0, frac: 1 - (p.dash.cooldownLeft ?? 0) / DASH.cooldown } : null;
-    const ad = m.adrenaline ? p.adrenaline : null;
-    const adren = ad ? (ad.active ? { state: 'active', frac: ad.left / m.adrenalineTime }
-      : ad.cooldownLeft > 0 ? { state: 'cooldown', frac: 1 - ad.cooldownLeft / m.adrenalineCooldown } : { state: 'ready', frac: 1 }) : null;
-    hud.setPerks({ dash, adren });
+    hud.setPerks({ dash });
     const d = this.downed;
     // giving up is Space once the respawn delay has passed (see update())
-    hud.setDowned(d ? { left: d.left, key: d.canGiveUp ? 'Space' : '' } : null);
-    const rt = this.reviveTarget, mt = this.medicTarget;
     const nameOf = (t) => t.name ?? this.remotes.get(t.id)?.name ?? 'teammate';
-    hud.setAssist(rt ? { kind: 'revive', name: nameOf(rt), progress: rt.progress } : mt ? { kind: 'medic', name: nameOf(mt) } : null);
+    hud.setDowned(d ? { left: d.left, key: d.canGiveUp ? 'Space' : '', carried: !!d.carriedBy, sub: this.#downedText(d, nameOf) } : null);
+    const rt = this.reviveTarget;
+    hud.setAssist(!rt ? null : rt.carry ? { kind: 'carry', name: nameOf(rt), text: rt.carry } : { kind: 'revive', name: nameOf(rt), progress: rt.progress });
     if (this.hud.isExtraOpen('skills')) this.skillPanel.setAtCamp(this.#atCamp());
+  }
+
+  /** The line under "You are downed": who can help, and how (field revive, or being carried to camp). */
+  #downedText(d, nameOf) {
+    if (d.carriedBy) return `${nameOf({ id: d.carriedBy })} carries you to camp`;
+    if (this.fieldReviveReady() || this.campReviveAt(this.player.pos)) return 'A teammate can revive you';
+    return `Field revive in ${clockText(this.fieldReviveIn())}: a teammate must carry you to camp`;
   }
 
   /** Compass markers: the hut, the boat and teammates. */

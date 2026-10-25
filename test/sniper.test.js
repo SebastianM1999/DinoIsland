@@ -26,9 +26,9 @@ test('sniper occupies pocket eight, suppresses the torch and damages a distant t
   assert.equal(EQUIP[7], 'sniper');
   assert.ok(leftHandBusy('sniper'));
   assert.deepEqual(player.inv.guns.sniper, { loaded: W.magazine, reserve: W.reserve });
-  player.mods.gunMul = 1.25;
+  player.mods.damageMul = 1.25;
   shot();
-  assert.equal(dino.hp, 10000 - W.damage * 1.25, 'Marksman applies to the fourth firearm');
+  assert.equal(dino.hp, 10000 - W.damage * 1.25, 'Weapon Mastery applies to the fourth firearm');
   assert.equal(player.inv.guns.sniper.loaded, W.magazine - 1);
   assert.ok(messages.some(m => m.t === MSG.EV && m.e === EV.SHOT && m.kind === 'sniper'));
 });

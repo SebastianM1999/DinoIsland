@@ -213,13 +213,12 @@ function look(d, s, spec, sys, budget) {
   for (const p of w.players.values()) {
     if (!perceivable(sys, d, p)) continue;
     const dx = p.x - d.x, dz = p.z - d.z, dist = Math.hypot(dx, dz);
-    const stealth = p.mods?.stalkerMul ?? 1;
     const lit = carriesLight(p) ? LIGHT[underRoof(sys, p.x, p.z) ? 'roof' : 'open'] : null;
     let gain;
-    if (dist <= spec.feel * stealth) {
+    if (dist <= spec.feel) {
       gain = FEEL_GAIN;
     } else {
-      const range = spec.sightRange * w.sightMul() * stealth * (lit ? lit.range : 1);
+      const range = spec.sightRange * w.sightMul() * (lit ? lit.range : 1);
       if (dist > range) { s.seenAt.delete(p.id); continue; }
       const dot = (dx * fx + dz * fz) / Math.max(dist, 1e-6);
       if (dot < glimpse) { s.seenAt.delete(p.id); continue; }

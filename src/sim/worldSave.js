@@ -60,7 +60,7 @@ export function rosterRecord(world, p) {
     key: p.key,
     name: p.name,
     outfit: copy(p.outfit),
-    prof: { xp: p.prof.xp, bonus: p.prof.bonus, skills: { ...p.prof.skills } },
+    prof: { xp: p.prof.xp, skills: { ...p.prof.skills } },
     inv,
     x: r3(p.x), y: r3(p.y), z: r3(p.z), yaw: r3(p.yaw),
     hp: defeated ? 0 : Math.ceil(p.hp),
@@ -94,6 +94,7 @@ export function exportWorld(world) {
     creativeUsed: !!world.creativeUsed,
     store: { ...world.store },
     upgrades: [...world.upgrades],
+    fieldReviveAt: r3(world.fieldReviveAt),
     story: world.story.export(),
     ...island,
     mission: { islandsDone: m.islandsDone, contracts: copy(m.contracts), stats: copy(m.stats), ...island.mission },
@@ -178,6 +179,7 @@ export function sanitizeInventory(world, raw) {
   inv.torch = !!raw.torch;
   inv.lantern = !!raw.lantern;
   inv.lanternFuel = inv.lantern ? int(raw.lanternFuel, 0, LANTERN.maxFuel, 0) : 0;
+  inv.tonic = int(raw.tonic, 0, CONFIG.player.tonicMax, 0);
   for (const k of LOOT_KEYS) inv.loot[k] = int(raw.loot?.[k], 0, 9999, 0);
   return inv;
 }
@@ -218,6 +220,8 @@ export function restoreWorld(world, data) {
   world.creativeUsed = !!data.creativeUsed;
   for (const k of Object.keys(world.store)) world.store[k] = int(data.store[k], 0, 1e6, 0);
   world.upgrades = new Set(data.upgrades.filter((id) => typeof id === 'string'));
+  // (older saves have no field revive cooldown: ready)
+  world.fieldReviveAt = Math.min(num(data.fieldReviveAt), world.now + CONFIG.player.fieldReviveCooldown);
   world.story.restore(data.story);
 
   const m = world.mission, sm = data.mission;

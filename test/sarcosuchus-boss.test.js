@@ -313,7 +313,7 @@ test('arena boundary blocks attacks from outside, death rewards once and never r
   f.sys.damage(f.d, 100, 'body', f.p.id, 'spear');
   assert.equal(f.d.hp, hp);
   f.p.x = 0; f.p.z = -6.5;
-  f.sys.damage(f.d, hp + 1, 'body', f.p.id, 'spear');
+  f.sys.damage(f.d, hp * 2, 'body', f.p.id, 'spear');   // (its armoured body takes x0.7: shared/weakSpots.js)
   assert.equal(f.d.alive, false);
   assert.ok(!f.sys.respawnQueue.some(r => r.type === 'alpha-sarcosuchus'));
   const deaths = f.events.filter(e => e.e === EV.DINO_DIE).length;

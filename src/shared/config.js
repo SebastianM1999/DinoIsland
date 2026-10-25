@@ -79,6 +79,14 @@ export const CONFIG = {
     reviveTime: 4,           // seconds a teammate holds E to revive (Rescuer shortens it)
     reviveRange: 2.6,
     reviveHpFrac: 0.5,       // revived with this fraction of max HP
+    // team revive rules (sim/world.js revive): one revive out in the field per fieldReviveCooldown s for the
+    // whole team; otherwise a teammate carries the body to camp (within campReviveRadius of a station) and
+    // revives it there. A carried body does not bleed out; the carrier walks at carrySpeedMul and cannot fight.
+    fieldReviveCooldown: 600,
+    campReviveRadius: 6,
+    carrySpeedMul: 0.6,
+    // solo: a crafted revival tonic (shared/crafting.js 'tonic') gets you back up when nobody could revive you
+    tonicMax: 1,
     hutHealRadius: 14,
     hutHealPerSecond: 12,
     knockdownTime: 1.1,

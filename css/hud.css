@@ -1417,10 +1417,6 @@
 }
 .hud-perk.is-ready { color: var(--ink); }
 .hud-perk.is-ready .hud-perk-fill { background: rgba(124, 203, 69, 0.55); }
-.is-adren[data-state='active'] { color: var(--ink); animation: hud-dot 0.7s ease-in-out infinite; }
-.is-adren[data-state='active'] .hud-perk-fill { background: rgba(255, 201, 51, 0.6); }
-.is-adren[data-state='cooldown'] .hud-perk-fill { background: rgba(185, 195, 220, 0.3); }
-.is-adren[data-state='ready'] .hud-perk-fill { background: rgba(124, 203, 69, 0.55); }
 
 .hud-mate.is-downed { color: #ff9aa5; }
 .hud-mate.is-downed .hud-mate-ic { animation: hud-pulse 0.8s ease-in-out infinite; }
@@ -1440,7 +1436,7 @@
 .hud-assist-bar { width: 7em; height: 0.7em; border-radius: 99em; background: var(--track); overflow: hidden; }
 .hud-assist-bar i { display: block; height: 100%; background: var(--green); transform-origin: left center; transform: scaleX(0); transition: transform 0.1s linear; }
 @media (prefers-reduced-motion: reduce) {
-  .hud-points, .is-adren[data-state='active'], .hud-mate.is-downed .hud-mate-ic { animation: none; }
+  .hud-points, .hud-mate.is-downed .hud-mate-ic { animation: none; }
 }
 
 /* Keep the equipment strip clear of the vitals on handheld-width screens.

@@ -94,9 +94,9 @@ test('sight is blocked by a hill, a trunk, a boulder and the cave roof', () => {
   }
 });
 
-test('Stalker and the ash rain shorten sight', () => {
+test('the ash rain shortens sight', () => {
   const range = senseSpec('raptor').sightRange;
-  for (const [what, setup] of [['nothing', () => {}], ['Stalker', (s) => { s.p.mods.stalkerMul = 0.5; }], ['ash', (s) => { s.world.sightMul = () => 0.5; }]]) {
+  for (const [what, setup] of [['nothing', () => {}], ['ash', (s) => { s.world.sightMul = () => 0.5; }]]) {
     const s = scene('raptor', range * 0.75);
     s.p.spd = 2;
     setup(s);

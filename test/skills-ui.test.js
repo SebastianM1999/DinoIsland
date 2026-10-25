@@ -27,8 +27,8 @@ const tileTarget = id => ({ closest: selector => selector === '[data-skill]' ? {
 
 test('panel: keyboard inspection replaces the description of a stationary pointer', () => {
   withPanel({}, ({ events, description }) => {
-    events.pointerover({ target: tileTarget('bruteForce') });
-    assert.match(description.innerHTML, /Brute Force/);
+    events.pointerover({ target: tileTarget('weaponMastery') });
+    assert.match(description.innerHTML, /Weapon Mastery/);
     events.focusin({ target: tileTarget('weakSpot') });
     assert.match(description.innerHTML, /Weak Spot/);
     assert.match(description.innerHTML, /Spend 4 points in Fighting first/);
@@ -40,7 +40,7 @@ test('panel: keyboard inspection replaces the description of a stationary pointe
 test('panel: the home and lobby preview inspect skills without spending points', () => {
   let buys = 0;
   withPanel({ readOnly: true, onBuy: () => buys++ }, ({ panel, events }) => {
-    events.click({ target: tileTarget('bruteForce') });
+    events.click({ target: tileTarget('weaponMastery') });
     assert.equal(buys, 0);
     assert.deepEqual(panel.view, freshProfile());
   });
@@ -150,15 +150,15 @@ test('prof: the net layer sanitizes and keeps the server profile, and handlers s
   const net = new Net({ send() {}, close() {}, set onMessage(f) { transport = f; }, set onClose(f) {} }, 'local');
   let seen = null;
   net.on(MSG.PROF, (m) => { seen = m.prof; });
-  // the server's profile: level 3 (240 xp) = 3 points, so 4 requested ranks are one too many
-  transport({ t: MSG.PROF, prof: { xp: 240, bonus: 0, skills: { thickSkin: 3, marksman: 1 } } });
+  // the server's profile: level 3 (240 xp) = 3 points, so 4 requested ranks (an old Marksman among them) are one too many
+  transport({ t: MSG.PROF, prof: { xp: 240, skills: { thickSkin: 3, marksman: 1 } } });
   assert.deepEqual(net.prof, seen);
   assert.equal(progress(net.prof).spent, 3);
   assert.equal(skillMods(net.prof.skills).maxHpAdd, 20, 'the mods the game derives from it');
   // a later, bigger profile replaces it
   transport({ t: MSG.PROF, prof: { xp: MAX_XP * 5, bonus: 50, skills: {} } });
   assert.equal(net.prof.xp, MAX_XP);
-  assert.equal(net.prof.bonus, 12);
+  assert.equal('bonus' in net.prof, false, 'no bonus points');
   // creative mode's every-skill profile is shown only, never kept
   transport({ t: MSG.PROF, prof: { ...freshProfile(), creative: true } });
   assert.equal(net.prof.xp, MAX_XP);
@@ -200,7 +200,7 @@ test('prof: it is delivered in reliable order (held snapshots wait for it)', () 
 
 // ------------------------------------------------------------------ skill panel view-model
 
-const rich = (skills = {}) => ({ xp: MAX_XP, bonus: 0, skills });   // 30 points
+const rich = (skills = {}) => ({ xp: MAX_XP, skills });   // 40 points: the whole tree
 
 test('view: tiers are grouped per tree with their gate labels', () => {
   const v = buildSkillView(rich());
@@ -209,29 +209,29 @@ test('view: tiers are grouped per tree with their gate labels', () => {
   assert.deepEqual(f.tiers.map((t) => t.label), ['Tier I', 'Tier II', 'Capstone']);
   assert.deepEqual(f.tiers.map((t) => t.gateText), ['', '4 points in Fighting', '10 points']);
   assert.deepEqual(v.trees.map((t) => t.sub), ['Hunt harder', 'Run further', 'Survive together']);
-  assert.deepEqual(f.tiers.map((t) => t.skills.length), [3, 4, 1]);
+  assert.deepEqual(v.trees.map((t) => t.tiers.map((g) => g.skills.length)), [[2, 2, 1], [2, 2, 1], [2, 2, 1]]);
   assert.equal(tierLabel('endurance', 3), 'Capstone');
   assert.equal(tierGateText('endurance', 3), `${TIER_GATE[3]} points`);
-  assert.equal(v.free, 30);
-  assert.equal(v.level, 30);
+  assert.equal(v.free, 40);
+  assert.equal(v.level, 40);
 });
 
 test('view: available, locked (with the reason) and maxed states', () => {
   let prof = rich();
-  assert.equal(skillView(prof, 'bruteForce').state, 'available');
+  assert.equal(skillView(prof, 'weaponMastery').state, 'available');
   const weak = skillView(prof, 'weakSpot');
   assert.equal(weak.state, 'locked');
   assert.match(weak.reason, /4 points in Fighting/);
   assert.equal(weak.lock, 'gate');
   assert.match(skillView(prof, 'bloodlust').reason, /10 points/);
-  for (let i = 0; i < 3; i++) prof = previewBuy(prof, 'bruteForce');
-  const bf = skillView(prof, 'bruteForce');
+  for (let i = 0; i < 3; i++) prof = previewBuy(prof, 'weaponMastery');
+  const bf = skillView(prof, 'weaponMastery');
   assert.equal(bf.state, 'maxed');
   assert.equal(bf.rank, 3);
   assert.equal(bf.next, null);
-  assert.equal(bf.now, SKILLS.bruteForce.ranks[2]);
+  assert.equal(bf.now, SKILLS.weaponMastery.ranks[2]);
   // no free points: an open node is locked for lack of points
-  const broke = skillView({ xp: 0, bonus: 0, skills: { bruteForce: 1 } }, 'marksman');
+  const broke = skillView({ xp: 0, skills: { weaponMastery: 1 } }, 'steadyHands');
   assert.equal(broke.state, 'locked');
   assert.match(broke.reason, /Not enough skill points/);
   assert.equal(broke.lock, 'points', 'tier open, only points missing');
@@ -254,25 +254,28 @@ test('view: every skill of the contract appears exactly once', () => {
 });
 
 test('previewBuy matches the server rules and never mutates', () => {
-  const prof = { xp: 0, bonus: 0, skills: {} };          // 1 point
-  const next = previewBuy(prof, 'bruteForce');
-  assert.deepEqual(next.skills, { bruteForce: 1 });
+  const prof = { xp: 0, skills: {} };          // 1 point
+  const next = previewBuy(prof, 'weaponMastery');
+  assert.deepEqual(next.skills, { weaponMastery: 1 });
   assert.deepEqual(prof.skills, {}, 'input untouched');
-  assert.equal(previewBuy(next, 'marksman'), null, 'out of points');
+  assert.equal(previewBuy(next, 'steadyHands'), null, 'out of points');
+  assert.equal(previewBuy(rich(), 'marksman'), null, 'a removed skill');
   assert.equal(previewBuy(rich(), 'weakSpot'), null, 'gate');
   assert.equal(previewBuy(rich(), 'nope'), null);
-  // replaying optimistic buys always stays a valid profile
+  // replaying optimistic buys always stays a valid profile, and at the cap it buys the whole tree
   let p = rich();
-  for (const id of SKILL_IDS) for (let i = 0; i < 4; i++) p = previewBuy(p, id) ?? p;
+  for (let pass = 0; pass < 3; pass++) for (const id of SKILL_IDS) for (let i = 0; i < 4; i++) p = previewBuy(p, id) ?? p;
   assert.deepEqual(sanitizeProfile(p), p);
+  assert.equal(progress(p).free, 0);
+  assert.ok(SKILL_IDS.every((id) => p.skills[id] === SKILLS[id].ranks.length));
 });
 
 test('refund and xp table text', () => {
-  assert.equal(refundOf({ xp: 0, bonus: 0, skills: { bruteForce: 1 } }), 1);
-  assert.equal(refundOf(rich({ bloodlust: 1, bruteForce: 3, marksman: 3, steadyHands: 3 })), 3 + 9);
+  assert.equal(refundOf({ xp: 0, skills: { weaponMastery: 1 } }), 1);
+  assert.equal(refundOf(rich({ bloodlust: 1, weaponMastery: 3, steadyHands: 3, weakSpot: 3 })), 3 + 9);
   const t = xpTableText();
   assert.match(t, /Raptor 20 XP/);
-  assert.match(t, /boat part 150 XP \+ 1 point/);
+  assert.match(t, /boat part 150 XP\. Every level is one skill point/);
 });
 
 test('camp check: any camp station within the radius counts, missing stations are ignored', () => {

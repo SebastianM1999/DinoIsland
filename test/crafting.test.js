@@ -218,3 +218,17 @@ test('island 1: the team builds its camp table at the tent from the hut store, a
   act({ a: ACT.CRAFT, recipe: 'bow2' });
   assert.ok(!world.upgrades.has('bow2'));
 });
+
+test('the revival tonic: crafted from meat and hide, one carried at a time', () => {
+  const { world, player, craft, stock, messages } = setup();
+  assert.deepEqual(RECIPE_BY_ID.tonic.cost, { meat: 2, hide: 1 });
+  stock({ meat: 4, hide: 2 });
+  craft('tonic');
+  assert.equal(player.inv.tonic, 1);
+  assert.equal(world.store.meat, 2);
+  assert.ok(messages.some(({ msg }) => msg.t === MSG.INV && msg.inv.tonic === 1), 'the client sees it');
+  craft('tonic');
+  assert.equal(player.inv.tonic, CONFIG.player.tonicMax, 'only one at a time');
+  assert.equal(world.store.meat, 2, 'refused before paying');
+  assert.ok(messages.some(({ msg }) => msg.e === EV.TOAST && /already carry a revival tonic/.test(msg.text)));
+});
