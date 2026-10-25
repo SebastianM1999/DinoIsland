@@ -1,3 +1,5 @@
+import { journalMargin } from './journalMargins.js';
+import { uiIcon } from './uiIcons.js';
 // Crafting box dialog: opens with E at the hut workbench. Two tabs – supplies
 // (arrows, traps, spear; crafted again and again) and team upgrades
 // (built once, a new tier unlocks on every island). Everything is paid from
@@ -72,7 +74,7 @@ export class CraftingPanel {
       <span class="craft-ic">${icon(r.icon)}</span>
       <span class="craft-txt"><b>${esc(r.name)}${isUpgrade ? ` <em>${LINE_NAME[r.line]} · tier ${r.tier}</em>` : ''}</b><small>${sub}</small></span>
       <span class="craft-costs">${this.costHtml(r)}</span>
-      <button type="button" class="wd-btn${done ? '' : ' wd-primary'}" data-act="craft" data-id="${r.id}"${disabled ? ' disabled' : ''}>${done ? icon('check') : ''}${label}</button>
+      <button type="button" class="wd-btn${done ? '' : ' wd-primary'}" data-act="craft" data-id="${r.id}"${disabled ? ' disabled' : ''}>${uiIcon(done ? 'check' : 'hammer')}${label}</button>
     </li>`;
   }
 
@@ -83,18 +85,19 @@ export class CraftingPanel {
     const rows = RECIPES.filter((r) => r.kind === kind)
       .sort((a, b) => (a.tier || 0) - (b.tier || 0))
       .map((r) => this.row(r)).join('');
-    const tabBtn = (id, text) => `<button type="button" class="craft-tab${this.tab === id ? ' is-on' : ''}" data-act="tab" data-tab="${id}">${text}</button>`;
+    const tabBtn = (id, text) => `<button type="button" class="craft-tab${this.tab === id ? ' is-on' : ''}" data-act="tab" data-tab="${id}">${uiIcon(id === 'supplies' ? 'package' : 'tent')}${text}</button>`;
     const refill = this.tab === 'supplies'
-      ? `<button type="button" class="wd-btn" data-act="refill">${icon('arrow')} Free basic resupply</button>` : '';
+      ? `<button type="button" class="wd-btn" data-act="refill">${uiIcon('refresh-cw')} Free basic resupply</button>` : '';
     this.el.innerHTML = `
+      ${journalMargin('crafting')}
       <header class="hud-panel-head">
-        <h2>${icon('crate')} Crafting box</h2>
+        <h2>${uiIcon('hammer')} Crafting box</h2>
         <span class="hud-panel-close"><kbd>E</kbd> / <kbd>Esc</kbd> Close</span>
       </header>
-      <div class="craft-stockbar"><span class="craft-stock-label">${icon('home')} Hut store</span>${stock}</div>
+      <div class="craft-stockbar"><span class="craft-stock-label">${uiIcon('tent')} Hut store</span>${stock}</div>
       <nav class="craft-tabs">${tabBtn('supplies', 'Supplies')}${tabBtn('upgrades', 'Team upgrades')}</nav>
       <ul class="craft-list">${rows}</ul>
-      <footer class="wd-foot">${refill}<button type="button" class="wd-btn" data-act="close">Close</button></footer>`;
+      <footer class="wd-foot">${refill}<button type="button" class="wd-btn" data-act="close">${uiIcon('x')} Close</button></footer>`;
   }
 
   onOpen() { this.render(); }

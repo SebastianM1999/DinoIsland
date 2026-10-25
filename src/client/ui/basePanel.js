@@ -1,3 +1,5 @@
+import { journalMargin } from './journalMargins.js';
+import { uiIcon } from './uiIcons.js';
 // Base dialog (islands 2+): opens with E at a building plot's stake or at the
 // base flag. Build the camp on the chosen plot, then grow it twice. Costs come
 // from the shared hut store; the server validates everything (ACT.BASE).
@@ -75,7 +77,7 @@ export class BasePanel {
       <span class="craft-ic">${icon(S.icon)}</span>
       <span class="craft-txt"><b>${esc(S.name)} <em>stage ${stage}</em></b><small>${esc(S.text)}</small></span>
       <span class="craft-costs">${done ? '' : this.costHtml(cost)}</span>
-      <button type="button" class="wd-btn${next ? ' wd-primary' : ''}" data-act="${stage === 1 ? 'build' : 'upgrade'}"${canStart ? '' : ' disabled'}>${done ? icon('check') : ''}${label}</button>
+      <button type="button" class="wd-btn${next ? ' wd-primary' : ''}" data-act="${stage === 1 ? 'build' : 'upgrade'}"${canStart ? '' : ' disabled'}>${uiIcon(done ? 'check' : 'hammer')}${label}</button>
     </li>`;
   }
 
@@ -90,7 +92,7 @@ export class BasePanel {
     return `<li class="craft-row${broken.length ? ' is-hurt' : ''}"><span class="craft-ic">${icon('heart')}</span>
       <span class="craft-txt"><b>Base health <em>${pct}%</em></b><span class="base-hp"><i style="width:${pct}%"></i></span><small>${esc(sub)}</small></span>
       <span class="craft-costs">${cost ? this.costHtml(cost) : ''}</span>
-      <button type="button" class="wd-btn${cost ? ' wd-primary' : ''}" data-act="repair"${cost && this.afford({ cost }) ? '' : ' disabled'}>Repair</button></li>`;
+      <button type="button" class="wd-btn${cost ? ' wd-primary' : ''}" data-act="repair"${cost && this.afford({ cost }) ? '' : ' disabled'}>${uiIcon('wrench')} Repair</button></li>`;
   }
 
   /** One row per tower spot: locked, free (choose a tower) or built (upgrade). */
@@ -105,13 +107,13 @@ export class BasePanel {
         const need = BASE_STAGES[slot < 2 ? 2 : 3].name.toLowerCase();
         return `<li class="craft-row is-locked"><span class="craft-ic">${icon('tower')}</span>
           <span class="craft-txt"><b>Tower spot ${slot + 1}</b><small>Opens with the ${esc(need)}.</small></span>
-          <button type="button" class="wd-btn" disabled>Locked</button></li>`;
+          <button type="button" class="wd-btn" disabled>${uiIcon('lock-keyhole')}Locked</button></li>`;
       }
       if (!t) {
         const choice = Object.entries(TOWERS).map(([kind, T]) => {
           const cost = towerCost(kind, 1, levelIndex);
           const ok = this.afford({ cost });
-          return `<button type="button" class="wd-btn" data-act="tower" data-slot="${slot}" data-kind="${kind}" title="${esc(T.text)}"${ok ? '' : ' disabled'}>${icon(T.icon)}${esc(T.name)} ${this.costHtml(cost)}</button>`;
+          return `<button type="button" class="wd-btn" data-act="tower" data-slot="${slot}" data-kind="${kind}" title="${esc(T.text)}"${ok ? '' : ' disabled'}>${uiIcon('tower-control')}${esc(T.name)} ${this.costHtml(cost)}</button>`;
         }).join('');
         return `<li class="craft-row"><span class="craft-ic">${icon('tower')}</span>
           <span class="craft-txt"><b>Tower spot ${slot + 1}</b><small>Free – choose a tower.</small></span>
@@ -125,9 +127,9 @@ export class BasePanel {
       return `<li class="craft-row${maxed ? ' is-done' : ''}"><span class="craft-ic">${icon(T.icon)}</span>
         <span class="craft-txt"><b>${esc(maxed ? T.upgrade.name : T.name)} <em>spot ${slot + 1}</em></b><small>${esc(sub)}</small></span>
         <span class="craft-costs">${maxed ? '' : this.costHtml(cost)}</span>
-        <button type="button" class="wd-btn${maxed ? '' : ' wd-primary'}" data-act="towerUp" data-slot="${slot}"${ok ? '' : ' disabled'}>${maxed ? `${icon('check')}Max` : 'Upgrade'}</button></li>`;
+        <button type="button" class="wd-btn${maxed ? '' : ' wd-primary'}" data-act="towerUp" data-slot="${slot}"${ok ? '' : ' disabled'}>${uiIcon(maxed ? 'check' : 'hammer')}${maxed ? 'Max' : 'Upgrade'}</button></li>`;
     }).join('');
-    return `<h3 class="base-sub">${icon('tower')} Defence towers</h3><ul class="craft-list">${rows}</ul>`;
+    return `<h3 class="base-sub">${uiIcon('tower-control')} Defence towers</h3><ul class="craft-list">${rows}</ul>`;
   }
 
   render() {
@@ -141,15 +143,16 @@ export class BasePanel {
       : `${kind ? `${esc(kind.text)} ` : ''}Choose where your team builds its base on this island – the other plots disappear once you build.`;
     const rows = Array.from({ length: MAX_STAGE }, (_, i) => this.stageRow(i + 1)).join('');
     this.el.innerHTML = `
+      ${journalMargin('base')}
       <header class="hud-panel-head">
-        <h2>${icon(BASE_STAGES[Math.max(1, base?.stage || 1)].icon)} ${title}</h2>
+        <h2>${uiIcon('tent')} ${title}</h2>
         <span class="hud-panel-close"><kbd>E</kbd> / <kbd>Esc</kbd> Close</span>
       </header>
       <p class="base-intro">${intro}</p>
-      <div class="craft-stockbar"><span class="craft-stock-label">${icon('home')} Hut store</span>${stock}</div>
+      <div class="craft-stockbar"><span class="craft-stock-label">${uiIcon('tent')} Hut store</span>${stock}</div>
       <ul class="craft-list">${this.healthRow()}${rows}</ul>
       ${this.towerRows()}
-      <footer class="wd-foot"><button type="button" class="wd-btn" data-act="close">Close</button></footer>`;
+      <footer class="wd-foot"><button type="button" class="wd-btn" data-act="close">${uiIcon('x')} Close</button></footer>`;
   }
 
   onOpen() {

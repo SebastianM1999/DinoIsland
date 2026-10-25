@@ -1,3 +1,5 @@
+import { journalMargin } from './journalMargins.js';
+import { uiIcon } from './uiIcons.js';
 // In-game HUD for Dinosaur Island. Plain DOM + one canvas per map view.
 // Layout and look follow inspiration/ingame-UI-no-BG.png and HUD-art.png.
 //
@@ -266,7 +268,8 @@ export class Hud {
     this.$invPanel.setAttribute('aria-label', 'Inventory');
     this.$invPanel.hidden = true;
     this.$invPanel.innerHTML = `
-      <header class="hud-panel-head"><h2>Inventory</h2><button type="button" class="wd-btn" data-inventory-action="close">Close <kbd>Esc</kbd></button></header>
+      ${journalMargin('inventory')}
+      <header class="hud-panel-head"><h2>${uiIcon('backpack')} Inventory</h2><button type="button" class="wd-btn" data-inventory-action="close">${uiIcon('x')}Close <kbd>Esc</kbd></button></header>
       <div class="hud-inv-body">
         <div class="hud-inv-items"></div>
         <aside class="hud-inv-detail" aria-label="Explorer and selected item">
@@ -843,9 +846,9 @@ export class Hud {
     const sf = inv.speedFactor ?? 1;
     const w = Math.round((inv.carryWeight || 0) * 10) / 10;
     this.$invItems.innerHTML = `
-      <h3>Pockets <small>drag to rearrange · select one and press 1-8</small></h3>
+      <h3>${uiIcon('package')}Pockets <small>drag to rearrange · select one and press 1-8</small></h3>
       <ol class="hud-pockets">${pocketCells}</ol>
-      <h3>Backpack <small class="${stacks.length >= slots ? 'is-slow' : ''}">${stacks.length} / ${slots} stacks</small></h3>
+      <h3>${uiIcon('backpack')}Backpack <small class="${stacks.length >= slots ? 'is-slow' : ''}">${stacks.length} / ${slots} stacks</small></h3>
       <ol class="hud-backpack">${backpack}</ol>
       <p class="hud-inv-stat">${icon('weight')} Load <b class="${w >= maxCarry ? 'is-slow' : ''}">${w} / ${maxCarry}</b> · Speed <b class="${sf < 0.95 ? 'is-slow' : ''}">${Math.round(sf * 100)}%</b></p>
       <div class="hud-inv-drop" data-world-drop>Drag here to drop on the ground</div>`;
@@ -892,9 +895,9 @@ export class Hud {
       <p class="hud-inv-quantity">${esc(count)}</p>
       ${rows.length ? `<dl class="hud-inv-statrows">${rows.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('')}</dl>` : ''}
       <p>${esc(info.text || 'Equipment for your expedition.')}</p>${info.use ? `<p class="hud-inv-note">${esc(info.use)}</p>` : ''}
-      <div class="hud-inv-actions"><button type="button" class="wd-btn" data-inventory-action="back">Back</button>
-      <button type="button" class="wd-btn" data-inventory-action="drop" ${item.drop ? '' : 'disabled'}>Drop ${material ? 'stack' : ['spear', 'pistol', 'rifle', 'mpx', 'sniper'].includes(item.kind) ? 'equipment' : 'one stack'}</button>
-      ${material ? '<button type="button" class="wd-btn wd-primary" data-inventory-action="deposit">Deposit at hut</button>' : ''}</div>
+      <div class="hud-inv-actions"><button type="button" class="wd-btn" data-inventory-action="back">${uiIcon('arrow-left')}Back</button>
+      <button type="button" class="wd-btn" data-inventory-action="drop" ${item.drop ? '' : 'disabled'}>${uiIcon('download')}Drop ${material ? 'stack' : ['spear', 'pistol', 'rifle', 'mpx', 'sniper'].includes(item.kind) ? 'equipment' : 'one stack'}</button>
+      ${material ? `<button type="button" class="wd-btn wd-primary" data-inventory-action="deposit">${uiIcon('package')}Deposit at hut</button>` : ''}</div>
       ${material ? '<p class="hud-inv-note">Move close to the hut drop-off to deposit. Actions affect the full stack.</p>' : ''}`;
   }
 
@@ -1341,7 +1344,7 @@ export class Hud {
         <p>${esc(d.text)}</p>
         <div class="board-progress">${bar(c.progress, d.goal)}<b>${c.progress}/${d.goal}</b></div>
         <p class="board-reward">${icon('trophy')} ${esc(d.reward.text)}</p>
-        <button type="button" class="board-track" data-track="${d.id}" aria-pressed="${tracked}">${tracked ? 'Tracking' : 'Track'}</button>
+        <button type="button" class="board-track" data-track="${d.id}" aria-pressed="${tracked}">${uiIcon(tracked ? 'circle-check' : 'compass')}${tracked ? 'Tracking' : 'Track'}</button>
       </article>`;
     }).join('');
     const doneCards = done.map(({ d }) => `
@@ -1352,11 +1355,12 @@ export class Hud {
       </article>`).join('');
 
     this.$board.innerHTML = `
+      ${journalMargin('board')}
       <header class="board-head">
-        <h2>${icon('quest')} Mission Board</h2>
+        <h2>${uiIcon('scroll-text')} Mission Board</h2>
         <p>Team contracts · rewards upgrade the whole team</p>
         <span class="hud-panel-close"><kbd>E</kbd> Close</span>
-        <button type="button" class="board-close" data-close-board aria-label="Close mission board" title="Close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
+        <button type="button" class="board-close" data-close-board aria-label="Close mission board" title="Close">${uiIcon('x')}</button>
       </header>
       ${quest}
       <div class="board-cols">

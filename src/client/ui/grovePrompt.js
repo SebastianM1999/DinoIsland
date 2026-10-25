@@ -1,3 +1,5 @@
+import { journalMargin } from './journalMargins.js';
+import { uiIcon } from './uiIcons.js';
 // The giant's pen prompt (the boss arena's plateau, see shared/grove.js):
 // shown when the player walks into its barrier at the end of the causeway. A system warning (Yes / No); on Yes the explorer admits they are
 // too scared to go in, then a hint explains what unlocks the grove.
@@ -7,7 +9,6 @@
 // shared/grove.js), so this prompt only needs new texts if the flow changes.
 
 import { GROVE } from '../../shared/grove.js';
-import { icon } from './icons.js';
 
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
@@ -38,37 +39,40 @@ export class GrovePrompt {
     this.el.dataset.stage = stage;
     if (stage === 'warn') {
       this.el.innerHTML = `
+      ${journalMargin('grove')}
         <header class="grove-head grove-warn">
-          <span class="grove-badge" aria-hidden="true">!</span>
+          <span class="grove-badge" aria-hidden="true">${uiIcon('triangle-alert')}</span>
           <h2 id="grove-title">Warning</h2>
         </header>
         <p class="grove-text">Beyond these burning stones lies the <b>${esc(GROVE.name)}</b>. Something ancient and enormous lives out there in the lava.</p>
         <p class="grove-ask">Do you really want to enter?</p>
         <footer class="wd-foot">
-          <button type="button" class="wd-btn wd-primary" data-act="yes">Yes</button>
-          <button type="button" class="wd-btn" data-act="no">No</button>
+          <button type="button" class="wd-btn wd-primary" data-act="yes">${uiIcon('check')} Yes</button>
+          <button type="button" class="wd-btn" data-act="no">${uiIcon('x')} No</button>
         </footer>`;
       this.el.querySelector('[data-act="no"]').focus();
     } else if (stage === 'fear') {
       this.el.innerHTML = `
+      ${journalMargin('grove')}
         <header class="grove-head grove-speaker">
-          <span class="grove-avatar" aria-hidden="true">${icon('person')}</span>
+          <span class="grove-avatar" aria-hidden="true">${uiIcon('user-round')}</span>
           <h2 id="grove-title">${esc(this.speaker?.() || 'You')}</h2>
         </header>
         <p class="grove-line">“…No. No, no, no. Did you <i>see</i> the size of that thing? I'm way too scared to go in there. Not yet.”</p>
         <footer class="wd-foot">
-          <button type="button" class="wd-btn wd-primary" data-act="next">Continue</button>
+          <button type="button" class="wd-btn wd-primary" data-act="next">${uiIcon('arrow-right')} Continue</button>
         </footer>`;
       this.el.querySelector('[data-act="next"]').focus();
     } else {
       this.el.innerHTML = `
+      ${journalMargin('grove')}
         <header class="grove-head grove-hint">
-          <span class="grove-badge" aria-hidden="true">?</span>
+          <span class="grove-badge" aria-hidden="true">${uiIcon('circle-help')}</span>
           <h2 id="grove-title">Hint</h2>
         </header>
         <p class="grove-text">You can't enter the ${esc(GROVE.name)} yet. First unlock the skill <b>${esc(GROVE.requiredSkill)}</b> on one of the later islands – then come back and face the giant.</p>
         <footer class="wd-foot">
-          <button type="button" class="wd-btn wd-primary" data-act="close">Got it</button>
+          <button type="button" class="wd-btn wd-primary" data-act="close">${uiIcon('check')}Got it</button>
         </footer>`;
       this.el.querySelector('[data-act="close"]').focus();
     }
