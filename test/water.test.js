@@ -93,3 +93,21 @@ test('the waterfall sheet follows the cliff down into the basin and never cuts i
     }
   }
 });
+
+test('one underwater answer for every water surface: a sloping river never splits into underside and top', () => {
+  const { terrain, layout } = islands.find(({ layout }) => layout.waterfalls.length);
+  const water = buildWater(terrain, layout);
+  const surfaces = water.group.children.filter((m) => m.material?.uniforms?.uUnder);
+  const names = new Set(surfaces.map((m) => m.name));
+  for (const kind of ['sea', 'pool', 'river']) assert.ok(names.has(kind), `${kind} uses the water shader`);
+  const under = () => new Set(surfaces.map((m) => m.material.uniforms.uUnder.value));
+  assert.deepEqual([...under()], [0], 'above the water: every surface shows its top');
+  water.setUnderwater(1);
+  assert.deepEqual([...under()], [1], 'diving: every surface shows its underside');
+  water.setUnderwater(0);
+  assert.deepEqual([...under()], [0], 'surfacing: back to the top');
+  // the shader asks the shared answer, not each fragment's height against the camera
+  const frag = surfaces.find((m) => m.name === 'river').material.fragmentShader;
+  assert.match(frag, /if \(uUnder > 0\.5\)/);
+  assert.doesNotMatch(frag, /cameraPosition\.y\s*<\s*vSurfY/);
+});

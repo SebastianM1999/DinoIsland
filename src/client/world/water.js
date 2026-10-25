@@ -180,6 +180,7 @@ uniform vec3 uSkyTop;
 uniform vec3 uSunDir;
 uniform vec3 uSunColor;
 uniform float uCave;        // Hollow Mountain: 0 daylight .. 1 inside (lit by the lamps only)
+uniform float uUnder;       // 1 while the camera is under the water (game.js #underwaterView), else 0
 uniform vec4 uLamps[CAVE_LAMPS];     // xyz position, w intensity (torches, crystal lights)
 uniform vec3 uLampCol[CAVE_LAMPS];
 varying vec3 vWorld;
@@ -247,7 +248,10 @@ void main() {
 
   // seen from below (a diver looking up): a slightly wavy, bright mirror. Straight up there is a window onto the sky
   // (Snell: ~48 degrees), further out the surface mirrors the dark water; sun caustics play in the window by day.
-  if (cameraPosition.y < vSurfY - 0.02) {
+  // (one answer for the whole frame, the same one the underwater fog uses: comparing the camera with each fragment's
+  // own surface height drew a rapid rising above the eye as an underside, so its whitewater turned blue along a hard
+  // line, depending on where you stood)
+  if (uUnder > 0.5) {
     float upView = max(dot(vec3(N.x, -N.y, N.z), V), 0.0);
     float win = smoothstep(0.6, 0.76, upView);
     vec3 body = uDeep * 0.5 + vec3(0.02, 0.16, 0.17);
@@ -564,6 +568,7 @@ export function buildWater(terrain, layout = {}, sunDir = new THREE.Vector3(-0.4
     uRipples: { value: Array.from({ length: MAX_RIPPLES }, () => new THREE.Vector4(0, 0, -99, 0)) },
     uImpact: { value: new THREE.Vector4(0, 0, 0, 0) },
     uCave: { value: 0 },
+    uUnder: { value: 0 },
     uLamps: { value: Array.from({ length: CAVE_LAMPS }, () => new THREE.Vector4(0, -1000, 0, 0)) },
     uLampCol: { value: Array.from({ length: CAVE_LAMPS }, () => new THREE.Vector3(1, 1, 1)) },
   };
@@ -841,6 +846,10 @@ export function buildWater(terrain, layout = {}, sunDir = new THREE.Vector3(-0.4
     setCave(k, lamps = null) {
       shared.uCave.value = k;
       if (lamps) lamps(shared.uLamps.value, shared.uLampCol.value);
+    },
+    /** Is the camera under the water? Every water surface then shows its underside, otherwise its top. */
+    setUnderwater(under) {
+      shared.uUnder.value = under ? 1 : 0;
     },
     /**
      * A ring ripple spreading from (x, z) on whatever water is there (footsteps,

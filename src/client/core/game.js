@@ -1178,6 +1178,7 @@ export class Game {
     const cam = this.gfx.camera.position, t = this.terrain, fog = this.gfx.scene.fog, bg = this.gfx.scene.background;
     const level = t.waterLevelAt(cam.x, cam.z);
     const under = level !== null && cam.y < level - 0.02 ? 1 : 0;
+    this.water.setUnderwater(under);
     this.uwK += (under - this.uwK) * Math.min(1, dt * (under ? 16 : 7));
     if (Math.abs(this.uwK - under) < 0.01) this.uwK = under;
     const k = this.uwK, cave = !!this.caveWorld;
