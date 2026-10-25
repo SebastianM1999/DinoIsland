@@ -7,7 +7,7 @@ import { exportWorld, worldOptions, restoreWorld } from '../src/sim/worldSave.js
 
 test("Elias' note on the summit teaches the supplies and the first upgrades; tier 2 needs no note", () => {
   const taught = RECIPES.filter((r) => r.learn === 'peak').map((r) => r.id).sort();
-  assert.deepEqual(taught, ['arrows', 'bow1', 'quiver1', 'spear', 'spear1', 'trap']);
+  assert.deepEqual(taught, ['arrows', 'bow1', 'quiver1', 'spear', 'spear1', 'tonic', 'trap']);
   const bow2 = RECIPES.find((r) => r.id === 'bow2');
   assert.equal(recipeKnown(bow2, new Set()), true);
   assert.equal(recipeKnown(RECIPES[0], new Set()), false);
@@ -40,7 +40,7 @@ test('crafting waits for the note: refused before, possible once anyone has read
   at(note);
   world.receive(p.id, { t: MSG.ACT, a: ACT.READ, note: 'peak' });
   assert.ok(world.story.steps.has('peak'), 'the story step is done');
-  assert.ok(toasts().some((t) => /The team learned: Arrows ×6, Spike trap, Spare spear, Reinforced bow, Stone spearhead, Leather quiver/.test(t)));
+  assert.ok(toasts().some((t) => /The team learned: Arrows ×6, Spike trap, Spare spear, Revival tonic, Reinforced bow, Stone spearhead, Leather quiver/.test(t)));
   at(rack);
   craft('arrows');
   assert.equal(p.inv.arrows, 6);

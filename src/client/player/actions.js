@@ -5,6 +5,7 @@
 
 import * as THREE from 'three';
 import { CONFIG } from '../../shared/config.js';
+import { clockText } from '../../shared/revive.js';
 import { ACT, EV, PF, EQUIP } from '../../shared/protocol.js';
 import { WALL_TORCH } from '../../shared/torch.js';
 import { NOTE_BY_ID, NOTE_REACH } from '../../shared/notes.js';
@@ -114,7 +115,7 @@ export class PlayerActions {
     net.on(`ev:${EV.DINO_HIT}`, (m) => {
       if (m.by !== game.me.id) return;
       game.hud.hitMarker(m.weak);
-      if (m.armor) game.hud.toast('The plates deflect your hit – aim for the flank or neck!', 'info');
+      if (m.armor) game.hud.toast(`Armour deflects your hit – aim for the ${m.aim ?? 'weak spot'}!`, 'info');
       game.audio?.play(m.weak ? 'hitWeak' : 'hit');
     });
     net.on(`ev:${EV.DEATH}`, (m) => {
@@ -198,10 +199,10 @@ export class PlayerActions {
 
     // --- carry slowdown (and eating makes you slow and vulnerable)
     const w = this.carryWeight();
-    g.player.speedFactor = Math.max(P.minCarrySpeed, 1 - w * P.carrySlowPerUnit) * (eating ? 0.5 : 1) * (this.butcher ? 0.35 : 1);
+    g.player.speedFactor = Math.max(P.minCarrySpeed, 1 - w * P.carrySlowPerUnit) * (eating ? 0.5 : 1) * (this.butcher ? 0.35 : 1) * (g.carrying != null ? P.carrySpeedMul : 1);
 
     const tool = this.tool;
-    const canAct = alive && !eating && !panel && input.locked;
+    const canAct = alive && !eating && !panel && input.locked && g.carrying == null;   // carrying a body takes both hands
     const scopeReady = canAct && tool === 'sniper' && !!this.inv.guns?.sniper && this.inv.guns.sniper.owned !== false
       && !this.inv.reloading && this.vm.tool === tool && this.vm.shown === tool && this.knifeProgress() == null && !input.isHeld('knife') && !this.vm.pendingTool && this.vm.switchT < 0.05 && !this.vm.timed;
     this.scope.update(dt, scopeReady && input.isHeld('secondary') && !g.player.sprinting, scopeReady);
@@ -215,7 +216,7 @@ export class PlayerActions {
       if (canAct && input.isHeld('primary') && this.inv.bow !== false && this.inv.arrows > 0 && this.cooldown <= 0) {
         if (!this.drawing) g.audio?.play('bowDraw');
         this.drawing = true;
-        this.drawT = Math.min(W.bow.maxDrawTime, this.drawT + dt);
+        this.drawT = Math.min(W.bow.maxDrawTime, this.drawT + dt / g.mods.reloadMul);   // Steady Hands draws faster
       }
       if (this.drawing && (!input.isHeld('primary') || !canAct)) {
         if (canAct && this.drawT >= W.bow.minDrawToFire) this.shootArrow();
@@ -295,9 +296,6 @@ export class PlayerActions {
     // --- knife (hold V at a carcass), then interactions (E) + prompt
     this.updateKnife(dt, alive && !panel && !eating && input.locked, input.isHeld('knife'));
     this.updateRevive(dt, alive && !panel && !eating && input.locked, input.isHeld('interact'));
-    // Field Medic: a hurt teammate in front of you can be healed with one of your fruit
-    const mate = alive && g.mods.fieldMedic && this.inv.fruit.length ? this.lookedAtTeammate(P.giveRange) : null;
-    g.medicTarget = mate && (mate.fl & PF.DOWNED) === 0 && mate.hp < mate.mhp - 0.5 ? { id: mate.id, name: mate.name } : null;
     this.updateInteraction(alive && !panel, input.wasPressed('interact'));
 
     // --- automatic looting: walk over items to collect them
@@ -382,7 +380,7 @@ export class PlayerActions {
     const o = origin.clone().addScaledVector(dir, 0.6).addScaledVector(right, 0.05).addScaledVector(up, -0.04);
     g.projectiles.fire('arrow', o, dir.clone().multiplyScalar(speed), power);
     this.inv.arrows--;
-    this.cooldown = W.bow.cooldown;
+    this.cooldown = W.bow.cooldown * g.mods.reloadMul;   // Steady Hands nocks the next arrow sooner
     g.audio?.play('bow');
   }
 
@@ -465,9 +463,7 @@ export class PlayerActions {
     const target = this.lookedAtTeammate(P.giveRange);
     if (!target) return this.game.hud.toast('Look at a teammate close by to give them fruit', 'fruit');
     if (!this.inv.fruit.length) return this.game.hud.toast('You have no fruit to give', 'fruit');
-    // Field Medic: feeding a hurt teammate heals them on the spot (the server checks the skill)
-    const heal = this.game.mods.fieldMedic && (target.fl & PF.DOWNED) === 0 && target.hp < target.mhp - 0.5;
-    this.game.net.act(ACT.GIVE, heal ? { to: target.id, heal: true } : { to: target.id });
+    this.game.net.act(ACT.GIVE, { to: target.id });
   }
 
   // ------------------------------------------------------------------ interactions
@@ -560,24 +556,36 @@ export class PlayerActions {
     return best;
   }
 
-  /** Hold E at a downed teammate to revive them (server channel; releasing, walking off or being hit stops it). */
+  /**
+   * Hold E at a downed teammate to revive them (server channel; releasing, walking off or being hit stops it).
+   * Out in the field that needs the team's field revive (one per CONFIG.player.fieldReviveCooldown); without
+   * it, E picks the body up (ACT.CARRY) to revive it at camp, and E again puts it down.
+   */
   updateRevive(dt, enabled, held) {
     const g = this.game;
     this.reviveRetry = Math.max(0, this.reviveRetry - dt);
     const target = enabled ? this.findDowned() : null;
+    const carried = target && target.id === g.carrying;
+    const atCamp = !!target && g.campReviveAt(target.pos);
+    // carrying: revive at camp, else E puts the body down; not carrying: revive if allowed, else E picks it up
+    const canRevive = !!target && (atCamp || (!carried && g.fieldReviveReady()));
     const r = this.reviving;
-    if (r && (!held || !target || target.id !== r.id)) {
+    if (r && (!held || !target || target.id !== r.id || !canRevive)) {
       g.net.act(ACT.REVIVE, { stop: true });
       this.reviving = null;
-    } else if (!r && target && held && this.reviveRetry <= 0) {
+    } else if (!r && canRevive && held && this.reviveRetry <= 0) {
       this.reviving = { id: target.id, t: 0, start: g.time };
       g.net.act(ACT.REVIVE, { to: target.id });
     }
     const cur = this.reviving;
-    g.reviveTarget = target ? {
+    g.reviveTarget = !target ? null : canRevive ? {
       id: target.id, name: target.name,
       progress: cur && cur.t > 0 ? Math.min(1, (g.time - cur.start) / cur.t) : 0,
-    } : null;
+    } : {
+      id: target.id, name: target.name,
+      carry: carried ? `Put ${target.name} down` : `Carry ${target.name} to camp (field revive in ${clockText(g.fieldReviveIn())})`,
+      run: () => g.net.act(ACT.CARRY, carried ? { drop: true } : { to: target.id }),
+    };
   }
 
   updateInteraction(enabled, pressed) {
@@ -605,7 +613,10 @@ export class PlayerActions {
 
     // (items on the ground are looted automatically – see autoLoot())
     // 0. a downed teammate: reviving beats everything else on E
+    if (g.reviveTarget?.carry) return { text: g.reviveTarget.carry, run: g.reviveTarget.run };
     if (g.reviveTarget) return { text: this.reviving ? `Reviving ${g.reviveTarget.name}…` : `Hold to revive ${g.reviveTarget.name}`, run: null };
+    // carrying a body out of reach of its prompt (it hangs behind us): E puts it down
+    if (g.carrying != null) return { text: 'Put the body down', run: () => net.act(ACT.CARRY, { drop: true }) };
     // 0b. an unlit wall torch in the Hollow Mountain: light it with the burning hand torch
     if (g.layout.wallTorches?.length) {
       let wt = null, wd = WALL_TORCH.reach;
@@ -724,8 +735,7 @@ export class PlayerActions {
     if (st.board && near(st.board, 3.5)) {
       return { text: 'Open the mission board', run: () => g.openBoard() };
     }
-    // 4. heal a hurt teammate (Field Medic) / give fruit
-    if (g.medicTarget) return { text: `Heal ${g.medicTarget.name} with fruit`, run: () => net.act(ACT.GIVE, { to: g.medicTarget.id, heal: true }) };
+    // 4. give fruit
     const mate = inv.fruit.length ? this.lookedAtTeammate(P.giveRange) : null;
     if (mate) return { text: `Give fruit to ${mate.name}`, key: 'G', run: null };
     return null;
@@ -843,6 +853,7 @@ export class PlayerActions {
       slots: this.slots,
     });
     hud.setTorch(!!inv.torch || !!inv.lantern, !!g.torchLit, inv.lantern ? { fuel: inv.lanternFuel ?? 0, blood: inv.loot?.bossBlood ?? 0 } : null);
+    hud.setTonic?.(inv.tonic ?? 0);
     const tool = this.tool;
     hud.setCrosshair({
       draw: this.drawing ? this.drawT / W.bow.maxDrawTime : 0,

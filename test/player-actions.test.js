@@ -39,7 +39,10 @@ function fixture(t) {
     dinos: { map: new Map(), spotted: new Set(), raycast: () => game.hitCandidate, nearest: () => null },
     remotes: { map: new Map() }, items: { items: new Map(), nearestItem: () => null },
     audio: { play: name => sounds.push(name) }, stations: () => station,
-    mods: { reloadMul: 1, knifeTimeMul: 1, fieldMedic: false },
+    mods: { reloadMul: 1, knifeTimeMul: 1 },
+    // revive rules (core/game.js): the team's field revive, camp reach and the carried body
+    fieldReady: true, campAt: false, carrying: null,
+    fieldReviveReady: () => game.fieldReady, fieldReviveIn: () => (game.fieldReady ? 0 : 125), campReviveAt: () => game.campAt,
     eq: 0, time: 10, renderTime: 9.12345, flags: 0, maxHp: 100,
     running: true, downed: false, panel: false, fruitCounts: {}, store: {},
   };
@@ -187,19 +190,16 @@ test('fruit choice avoids wasting large heals, eating is throttled and empty pou
   assert.equal(requests.length, 2);
 });
 
-test('fruit giving targets a nearby living teammate and healing requires Field Medic and missing health', t => {
+test('fruit giving targets a nearby living teammate and always hands the fruit over', t => {
   const { game, pressed, frame, requests, toasts } = fixture(t);
   game.me.inv.fruit = ['berry']; pressed.add('give'); frame(); assert.equal(requests.length, 0);
   assert.match(toasts.at(-1)[0], /teammate/);
   const mate = { id: 2, name: 'Hunter', alive: true, fl: 0, hp: 50, mhp: 100, pos: new THREE.Vector3(0, CONFIG.player.eyeHeight - 1.2, -2) };
   game.remotes.map.set(2, mate); pressed.add('give'); frame();
-  assert.deepEqual(requests.at(-1), { a: ACT.GIVE, to: 2 });
-  game.mods.fieldMedic = true; pressed.add('give'); frame();
-  assert.deepEqual(requests.at(-1), { a: ACT.GIVE, to: 2, heal: true });
-  mate.fl = PF.DOWNED; pressed.add('give'); frame(); assert.equal(Object.hasOwn(requests.at(-1), 'heal'), false);
-  mate.alive = false; pressed.add('give'); frame(); assert.equal(requests.length, 3);
+  assert.deepEqual(requests.at(-1), { a: ACT.GIVE, to: 2 }, 'a hurt teammate gets the fruit, not a heal');
+  mate.alive = false; pressed.add('give'); frame(); assert.equal(requests.length, 1);
   mate.alive = true; game.me.inv.fruit = []; pressed.add('give'); frame();
-  assert.match(toasts.at(-1)[0], /no fruit/); assert.equal(requests.length, 3);
+  assert.match(toasts.at(-1)[0], /no fruit/); assert.equal(requests.length, 1);
 });
 
 test('revive input waits for server duration, stops on damage and release, and retries refused channels after a delay', t => {
@@ -216,6 +216,46 @@ test('revive input waits for server duration, stops on damage and release, and r
   assert.deepEqual(requests.at(-1), { a: ACT.REVIVE, stop: true });
   held.add('interact'); frame(); emit(EV.REVIVED, { id: 2 }); assert.equal(actions.reviving, null);
   game.remotes.map.get(2).pos.y = 3; frame(); assert.equal(game.reviveTarget, null);
+});
+
+test('with the field revive used, E carries the body, puts it down, and holding E revives it at camp', t => {
+  const { game, actions, held, pressed, frame, requests, prompts } = fixture(t);
+  game.fieldReady = false;
+  game.remotes.map.set(2, { id: 2, name: 'Hunter', fl: PF.DOWNED, pos: new THREE.Vector3(1, 0, 0) });
+  // holding E out in the field does not start a revive; the prompt offers to carry the body
+  held.add('interact'); frame();
+  assert.deepEqual(requests, []);
+  assert.equal(game.reviveTarget.carry, 'Carry Hunter to camp (field revive in 2:05)');
+  assert.deepEqual(prompts.at(-1), ['Carry Hunter to camp (field revive in 2:05)', 'E']);
+  held.clear(); pressed.add('interact'); frame();
+  assert.deepEqual(requests.at(-1), { a: ACT.CARRY, to: 2 });
+  // carrying (the server confirmed with EV.CARRY: core/game.js): slower, no weapons, E puts it down
+  game.carrying = 2;
+  frame();
+  assert.ok(Math.abs(game.player.speedFactor - CONFIG.player.carrySpeedMul) < 1e-9);
+  game.hitCandidate = { view: { id: 7 }, dist: 1, zone: 'body', point: new THREE.Vector3() };
+  pressed.add('primary'); frame();
+  assert.ok(!requests.some((m) => m.a === ACT.MELEE), 'both hands are full');
+  pressed.delete('primary'); game.hitCandidate = null;
+  assert.equal(game.reviveTarget.carry, 'Put Hunter down');
+  pressed.add('interact'); frame();
+  assert.deepEqual(requests.at(-1), { a: ACT.CARRY, drop: true });
+  // at camp: holding E revives the carried body (no field cooldown there)
+  game.campAt = true;
+  held.add('interact'); frame();
+  assert.deepEqual(requests.at(-1), { a: ACT.REVIVE, to: 2 });
+  assert.equal(game.reviveTarget.carry, undefined);
+  assert.ok(actions.reviving);
+  // carried out of reach of the prompt: E still puts it down
+  held.clear(); frame();
+  game.remotes.map.clear(); frame();
+  assert.equal(actions.findInteraction(game.player.pos).text, 'Put the body down');
+  // the field revive is ready again: out in the field E revives as before
+  game.carrying = null; game.campAt = false; game.fieldReady = true;
+  game.remotes.map.set(2, { id: 2, name: 'Hunter', fl: PF.DOWNED, pos: new THREE.Vector3(1, 0, 0) });
+  requests.length = 0; actions.reviveRetry = 0;
+  held.add('interact'); frame();
+  assert.deepEqual(requests, [{ a: ACT.REVIVE, to: 2 }]);
 });
 
 test('auto-loot avoids own drops and inaccessible items, throttles repeated requests and budgets incoming loot weight', t => {
@@ -283,7 +323,8 @@ test('inventory callbacks request drops and deposits, wheel cancels bow draws, a
   game.dinos.map.set(8, { id: 8, type: 'raptor', alive: true, pos: new THREE.Vector3(2, 0, 0) });
   frame(); assert.equal(game.player.speedFactor, CONFIG.player.minCarrySpeed * 0.5);
   assert.equal(game.inventoryHud.spearHealth, 67); assert.match(game.hint[0], /nearby/);
-  emit(EV.DINO_HIT, { by: 1, weak: true, armor: true }); assert.equal(game.hit, true); assert.match(toasts.at(-1)[0], /plates/);
+  emit(EV.DINO_HIT, { by: 1, weak: false, armor: true, aim: 'flank' }); assert.equal(game.hit, false); assert.match(toasts.at(-1)[0], /aim for the flank/);
+  emit(EV.DINO_HIT, { by: 1, weak: true }); assert.equal(game.hit, true);
   actions.drawing = true; emit(EV.DEATH, { id: 1 }); assert.equal(actions.drawing, false); assert.equal(game.progress, null);
 });
 

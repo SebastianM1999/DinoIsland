@@ -54,9 +54,7 @@ export class PlayerController {
     this.maxStamina = P.maxStamina;     // Deep Lungs raises it
     this.stamina = P.maxStamina;
     this.staminaDelay = 0;
-    this.hpFrac = 1;                    // current / max HP, set by the game each frame (Adrenaline trigger)
-    /** Adrenaline: stamina is free while `active`, then `cooldownLeft` s until it can fire again (for the HUD). */
-    this.adrenaline = { active: false, left: 0, cooldownLeft: 0 };
+    this.jumped = false;                // airborne from our own jump (Springy Legs carries it farther)
     /** Dash (key Q): `active` during the burst, `ready` when the cooldown is over (for the HUD). */
     this.dash = { active: false, cooldownLeft: 0, ready: true };
     this.dashT = 0;                     // seconds of burst left
@@ -160,24 +158,13 @@ export class PlayerController {
     if (this.knockTimer > 0) this.knockTimer -= dt;
     const controllable = !this.frozen && this.knockTimer <= 0;
     const mods = this.mods;
-    const ad = this.adrenaline, ds = this.dash;
+    const ds = this.dash;
 
     // --- breath: eyes under water drain it, air refills it fast (creative: never)
     this.submerged = t.headUnderwater?.(this.pos.x, this.pos.y, this.pos.z) ?? false;
     if (this.submerged && !this.creative && !this.frozen) this.breath = Math.max(0, this.breath - dt);
     else this.breath = Math.min(DV.breath, this.breath + DV.refill * dt);
 
-    // --- adrenaline: low HP starts a window of free stamina, then a long cooldown
-    if (ad.active) {
-      ad.left -= dt;
-      if (ad.left <= 0) { ad.active = false; ad.left = 0; ad.cooldownLeft = mods.adrenalineCooldown; }
-    } else if (ad.cooldownLeft > 0) ad.cooldownLeft = Math.max(0, ad.cooldownLeft - dt);
-    if (mods.adrenaline && !ad.active && ad.cooldownLeft <= 0 && !this.frozen && this.hpFrac > 0 && this.hpFrac < mods.adrenalineBelow) {
-      ad.active = true;
-      ad.left = mods.adrenalineTime;
-    }
-    if (!mods.adrenaline) { ad.active = false; ad.left = 0; }
-    const free = ad.active;
     ds.cooldownLeft = Math.max(0, ds.cooldownLeft - dt);
     const dashPress = !!intent.dash && !this.prevDash;
     this.prevDash = !!intent.dash;
@@ -209,7 +196,7 @@ export class PlayerController {
     const ilen = Math.hypot(ix, iz);
     const moving = ilen > 0.01;
     const wantsSprint = controllable && !flying && intent.sprint && intent.forward && moving;
-    const canSprint = free || this.stamina > 1;
+    const canSprint = this.stamina > 1;
     this.sprinting = wantsSprint && canSprint && this.onGround ? true : this.sprinting && wantsSprint && canSprint;
 
     const max = this.maxStamina;
@@ -220,7 +207,7 @@ export class PlayerController {
     // out in the volcano's ash rain stamina refills slower too (core/game.js sets ashOutside)
     const ashCut = this.ashOutside && !this.creative ? 1 - CONFIG.volcano.ash.staminaRegenCut : 1;
     if (this.sprinting) {
-      if (!free) this.stamina -= P.staminaDrain * mods.sprintDrainMul * this.#buffMul('secondwind', 'drainMul') * (1 + H.staminaMul * heat) * dt;
+      this.stamina -= P.staminaDrain * this.#buffMul('secondwind', 'drainMul') * (1 + H.staminaMul * heat) * dt;
       this.staminaDelay = P.staminaRegenDelay * mods.regenDelayMul;
     } else if (this.staminaDelay > 0) {
       this.staminaDelay -= dt;
@@ -243,7 +230,7 @@ export class PlayerController {
     const diving = this.diving;
 
     // --- dash (Q): a short burst along the input direction (or where we look); the cost is paid up front
-    if (dashPress && mods.dash && controllable && !flying && !this.swimming && ds.cooldownLeft <= 0 && (free || this.stamina >= DASH.cost)) {
+    if (dashPress && mods.dash && controllable && !flying && !this.swimming && ds.cooldownLeft <= 0 && this.stamina >= DASH.cost) {
       let dx = (intent.right ? 1 : 0) - (intent.left ? 1 : 0), dz = (intent.back ? 1 : 0) - (intent.forward ? 1 : 0);
       if (!dx && !dz) dz = -1;
       const dl = Math.hypot(dx, dz), sin = Math.sin(this.yaw), cos = Math.cos(this.yaw);
@@ -252,7 +239,8 @@ export class PlayerController {
       this.dashDir.z = -dx * sin + dz * cos;
       this.dashT = DASH.duration;
       ds.cooldownLeft = DASH.cooldown;
-      if (!free) { this.stamina = Math.max(0, this.stamina - DASH.cost); this.staminaDelay = P.staminaRegenDelay * mods.regenDelayMul; }
+      this.stamina = Math.max(0, this.stamina - DASH.cost);
+      this.staminaDelay = P.staminaRegenDelay * mods.regenDelayMul;
       this.onDash?.();
     }
     // wading slows you; in a bog (swamp) its own factor replaces that, so it is exactly -20 %
@@ -265,6 +253,8 @@ export class PlayerController {
       : diving ? DV.speed * this.speedFactor
       : this.swimming ? SW.speed * this.speedFactor
       : (this.sprinting ? P.sprintSpeed : P.walkSpeed) * this.speedFactor * waterSlow * this.#buffMul('quickfoot', 'speedMul');
+    // Springy Legs: a jump carries you farther (the air keeps the faster target speed until you land)
+    if (this.jumped && !this.onGround && !flying && !this.swimming) speed *= mods.jumpReachMul;
 
     let wx = 0, wz = 0, wy = 0;
     if (moving) {
@@ -340,12 +330,15 @@ export class PlayerController {
     ds.active = this.dashT > 0;
     ds.ready = ds.cooldownLeft <= 0;
 
-    // --- jump (Light Feet: free; Adrenaline: free for a while). Jump height goes with v^2, so the
-    // "+10% / +20% height" of Springy Legs scales the speed by its square root.
-    const jumpCost = free || mods.lightFeet ? 0 : P.jumpStaminaCost;
+    // --- jump (Light Feet: free). Jump height goes with v^2, so the "+15% / +30% / +45% height" of
+    // Springy Legs scales the speed by its square root; its reach scales the take-off speed.
+    const jumpCost = mods.lightFeet ? 0 : P.jumpStaminaCost;
     if (controllable && !flying && !diving && intent.jump && this.onGround && !this.sliding && (jumpCost === 0 || this.stamina > jumpCost)) {
       this.vel.y = P.jumpSpeed * Math.sqrt(mods.jumpMul) * (depth > 0.8 ? 0.6 : 1);
+      this.vel.x *= mods.jumpReachMul;
+      this.vel.z *= mods.jumpReachMul;
       this.onGround = false;
+      this.jumped = true;
       if (jumpCost > 0) {
         this.stamina -= jumpCost;
         this.staminaDelay = P.staminaRegenDelay * mods.regenDelayMul;
@@ -412,6 +405,7 @@ export class PlayerController {
       this.pos.y = ground;
       this.vel.y = 0;
       this.onGround = true;
+      this.jumped = false;
     } else if (this.onGround && this.vel.y <= 0 && this.pos.y - ground < P.stepHeight) {
       // stick to the ground when walking downhill
       this.pos.y = ground;

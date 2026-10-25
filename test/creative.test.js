@@ -9,7 +9,7 @@ import { SKILL_IDS, maxRank, progress, creativeProfile } from '../src/shared/ski
 function solo(level = 0) {
   const sent = [];
   const world = new ServerWorld({ send: (to, message) => sent.push({ to, message }) }, { level, variant: 5 });
-  const { id } = world.join('Maker', undefined, undefined, { xp: 0, bonus: 0, skills: { thickSkin: 1 } });
+  const { id } = world.join('Maker', undefined, undefined, { xp: 0, skills: { thickSkin: 1 } });
   const p = world.players.get(id);
   const act = (m) => world.receive(id, { t: MSG.ACT, ...m });
   const lastProf = () => sent.filter((s) => s.to === id && s.message.t === MSG.PROF).at(-1)?.message.prof;

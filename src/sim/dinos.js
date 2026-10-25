@@ -5,6 +5,7 @@
 import { CONFIG } from '../shared/config.js';
 import { EV, DS } from '../shared/protocol.js';
 import { XP_BY_TYPE } from '../shared/skills.js';
+import { zoneMul, weakSpotOf, WEAK_AT, ARMOR_AT } from '../shared/weakSpots.js';
 import { resolveCircle, segmentColliders, penetration } from '../shared/collision.js';
 import { dinoBodyCircles } from '../shared/dinoContact.js';
 import { angleDiff, clamp } from '../shared/rng.js';
@@ -192,14 +193,13 @@ export class DinoSystem {
 
   players() { return this.world.players.values(); }
 
-  /** Nearest living player within `radius` (optionally filtered); Stalker shrinks the radius per player. */
+  /** Nearest living player within `radius` (optionally filtered). */
   nearestPlayer(d, radius, filter = null) {
     let best = null, bd = radius * radius;
     for (const p of this.world.players.values()) {
       if (!p.alive || (filter && !filter(p))) continue;
       const q = (p.x - d.x) ** 2 + (p.z - d.z) ** 2;
-      const reach = radius * p.mods.stalkerMul;
-      if (q < bd && q < reach * reach) { bd = q; best = p; }
+      if (q < bd) { bd = q; best = p; }
     }
     return best;
   }
@@ -646,18 +646,20 @@ export class DinoSystem {
       if (!p || !inside(this.world.layout, p.x, p.z)) return;
     }
     const Z = CONFIG.hitZones;
-    const base = Z[zone] ?? 1;
+    const hitZone = zone in Z ? zone : 'body';
+    // the species' own weak spots and armour (shared/weakSpots.js)
+    const base = zoneMul(d.type, hitZone);
     let mult = base;
-    // skills (shared/skills.js): weapon/execute/sprint/bloodlust multipliers; Weak Spot scales only the bonus part of a zone
+    // skills (shared/skills.js): weapon/bloodlust multipliers; Weak Spot scales only the bonus part of a zone
     const by = this.world.players.get(byId);
     if (by) {
       amount *= this.world.damageMul(by, d, weapon);
       if (mult > 1) mult = 1 + (mult - 1) * by.mods.weakSpotMul;
     }
-    const hitZone = zone in Z ? zone : 'body';
     const dmg = amount * mult;
     d.hp -= dmg;
-    this.world.event(EV.DINO_HIT, { id: d.id, zone: hitZone, dmg: Math.round(dmg), by: byId, weak: base > 1.2, armor: base < 0.5 });
+    const armor = base < ARMOR_AT;
+    this.world.event(EV.DINO_HIT, { id: d.id, zone: hitZone, dmg: Math.round(dmg), by: byId, weak: base > WEAK_AT, armor, ...(armor ? { aim: weakSpotOf(d.type).zone } : {}) });
     if (d.hp <= 0) this.kill(d, byId);
     else BRAINS[d.type].onHurt?.(d, this, byId, dmg, weapon);
   }

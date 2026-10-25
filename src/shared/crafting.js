@@ -13,6 +13,8 @@ export const RECIPES = [
   { id: 'arrows',  kind: 'supply', learn: 'peak', icon: 'arrow', name: 'Arrows ×6', text: 'Six fresh arrows for the quiver.', cost: { teeth: 1 }, give: { arrows: 6 } },
   { id: 'trap',    kind: 'supply', learn: 'peak', icon: 'trap',  name: 'Spike trap', text: 'One more trap to set.', cost: { hide: 1, claws: 1 }, give: { traps: 1 } },
   { id: 'spear',   kind: 'supply', learn: 'peak', icon: 'spear', name: 'Spare spear', text: 'A new spear if you lost yours.', cost: { teeth: 1, hide: 1 }, give: { spear: 1 } },
+  // the solo revive: drunk on its own when you fall and no teammate could revive you (sim/world.js killPlayer)
+  { id: 'tonic',   kind: 'supply', learn: 'peak', icon: 'herb',  name: 'Revival tonic', text: 'If you fall with nobody left to revive you, you drink it and get back up. Carry one at a time.', cost: { meat: 2, hide: 1 }, give: { tonic: 1 } },
   // the swamp: Elias' lantern from the drawing at his raft (it burns glowblood: shared/torch.js LANTERN)
   { id: 'lantern', kind: 'supply', learn: 'raft', icon: 'lantern', name: 'Lantern', text: 'Burns glowblood from the swamp boss – it lights the Blackmire, where torches choke.', cost: { hide: 2, claws: 1, resin: 1 }, give: { lantern: 1 } },
 

@@ -3,15 +3,16 @@
 // client derives the same `skillMods()` to apply its own movement/stamina
 // effects and to show the tree. Pure data + functions, no I/O.
 //
-// A profile is `{ xp, bonus, skills }`:
+// A profile is `{ xp, skills }`:
 //   xp      total experience (the level is derived from it)
-//   bonus   extra skill points earned outside levelling (required items)
 //   skills  { [skillId]: rank } – bought ranks
+// Skill points come only from levels: level N = N points, no bonus points and no skipped
+// levels. At LEVEL_CAP an explorer has exactly TREE_COST points, enough for the whole tree.
 // It belongs to the expedition: the host keeps it per explorer in the world's roster and
 // its save (sim/worldSave.js), re-validated with sanitizeProfile() on load so an edited
-// save can never exceed its budget.
+// (or older) save can never exceed its budget.
 
-export const LEVEL_CAP = 30;
+export const LEVEL_CAP = 40;
 /** Points a freshly spent tier needs in the same tree (spent BEFORE buying the node). */
 export const TIER_GATE = { 1: 0, 2: 4, 3: 10 };
 export const TREES = ['fighting', 'endurance', 'durability'];
@@ -19,13 +20,11 @@ export const TREE_NAMES = { fighting: 'Fighting', endurance: 'Endurance', durabi
 
 /** XP granted to every player when a dinosaur of this type dies (anywhere on the island). */
 export const XP_BY_TYPE = { raptor: 20, 'gloom-raptor': 30, stego: 40, ptera: 60, brachio: 80, trex: 400, 'alpha-sarcosuchus': 800, 'sump-lurker': 70, 'crystal-plodder': 90 };
-/** A required item (boat part): XP for everyone plus one bonus skill point. */
+/** A required item (boat part): XP for everyone (no skill point: points only come from levels). */
 export const RELIC_XP = 150;
-export const RELIC_POINTS = 1;
-export const MAX_BONUS_POINTS = 12;
 
-/** XP needed to go from `level` to `level + 1`. */
-export const xpToNext = (level) => 100 + 40 * (level - 1);
+/** XP needed to go from `level` to `level + 1` (the whole climb to LEVEL_CAP is 18 720 XP). */
+export const xpToNext = (level) => 100 + 20 * (level - 1);
 /** Total XP at which `level` is reached (level 1 = 0). */
 export function xpForLevel(level) {
   let t = 0;
@@ -49,42 +48,46 @@ export const DASH = { cost: 25, distance: 3.6, duration: 0.18, cooldown: 2 };
  */
 export const SKILLS = {
   // ---------------------------------------------------------------- fighting
-  bruteForce:   { tree: 'fighting', tier: 1, name: 'Brute Force',   cost: 1, ranks: ['Spear damage +10%', 'Spear damage +20%', 'Spear damage +30%'] },
-  marksman:     { tree: 'fighting', tier: 1, name: 'Marksman',      cost: 1, ranks: ['Gun damage +10%', 'Gun damage +20%', 'Gun damage +30%'] },
-  steadyHands:  { tree: 'fighting', tier: 1, name: 'Steady Hands',  cost: 1, ranks: ['Reload 10% faster', 'Reload 20% faster', 'Reload 30% faster'] },
-  weakSpot:     { tree: 'fighting', tier: 2, name: 'Weak Spot',     cost: 1, ranks: ['Weak-spot bonus +15%', 'Weak-spot bonus +30%', 'Weak-spot bonus +45%'] },
-  executioner:  { tree: 'fighting', tier: 2, name: 'Executioner',   cost: 1, ranks: ['+15% damage to dinos under 25% HP', '+30% damage to dinos under 25% HP', '+45% damage to dinos under 25% HP'] },
-  sprintStrike: { tree: 'fighting', tier: 2, name: 'Sprint Strike', cost: 1, ranks: ['The first hit after a sprint deals double damage'] },
+  weaponMastery: { tree: 'fighting', tier: 1, name: 'Weapon Mastery', cost: 1, ranks: ['Damage with every weapon +10%', 'Damage with every weapon +20%', 'Damage with every weapon +30%'] },
+  steadyHands:  { tree: 'fighting', tier: 1, name: 'Steady Hands',  cost: 1, ranks: ['Reload and draw the bow 10% faster', 'Reload and draw the bow 20% faster', 'Reload and draw the bow 30% faster'] },
+  weakSpot:     { tree: 'fighting', tier: 2, name: 'Weak Spot',     cost: 1, ranks: ["Each species' weak spot hits +15% harder", "Each species' weak spot hits +30% harder", "Each species' weak spot hits +45% harder"] },
   butchersEye:  { tree: 'fighting', tier: 2, name: "Butcher's Eye", cost: 1, ranks: ['The knife works twice as fast'] },
   bloodlust:    { tree: 'fighting', tier: 3, name: 'Bloodlust',     cost: 3, ranks: ['Each kill heals 15% max HP and gives +20% damage for 8 s'] },
   // --------------------------------------------------------------- endurance
   deepLungs:    { tree: 'endurance', tier: 1, name: 'Deep Lungs',       cost: 1, ranks: ['Max stamina +10%', 'Max stamina +20%', 'Max stamina +30%'] },
   secondWind:   { tree: 'endurance', tier: 1, name: 'Second Wind',      cost: 1, ranks: ['Stamina regen +15%, shorter delay', 'Stamina regen +30%, shorter delay', 'Stamina regen +45%, shorter delay'] },
-  efficientStride: { tree: 'endurance', tier: 1, name: 'Efficient Stride', cost: 1, ranks: ['Sprint drain -15%', 'Sprint drain -30%', 'Sprint drain -45%'] },
   lightFeet:    { tree: 'endurance', tier: 2, name: 'Light Feet',       cost: 1, ranks: ['Jumps cost no stamina'] },
-  stalker:      { tree: 'endurance', tier: 2, name: 'Stalker',          cost: 1, ranks: ['Dinos notice you 10% later', 'Dinos notice you 20% later', 'Dinos notice you 30% later'] },
-  springyLegs:  { tree: 'endurance', tier: 2, name: 'Springy Legs',     cost: 1, ranks: ['Jump height +10%', 'Jump height +20%'] },
-  adrenaline:   { tree: 'endurance', tier: 2, name: 'Adrenaline',       cost: 2, ranks: ['Below 30% HP stamina is free for 6 s (60 s cooldown)'] },
+  springyLegs:  { tree: 'endurance', tier: 2, name: 'Springy Legs',     cost: 1, ranks: ['Jump 15% higher and 10% farther', 'Jump 30% higher and 20% farther', 'Jump 45% higher and 30% farther'] },
   dash:         { tree: 'endurance', tier: 3, name: 'Dash',             cost: 3, ranks: ['Press Q to dash forward (costs stamina, 2 s cooldown)'] },
   // -------------------------------------------------------------- durability
   thickSkin:    { tree: 'durability', tier: 1, name: 'Thick Skin',      cost: 1, ranks: ['Max HP +10', 'Max HP +20', 'Max HP +30'] },
   regeneration: { tree: 'durability', tier: 1, name: 'Regeneration',    cost: 1, ranks: ['Regenerate 0.5 HP/s after 8 s without damage', 'Regenerate 1 HP/s after 8 s without damage', 'Regenerate 1.5 HP/s after 8 s without damage'] },
-  heartyAppetite: { tree: 'durability', tier: 1, name: 'Hearty Appetite', cost: 1, ranks: ['Fruit heals +25%', 'Fruit heals +50%', 'Fruit heals +75%'] },
   healingAura:  { tree: 'durability', tier: 2, name: 'Healing Aura',    cost: 1, ranks: ['Teammates within 6 m regenerate +0.5 HP/s', 'Teammates within 6 m regenerate +1 HP/s', 'Teammates within 6 m regenerate +1.5 HP/s'] },
-  fieldMedic:   { tree: 'durability', tier: 2, name: 'Field Medic',     cost: 1, ranks: ['Hold E on a teammate to heal them with your own fruit'] },
-  unshakable:   { tree: 'durability', tier: 2, name: 'Unshakable',      cost: 1, ranks: ['Knockback and knockdown time halved', 'No knockback or knockdown from any dinosaur'] },
   rescuer:      { tree: 'durability', tier: 2, name: 'Rescuer',         cost: 1, ranks: ['Revive takes 60% of the time', 'Revive takes 30% of the time'] },
   lastStand:    { tree: 'durability', tier: 3, name: 'Last Stand',      cost: 3, ranks: ['Survive one lethal hit per life at 1 HP, then 2 s invulnerable'] },
 };
 export const SKILL_IDS = Object.keys(SKILLS);
 
+/**
+ * Skills of older saves that no longer exist. A merged skill passes the better of its old
+ * ranks on (`into`); the others are dropped. Points are derived from the level, so every
+ * dropped rank is a refunded point.
+ */
+export const LEGACY_SKILLS = {
+  bruteForce: { into: 'weaponMastery' }, marksman: { into: 'weaponMastery' },
+  executioner: {}, sprintStrike: {}, efficientStride: {}, stalker: {}, adrenaline: {},
+  heartyAppetite: {}, fieldMedic: {}, unshakable: {},
+};
+
 /** Skill ids of a tree, tier-sorted (definition order inside a tier). */
 export const treeSkills = (tree) => SKILL_IDS.filter((id) => SKILLS[id].tree === tree).sort((a, b) => SKILLS[a].tier - SKILLS[b].tier);
 export const maxRank = (id) => SKILLS[id].ranks.length;
+/** Points that buy every rank of every tree: exactly the points at LEVEL_CAP. */
+export const TREE_COST = SKILL_IDS.reduce((n, id) => n + maxRank(id) * SKILLS[id].cost, 0);
 
 // ------------------------------------------------------------------ profile
 
-export const freshProfile = () => ({ xp: 0, bonus: 0, skills: {} });
+export const freshProfile = () => ({ xp: 0, skills: {} });
 
 /** Points spent on skills (all trees, or one tree). */
 export function spentPoints(skills, tree = null) {
@@ -101,7 +104,7 @@ export function progress(prof) {
   const level = levelFromXp(prof.xp);
   const capped = level >= LEVEL_CAP;
   const base = xpForLevel(level);
-  const total = level + (prof.bonus | 0);
+  const total = level;   // one point per level, nothing else
   const spent = spentPoints(prof.skills);
   return {
     level, capped, xp: prof.xp,
@@ -113,13 +116,12 @@ export function progress(prof) {
 }
 
 /**
- * Creative mode: every skill at max rank and nothing left to spend. Not a valid saved
- * profile (sanitizeProfile would trim it), so it is only ever shown, never saved.
+ * Creative mode: every skill at max rank and nothing left to spend (at LEVEL_CAP the points
+ * cover the whole tree). Marked `creative`, so it is only ever shown, never saved.
  */
 export function creativeProfile() {
   const skills = Object.fromEntries(SKILL_IDS.map((id) => [id, maxRank(id)]));
-  const level = levelFromXp(MAX_XP);
-  return { xp: MAX_XP, bonus: Math.max(0, spentPoints(skills) - level), skills, creative: true };
+  return { xp: MAX_XP, skills, creative: true };
 }
 
 /** Can the next rank of `id` be bought? -> { ok, reason? } */
@@ -140,15 +142,26 @@ export function buy(prof, id) {
   return { ...prof.skills, [id]: (prof.skills[id] | 0) + 1 };
 }
 
+/** Old skill ids of `skills` mapped onto the current tree (merged skills keep their best rank, removed ones vanish). */
+export function migrateSkills(skills) {
+  const out = {};
+  for (const [id, n] of Object.entries(skills)) {
+    const to = Object.hasOwn(LEGACY_SKILLS, id) ? LEGACY_SKILLS[id].into : id;
+    if (to && Object.hasOwn(SKILLS, to)) out[to] = Math.max(out[to] | 0, n | 0);
+  }
+  return out;
+}
+
 /**
- * Make an untrusted profile valid: clamp XP/bonus, drop unknown skills, and replay
- * the purchases in tier order so ranks, gates and the point budget all hold.
- * Anything that doesn't fit is dropped (never throws).
+ * Make an untrusted profile valid: clamp XP, map old skills onto the current tree, drop unknown
+ * ones, and replay the purchases in tier order so ranks, gates and the point budget all hold.
+ * Anything that doesn't fit is dropped, so its points are free again (never throws). The `bonus`
+ * points of older saves (boat parts) are ignored: points only come from levels.
  */
 export function sanitizeProfile(raw) {
   const num = (v, max) => (Number.isFinite(v) ? Math.max(0, Math.min(max, Math.floor(v))) : 0);
-  const prof = { xp: num(raw?.xp, MAX_XP), bonus: num(raw?.bonus, MAX_BONUS_POINTS), skills: {} };
-  const want = raw?.skills && typeof raw.skills === 'object' ? raw.skills : {};
+  const prof = { xp: num(raw?.xp, MAX_XP), skills: {} };
+  const want = raw?.skills && typeof raw.skills === 'object' ? migrateSkills(raw.skills) : {};
   const ids = SKILL_IDS.filter((id) => (want[id] | 0) > 0).sort((a, b) => SKILLS[a].tier - SKILLS[b].tier);
   for (const id of ids) {
     const target = Math.min(maxRank(id), want[id] | 0);
@@ -170,36 +183,26 @@ const at = (skills, id, values) => (rank(skills, id) ? values[rank(skills, id) -
 export function skillMods(skills = {}) {
   const r = (id) => rank(skills, id);
   return {
-    // fighting (server)
-    meleeMul: 1 + at(skills, 'bruteForce', [0.1, 0.2, 0.3]),
-    gunMul: 1 + at(skills, 'marksman', [0.1, 0.2, 0.3]),
-    reloadMul: 1 - at(skills, 'steadyHands', [0.1, 0.2, 0.3]),
-    weakSpotMul: 1 + at(skills, 'weakSpot', [0.15, 0.3, 0.45]),   // scales the extra part of a weak-spot zone multiplier
-    executionerBonus: at(skills, 'executioner', [0.15, 0.3, 0.45]), // vs dinos below executionerBelow of max HP
-    executionerBelow: 0.25,
-    sprintStrike: r('sprintStrike') > 0,
+    // fighting (server; reloadMul also client)
+    damageMul: 1 + at(skills, 'weaponMastery', [0.1, 0.2, 0.3]),   // every player weapon (not traps or towers)
+    reloadMul: 1 - at(skills, 'steadyHands', [0.1, 0.2, 0.3]),     // gun reloads, the bow's draw time and nock cooldown
+    weakSpotMul: 1 + at(skills, 'weakSpot', [0.15, 0.3, 0.45]),   // scales the extra part of a species' weak-spot multiplier (shared/weakSpots.js)
     knifeTimeMul: r('butchersEye') ? 0.5 : 1,
     bloodlust: r('bloodlust') > 0,                 // kill: heal bloodlustHeal of max HP, +bloodlustDmg damage for bloodlustTime s
     bloodlustHeal: 0.15, bloodlustDmg: 0.2, bloodlustTime: 8,
-    // endurance (client; the server only needs stalker/dash)
+    // endurance (client; the server only needs dash and the jump reach)
     staminaMul: 1 + at(skills, 'deepLungs', [0.1, 0.2, 0.3]),
     staminaRegenMul: 1 + at(skills, 'secondWind', [0.15, 0.3, 0.45]),
     regenDelayMul: r('secondWind') ? [0.85, 0.7, 0.55][r('secondWind') - 1] : 1,
-    sprintDrainMul: 1 - at(skills, 'efficientStride', [0.15, 0.3, 0.45]),
     lightFeet: r('lightFeet') > 0,
-    jumpMul: 1 + at(skills, 'springyLegs', [0.1, 0.2]),
-    adrenaline: r('adrenaline') > 0,               // below adrenalineBelow of max HP: free stamina for adrenalineTime s, cooldown adrenalineCooldown
-    adrenalineBelow: 0.3, adrenalineTime: 6, adrenalineCooldown: 60,
+    jumpMul: 1 + at(skills, 'springyLegs', [0.15, 0.3, 0.45]),     // jump height
+    jumpReachMul: 1 + at(skills, 'springyLegs', [0.1, 0.2, 0.3]),  // horizontal speed in the air after a jump
     dash: r('dash') > 0,
-    stalkerMul: 1 - at(skills, 'stalker', [0.1, 0.2, 0.3]),        // dino sight / alert radius multiplier
     // durability (server, maxHp also client HUD)
     maxHpAdd: at(skills, 'thickSkin', [10, 20, 30]),
     regenHps: at(skills, 'regeneration', [0.5, 1, 1.5]),           // after regenDelay s without damage
     regenDelay: 8,
-    fruitHealMul: 1 + at(skills, 'heartyAppetite', [0.25, 0.5, 0.75]),
     auraHps: at(skills, 'healingAura', [0.5, 1, 1.5]), auraRadius: 6,
-    fieldMedic: r('fieldMedic') > 0,
-    knockMul: r('unshakable') === 0 ? 1 : r('unshakable') === 1 ? 0.5 : 0,   // scales knockback AND knockdown time; 0 = none
     reviveTimeMul: r('rescuer') ? [0.6, 0.3][r('rescuer') - 1] : 1,
     lastStand: r('lastStand') > 0, lastStandInvuln: 2,
   };

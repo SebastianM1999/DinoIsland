@@ -14,7 +14,8 @@ import { CONFIG } from '../shared/config.js';
 import { Terrain } from '../shared/terrain.js';
 import { buildLayout } from '../shared/layout.js';
 import { MSG, ACT, EV, EQUIP, PF, OWNER_KEY } from '../shared/protocol.js';
-import { sanitizeProfile, creativeProfile, skillMods, progress, buy, canBuy, SKILL_IDS, MAX_XP, MAX_BONUS_POINTS, RELIC_XP, RELIC_POINTS, DASH } from '../shared/skills.js';
+import { clockText } from '../shared/revive.js';
+import { sanitizeProfile, creativeProfile, skillMods, progress, buy, canBuy, SKILL_IDS, MAX_XP, RELIC_XP, DASH } from '../shared/skills.js';
 import { DinoSystem } from './dinos.js';
 import { trexBrain } from './ai/trex.js';
 import { NOISE } from './ai/senses.js';
@@ -62,10 +63,11 @@ const MOVE_RESERVE = 6;
 const DINO_PUSH_TOLERANCE = 0.5;
 /** Seconds of invulnerability after being revived. */
 const REVIVE_INVULN = 1.5;
+/** Actions a player carrying a body cannot take (sim/world.js carryAction). */
+const CARRY_BLOCKS = new Set([ACT.SHOT, ACT.MELEE, ACT.FIRE, ACT.RELOAD, ACT.EAT, ACT.TRAP, ACT.BUTCHER]);
 /** After an accepted dash the movement validator stays generous for this long. */
 const DASH_WINDOW = 0.6;
 /** Sprint Strike stays armed this long after the last sprinting state packet. */
-const SPRINT_STRIKE_WINDOW = 2;
 
 export class ServerWorld {
   /**
@@ -91,6 +93,7 @@ export class ServerWorld {
     this.creativeUsed = false;          // creative mode was switched on in this expedition (shown on its save)
     this.store = Object.fromEntries(LOOT_KEYS.map((k) => [k, 0]));
     this.upgrades = new Set();          // team upgrades built at the workbench (survive islands)
+    this.fieldReviveAt = 0;             // world time of the team's next revive out in the field (startRevive; saved)
     this.story = new Story(this);       // the notes the team has read (sim/story.js; survives islands)
     this.fruitRng = makeRng((Math.random() * 0xffffffff) >>> 0);
     this.#loadLevel(opts.level ?? 0, opts.variant);
@@ -189,7 +192,7 @@ export class ServerWorld {
       Object.assign(p, {
         x: sp.x, y: this.terrain.heightAt(sp.x, sp.z), z: sp.z, yaw: sp.yaw, pitch: 0, spd: 0,
         hp: p.maxHp, alive: true, deadT: 0, eating: null, hot: null,
-        downed: false, downT: 0, reviving: null, lastStandUsed: false, invulnUntil: 0,
+        downed: false, downT: 0, reviving: null, carrying: null, carriedBy: null, lastStandUsed: false, invulnUntil: 0,
         lastMoveAt: this.now, moveBudget: 3.5, epoch: p.epoch + 1, breath: DIVE.breath, drownT: 0,
       });
       this.resupplyForIsland(p);
@@ -269,12 +272,14 @@ export class ServerWorld {
       downed: false,         // lying on the ground, bleeding out (a teammate can revive)
       downT: 0,
       downedAt: 0,
-      reviving: null,        // { to, until } while this player revives a downed teammate
+      reviving: null,        // { to, until, field } while this player revives a downed teammate (field: away from camp)
+      carrying: null,        // id of the downed teammate whose body this player carries
+      carriedBy: null,       // id of the teammate carrying this downed player
       lastHurtAt: -99,
       lastStandUsed: false,
       invulnUntil: 0,
       bloodlustUntil: 0,
-      sprinting: false, sprintArmed: false, lastSprintAt: -99,
+      sprinting: false,
       nextDashAt: 0, dashUntil: 0,
       nextSkillAt: 0,
       eating: null,
@@ -320,6 +325,8 @@ export class ServerWorld {
   leave(id) {
     const p = this.players.get(id);
     if (!p) return;
+    this.dropBody(p);
+    if (p.carriedBy) this.dropBody(this.players.get(p.carriedBy));
     if (p.key) this.roster.set(p.key, rosterRecord(this, p));   // the character waits in the expedition
     this.players.delete(id);
     this.event(EV.PLAYER_LEAVE, { id });
@@ -347,6 +354,7 @@ export class ServerWorld {
       fruit: [],
       torch: false,          // owns the hand-held torch (picked up at the island's torch spots)
       lantern: false,        // owns the lantern (crafted on the swamp island: shared/torch.js LANTERN)
+      tonic: 0,              // revival tonics carried (shared/crafting.js 'tonic', at most P.tonicMax)
       lanternFuel: 0,        // seconds of glowblood left in it
       loot: Object.fromEntries(LOOT_KEYS.map((k) => [k, 0])),
     };
@@ -373,12 +381,12 @@ export class ServerWorld {
     return out;
   }
 
-  /** `target` gets the good of a fruit of `type` (eaten, or fed by a Field Medic with `by`'s skills). */
-  applyFruit(target, type, by = target) {
+  /** `target` gets the good of an eaten fruit of `type`. */
+  applyFruit(target, type) {
     const ft = CONFIG.fruit.types[type];
     if (!ft) return;
-    this.healPlayer(target, ft.heal * by.mods.fruitHealMul);
-    if (ft.hot > 0) target.hot = { rate: (ft.hot * by.mods.fruitHealMul) / ft.hotTime, t: ft.hotTime };
+    this.healPlayer(target, ft.heal);
+    if (ft.hot > 0) target.hot = { rate: ft.hot / ft.hotTime, t: ft.hotTime };
     const buff = ft.buff && CONFIG.fruit.buffs[ft.buff];
     if (buff) {
       target.buffs = { ...(target.buffs || {}), [ft.buff]: this.now + buff.time };
@@ -443,9 +451,6 @@ export class ServerWorld {
 
   hurtPlayer(p, dmg, { kx = 0, kz = 0, down = 0, src = null, from = null } = {}) {
     if (!p.alive || dmg <= 0 || p.creative || this.now < p.invulnUntil) return;
-    // Unshakable: the client scales the knockdown TIME with the same mods, we scale what it is sent
-    const knock = p.mods.knockMul;
-    if (knock !== 1) { kx *= knock; kz *= knock; if (knock === 0) down = 0; }
     p.lastHurtAt = this.now;
     // Lotus Skin (glow lotus): less damage while it lasts
     if (p.buffs?.lotusskin > this.now) dmg *= CONFIG.fruit.buffs.lotusskin.damageMul;
@@ -542,10 +547,29 @@ export class ServerWorld {
     this.toast(`${p.name} butchered the ${CONFIG.dinos[d.type].name}: ${parts}`, 'bones');
   }
 
-  /** A lethal hit: downed when a living teammate could still revive, else defeated (the old death). */
+  /**
+   * A lethal hit: downed when a living teammate could still revive, else a carried revival tonic
+   * gets them back up (solo, or the last one standing), else defeated (the old death).
+   */
   killPlayer(p, src) {
     if (this.hasRescuer(p)) this.downPlayer(p, src);
+    else if (p.inv.tonic > 0 && !p.creative) this.drinkTonic(p);
     else this.defeatPlayer(p, src);
+  }
+
+  /** The revival tonic: back on their feet where they fell, like a revive. */
+  drinkTonic(p) {
+    p.inv.tonic--;
+    this.sendInv(p);
+    this.dropBody(p);
+    this.stopButcher(p);
+    p.eating = null;
+    p.hp = Math.ceil(P.reviveHpFrac * p.maxHp);
+    p.invulnUntil = this.now + REVIVE_INVULN;
+    p.lastStandUsed = false;
+    p.lastHurtAt = this.now;
+    this.event(EV.REVIVED, { id: p.id, by: p.id, x: r2(p.x), z: r2(p.z), tonic: 1 });
+    this.toast(`${p.name} drank a revival tonic and got back up`, 'herb');
   }
 
   /** Is another player alive (so not downed and not dead) who could revive `p`? */
@@ -555,6 +579,7 @@ export class ServerWorld {
   }
 
   downPlayer(p, src) {
+    this.dropBody(p);
     p.butcher = null;
     p.alive = false;
     p.downed = true;
@@ -567,11 +592,14 @@ export class ServerWorld {
     p.reviving = null;
     if (p.inv.reloading) { p.inv.reloading = null; this.sendInv(p); }
     this.event(EV.DOWN, { id: p.id, secs: P.bleedOutTime, by: src });
-    this.toast(`${p.name} is down! Revive them before they bleed out`, 'skull');
+    this.toast(this.fieldReviveReady() ? `${p.name} is down! Revive them before they bleed out`
+      : `${p.name} is down! Carry them to camp to revive them`, 'skull');
   }
 
   /** True death: the carried loot falls where the player died and they respawn after the delay. */
   defeatPlayer(p, src, respawnIn = P.respawnDelay) {
+    this.dropBody(p);
+    if (p.carriedBy) this.dropBody(this.players.get(p.carriedBy));
     p.butcher = null;
     p.alive = false;
     p.downed = false;
@@ -610,14 +638,31 @@ export class ServerWorld {
 
   // ------------------------------------------------------------------ revive
 
-  /** Hold E at a downed teammate: starts the channel (finished in updateRevive). */
+  /** Is the team's revive out in the field ready (once per P.fieldReviveCooldown s)? */
+  fieldReviveReady() { return this.now >= this.fieldReviveAt; }
+
+  /** Is `p` at camp (near one of its stations)? Skills are reset there and bodies revived without the field cooldown. */
+  atCamp(p, radius = P.campReviveRadius) {
+    const st = this.stations();
+    return this.nearAny(p, [st.fire, st.safe, st.workbench, st.wardrobe, st.board, ...st.dropOff, ...st.refill], radius);
+  }
+
+  /**
+   * Hold E at a downed teammate: starts the channel (finished in updateRevive). At camp always; out in the
+   * field only while the team's field revive is ready, else the body has to be carried to camp (ACT.CARRY).
+   */
   startRevive(p, toId) {
     const q = this.players.get(toId);
     if (!p.alive || p.eating || !q || q === p || !q.downed || !this.near(p, q.x, q.z, P.reviveRange + 0.5)) return;
     if (p.reviving?.to === q.id) return;
+    const field = !this.atCamp(q);
+    if (field && !this.fieldReviveReady()) {
+      this.toast(`Field revive in ${clockText(this.fieldReviveAt - this.now)}: carry ${q.name} to camp to revive them there`, 'team', p.id);
+      return;
+    }
     this.stopRevive(p);
     const t = P.reviveTime * p.mods.reviveTimeMul;
-    p.reviving = { to: q.id, until: this.now + t };
+    p.reviving = { to: q.id, until: this.now + t, field };
     this.playerNoise(p, 'revive', q.x, q.z);   // a predator nearby hears the rescue at the body
     this.event(EV.REVIVE, { id: q.id, by: p.id, to: q.id, secs: r2(t) });
   }
@@ -633,12 +678,59 @@ export class ServerWorld {
     const q = this.players.get(p.reviving.to);
     if (!q || !q.downed || p.eating || Math.hypot(p.x - q.x, p.z - q.z) > P.reviveRange + 1) return this.stopRevive(p);
     if (this.now < p.reviving.until) return;
+    const field = p.reviving.field && !this.atCamp(q);
+    if (field && !this.fieldReviveReady()) return this.stopRevive(p);   // a teammate used it first
     p.reviving = null;
+    if (field) {
+      this.fieldReviveAt = this.now + P.fieldReviveCooldown;
+      this.event(EV.FIELD_REVIVE, { secs: P.fieldReviveCooldown });
+    }
     this.revivePlayer(q, p);
+  }
+
+  // ------------------------------------------------------------------ carrying a downed body
+
+  /** ACT.CARRY: pick up a downed teammate's body ({ to }) or put the carried one down ({ drop: true }). */
+  carryAction(p, m) {
+    if (m.drop) return this.dropBody(p);
+    const q = this.players.get(m.to);
+    if (!p.alive || p.carrying || p.eating || p.butcher || !q || q === p || !q.downed || q.carriedBy ||
+        !this.near(p, q.x, q.z, P.reviveRange + 0.5)) return;
+    this.stopRevive(p);
+    p.carrying = q.id;
+    q.carriedBy = p.id;
+    this.event(EV.CARRY, { id: q.id, by: p.id });
+    this.toast(`${p.name} carries ${q.name} – revive them at camp`, 'team');
+  }
+
+  /** `p` puts the body they carry down where they stand (also when they fall, leave or the body is revived). */
+  dropBody(p) {
+    const q = p?.carrying != null ? this.players.get(p.carrying) : null;
+    if (!p || p.carrying == null) return;
+    p.carrying = null;
+    if (!q) return;
+    q.carriedBy = null;
+    this.event(EV.CARRY, { id: q.id, by: null });
+  }
+
+  /** A carried body hangs half a metre behind its carrier, on the ground under them. */
+  followCarrier(q) {
+    const c = this.players.get(q.carriedBy);
+    // (every way of losing the carrier drops the body first; this only guards a stale link)
+    if (!c || !c.alive || c.carrying !== q.id) {
+      q.carriedBy = null;
+      if (c?.carrying === q.id) c.carrying = null;
+      this.event(EV.CARRY, { id: q.id, by: null });
+      return;
+    }
+    q.x = c.x + Math.sin(c.yaw) * 0.5;
+    q.z = c.z + Math.cos(c.yaw) * 0.5;
+    q.y = this.layout.groundAt(q.x, q.z, c.y + P.stepHeight);
   }
 
   /** `by` brought the downed `q` back on their feet where they lay. */
   revivePlayer(q, by) {
+    if (q.carriedBy) this.dropBody(this.players.get(q.carriedBy));
     q.downed = false;
     q.downT = 0;
     q.alive = true;
@@ -654,16 +746,17 @@ export class ServerWorld {
     this.toast(`${by.name} revived ${q.name}`, 'team');
   }
 
-  /** A downed player bleeds out, or is given up on when nobody is left to help. */
+  /** A downed player bleeds out (not while carried), or is given up on when nobody is left to help. */
   updateDowned(p, dt) {
-    p.downT -= dt;
+    if (p.carriedBy) this.followCarrier(p);
+    if (!p.carriedBy) p.downT -= dt;
     if (p.downT <= 0 || !this.hasRescuer(p)) this.defeatPlayer(p, null);
   }
 
   // ------------------------------------------------------------------ skills / xp
 
   sendProf(p) {
-    const prof = p.creative ? creativeProfile() : { xp: p.prof.xp, bonus: p.prof.bonus, skills: p.prof.skills };
+    const prof = p.creative ? creativeProfile() : { xp: p.prof.xp, skills: p.prof.skills };
     this.send(p.id, { t: MSG.PROF, prof });
   }
 
@@ -677,14 +770,13 @@ export class ServerWorld {
     p.hp = Math.min(p.hp, p.maxHp);
   }
 
-  /** XP (and bonus skill points) for every connected player, wherever they are, alive or not. */
-  awardXp(amount, why, bonus = 0) {
+  /** XP for every connected player, wherever they are, alive or not (skill points only come with levels). */
+  awardXp(amount, why) {
     for (const p of this.players.values()) {
       const before = progress(p.prof);
       p.prof.xp = Math.min(MAX_XP, p.prof.xp + amount);
-      p.prof.bonus = Math.min(MAX_BONUS_POINTS, p.prof.bonus + bonus);
       const now = progress(p.prof);
-      if (now.xp === before.xp && now.total === before.total) continue;   // maxed out: nothing changed
+      if (now.xp === before.xp) continue;   // maxed out: nothing changed
       this.send(p.id, { t: MSG.EV, e: EV.XP, amount, why, ...(now.level !== before.level ? { level: now.level } : {}), free: now.free });
       this.sendProf(p);
     }
@@ -701,8 +793,7 @@ export class ServerWorld {
       if (!ok.ok) return this.toast(ok.reason, 'info', p.id);
       p.prof.skills = buy(p.prof, m.id);
     } else if (m.op === 'reset') {
-      const st = this.stations();
-      if (!p.alive || !this.nearAny(p, [st.fire, st.safe, st.workbench, st.wardrobe, st.board, ...st.dropOff, ...st.refill], 6)) {
+      if (!p.alive || !this.atCamp(p, 6)) {
         return this.toast('Skills can only be reset at your camp', 'info', p.id);
       }
       if (!Object.keys(p.prof.skills).length) return;
@@ -720,13 +811,11 @@ export class ServerWorld {
     p.moveBudget += DASH.distance + 1;
   }
 
-  /** Damage multiplier for `p` hitting dinosaur `d` with `weapon` (Brute Force, Marksman, Executioner, Sprint Strike, Bloodlust). */
+  /** Damage multiplier for `p` hitting dinosaur `d` with `weapon` (Weapon Mastery on every player weapon, Bloodlust). */
   damageMul(p, d, weapon) {
     if (weapon === 'trap' || weapon === 'tower') return 1;
     const m = p.mods;
-    let mul = weapon === 'spear' ? m.meleeMul : GUNS.includes(weapon) ? m.gunMul : 1;
-    if (m.executionerBonus && d.hp <= m.executionerBelow * d.maxHp) mul *= 1 + m.executionerBonus;
-    if (m.sprintStrike && p.sprintArmed && this.now - p.lastSprintAt <= SPRINT_STRIKE_WINDOW) { mul *= 2; p.sprintArmed = false; }
+    let mul = m.damageMul;
     if (this.now < p.bloodlustUntil) mul *= 1 + m.bloodlustDmg;
     // Sharp Edge (obsidian fig)
     if (p.buffs?.sharpedge > this.now) mul *= CONFIG.fruit.buffs.sharpedge.dinoDamageMul;
@@ -742,13 +831,13 @@ export class ServerWorld {
 
   /**
    * Player `p` made a noise of `kind` (ai/senses.js NOISE) at its feet or at (x, z): dinosaurs in earshot
-   * hear it. Stalker hushes it; repeats within the kind's `every` seconds are one noise (automatic fire).
+   * hear it; repeats within the kind's `every` seconds are one noise (automatic fire).
    */
   playerNoise(p, kind, x = p.x, z = p.z) {
     const n = NOISE[kind], at = (p.noiseAt ??= {});
     if (this.now - (at[kind] ?? -99) < n.every) return;
     at[kind] = this.now;
-    this.dinos.noise(x, z, n.radius * (p.mods?.stalkerMul ?? 1), kind, p.id);
+    this.dinos.noise(x, z, n.radius, kind, p.id);
   }
 
   /** Dinosaurs see this much of their usual range (the volcano's ash rain). */
@@ -996,7 +1085,7 @@ export class ServerWorld {
     return {
       members: [...this.players.values()].sort((a, b) => a.slot - b.slot).map((p) => ({
         id: p.id, slot: p.slot, name: p.name, outfit: p.outfit, host: p.key === OWNER_KEY,
-        prof: { xp: p.prof.xp, bonus: p.prof.bonus, skills: { ...p.prof.skills } },
+        prof: { xp: p.prof.xp, skills: { ...p.prof.skills } },
       })),
     };
   }
@@ -1064,7 +1153,8 @@ export class ServerWorld {
     // a dash briefly lifts the cap by its distance (grantDash)
     const cap = creative ? 10 : at < p.dashUntil ? MOVE_RESERVE + DASH.distance + 1 : at < p.knockBudgetUntil ? 7 : MOVE_RESERVE;
     p.moveBudget = Math.min(cap,
-      p.moveBudget + Math.max(0, at - p.lastMoveAt) * (creative ? P.creative.flySpeed + 4 : 11 * (p.buffs?.quickfoot > at ? CONFIG.fruit.buffs.quickfoot.speedMul : 1)));
+      // (Springy Legs carries a sprint jump up to jumpReachMul faster through the air)
+      p.moveBudget + Math.max(0, at - p.lastMoveAt) * (creative ? P.creative.flySpeed + 4 : 11 * p.mods.jumpReachMul * (p.buffs?.quickfoot > at ? CONFIG.fruit.buffs.quickfoot.speedMul : 1)));
     p.lastMoveAt = at;
     const distance = Math.hypot(x - p.x, z - p.z);
     const lim = CONFIG.world.size / 2 - 5;
@@ -1096,9 +1186,7 @@ export class ServerWorld {
     if (this.terrain.headUnderwater(p.x, p.y, p.z)) p.fl &= ~(PF.TORCH | PF.LANTERN);     // ... it goes out under water
     else if ((p.fl & PF.TORCH) && !(p.fl & PF.LANTERN) && inBlackmire(this.layout, p.x, p.z)) p.fl &= ~PF.TORCH;   // ... and a torch chokes in the Blackmire
     if (p.fl & PF.SPRINT) {
-      if (!p.sprinting) p.sprintArmed = true;   // Sprint Strike arms when a sprint starts
       p.sprinting = true;
-      p.lastSprintAt = at;
     } else p.sprinting = false;
     if (!historical) {
       if (p.sprinting) this.playerNoise(p, 'sprint');
@@ -1229,6 +1317,8 @@ export class ServerWorld {
 
   onAct(p, m) {
     const inv = p.inv;
+    // carrying a body takes both hands: no weapons, no eating
+    if (p.carrying != null && CARRY_BLOCKS.has(m.a)) return;
     switch (m.a) {
       case ACT.CREATIVE: {
         const on = !!m.on;
@@ -1290,7 +1380,7 @@ export class ServerWorld {
           inv.spearHealth = 0;
         }
         this.playerNoise(p, 'bow');   // a bow string or a throw (ai/senses.js)
-        p.nextFireAt = this.now + (kind === 'spear' ? W.spear.throwCooldown * (1 + u.throwCooldown) : W.bow.cooldown);
+        p.nextFireAt = this.now + (kind === 'spear' ? W.spear.throwCooldown * (1 + u.throwCooldown) : W.bow.cooldown * p.mods.reloadMul);   // Steady Hands
         this.projectiles.set(`${p.id}:${m.pid}`, { kind, health, t: this.now, pw: Math.max(0, Math.min(1, Number(m.pw) || 0)), o: m.o.slice(), v: m.v.slice() });
         this.sendInv(p);
         this.event(EV.FIRE, { by: p.id, kind, o: m.o, v: m.v, pid: m.pid }, p.id);
@@ -1455,15 +1545,6 @@ export class ServerWorld {
         if (!p.alive || inv.fruit.length === 0) return;
         const q = this.players.get(m.to);
         if (!q || !q.alive || q === p || !this.near(p, q.x, q.z, P.giveRange + 1.5)) return;
-        // Field Medic: { to, heal: true } feeds the teammate one of my fruit on the spot instead of handing it over
-        if (m.heal && p.mods.fieldMedic) {
-          if (p.eating || q.hp >= q.maxHp) return;
-          const type = inv.fruit.splice(this.bestFruitIndex(p, q), 1)[0];
-          this.applyFruit(q, type, p);
-          this.sendInv(p);
-          this.event(EV.HEAL, { id: q.id, by: p.id, hp: Math.ceil(q.hp) });
-          return;
-        }
         if (q.inv.fruit.length >= this.caps().fruit) return this.toast(`${q.name} can't carry more fruit`, 'fruit', p.id);
         // give the fruit that heals the most if they're hurt, else the first
         const idx = this.bestFruitIndex(p);
@@ -1599,6 +1680,7 @@ export class ServerWorld {
       case ACT.BASE: return this.baseAction(p, m);
       case ACT.SKILL: return this.skillAction(p, m);
       case ACT.REVIVE: return m.stop ? this.stopRevive(p) : this.startRevive(p, m.to);
+      case ACT.CARRY: return this.carryAction(p, m);
       case ACT.DASH: return;   // already granted in receiveAction, ahead of the bundled state
       case ACT.RESPAWN: {
         // giving up while downed (after the bleed-out grace): true death, back on the beach at once
@@ -1629,6 +1711,7 @@ export class ServerWorld {
       if (r.give.traps && inv.traps >= caps.traps) return deny('You carry as many traps as you can');
       if (r.give.spear && inv.spear) return deny('You still have your spear');
       if (r.give.lantern && inv.lantern) return deny('You already carry a lantern');
+      if (r.give.tonic && inv.tonic >= P.tonicMax) return deny('You already carry a revival tonic');
     }
     if (!this.pay(p, r.cost)) return deny('Not enough loot in the hut store');
     if (r.kind === 'upgrade') {
@@ -1641,6 +1724,7 @@ export class ServerWorld {
       if (r.give.traps) inv.traps = Math.min(caps.traps, inv.traps + r.give.traps);
       if (r.give.spear) { inv.spear = true; inv.spearHealth = W.spear.durability; }
       if (r.give.lantern) { inv.lantern = true; this.story.onEvent('craft:lantern'); }
+      if (r.give.tonic) inv.tonic = Math.min(P.tonicMax, inv.tonic + r.give.tonic);
       this.sendInv(p);
       this.toast(`Crafted: ${r.name}`, 'crate', p.id);
     }
@@ -1885,7 +1969,7 @@ export class ServerWorld {
         r.byName = p.name;
         this.event(EV.RELIC, { id: r.id, kind: r.kind, by: p.id });
         this.mission.onRelicFound(r, p);
-        this.awardXp(RELIC_XP, 'Boat part', RELIC_POINTS);
+        this.awardXp(RELIC_XP, 'Boat part');
         this.checkpoint('relic');
       }
       // the hunter's camp (island 1): walk up to it to take your own bow, with a full quiver's start
@@ -1977,7 +2061,7 @@ export class ServerWorld {
     const p = [];
     for (const q of this.players.values()) {
       const carry = q.inv.loot.meat + q.inv.loot.hide + q.inv.loot.plates;
-      const fl = q.fl | (q.eating ? 4 : 0) | (q.downed ? PF.DOWNED : 0);
+      const fl = q.fl | (q.eating ? 4 : 0) | (q.downed ? PF.DOWNED : 0) | (q.carriedBy ? PF.CARRIED : 0);
       p.push([q.id, r2(q.x), r2(q.y), r2(q.z), r3(q.yaw), r3(q.pitch), r2(q.spd), q.eq, fl, Math.ceil(q.hp), q.alive ? 1 : 0, carry, q.maxHp]);
     }
     // Dinosaurs far from every player change nothing anyone can see (fog):
@@ -2015,6 +2099,7 @@ export class ServerWorld {
       relics: this.relics.map((r) => ({ id: r.id, kind: r.kind, x: r.x, y: r.y, z: r.z, found: r.found })),
       boat: { repaired: this.mission.phase === 'repaired' || this.mission.phase === 'sailing' },
       base: this.publicBase(),
+      fieldRevive: r2(Math.max(0, this.fieldReviveAt - this.now)),   // seconds until the team's next field revive
       raid: this.raids.public(),
       volcano: this.volcano.public(),
     };

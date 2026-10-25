@@ -1,5 +1,5 @@
-// Skill effects on the local player's movement: stamina, Light Feet, Springy Legs,
-// Adrenaline and the Dash, driven through a headless controller on flat ground.
+// Skill effects on the local player's movement: stamina, Light Feet, Springy Legs
+// and the Dash, driven through a headless controller on flat ground.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { PlayerController } from '../src/client/player/controller.js';
@@ -42,15 +42,14 @@ test('Deep Lungs raises max stamina and keeps the stamina fraction', () => {
   assert.ok(Math.abs(pc.stamina - pc.maxStamina) < 1e-9, 'regenerates up to the new max');
 });
 
-test('Efficient Stride lowers the sprint drain', () => {
+test('the sprint drain is the same for everyone (Efficient Stride is gone)', () => {
   const drain = (skills) => {
     const pc = make(skills);
     run(pc, 1.5, { forward: true, sprint: true });
     assert.ok(pc.sprinting);
     return P.maxStamina - pc.stamina;
   };
-  const base = drain({}), eff = drain({ efficientStride: 3 });
-  assert.ok(eff < base * 0.65, `drain ${eff} vs ${base}`);
+  assert.ok(Math.abs(drain({ efficientStride: 3 }) - drain({})) < 1e-9);
 });
 
 test('Second Wind: regeneration is faster and starts earlier', () => {
@@ -82,37 +81,32 @@ test('Light Feet: jumping costs no stamina and works at zero stamina', () => {
 
 test('Springy Legs: jump HEIGHT grows by the rank percentage', () => {
   const base = peakHeight(make());
-  for (const [rank, k] of [[1, 1.1], [2, 1.2]]) {
+  for (const [rank, k] of [[1, 1.15], [2, 1.3], [3, 1.45]]) {
     const h = peakHeight(make({ springyLegs: rank }));
-    assert.ok(Math.abs(h / base - k) < 0.04, `rank ${rank}: ${h / base}`);
+    assert.ok(Math.abs(h / base - k) < 0.05, `rank ${rank}: ${h / base}`);
   }
 });
 
-test('Adrenaline: below 30% HP stamina is free for 6 s, then a 60 s cooldown', () => {
-  const pc = make({ adrenaline: 1 });
-  pc.hpFrac = 0.9;
-  run(pc, 1, { forward: true, sprint: true });
-  assert.ok(!pc.adrenaline.active, 'healthy: not active');
-  pc.stamina = P.maxStamina;
-  pc.hpFrac = 0.2;
-  pc.update(DT, { forward: true, sprint: true });
-  assert.ok(pc.adrenaline.active);
-  const before = pc.stamina;
-  run(pc, 3, { forward: true, sprint: true });
-  assert.ok(pc.sprinting);
-  assert.ok(pc.stamina >= before - 1e-9, 'sprinting costs nothing');
-  // free even at zero stamina, and jumps are free too
-  pc.stamina = 0;
-  run(pc, 0.5, { forward: true, sprint: true });
-  assert.ok(pc.sprinting, 'sprint still possible at 0 stamina');
-  run(pc, 3, { forward: true, sprint: true });   // > 6 s in total
-  assert.ok(!pc.adrenaline.active);
-  assert.ok(pc.adrenaline.cooldownLeft > 50 && pc.adrenaline.cooldownLeft <= 60);
-  // on cooldown it does not fire again even at low HP
-  pc.update(DT, {});
-  assert.ok(!pc.adrenaline.active);
-  run(pc, 60, {});
-  assert.ok(pc.adrenaline.active, 'ready again after the cooldown');
+test('Springy Legs: a running jump carries farther and lands back at normal speed', () => {
+  /** Sprint up to speed, jump, and measure the ground covered in the air. */
+  const leap = (skills) => {
+    const pc = make({ deepLungs: 1, ...skills });
+    pc.yaw = 0;
+    run(pc, 1, { forward: true, sprint: true });
+    const z0 = pc.pos.z, v0 = Math.hypot(pc.vel.x, pc.vel.z);
+    pc.update(DT, { forward: true, sprint: true, jump: true });
+    const air = Math.hypot(pc.vel.x, pc.vel.z) / v0;
+    let n = 0;
+    while (!pc.onGround && n++ < 400) pc.update(DT, { forward: true, sprint: true });
+    const dist = z0 - pc.pos.z;
+    run(pc, 1, { forward: true, sprint: true });
+    return { dist, air, after: Math.hypot(pc.vel.x, pc.vel.z) / v0, jumped: pc.jumped };
+  };
+  const base = leap({}), far = leap({ springyLegs: 3 });
+  assert.ok(Math.abs(base.air - 1) < 0.02, `plain take-off keeps the run speed (${base.air})`);
+  assert.ok(Math.abs(far.air - 1.3) < 0.02, `+30% take-off speed (${far.air})`);
+  assert.ok(far.dist > base.dist * 1.4, `farther: ${far.dist} vs ${base.dist}`);
+  assert.ok(Math.abs(far.after - 1) < 0.05 && far.jumped === false, 'back to the normal run once landed');
 });
 
 test('Dash: covers DASH.distance on the ground, costs stamina, then cools down', () => {
@@ -155,7 +149,7 @@ test('Dash follows the movement keys and works in the air', () => {
   assert.ok(-air.pos.z > DASH.distance - 0.2, `air dash z=${air.pos.z}`);
 });
 
-test('Dash needs the skill, enough stamina, and a free body; Adrenaline makes it free', () => {
+test('Dash needs the skill, enough stamina, and a free body', () => {
   const none = make();
   none.update(DT, { dash: true });
   assert.ok(!none.dash.active, 'no skill');
@@ -175,13 +169,11 @@ test('Dash needs the skill, enough stamina, and a free body; Adrenaline makes it
   dead.update(DT, { dash: true });
   assert.ok(!dead.dash.active, 'frozen');
 
-  const free = make({ dash: 1, adrenaline: 1 });
-  free.hpFrac = 0.1;
-  free.stamina = 0;
-  free.staminaDelay = 5;
-  free.update(DT, { dash: true });
-  assert.ok(free.dash.active, 'free during Adrenaline');
-  assert.equal(free.stamina, 0);
+  // (Adrenaline is gone: low HP makes nothing free)
+  const low = make({ dash: 1, adrenaline: 1 });
+  low.stamina = 0;
+  low.update(DT, { dash: true });
+  assert.ok(!low.dash.active);
 });
 
 test('Dash respects collisions (no teleporting through a wall)', () => {

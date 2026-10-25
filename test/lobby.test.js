@@ -134,7 +134,7 @@ test('the client keeps the lobby members and re-estimates the clock when the isl
 });
 
 test('a lobby card shows the explorer, the host and their level; the stage keeps slots apart', () => {
-  const card = lobbyCard({ id: 4, name: 'Ada', slot: 1, host: false, prof: { xp: xpForLevel(7), bonus: 0, skills: { nonsense: 9 } } }, 4);
+  const card = lobbyCard({ id: 4, name: 'Ada', slot: 1, host: false, prof: { xp: xpForLevel(7), skills: { nonsense: 9 } } }, 4);
   assert.deepEqual([card.name, card.host, card.level], ['Ada (you)', false, 7]);
   assert.deepEqual(card.prof.skills, {}, 'an unknown skill from the wire is dropped');
   assert.equal(lobbyCard({ id: 1, name: 'Host', host: true, prof: null }, 4).level, 1);
