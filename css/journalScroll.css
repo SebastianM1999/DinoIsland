@@ -1,0 +1,127 @@
+/* Antique folio margins are separate, inert layers. Real controls retain their
+   own layout; narrow/short windows omit the margin rather than shrinking UI. */
+@font-face {
+  font-family: 'Caveat';
+  src: url('../assets/fonts/caveat-variable.ttf') format('truetype');
+  font-weight: 400 700; font-style: normal; font-display: swap;
+}
+body.island-theme .journal-margin {
+  display: none; position: absolute; left: 26px; top: 24px; bottom: 24px;
+  width: 138px; z-index: -1; pointer-events: none; user-select: none;
+  color: #3f4530; border-right: 1px solid #98764255;
+  padding-right: 12px; container-type: size; container-name: folio-margin;
+}
+body.island-theme .journal-folio {
+  position: relative; display: flex; flex-direction: column; align-items: flex-start;
+  gap: 1px; width: 132px; padding: 12px 11px 13px; margin: 0 0 12px -5px;
+  background: var(--journal-paper); color: #273e2d;
+  font: 700 25px/.95 'Caveat', 'Segoe Print', cursive;
+  transform: rotate(-5deg); border: 0;
+  clip-path: polygon(0 7%, 5% 3%, 13% 5%, 25% 1%, 39% 4%, 52% 0, 66% 3%, 80% 1%, 94% 4%, 99% 0, 97% 22%, 100% 41%, 97% 63%, 100% 80%, 96% 96%, 85% 99%, 73% 96%, 59% 100%, 46% 97%, 32% 99%, 20% 96%, 6% 100%, 1% 91%, 3% 72%, 0 53%, 2% 34%);
+  border-radius: 3px 7px 2px 5px;
+  box-shadow: 1px 3px 4px #68462655, inset 0 0 12px #ae7e3b22;
+}
+body.island-theme .journal-folio::before {
+  content: ''; position: absolute; inset: 1px; pointer-events: none;
+  box-shadow: inset 0 0 12px #98703c55; border-radius: inherit;
+}
+body.island-theme .journal-folio small { font: inherit; font-size: 28px; }
+body.island-theme .journal-folio b { font: inherit; font-weight: 700; }
+body.island-theme .journal-botanical {
+  display: block; width: 132px; height: clamp(145px, 25dvh, 230px);
+  background: url('../assets/ui/journal-botanical.png') center / contain no-repeat;
+  mix-blend-mode: multiply; opacity: .86; transform: rotate(-7deg);
+}
+body.island-theme .journal-handnote {
+  display: block; margin: 18px 4px 0; max-width: 126px;
+  font: 500 25px/1.08 'Caveat', 'Segoe Print', cursive;
+  text-align: center; transform: rotate(-6deg); color: #484632;
+}
+body.island-theme .journal-island-sketch {
+  display: block; width: 135px; height: 100px; margin-top: 10px;
+  background: url('../assets/ui/journal-island.png') center / contain no-repeat;
+  mix-blend-mode: multiply; opacity: .83;
+}
+body.island-theme .journal-margin-leaves {
+  position: absolute; left: -26px; bottom: -24px; width: 158px; height: 150px;
+  background: url('../assets/ui/journal-leaves.png') left bottom / contain no-repeat;
+  transform: rotate(-8deg); opacity: .92;
+}
+body.island-theme #home-explorer-root .hud-panel > .journal-margin { display: none; }
+@container folio-margin (max-height: 600px) {
+  body.island-theme .journal-botanical { height: 140px; }
+  body.island-theme .journal-handnote { font-size: 23px; margin-top: 12px; }
+  body.island-theme .journal-island-sketch { height: 72px; margin-top: 4px; }
+  body.island-theme .journal-margin-leaves { width: 120px; height: 110px; }
+}
+@container folio-margin (max-height: 450px) {
+  body.island-theme .journal-botanical { height: 95px; }
+  body.island-theme .journal-island-sketch { display: none; }
+  body.island-theme .journal-handnote { font-size: 22px; }
+  body.island-theme .journal-margin-leaves { height: 78px; }
+}
+@container folio-margin (max-height: 330px) {
+  body.island-theme .journal-botanical { display: none; }
+  body.island-theme .journal-handnote { margin-top: 20px; }
+  body.island-theme .journal-margin-leaves { display: none; }
+}
+
+@media (min-width: 1100px) and (min-height: 740px) {
+  body.island-theme :is(.home-panel, .home-dialog-card:not(.home-skills-card), .settings-card, .pause-card, .friends-card, .hud-panel):has(> .journal-margin) {
+    padding-left: 188px;
+    outline: none; box-shadow: none;
+  }
+  body.island-theme :is(.home-panel, .home-dialog-card:not(.home-skills-card), .settings-card, .pause-card, .friends-card, .hud-panel):has(> .journal-margin)::after {
+    inset: -7px auto -7px -7px; width: 32px; opacity: 1; filter: none; border-radius: 3px;
+    background: url('../assets/ui/journal-binding.svg') left top / 32px 360px repeat-y;
+  }
+  body.island-theme .journal-margin { display: block; }
+  body.island-theme .home-panel { width: min(930px, 100%); }
+  body.island-theme #settings .settings-card { width: min(1030px, 100%); padding-left: 188px; }
+  body.island-theme #paused .pause-card { width: min(1170px, 100%); padding-left: 188px; }
+  body.island-theme #steam-friends .friends-card { width: min(930px, 100%); }
+  body.island-theme #home-expeditions .expeditions-panel { width: min(1070px, 100%); }
+  body.island-theme #home-guide .home-panel { width: min(1130px, 100%); }
+  body.island-theme #home-credits .home-panel { width: min(870px, 100%); }
+  body.island-theme #home-explorer-root .home-dialog-card { width: min(1350px, 100%); }
+  body.island-theme #home-explorer-root .hud-panel {
+    padding-left: 0; outline: none; box-shadow: none;
+  }
+  body.island-theme #home-explorer-root .hud-panel::after { display: none; }
+  body.island-theme .hud-panel.hud-inv { width: min(1350px, 95vw); }
+  body.island-theme .hud-panel.hud-craft { width: min(900px, 94vw); }
+  body.island-theme .hud-panel.hud-boat { width: min(900px, 94vw); }
+  body.island-theme .hud-panel.hud-note { width: min(920px, 94vw); }
+  body.island-theme .hud-panel.hud-grove { width: min(850px, 94vw); }
+  body.island-theme .hud-panel.hud-wardrobe { width: min(1200px, 94vw); }
+  /* Dense skill grids gain a margin only when their original content fits too. */
+  body.island-theme .hud-panel.hud-skills:has(> .journal-margin) {
+    padding-left: 22px; outline: none; box-shadow: var(--stone-rim);
+  }
+  body.island-theme .hud-skills > .journal-margin { display: none; }
+  body.island-theme .hud-panel.hud-skills:has(> .journal-margin)::after { display: none; }
+
+  body.island-theme #menu { padding-left: calc(2vw + 190px); }
+  body.island-theme #menu::before {
+    width: 670px; border: 0;
+    box-shadow: inset 0 0 30px #98703c55;
+  }
+  body.island-theme #menu::after {
+    content: ''; position: fixed; left: calc(2vw - 5px); top: calc(2vh - 7px); bottom: calc(2vh - 7px);
+    width: 32px; background: url('../assets/ui/journal-binding.svg') left top / 32px 360px repeat-y;
+    z-index: -1; pointer-events: none; user-select: none;
+  }
+  body.island-theme #menu > .journal-margin {
+    position: fixed; left: calc(2vw + 28px); top: calc(2vh + 28px); bottom: calc(2vh + 10px);
+  }
+  body.island-theme #menu[inert]::after,
+  body.island-theme #menu[inert] > .journal-margin { visibility: hidden; }
+}
+@media (min-width: 1750px) and (min-height: 840px) {
+  body.island-theme .hud-panel.hud-skills:has(> .journal-margin) {
+    width: min(1650px, calc(100vw - 48px)); padding-left: 188px;
+    outline: none; box-shadow: none;
+  }
+  body.island-theme .hud-skills > .journal-margin { display: block; }
+  body.island-theme .hud-panel.hud-skills:has(> .journal-margin)::after { display: block; }
+}

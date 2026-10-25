@@ -1,4 +1,4 @@
-/* Native stone/parchment skill tree. All surfaces and controls are live UI. */
+/* Native field-journal skill tree. All surfaces and controls are live UI. */
 .hud-panel.hud-skills {
   position: absolute; width: min(1480px, calc(100vw - 32px)); height: min(860px, calc(100dvh - 32px)); max-height: calc(100dvh - 32px);
   padding: 18px 22px; overflow: hidden; display: grid; grid-template-rows: 124px minmax(0, 1fr) 108px; gap: 14px;
@@ -162,4 +162,56 @@
 @media (prefers-reduced-motion: reduce) {
   .hud-skills { animation: none; }
   .sk-xpbar .hud-bar-fill { transition: none; }
+}
+
+/* Tinted pages and ink medallions retain the three branches and locked states. */
+body.island-theme .hud-panel.hud-skills {
+  color: var(--journal-ink); text-shadow: none; border-width: 1px;
+  border-radius: 5px 8px 4px 7px;
+}
+body.island-theme .hud-skills :is(.sk-heading, .sk-desc) {
+  background: #fff4da77; border-color: #ae906366; border-radius: 4px;
+  box-shadow: inset 0 1px #fff9; color: var(--journal-ink); text-shadow: none;
+}
+body.island-theme .sk-heading h2 { font-family: var(--journal-heading); text-transform: none; letter-spacing: -.025em; }
+body.island-theme .hud-skills .sk-kicker { letter-spacing: .06em; }
+body.island-theme .sk-xprow { background: #e9dcbd; border: 1px solid #a18b65; box-shadow: inset 0 1px #fff8; border-radius: 5px; }
+body.island-theme .sk-xpbar { background: #cfc7a7; border-color: #a18b65; box-shadow: none; }
+body.island-theme .sk-xpbar .hud-bar-fill { background: linear-gradient(#62805c, #36543d); }
+body.island-theme .sk-xp-emblem { color: #406043; }
+body.island-theme .sk-level { background: #f8ecd0; border: 1px solid #9c8052; color: #31543b; box-shadow: inset 0 1px #fff9; }
+body.island-theme .sk-free { background: #345d46; color: #fff7df; border: 1px solid #284d39; }
+body.island-theme .sk-free b { color: #fff7df; }
+body.island-theme .sk-col { --ac: #9c4938; --dark: #e9c7b3; background: linear-gradient(145deg, #fff7e04d, transparent), var(--dark); border: 1px solid color-mix(in srgb, var(--ac) 65%, #bda57c); border-radius: 5px; box-shadow: inset 0 1px #fff9, 0 2px 2px #78552e26; }
+body.island-theme .sk-endurance { --ac: #42663a; --dark: #d5dfb8; }
+body.island-theme .sk-durability { --ac: #2a6176; --dark: #c8dfe1; }
+body.island-theme .sk-colhead { background: var(--ac); border-bottom: 1px solid #523e2f66; border-radius: 4px 4px 0 0; }
+body.island-theme .sk-treetxt b { color: #fff8e6; text-shadow: none; }
+body.island-theme .sk-treeic { background: #fff0d322; color: #fff8e6; border: 1px solid #fff0d366; border-radius: 50%; box-shadow: none; transform: none; }
+body.island-theme .sk-treeic svg { filter: none; transform: none; }
+body.island-theme .sk-badge { background: #f5e7c6; border: 1px solid #fff5d999; color: var(--ac); box-shadow: none; }
+body.island-theme .sk-tier { background: #f8edd35c; border-color: color-mix(in srgb, var(--ac) 40%, transparent); border-radius: 4px; }
+body.island-theme .sk-tierlabel { background: #fff0ce80; border: 0; border-right: 1px solid #92764e66; color: #3a4430; border-radius: 0; }
+body.island-theme .sk-tier:not(.is-locked) .sk-gate { color: #304a2a; }
+body.island-theme .sk-tile { background: #fff2d780; color: #273c30; text-shadow: none; border-color: color-mix(in srgb, var(--ac) 50%, transparent); border-radius: 5px 8px 5px 7px; box-shadow: inset 0 1px #fff8, 0 1px 2px #7650241a; }
+body.island-theme .sk-disc { background: var(--ac); color: #fff8e5; border: 1px solid #fff0d3; box-shadow: 0 0 0 1px var(--ac); }
+body.island-theme .sk-meta > span { color: #5e6050; }
+body.island-theme .sk-tile.lock-gate { background: #e5ddc099; border-color: #777c6b; border-style: dashed; box-shadow: none; }
+body.island-theme .sk-tile.lock-gate .sk-disc { background: #768074; border-color: #fff0d3; color: #fff7e4; }
+body.island-theme .sk-tile:hover,
+body.island-theme .sk-tile:focus-visible { background: #fff5df; border-color: var(--ac); box-shadow: inset 0 0 0 1px var(--ac); }
+body.island-theme .sk-tile:focus-visible { outline: 3px solid #285b44; outline-offset: 3px; }
+body.island-theme .sk-tile.is-maxed { border-color: #8b6427; }
+body.island-theme .sk-tile.is-maxed .sk-disc { background: #8b6427; color: #fff6dd; border-color: #fff6dd; }
+body.island-theme .sk-done { color: #664a1e; }
+body.island-theme .sk-detail-disc { background: #984a38; border-color: #fff0d3; color: #fff4df; box-shadow: 0 1px 3px #70543144; }
+body.island-theme .sk-detail-disc.sk-endurance { background: #42663a; color: #fff4df; }
+body.island-theme .sk-detail-disc.sk-durability { background: #2a6176; color: #fff4df; }
+body.island-theme .sk-actions .wd-btn { background: linear-gradient(#c16a32, #97441f); border: 1px solid #8d4826; border-radius: 5px; box-shadow: inset 0 1px #fff5, 0 1px 2px #76502433; color: #fff8e8; }
+body.island-theme .sk-actions .sk-danger { background: #973e2c; }
+@media (max-width: 620px) {
+  body.island-theme .hud-skills .sk-name,
+  body.island-theme .hud-skills .sk-meta,
+  body.island-theme .hud-skills .sk-gate { font-size: 14px; }
+  body.island-theme .hud-panel.hud-skills { grid-template-rows: 150px max-content max-content; }
 }

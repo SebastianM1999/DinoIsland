@@ -11,6 +11,7 @@
   <link rel="stylesheet" href="css/main.css">
   <link rel="stylesheet" href="css/menu.css">
   <link rel="stylesheet" href="css/expeditionTheme.css">
+  <link rel="stylesheet" href="css/journalScroll.css">
   <script type="importmap">
     {
       "imports": {
@@ -36,129 +37,119 @@
     </div>
     <p class="menu-eyebrow menu-kicker">Co-op dinosaur survival · 1–4 explorers</p>
     <div class="menu-card">
-      <h1 class="logo">Dinosaur<br>Island <span class="logo-foot" aria-hidden="true"></span></h1>
+      <h1 class="logo">Dinosaur<br>Island <span class="logo-foot" aria-hidden="true"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#ui-paw-print"/></svg></span></h1>
       <p class="menu-goal">Explore the islands. Hunt together.<br>Repair your boat and sail into the unknown.</p>
       <div class="explorer-card">
         <span class="explorer-mark" aria-hidden="true"><svg viewBox="0 0 24 24"><use href="#i-wing"/></svg></span>
         <div><label for="player-name">Playing as</label><input id="player-name" name="name" maxlength="14" placeholder="Explorer" autocomplete="off"><span id="home-progress">Explorer · Level 1</span></div>
-        <button type="button" id="btn-explorer" class="menu-link">Customize</button>
+        <button type="button" id="btn-explorer" class="menu-link"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#ui-shirt"/></svg><span class="ui-label">Customize</span></button>
       </div>
       <input type="hidden" id="play-island" value="0">
       <nav class="menu-buttons" aria-label="Start an expedition">
-        <button type="button" class="btn btn-primary" id="btn-solo"><span>Play solo</span><span aria-hidden="true">→</span><span class="action-note">An offline expedition of your own</span></button>
+        <button type="button" class="btn btn-primary" id="btn-solo"><span class="ui-label"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#ui-play"/></svg>Play solo</span><span aria-hidden="true"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#ui-arrow-right"/></svg></span><span class="action-note">An offline expedition of your own</span></button>
         <div class="menu-play-options">
-          <button type="button" class="btn" data-home-panel="host"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-play"/></svg>Create game</button>
-          <button type="button" class="btn" data-home-panel="join"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-door"/></svg>Join game</button>
+          <button type="button" class="btn" data-home-panel="host"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#ui-users-round"/></svg><span class="ui-label">Create game</span></button>
+          <button type="button" class="btn" data-home-panel="join"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#ui-log-in"/></svg><span class="ui-label">Join game</span></button>
         </div>
       </nav>
       <p id="lobby-status" class="lobby-status" role="status" aria-live="polite"></p>
     </div>
     <nav class="menu-utilities" aria-label="Game information and preferences">
-      <button type="button" class="menu-link" id="btn-home-skills">Skill tree</button>
-      <button type="button" class="menu-link" data-home-panel="guide">How to play</button>
-      <button type="button" class="menu-link" data-open-settings>Settings</button>
-      <button type="button" class="menu-link" data-home-panel="credits">Credits</button>
+      <button type="button" class="menu-link" id="btn-home-skills"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#ui-leaf"/></svg><span class="ui-label">Skill tree</span></button>
+      <button type="button" class="menu-link" data-home-panel="guide"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#ui-book-open"/></svg><span class="ui-label">How to play</span></button>
+      <button type="button" class="menu-link" data-open-settings><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#ui-settings"/></svg><span class="ui-label">Settings</span></button>
+      <button type="button" class="menu-link" data-home-panel="credits"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#ui-info"/></svg><span class="ui-label">Credits</span></button>
     </nav>
     <aside class="tour-info" aria-label="Island preview">
-      <button type="button" class="tour-stop" id="tour-next" disabled aria-label="Select next starting island">Next island</button>
+      <button type="button" class="tour-stop" id="tour-next" disabled aria-label="Select next starting island"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#ui-compass"/></svg><span class="ui-label">Next island</span></button>
     </aside>
   </main>
 
   <div id="home-expeditions" class="screen home-dialog" hidden>
     <section class="home-panel expeditions-panel" role="dialog" aria-modal="true" aria-labelledby="home-expeditions-title">
-      <header class="home-panel-head"><div><p class="menu-eyebrow" id="expeditions-eyebrow">Play solo</p><h2 id="home-expeditions-title">Choose an expedition</h2></div><button type="button" class="menu-link" data-home-close aria-label="Close expeditions">×</button></header>
+      <header class="home-panel-head"><div><p class="menu-eyebrow" id="expeditions-eyebrow">Play solo</p><h2 id="home-expeditions-title"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#ui-compass"/></svg><span class="ui-label">Choose an expedition</span></h2></div><button type="button" class="menu-link" data-home-close aria-label="Close expeditions"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#ui-x"/></svg></button></header>
       <p>Each expedition keeps its own island, team progress, explorer level, skills and backpack. Starting a new one never replaces another.</p>
-      <section class="home-option expedition-new"><h3>New expedition</h3><label for="expedition-name">Name</label><div class="host-address-row"><input id="expedition-name" maxlength="32" spellcheck="false" autocomplete="off" placeholder="Expedition 1"><button type="button" class="btn btn-primary" id="btn-expedition-new">Start</button></div><p class="lobby-note">A new expedition starts with a fresh island and a new explorer at level 1.</p></section>
-      <section class="home-option"><h3>Saved expeditions</h3><ul id="expedition-list" class="expedition-list"></ul>
-        <div class="expedition-tools" id="expedition-tools" hidden><button type="button" class="menu-link" id="btn-expedition-import">Import from file</button><input type="file" id="expedition-import" accept=".json,application/json" hidden><p class="lobby-note">Browsers can clear site data: export expeditions you want to keep.</p></div>
+      <section class="home-option expedition-new"><h3><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#ui-compass"/></svg>New expedition</h3><label for="expedition-name">Name</label><div class="host-address-row"><input id="expedition-name" maxlength="32" spellcheck="false" autocomplete="off" placeholder="Expedition 1"><button type="button" class="btn btn-primary" id="btn-expedition-new"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#ui-play"/></svg><span class="ui-label">Start</span></button></div><p class="lobby-note">A new expedition starts with a fresh island and a new explorer at level 1.</p></section>
+      <section class="home-option"><h3><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#ui-save"/></svg>Saved expeditions</h3><ul id="expedition-list" class="expedition-list"></ul>
+        <div class="expedition-tools" id="expedition-tools" hidden><button type="button" class="menu-link" id="btn-expedition-import"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#ui-upload"/></svg><span class="ui-label">Import from file</span></button><input type="file" id="expedition-import" accept=".json,application/json" hidden><p class="lobby-note">Browsers can clear site data: export expeditions you want to keep.</p></div>
       </section>
       <p class="home-feedback lobby-note" id="expedition-status" role="status" aria-live="polite"></p>
-      <footer><button type="button" class="menu-link" data-home-close>Back to menu</button></footer>
+      <footer><button type="button" class="menu-link" data-home-close><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#ui-arrow-left"/></svg><span class="ui-label">Back to menu</span></button></footer>
     </section>
   </div>
 
   <div id="home-host" class="screen home-dialog" hidden>
     <section class="home-panel home-steam-panel" role="dialog" aria-modal="true" aria-labelledby="home-host-title">
-      <header class="home-panel-head"><div><p class="menu-eyebrow">Gather your crew</p><h2 id="home-host-title">Create an expedition</h2></div><button type="button" class="menu-link" data-home-close aria-label="Close create game">×</button></header>
+      <header class="home-panel-head"><div><p class="menu-eyebrow">Gather your crew</p><h2 id="home-host-title"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#ui-users-round"/></svg><span class="ui-label">Create an expedition</span></h2></div><button type="button" class="menu-link" data-home-close aria-label="Close create game"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#ui-x"/></svg></button></header>
       <p>Explore together with up to four players. Your friends join through Steam.</p>
       <p id="steam-status" class="lobby-note" role="status">Checking Steam…</p>
       <fieldset id="lobby-visibility" class="home-choices" hidden>
         <legend>Who can join?</legend>
-        <label class="home-choice"><input type="radio" name="lobby-visibility" value="friends" checked><strong>Friends only</strong><span>Your Steam friends see the expedition and can join.</span></label>
-        <label class="home-choice"><input type="radio" name="lobby-visibility" value="private"><strong>Invite only</strong><span>Only friends you invite from the expedition can join.</span></label>
-        <label class="home-choice"><input type="radio" name="lobby-visibility" value="public"><strong>Anyone</strong><span>Listed in public games for every Steam player.</span></label>
+        <label class="home-choice"><input type="radio" name="lobby-visibility" value="friends" checked><strong><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#ui-users-round"/></svg>Friends only</strong><span>Your Steam friends see the expedition and can join.</span></label>
+        <label class="home-choice"><input type="radio" name="lobby-visibility" value="private"><strong><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#ui-lock-keyhole"/></svg>Invite only</strong><span>Only friends you invite from the expedition can join.</span></label>
+        <label class="home-choice"><input type="radio" name="lobby-visibility" value="public"><strong><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#ui-globe"/></svg>Anyone</strong><span>Listed in public games for every Steam player.</span></label>
       </fieldset>
       <p class="home-feedback" role="status" aria-live="polite"></p>
-      <footer><button type="button" class="menu-link" data-home-close>Back to menu</button><button type="button" class="btn btn-primary" id="btn-host" hidden>Host game</button></footer>
+      <footer><button type="button" class="menu-link" data-home-close><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#ui-arrow-left"/></svg><span class="ui-label">Back to menu</span></button><button type="button" class="btn btn-primary" id="btn-host" hidden><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#ui-users-round"/></svg><span class="ui-label">Host game</span></button></footer>
     </section>
   </div>
   <div id="home-join" class="screen home-dialog" hidden>
     <section class="home-panel home-steam-panel" role="dialog" aria-modal="true" aria-labelledby="home-join-title">
-      <header class="home-panel-head"><div><p class="menu-eyebrow">Find your crew</p><h2 id="home-join-title">Join an expedition</h2></div><button type="button" class="menu-link" data-home-close aria-label="Close join game">×</button></header>
+      <header class="home-panel-head"><div><p class="menu-eyebrow">Find your crew</p><h2 id="home-join-title"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#ui-log-in"/></svg><span class="ui-label">Join an expedition</span></h2></div><button type="button" class="menu-link" data-home-close aria-label="Close join game"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#ui-x"/></svg></button></header>
       <p class="lobby-note" id="home-steam-note">Checking Steam…</p>
       <div class="home-choices">
-        <button type="button" class="home-choice" id="btn-friends" disabled><strong>Join a friend</strong><span>Friends playing right now, and invitations you received.</span></button>
-        <button type="button" class="home-choice" id="btn-public" disabled><strong>Browse public games</strong><span>Open expeditions any Steam player can join.</span></button>
+        <button type="button" class="home-choice" id="btn-friends" disabled><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#ui-user-round"/></svg><span class="ui-label"><strong>Join a friend</strong><span>Friends playing right now, and invitations you received.</span></span></button>
+        <button type="button" class="home-choice" id="btn-public" disabled><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#ui-globe"/></svg><span class="ui-label"><strong>Browse public games</strong><span>Open expeditions any Steam player can join.</span></span></button>
       </div>
       <p class="home-feedback" role="status" aria-live="polite"></p>
-      <footer><button type="button" class="menu-link" data-home-close>Back to menu</button></footer>
+      <footer><button type="button" class="menu-link" data-home-close><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#ui-arrow-left"/></svg><span class="ui-label">Back to menu</span></button></footer>
     </section>
   </div>
   <div id="home-guide" class="screen home-dialog" hidden>
     <section class="home-panel" role="dialog" aria-modal="true" aria-labelledby="home-guide-title">
-      <header class="home-panel-head"><div><p class="menu-eyebrow">Your first expedition</p><h2 id="home-guide-title">How to play</h2></div><button type="button" class="menu-link" data-home-close aria-label="Close how to play">×</button></header>
-      <ol class="home-guide-steps"><li><h3>Explore and prepare</h3><p>Follow the trails, gather fruit, and use the camp workbench to craft supplies. Fruit restores health.</p></li><li><h3>Hunt as a team</h3><p>Track dinosaurs, choose your moment, and keep an eye on your crew. Harvest fallen dinosaurs for resources.</p></li><li><h3>Find the boat parts</h3><p>Your mission board lists the missing parts. Search the island, repair the boat, and gather everyone to set sail.</p></li><li><h3>Grow stronger</h3><p>Hunts and recovered boat parts earn experience. Open Skills with K and spend your points near camp.</p></li></ol>
-      <footer><button type="button" class="menu-link" data-home-close>Back to menu</button></footer>
+      <header class="home-panel-head"><div><p class="menu-eyebrow">Your first expedition</p><h2 id="home-guide-title"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#ui-book-open"/></svg><span class="ui-label">How to play</span></h2></div><button type="button" class="menu-link" data-home-close aria-label="Close how to play"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#ui-x"/></svg></button></header>
+      <ol class="home-guide-steps"><li><h3><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#ui-compass"/></svg>Explore and prepare</h3><p>Follow the trails, gather fruit, and use the camp workbench to craft supplies. Fruit restores health.</p></li><li><h3><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#ui-crosshair"/></svg>Hunt as a team</h3><p>Track dinosaurs, choose your moment, and keep an eye on your crew. Harvest fallen dinosaurs for resources.</p></li><li><h3><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#ui-wrench"/></svg>Find the boat parts</h3><p>Your mission board lists the missing parts. Search the island, repair the boat, and gather everyone to set sail.</p></li><li><h3><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#ui-leaf"/></svg>Grow stronger</h3><p>Hunts and recovered boat parts earn experience. Open Skills with K and spend your points near camp.</p></li></ol>
+      <footer><button type="button" class="menu-link" data-home-close><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#ui-arrow-left"/></svg><span class="ui-label">Back to menu</span></button></footer>
     </section>
   </div>
   <div id="home-credits" class="screen home-dialog" hidden>
     <section class="home-panel" role="dialog" aria-modal="true" aria-labelledby="home-credits-title">
-      <header class="home-panel-head"><div><p class="menu-eyebrow">Behind the expedition</p><h2 id="home-credits-title">Credits</h2></div><button type="button" class="menu-link" data-home-close aria-label="Close credits">×</button></header>
-      <p>Dinosaur Island · A co-op dinosaur hunting game.</p><section class="home-option"><h3>Music &amp; sound</h3><p>Music by Scott Buckley and Tsorthan Grove. Recorded and performed sound effects are credited with their sources and licenses.</p><p><a href="/assets/audio/CREDITS.md" target="_blank" rel="noopener">View sound credits</a></p><button type="button" class="btn" data-open-settings>Music attribution &amp; settings</button></section><section class="home-option"><h3>Built with</h3><p>Three.js, Node.js and Electron. Steam co-op uses Steamworks.</p></section>
-      <footer><button type="button" class="menu-link" data-home-close>Back to menu</button></footer>
+      <header class="home-panel-head"><div><p class="menu-eyebrow">Behind the expedition</p><h2 id="home-credits-title"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#ui-info"/></svg><span class="ui-label">Credits</span></h2></div><button type="button" class="menu-link" data-home-close aria-label="Close credits"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#ui-x"/></svg></button></header>
+      <p>Dinosaur Island · A co-op dinosaur hunting game.</p><section class="home-option"><h3><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#ui-music"/></svg>Music &amp; sound</h3><p>Music by Scott Buckley and Tsorthan Grove. Recorded and performed sound effects are credited with their sources and licenses.</p><p><a href="/assets/audio/CREDITS.md" target="_blank" rel="noopener">View sound credits</a></p><button type="button" class="btn" data-open-settings><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#ui-settings"/></svg><span class="ui-label">Music attribution &amp; settings</span></button></section><section class="home-option"><h3><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#ui-code"/></svg>Built with</h3><p>Three.js, Node.js and Electron. Steam co-op uses Steamworks.</p><p>Interface icons by Lucide (ISC), including Feather icons (MIT). <a href="/assets/ui/lucide-LICENSE.txt" target="_blank" rel="noopener">View icon license notices</a>.</p></section>
+      <footer><button type="button" class="menu-link" data-home-close><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#ui-arrow-left"/></svg><span class="ui-label">Back to menu</span></button></footer>
     </section>
   </div>
 
   <!-- Shown while pointer lock is released during play -->
   <div id="paused" class="screen" hidden>
     <section class="pause-card" role="dialog" aria-modal="true" aria-labelledby="pause-title" tabindex="-1">
-      <button type="button" class="icon-btn pause-close" id="btn-pause-close" aria-label="Close pause menu" title="Resume">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-      </button>
+      <button type="button" class="icon-btn pause-close" id="btn-pause-close" aria-label="Close pause menu" title="Resume"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#ui-x"/></svg></button>
       <header class="pause-head">
         <p class="menu-eyebrow pause-live">LIVE EXPEDITION</p>
-        <h2 id="pause-title">Expedition menu</h2>
+        <h2 id="pause-title"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#ui-compass"/></svg>Expedition menu</h2>
         <p class="pause-sub">Stay alert. The island keeps moving.</p>
         <p id="pause-save" class="pause-save lobby-note" role="status" aria-live="polite"></p>
       </header>
       <div class="pause-grid">
         <nav class="pause-actions" aria-label="Pause menu">
-          <button type="button" class="btn btn-primary btn-icon" id="btn-resume">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-play"/></svg>Back to the island
-          </button>
-          <button type="button" class="btn btn-icon" data-open-settings>
-            <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-gear"/></svg>Settings
-          </button>
-          <details class="pause-testing"><summary>Testing tools</summary>
-          <button type="button" class="btn btn-icon" id="btn-creative" aria-pressed="false">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-wing"/></svg><span>Creative mode: Off</span>
-          </button>
+          <button type="button" class="btn btn-primary btn-icon" id="btn-resume"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#ui-play"/></svg><span class="ui-label">Back to the island</span></button>
+          <button type="button" class="btn btn-icon" data-open-settings><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#ui-settings"/></svg><span class="ui-label">Settings</span></button>
+          <details class="pause-testing"><summary><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#ui-flask-conical"/></svg>Testing tools</summary>
+          <button type="button" class="btn btn-icon" id="btn-creative" aria-pressed="false"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#ui-flask-conical"/></svg><span>Creative mode: Off</span></button>
           </details>
-          <button type="button" class="btn" id="btn-accept-invite" hidden>Leave and join friend</button>
-          <button type="button" class="btn btn-icon btn-danger" id="btn-leave">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-door"/></svg><span>Leave game</span>
-          </button>
+          <button type="button" class="btn" id="btn-accept-invite" hidden><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#ui-log-in"/></svg><span class="ui-label">Leave and join friend</span></button>
+          <button type="button" class="btn btn-icon btn-danger" id="btn-leave"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#ui-log-out"/></svg><span>Leave game</span></button>
         </nav>
         <div class="pause-info">
           <section class="pause-block">
-            <h3><span id="pause-mission-title">Expedition</span><span id="pause-mission-progress"></span></h3>
+            <h3><span><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#ui-flag"/></svg><span id="pause-mission-title">Expedition</span></span><span id="pause-mission-progress"></span></h3>
             <ul id="pause-objectives" class="pause-objectives"></ul>
-            <h3>Team quests</h3><ul id="pause-contracts" class="pause-objectives"></ul>
+            <h3><span><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#ui-scroll-text"/></svg>Team quests</span></h3><ul id="pause-contracts" class="pause-objectives"></ul>
           </section>
           <section class="pause-block">
-            <h3>Players <span id="pause-team-count"></span></h3>
+            <h3><span><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#ui-users-round"/></svg>Players</span><span id="pause-team-count"></span></h3>
             <ul id="pause-team" class="pause-team"></ul>
-            <button type="button" class="btn" id="btn-invite" hidden>Invite friends</button>
+            <button type="button" class="btn" id="btn-invite" hidden><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#ui-user-plus"/></svg><span class="ui-label">Invite friends</span></button>
             <p id="steam-session-info" class="lobby-note" hidden></p>
           </section>
         </div>
@@ -170,20 +161,20 @@
 
   <div id="steam-friends" class="screen" hidden>
     <section class="friends-card brush" role="dialog" aria-modal="true" aria-labelledby="friends-title">
-      <h2 id="friends-title">Join a friend</h2>
+      <h2 id="friends-title"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#ui-users-round"/></svg><span class="ui-label">Join a friend</span></h2>
       <p id="friends-status" class="lobby-status" role="status" aria-live="polite"></p>
       <ul id="friends-list" class="friends-list" aria-label="Steam friends"></ul>
       <form id="lobby-id-form">
         <label for="lobby-id">Or enter a lobby ID</label>
         <div class="lobby-id-row">
           <input id="lobby-id" inputmode="numeric" maxlength="20" autocomplete="off" required>
-          <button class="btn" type="submit">Join</button>
+          <button class="btn" type="submit"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#ui-log-in"/></svg><span class="ui-label">Join</span></button>
         </div>
       </form>
       <div class="menu-buttons friends-actions">
-        <button class="btn" id="btn-browse-lobbies" type="button">Browse public games</button>
-        <button class="btn" id="btn-refresh-friends" type="button">Refresh</button>
-        <button class="btn" id="btn-close-friends" type="button">Back</button>
+        <button class="btn" id="btn-browse-lobbies" type="button"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#ui-globe"/></svg><span class="ui-label">Browse public games</span></button>
+        <button class="btn" id="btn-refresh-friends" type="button"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#ui-refresh-cw"/></svg><span class="ui-label">Refresh</span></button>
+        <button class="btn" id="btn-close-friends" type="button"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#ui-arrow-left"/></svg><span class="ui-label">Back</span></button>
       </div>
     </section>
   </div>
@@ -194,14 +185,12 @@
       <header class="settings-head">
         <svg class="settings-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-gear"/></svg>
         <h2 id="settings-title">Settings</h2>
-        <button type="button" class="icon-btn" id="btn-settings-close" aria-label="Close settings" title="Close (Esc)">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-close"/></svg>
-        </button>
+        <button type="button" class="icon-btn" id="btn-settings-close" aria-label="Close settings" title="Close (Esc)"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#ui-x"/></svg></button>
       </header>
       <div class="settings-tabs" role="tablist">
-        <button type="button" role="tab" id="tab-general" aria-controls="settings-general" aria-selected="true">Sound &amp; view</button>
-        <button type="button" role="tab" id="tab-graphics" aria-controls="settings-graphics" aria-selected="false">Graphics</button>
-        <button type="button" role="tab" id="tab-controls" aria-controls="settings-controls" aria-selected="false">Controls</button>
+        <button type="button" role="tab" id="tab-general" aria-controls="settings-general" aria-selected="true"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#ui-volume-2"/></svg><span class="ui-label">Sound &amp; view</span></button>
+        <button type="button" role="tab" id="tab-graphics" aria-controls="settings-graphics" aria-selected="false"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#ui-monitor"/></svg><span class="ui-label">Graphics</span></button>
+        <button type="button" role="tab" id="tab-controls" aria-controls="settings-controls" aria-selected="false"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#ui-keyboard"/></svg><span class="ui-label">Controls</span></button>
       </div>
       <div id="settings-general" role="tabpanel" aria-labelledby="tab-general" class="settings-panel"></div>
       <div id="settings-graphics" role="tabpanel" aria-labelledby="tab-graphics" class="settings-panel" hidden></div>
@@ -233,8 +222,8 @@
         </dl>
       </div>
       <footer class="settings-foot">
-        <button type="button" class="btn" id="btn-settings-reset">Reset to defaults</button>
-        <button type="button" class="btn btn-primary" id="btn-settings-done">Done</button>
+        <button type="button" class="btn" id="btn-settings-reset"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#ui-rotate-ccw"/></svg><span class="ui-label">Reset to defaults</span></button>
+        <button type="button" class="btn btn-primary" id="btn-settings-done"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#ui-check"/></svg><span class="ui-label">Done</span></button>
       </footer>
     </section>
   </div>

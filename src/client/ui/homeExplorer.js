@@ -1,3 +1,5 @@
+import { journalMargin } from './journalMargins.js';
+import { uiIcon, uiLabel, setUiLabel } from './uiIcons.js';
 // Home-menu outfit customization. Explorer level, XP and skills belong to each expedition
 // (saved with it), so this panel only explains where they are and opens the skill tree.
 import { disposeIslandScenes } from '../core/resources.js';
@@ -12,9 +14,10 @@ export function initHomeExplorer() {
   root.hidden = true;
   root.innerHTML = `
     <section class="home-dialog-card brush" role="dialog" aria-modal="true" aria-labelledby="home-explorer-title" tabindex="-1">
+      ${journalMargin('explorer')}
       <header class="home-dialog-head">
-        <div><p class="menu-eyebrow">Your expedition companion</p><h2 id="home-explorer-title">Explorer</h2></div>
-        <button type="button" class="icon-btn home-dialog-close" aria-label="Close explorer" title="Close (Esc)">×</button>
+        <div><p class="menu-eyebrow">Your expedition companion</p><h2 id="home-explorer-title">${uiLabel('user-round', 'Explorer')}</h2></div>
+        <button type="button" class="icon-btn home-dialog-close" aria-label="Close explorer" title="Close (Esc)">${uiIcon('x')}</button>
       </header>
       <section class="home-explorer-summary" aria-label="Saved progression"></section>
       <div class="home-explorer-wardrobe"><p role="status">Preparing your explorer…</p></div>
@@ -40,7 +43,7 @@ export function initHomeExplorer() {
   function renderProfile() {
     summary.innerHTML = `
       <p class="home-explorer-progress">Your outfit and name come with you everywhere. Your explorer level, XP, skills and backpack belong to each expedition: continue one from Play solo to grow that explorer.</p>
-      <button type="button" class="menu-link" data-explorer-skills>Read the skill tree</button>`;
+      <button type="button" class="menu-link" data-explorer-skills>${uiLabel('leaf', 'Read the skill tree')}</button>`;
   }
 
   function close() {
@@ -68,7 +71,7 @@ export function initHomeExplorer() {
       }
       const { Wardrobe, savedOutfit } = await import('./wardrobe.js');
       wardrobe = new Wardrobe({ slot: 0, outfit: savedOutfit(), onClose: close });
-      wardrobe.el.querySelector('h2').textContent = 'Outfit';
+      setUiLabel(wardrobe.el.querySelector('h2'), 'Outfit');
       wardrobe.el.querySelector('.hud-panel-close').hidden = true;
       mount.replaceChildren(wardrobe.el);
     })().catch(error => { loading = null; throw error; });

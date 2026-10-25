@@ -1,3 +1,5 @@
+import { journalMargin } from './journalMargins.js';
+import { uiIcon } from './uiIcons.js';
 // The story's letters and journal (shared/notes.js): E at a note opens it on a sheet of paper;
 // J opens the team's journal, every note it has read, island by island. A note in the journal
 // opens the same sheet; Back returns to the list.
@@ -5,7 +7,6 @@
 import { NOTE_BY_ID, NOTES } from '../../shared/notes.js';
 import { LEVELS } from '../../shared/levels.js';
 import { RECIPES } from '../../shared/crafting.js';
-import { icon } from './icons.js';
 
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
@@ -58,27 +59,29 @@ export class NotePanel {
     const n = this.note && NOTE_BY_ID[this.note];
     this.el.dataset.mode = n ? 'note' : 'journal';
     this.el.setAttribute('aria-label', n ? n.title : 'Journal');
-    const close = `<button type="button" class="wd-btn" data-act="close">Close <kbd>E</kbd></button>`;
+    const close = `<button type="button" class="wd-btn" data-act="close">${uiIcon('x')} Close <kbd>E</kbd></button>`;
     if (n) {
       const learned = RECIPES.filter((r) => r.learn === n.id);   // (the recipes this note teaches: shared/crafting.js)
       this.el.innerHTML = `
+      ${journalMargin('journal')}
         <article class="note-sheet note-${n.prop}">
           <h2>${esc(n.title)}</h2>
           ${n.text.map((t) => `<p>${esc(t)}</p>`).join('')}
           <p class="note-author">– ${esc(n.author)}</p>
         </article>
-        ${learned.length ? `<p class="note-learned">${icon('crate')} Teaches the team: ${learned.map((r) => esc(r.name)).join(', ')}</p>` : ''}
-        <div class="note-actions">${this.fromJournal ? `<button type="button" class="wd-btn" data-act="back">Back to the journal</button>` : ''}${close}</div>`;
+        ${learned.length ? `<p class="note-learned">${uiIcon('book-open')} Teaches the team: ${learned.map((r) => esc(r.name)).join(', ')}</p>` : ''}
+        <div class="note-actions">${this.fromJournal ? `<button type="button" class="wd-btn" data-act="back">${uiIcon('arrow-left')} Back to the journal</button>` : ''}${close}</div>`;
       return;
     }
     const islands = LEVELS.map((L, i) => ({ L, notes: NOTES.filter((x) => x.island === i && this.read.has(x.id)) })).filter((g) => g.notes.length);
     const body = islands.length
       ? islands.map(({ L, notes }) => `
         <h3>${esc(L.name)}</h3>
-        <ul class="note-list">${notes.map((x) => `<li><button type="button" data-note="${x.id}"><b>${esc(x.title)}</b><small>${esc(x.author)}</small></button></li>`).join('')}</ul>`).join('')
+        <ul class="note-list">${notes.map((x) => `<li><button type="button" data-note="${x.id}">${uiIcon('scroll-text')}<b>${esc(x.title)}</b><small>${esc(x.author)}</small></button></li>`).join('')}</ul>`).join('')
       : '<p class="note-empty">No notes yet. Look around – the castaways before you left word.</p>';
     this.el.innerHTML = `
-      <header class="hud-panel-head"><h2>${icon('quest')} Journal</h2><span class="hud-panel-close"><kbd>J</kbd> Close</span></header>
+      ${journalMargin('journal')}
+      <header class="hud-panel-head"><h2>${uiIcon('book-open')} Journal</h2><span class="hud-panel-close"><kbd>J</kbd> Close</span></header>
       <div class="note-journal">${body}</div>
       <div class="note-actions">${close}</div>`;
   }

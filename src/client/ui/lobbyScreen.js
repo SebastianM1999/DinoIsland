@@ -1,3 +1,4 @@
+import { uiLabel, setUiLabel, setUiAction } from './uiIcons.js';
 // The expedition lobby: a hosted expedition waits here until its host presses Start (sim/world.js
 // `inLobby`). Every explorer stands on one stage in their outfit, with their level and a read-only
 // look at their skill tree; the host starts the expedition or removes someone, everyone can leave.
@@ -140,9 +141,9 @@ export function runLobby(net, { title = 'Expedition', invite = null, leave }) {
         <ul class="lobby-cards" aria-label="Explorers"></ul>
       </div>
       <footer class="lobby-actions">
-        <button type="button" class="btn btn-primary lobby-start">Start expedition</button>
-        <button type="button" class="btn lobby-invite">Invite friends</button>
-        <button type="button" class="btn btn-danger lobby-leave">Leave</button>
+        <button type="button" class="btn btn-primary lobby-start">${uiLabel('play', 'Start expedition')}</button>
+        <button type="button" class="btn lobby-invite">${uiLabel('user-plus', 'Invite friends')}</button>
+        <button type="button" class="btn btn-danger lobby-leave">${uiLabel('log-out', 'Leave')}</button>
       </footer>
       <div class="lobby-skills" hidden><div class="lobby-skills-mount"></div></div>`;
     document.body.append(root);
@@ -167,27 +168,27 @@ export function runLobby(net, { title = 'Expedition', invite = null, leave }) {
       name.className = 'lobby-name';
       const badge = document.createElement('span');
       badge.className = 'host-badge';
-      badge.textContent = 'Host';
+      setUiAction(badge, 'crown', 'Host');
       head.append(name, badge);
       const level = document.createElement('span');
       level.className = 'lobby-level';
       const skills = document.createElement('button');
       skills.type = 'button';
       skills.className = 'btn lobby-skills-btn';
-      skills.textContent = 'Skills';
+      setUiAction(skills, 'leaf', 'Skills');
       const kick = document.createElement('button');
       kick.type = 'button';
       kick.className = 'btn kick';
       li.append(head, level, skills, kick);
       const card = { li, name, badge, level, skills, kick, member: null, timer: 0 };
-      card.resetKick = () => { clearTimeout(card.timer); delete kick.dataset.confirm; kick.textContent = 'Kick'; };
+      card.resetKick = () => { clearTimeout(card.timer); delete kick.dataset.confirm; setUiAction(kick, 'user-minus', 'Kick'); };
       card.resetKick();
       skills.addEventListener('click', () => { if (card.member) void showSkills(card.member.id); });
       kick.addEventListener('click', () => {
         if (!card.member) return;
         if (!kick.dataset.confirm) {
           kick.dataset.confirm = '1';
-          kick.textContent = 'Confirm kick';
+          setUiLabel(kick, 'Confirm kick');
           card.timer = setTimeout(card.resetKick, KICK_CONFIRM_MS);
           return;
         }
@@ -304,7 +305,7 @@ export function runLobby(net, { title = 'Expedition', invite = null, leave }) {
 
     startBtn.addEventListener('click', () => {
       startBtn.disabled = true;
-      startBtn.textContent = 'Starting…';
+      setUiLabel(startBtn, 'Starting…');
       net.send({ t: MSG.START });
     });
     inviteBtn.addEventListener('click', () => invite?.());

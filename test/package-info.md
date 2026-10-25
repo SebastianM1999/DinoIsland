@@ -2,6 +2,7 @@
 > Automated tests for shared rules, the authoritative simulation, headless client logic, the server and the Steam session, run with Node's built-in test runner (`npm test` = `node --test`).
 
 ## Files
+- `ui-icons.test.js` — safe dynamic icon labels, confirmation updates that retain the icon and action element, and a distinct visible glyph for every current skill; real-browser checks cover sizing and click targets separately.
 - `dialog-ornaments.test.js` — viewport geometry, modal visibility, event batching, absence of a continuous layout loop, removal and cleanup for exterior dialog foliage. Headless fixtures do not establish rendered appearance.
 
 - `coverage-gaps.test.js` — reporting of uncovered lines, functions and branches, including topic filters.

@@ -1,3 +1,4 @@
+import { setUiLabel, setUiAction } from './uiIcons.js';
 export function initSteamLobby({ join, isPlaying, leaveToJoin, notifyInvite = () => {}, releasePointer = () => {} }) {
   const $ = id => document.getElementById(id);
   const bridge = window.dinoSteam;
@@ -34,12 +35,12 @@ export function initSteamLobby({ join, isPlaying, leaveToJoin, notifyInvite = ()
         label.textContent = mode === 'public' ? `${friend.name} — ${friend.players}/4 explorers` : friend.name;
         const button = document.createElement('button');
         button.type = 'button'; button.className = 'btn';
-        button.textContent = mode !== 'invite' ? 'Join' : 'Invite';
+        setUiAction(button, mode !== 'invite' ? 'log-in' : 'user-plus', mode !== 'invite' ? 'Join' : 'Invite');
         button.addEventListener('click', async () => {
           if (mode !== 'invite') { close(); await join(friend.lobbyId); }
           else {
             button.disabled = true;
-            try { await bridge.invite(friend.id); button.textContent = 'Invited'; status.textContent = `Invitation sent to ${friend.name}.`; }
+            try { await bridge.invite(friend.id); setUiAction(button, 'check', 'Invited'); status.textContent = `Invitation sent to ${friend.name}.`; }
             catch (error) { button.disabled = false; status.textContent = error.message; }
           }
         });
@@ -54,10 +55,10 @@ export function initSteamLobby({ join, isPlaying, leaveToJoin, notifyInvite = ()
     releasePointer();
     mode = nextMode;
     previousFocus = document.activeElement;
-    $('friends-title').textContent = { join: 'Join a friend', public: 'Public expeditions', invite: 'Invite friends' }[mode];
+    setUiLabel($('friends-title'), { join: 'Join a friend', public: 'Public expeditions', invite: 'Invite friends' }[mode]);
     $('lobby-id-form').hidden = mode === 'invite';
     $('btn-browse-lobbies').hidden = mode === 'invite';
-    $('btn-browse-lobbies').textContent = mode === 'public' ? 'Show friends' : 'Browse public games';
+    setUiAction($('btn-browse-lobbies'), mode === 'public' ? 'users-round' : 'globe', mode === 'public' ? 'Show friends' : 'Browse public games');
     panel.hidden = false;
     $('btn-close-friends').focus();
     void refresh();
@@ -67,7 +68,7 @@ export function initSteamLobby({ join, isPlaying, leaveToJoin, notifyInvite = ()
     if (isPlaying()) {
       invitedLobby = lobbyId;
       $('btn-accept-invite').hidden = false;
-      $('btn-accept-invite').textContent = 'Leave and join friend';
+      setUiLabel($('btn-accept-invite'), 'Leave and join friend');
       notifyInvite();
     } else {
       close();
@@ -83,8 +84,8 @@ export function initSteamLobby({ join, isPlaying, leaveToJoin, notifyInvite = ()
   $('btn-refresh-friends').addEventListener('click', refresh);
   $('btn-browse-lobbies').addEventListener('click', () => {
     mode = mode === 'public' ? 'join' : 'public';
-    $('friends-title').textContent = mode === 'public' ? 'Public expeditions' : 'Join a friend';
-    $('btn-browse-lobbies').textContent = mode === 'public' ? 'Show friends' : 'Browse public games';
+    setUiLabel($('friends-title'), mode === 'public' ? 'Public expeditions' : 'Join a friend');
+    setUiAction($('btn-browse-lobbies'), mode === 'public' ? 'users-round' : 'globe', mode === 'public' ? 'Show friends' : 'Browse public games');
     void refresh();
   });
   $('btn-accept-invite').addEventListener('click', () => { if (invitedLobby) leaveToJoin(); });

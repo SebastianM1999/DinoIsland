@@ -1,3 +1,5 @@
+import { journalMargin } from './journalMargins.js';
+import { uiIcon } from './uiIcons.js';
 // Boat dialog: opens with E at the wreck on the east beach. Shows the three
 // boat parts of this island (found / still missing, with a hint where to
 // look), and the Repair button once all of them are found. Once repaired the
@@ -68,18 +70,19 @@ export class BoatPanel {
     let status, action = '';
     if (repaired) {
       status = m.complete ? 'All aboard – the boat is under way!' : `The boat is seaworthy! ${esc(sail?.text || 'Gather everyone here to set sail.')}`;
-      action = m.complete ? '' : `<button type="button" class="wd-btn wd-primary" data-act="sail">${icon('boat')} Set sail <kbd>Enter</kbd></button>
-        <button type="button" class="wd-btn" data-act="inventory">Inventory <kbd>Tab</kbd></button>`;
+      action = m.complete ? '' : `<button type="button" class="wd-btn wd-primary" data-act="sail">${uiIcon('sailboat')} Set sail <kbd>Enter</kbd></button>
+        <button type="button" class="wd-btn" data-act="inventory">${uiIcon('backpack')} Inventory <kbd>Tab</kbd></button>`;
     } else if (all || this.creative) {
       status = all ? 'All parts are here. Fix her up and get ready to sail!' : 'Creative mode: the boat can be repaired without the parts.';
-      action = `<button type="button" class="wd-btn wd-primary" data-act="repair">${icon('boat')} Repair the boat</button>`;
+      action = `<button type="button" class="wd-btn wd-primary" data-act="repair">${uiIcon('wrench')} Repair the boat</button>`;
     } else {
       status = `${relics.length - found} part${relics.length - found === 1 ? '' : 's'} still missing. Search the island – the hints tell you where.`;
-      action = `<button type="button" class="wd-btn" disabled>${icon('boat')} Repair the boat</button>`;
+      action = `<button type="button" class="wd-btn" disabled>${uiIcon('sailboat')} Repair the boat</button>`;
     }
     this.el.innerHTML = `
+      ${journalMargin('boat')}
       <header class="hud-panel-head">
-        <h2>${icon('boat')} The Wreck</h2>
+        <h2>${uiIcon('sailboat')} The Wreck</h2>
         <span class="hud-panel-close"><kbd>E</kbd> / <kbd>Esc</kbd> Close</span>
       </header>
       <p class="boat-status${all || repaired ? ' is-ready' : ''}">${status}</p>
@@ -87,7 +90,7 @@ export class BoatPanel {
         <i style="width:${relics.length ? Math.round((found / relics.length) * 100) : 0}%"></i><b>${found}/${relics.length} parts</b>
       </div>
       <ul class="boat-parts">${cards}</ul>
-      <footer class="wd-foot">${action}<button type="button" class="wd-btn" data-act="close">Close</button></footer>`;
+      <footer class="wd-foot">${action}<button type="button" class="wd-btn" data-act="close">${uiIcon('x')} Close</button></footer>`;
   }
 
   onOpen() {

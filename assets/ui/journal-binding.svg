@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="42" height="320" viewBox="0 0 42 320" preserveAspectRatio="none">
+  <defs>
+    <linearGradient id="leather" x2="1" y2="0">
+      <stop stop-color="#24170f"/><stop offset=".2" stop-color="#654025"/>
+      <stop offset=".52" stop-color="#432817"/><stop offset=".8" stop-color="#794e2e"/><stop offset="1" stop-color="#291b11"/>
+    </linearGradient>
+    <linearGradient id="rope" x2="0" y2="1">
+      <stop stop-color="#8e622f"/><stop offset=".35" stop-color="#d2b57c"/><stop offset=".7" stop-color="#b38a4e"/><stop offset="1" stop-color="#654321"/>
+    </linearGradient>
+    <filter id="grain"><feTurbulence baseFrequency=".3" numOctaves="3" stitchTiles="stitch"/><feColorMatrix values="0 0 0 0 .1  0 0 0 0 .05  0 0 0 0 .02  0 0 0 .24 0"/></filter>
+  </defs>
+  <path fill="url(#leather)" d="M3 0h32v320H3z"/>
+  <path d="M8 0v320M30 0v320" stroke="#b48c53" stroke-width="1.5" stroke-dasharray="5 5" opacity=".8"/>
+  <path d="M14 0v320" stroke="#281910" stroke-width="5"/>
+  <path d="M14 0v320" stroke="#c8a46a" stroke-width="3"/>
+  <path d="M12 0l4 5-4 5 4 5-4 5 4 5-4 5 4 5-4 5 4 5-4 5 4 5-4 5 4 5-4 5 4 5-4 5 4 5-4 5 4 5-4 5 4 5-4 5 4 5-4 5 4 5-4 5 4 5-4 5 4 5-4 5 4 5-4 5 4 5-4 5 4 5-4 5 4 5-4 5 4 5-4 5 4 5-4 5 4 5-4 5 4 5-4 5 4 5-4 5 4 5-4 5 4 5-4 5 4 5-4 5 4 5-4 5 4 5-4 5 4 5-4 5 4 5" fill="none" stroke="#72502d" stroke-width="1"/>
+  <path d="M3 0h32v320H3z" filter="url(#grain)"/>
+  <g fill="none" stroke="#20150c" stroke-width="9" opacity=".6">
+    <path d="M-4 97c17-11 33-13 46-1M-4 108c18-10 31-10 46-4"/>
+  </g>
+  <g fill="none" stroke="url(#rope)" stroke-width="6" stroke-linecap="round">
+    <path d="M-4 94c17-11 33-13 46-1M-4 105c18-10 31-10 46-4"/>
+    <path d="M24 98c14-13 23-1 13 10-7 8-19-4-8-10 10-5 14 7 6 11"/>
+  </g>
+  <path d="M0 93l3 6m3-9 3 6m3-8 3 6m3-7 3 6m3-6 2 5M0 104l3 6m3-8 3 6m3-7 3 6m3-6 3 5m4-5 2 5" fill="none" stroke="#684723" stroke-width="1.2"/>
+</svg>

@@ -1,3 +1,5 @@
+import { journalMargin } from './journalMargins.js';
+import { uiIcon, uiLabel, setUiLabel } from './uiIcons.js';
 // Wardrobe at the hut: pick a hat, shirt/jacket and pants with a live,
 // rotatable 3D preview of your explorer. "Wear outfit" sends the choice to
 // the server (which shares it with the team) and remembers it locally.
@@ -36,8 +38,9 @@ export class Wardrobe {
     el.className = 'hud-panel hud-wardrobe brush';
     el.setAttribute('aria-label', 'Wardrobe');
     el.innerHTML = `
+      ${journalMargin('wardrobe')}
       <header class="hud-panel-head">
-        <h2>Wardrobe</h2>
+        <h2>${uiLabel('shirt', 'Wardrobe')}</h2>
         <span class="hud-panel-close"><kbd>E</kbd> / <kbd>Esc</kbd> Close</span>
       </header>
       <div class="wd-body">
@@ -48,9 +51,9 @@ export class Wardrobe {
         <div class="wd-slots"></div>
       </div>
       <footer class="wd-foot">
-        <button type="button" class="wd-btn" data-act="random">Surprise me</button>
-        <button type="button" class="wd-btn" data-act="reset">Undo changes</button>
-        <button type="button" class="wd-btn wd-primary" data-act="wear">Wear outfit</button>
+        <button type="button" class="wd-btn" data-act="random">${uiLabel('shuffle', 'Surprise me')}</button>
+        <button type="button" class="wd-btn" data-act="reset">${uiLabel('rotate-ccw', 'Undo changes')}</button>
+        <button type="button" class="wd-btn wd-primary" data-act="wear">${uiLabel('check', 'Wear outfit')}</button>
       </footer>`;
     this.el = el;
     this.$slots = el.querySelector('.wd-slots');
@@ -70,11 +73,11 @@ export class Wardrobe {
     this.$slots.innerHTML = OUTFIT_SLOTS.map((s) => `
       <section class="wd-slot" data-slot="${s.key}">
         <header>
-          <h3>${s.label}</h3>
+          <h3>${uiIcon(s.key === 'hat' ? 'hard-hat' : s.key === 'top' ? 'shirt' : 'footprints')}${s.label}</h3>
           <div class="wd-cycle">
-            <button type="button" class="wd-arrow" data-step="-1" aria-label="Previous ${s.label}">‹</button>
+            <button type="button" class="wd-arrow" data-step="-1" aria-label="Previous ${s.label}">${uiIcon('chevron-left')}</button>
             <span class="wd-name" aria-live="polite"></span>
-            <button type="button" class="wd-arrow" data-step="1" aria-label="Next ${s.label}">›</button>
+            <button type="button" class="wd-arrow" data-step="1" aria-label="Next ${s.label}">${uiIcon('chevron-right')}</button>
           </div>
         </header>
         <div class="wd-swatches" role="radiogroup" aria-label="${s.label}">
@@ -137,7 +140,7 @@ export class Wardrobe {
       }
     }
     const changed = !sameOutfit(this.draft, this.worn);
-    this.$wear.textContent = changed ? 'Wear outfit' : 'Looking good!';
+    setUiLabel(this.$wear, changed ? 'Wear outfit' : 'Looking good!');
     this.$wear.classList.toggle('is-idle', !changed);
     this.preview.setOutfit(this.draft);
   }

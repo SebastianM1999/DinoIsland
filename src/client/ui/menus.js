@@ -1,3 +1,4 @@
+import { uiIcon, uiLabel, setUiLabel, setUiAction } from './uiIcons.js';
 // Shell menus outside the HUD: the settings dialog (volume, FOV, mouse)
 // and the contents of the pause screen.
 
@@ -7,17 +8,7 @@ import { SETTING_DEFS, setSetting, resetSettings, onSettings } from '../core/set
 
 const $ = (id) => document.getElementById(id);
 
-/** Inline SVG icon sprite used by the menus (<use href="#i-…">). */
-export const ICON_SPRITE = `
-<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
-  <symbol id="i-gear" viewBox="0 0 24 24"><path fill="currentColor" d="M10.3 2h3.4l.5 2.6c.6.2 1.2.5 1.7.9l2.5-.9 1.7 2.9-2 1.8c.1.6.1 1.2 0 1.8l2 1.8-1.7 2.9-2.5-.9c-.5.4-1.1.7-1.7.9l-.5 2.6h-3.4l-.5-2.6c-.6-.2-1.2-.5-1.7-.9l-2.5.9-1.7-2.9 2-1.8a5.6 5.6 0 0 1 0-1.8l-2-1.8 1.7-2.9 2.5.9c.5-.4 1.1-.7 1.7-.9zM12 8.6a3.4 3.4 0 1 0 0 6.8 3.4 3.4 0 0 0 0-6.8z" transform="translate(0 1)"/></symbol>
-  <symbol id="i-play" viewBox="0 0 24 24"><path fill="currentColor" d="M8 4.5v15a1 1 0 0 0 1.5.9l11.6-7.5a1 1 0 0 0 0-1.8L9.5 3.6A1 1 0 0 0 8 4.5z"/></symbol>
-  <symbol id="i-keys" viewBox="0 0 24 24"><path fill="currentColor" d="M4 6h16a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2zm1 3v2h2V9zm4 0v2h2V9zm4 0v2h2V9zm4 0v2h2V9zM7 13v2h10v-2z"/></symbol>
-  <symbol id="i-door" viewBox="0 0 24 24"><path fill="currentColor" d="M5 3h9a2 2 0 0 1 2 2v3h-2V5H5v14h9v-3h2v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2zm12.6 5.4L21.2 12l-3.6 3.6-1.4-1.4 1.2-1.2H9v-2h8.4l-1.2-1.2z"/></symbol>
-  <symbol id="i-close" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" d="M6 6l12 12M18 6L6 18"/></symbol>
-  <symbol id="i-wing" viewBox="0 0 24 24"><path fill="currentColor" d="M3 17c3.5-.5 6-2 8-4.5C13 10 15.5 5.5 21 4c-.5 3-1.8 5.2-3.6 6.8 1 .1 1.9 0 2.8-.3-.9 2-2.5 3.3-4.6 3.9.8.3 1.6.4 2.5.3-1.5 1.8-3.8 2.8-6.6 2.8L7 20H4.5l1-2.4c-.9 0-1.7-.2-2.5-.6z"/></symbol>
-  <symbol id="i-check" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" d="M5 12.5l4.5 4.5L19 7.5"/></symbol>
-</svg>`;
+export { UI_ICON_SPRITE as ICON_SPRITE } from './uiIcons.js';
 
 /**
  * Settings dialog. `onClose` runs after it closes (e.g. to show the pause
@@ -34,13 +25,14 @@ export function initSettings({ onClose } = {}) {
   // Build one labelled slider row per setting, grouped by heading.
   let group = '';
   const rows = new Map();
+  const settingIcons = { master:'volume-2', music:'music', sfx:'audio-lines', fov:'eye', sens:'mouse', renderScale:'monitor', ambientOcclusion:'sun', fpsLimit:'gauge', stats:'gauge' };
   for (const d of SETTING_DEFS) {
     // Graphics settings get their own tab; the rest share "Sound & view".
     const target = d.group === 'Graphics' ? panels.graphics : panel;
     if (d.group !== group && target === panel) {
       const h = document.createElement('h3');
       h.className = 'settings-group';
-      h.textContent = d.group;
+      h.innerHTML = uiLabel(d.group === 'Sound' ? 'volume-2' : 'eye', d.group);
       target.append(h);
     }
     group = d.group;
@@ -49,7 +41,7 @@ export function initSettings({ onClose } = {}) {
     const id = `set-${d.id}`;
     const toggle = d.type === 'toggle';
     row.innerHTML = `
-      <label for="${id}">${d.label}</label>
+      <label for="${id}">${uiIcon(settingIcons[d.id])}${d.label}</label>
       ${toggle ? `<input type="checkbox" id="${id}">` : `<input type="range" id="${id}" min="${d.min}" max="${d.max}" step="${d.step}">`}
       <output for="${id}"></output>`;
     const input = row.querySelector('input');
@@ -72,7 +64,7 @@ export function initSettings({ onClose } = {}) {
 
   const credits = document.createElement('details');
   credits.className = 'audio-credits';
-  credits.innerHTML = `<summary>Audio credits</summary>
+  credits.innerHTML = `<summary>${uiIcon('music')}Audio credits</summary>
     <p>Emerald Jungle exploration: <a href="https://opengameart.org/content/forest-exploration" target="_blank" rel="noopener">Forest Exploration — Tsorthan Grove</a>.</p>
     <p>Music by Scott Buckley — <a href="https://www.scottbuckley.com.au" target="_blank" rel="noopener">www.scottbuckley.com.au</a>:<br>
     Main menu: <a href="https://www.scottbuckley.com.au/library/call-to-adventure/" target="_blank" rel="noopener">Call To Adventure</a>.<br>
@@ -185,7 +177,7 @@ function teamRow(id) {
   const label = document.createElement('span');
   const badge = document.createElement('span');
   badge.className = 'host-badge';
-  badge.textContent = 'Host';
+  setUiAction(badge, 'crown', 'Host');
   name.append(label, badge);
   const bar = document.createElement('span');
   bar.className = 'hp';
@@ -203,11 +195,11 @@ function teamRow(id) {
   row = { li, label, badge, fill, state, kick, timer: 0, who: '', onKick: null };
   const describe = () => kick.setAttribute('aria-label', kick.dataset.confirm ? `Confirm: remove ${row.who} from the expedition` : `Remove ${row.who} from the expedition`);
   // (removing a player needs a second click, like leaving: a stray click must not end a friend's game)
-  row.reset = () => { clearTimeout(row.timer); delete kick.dataset.confirm; kick.textContent = 'Kick'; describe(); };
+  row.reset = () => { clearTimeout(row.timer); delete kick.dataset.confirm; setUiAction(kick, 'user-minus', 'Kick'); describe(); };
   kick.addEventListener('click', () => {
     if (!kick.dataset.confirm) {
       kick.dataset.confirm = '1';
-      kick.textContent = 'Confirm kick';
+      setUiLabel(kick, 'Confirm kick');
       describe();
       row.timer = setTimeout(row.reset, KICK_CONFIRM_MS);
       return;

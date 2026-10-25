@@ -1,3 +1,5 @@
+import { journalMargin } from './journalMargins.js';
+import { uiIcon } from './uiIcons.js';
 // Illustrated expedition skill tree panel (key K): level and XP, then
 // Fighting / Endurance / Durability as three columns of icon tiles grouped by
 // tier. Hovering or focusing a tile shows what it does in the footer. Buying
@@ -225,12 +227,13 @@ export class SkillPanel {
     const resetOff = !this.atCamp || refund === 0 || !!this.view.creative;
     // One native stone panel is shared by the home preview, lobby and live HUD.
     this.el.innerHTML = `
+      ${journalMargin('skills')}
       <header class="sk-head">
         <div class="sk-heading"><h2>${treeIcon('endurance')} <span>${esc(this.title)}</span></h2>
           <p class="sk-kicker">Prepare your expedition</p>
           <p class="sk-intro">${this.readOnly ? 'Each expedition has its own level and skills. Earn points there and spend them at its camp.' : 'Forge your own path. Learn new skills, strengthen your explorer, and prepare for the hunt.'}</p>
         </div>
-        <button type="button" class="sk-close-top" data-act="close" aria-label="Close skill tree" title="Close (Esc)">×</button>
+        <button type="button" class="sk-close-top" data-act="close" aria-label="Close skill tree" title="Close (Esc)">${uiIcon('x')}</button>
       <div class="sk-xprow" role="group" aria-label="Experience" title="${esc(xpTableText())}">
         <span class="sk-xp-emblem" aria-hidden="true">${treeIcon('endurance')}</span>
         <span class="sk-xpbar" role="progressbar" aria-label="Explorer experience" aria-valuemin="0" aria-valuemax="${v.need}" aria-valuenow="${v.into}"><span class="hud-bar-fill" style="transform:scaleX(${frac})"></span></span>
@@ -246,8 +249,8 @@ export class SkillPanel {
         <div class="sk-desc" id="${this.descId}" aria-live="polite">${this.#descHtml()}</div>
         <div class="sk-actions${this.confirming ? ' is-confirming' : ''}"${this.readOnly ? ' hidden' : ''}>
           ${this.readOnly ? '' : `${this.atCamp ? '' : '<span class="sk-note">Reset only at camp</span>'}
-          ${this.confirming ? '<button type="button" class="wd-btn" data-act="cancel">Cancel</button>' : ''}
-          <button type="button" class="wd-btn${this.confirming ? ' sk-danger' : ''}" data-act="reset"${resetOff ? ' disabled' : ''} title="${this.atCamp ? 'Refund every spent point' : 'Only at camp'}"><span aria-hidden="true">↶</span> ${resetLabel}</button>`}
+          ${this.confirming ? `<button type="button" class="wd-btn" data-act="cancel">${uiIcon('x')} Cancel</button>` : ''}
+          <button type="button" class="wd-btn${this.confirming ? ' sk-danger' : ''}" data-act="reset"${resetOff ? ' disabled' : ''} title="${this.atCamp ? 'Refund every spent point' : 'Only at camp'}">${uiIcon('rotate-ccw')} ${resetLabel}</button>`}
         </div>
       </footer>`;
     const cols_ = this.el.querySelector('.sk-cols');

@@ -1,3 +1,4 @@
+import { uiLabel, setUiLabel } from './uiIcons.js';
 // The expedition picker on the title screen: every saved expedition as a card (island, play
 // time, last save, party) with Continue / Host, Rename, Delete (and Export in the browser),
 // plus "New expedition", which always creates a separate expedition. Used for solo play and,
@@ -61,10 +62,10 @@ export function initExpeditionPanel({ backend, open, onPlay }) {
         ${badges ? `<span class="expedition-badges">${badges}</span>` : ''}
       </div>
       <div class="expedition-actions">
-        ${playable ? `<button type="button" class="btn btn-primary" data-act="play">${p.play}</button>` : ''}
-        ${playable ? '<button type="button" class="menu-link" data-act="rename">Rename</button>' : ''}
-        ${playable && backend.exportFile ? '<button type="button" class="menu-link" data-act="export">Export</button>' : ''}
-        ${s.incompatible ? '' : '<button type="button" class="menu-link expedition-delete" data-act="delete">Delete</button>'}
+        ${playable ? `<button type="button" class="btn btn-primary" data-act="play">${uiLabel('play', p.play)}</button>` : ''}
+        ${playable ? `<button type="button" class="menu-link" data-act="rename">${uiLabel('pencil', 'Rename')}</button>` : ''}
+        ${playable && backend.exportFile ? `<button type="button" class="menu-link" data-act="export">${uiLabel('download', 'Export')}</button>` : ''}
+        ${s.incompatible ? '' : `<button type="button" class="menu-link expedition-delete" data-act="delete">${uiLabel('trash-2', 'Delete')}</button>`}
       </div>
     </li>`;
   }
@@ -131,8 +132,8 @@ export function initExpeditionPanel({ backend, open, onPlay }) {
       // a second click within a few seconds confirms: deleting cannot be undone
       if (!button.dataset.confirm) {
         button.dataset.confirm = '1';
-        button.textContent = `Delete "${entry.name}" for good?`;
-        setTimeout(() => { if (button.isConnected) { delete button.dataset.confirm; button.textContent = 'Delete'; } }, 4000);
+        setUiLabel(button, `Delete "${entry.name}" for good?`);
+        setTimeout(() => { if (button.isConnected) { delete button.dataset.confirm; setUiLabel(button, 'Delete'); } }, 4000);
         return;
       }
       busy = true;
@@ -163,8 +164,8 @@ export function initExpeditionPanel({ backend, open, onPlay }) {
       purpose = PURPOSES[kind] ? kind : 'solo';
       const p = PURPOSES[purpose];
       $('expeditions-eyebrow').textContent = p.eyebrow;
-      $('home-expeditions-title').textContent = p.title;
-      $('btn-expedition-new').textContent = p.start;
+      setUiLabel($('home-expeditions-title'), p.title);
+      setUiLabel($('btn-expedition-new'), p.start);
       say('');
       nameInput.value = '';
       open('expeditions');
