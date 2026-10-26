@@ -40,6 +40,7 @@ Dieser Ordner ist der Gesamtplan für Waffen-Freischaltung, Dino-Level, Craft-Ki
 | 23 | [Hollow Mountain: Kristall & Elias' Lager](23-hollow-mountain.md) | 15, 21, 22 | world.js (craft) | umgesetzt (claude/hollow-story) |
 | 24 | [Map 3: Boss-Tor und T-Rex-Boss](24-boss-tor.md) | 23 | world.js (Boss) | umgesetzt (claude/volcano-boss-gate) |
 | 25 | [Map 3: Großer Ausbruch (Finale)](25-grosser-ausbruch.md) | 17, 24 | world.js (Boss-Tod → Volcano) | umgesetzt (claude/volcano-cataclysm) |
+| 26 | [Story v2: Sinn, Ende, Waffen-Progression](26-story-v2.md) | 14–25 | – | Vorschlag (Doku, claude/story-v2) |
 
 ```
 01 ─┬─ 02 ─────────────┐
