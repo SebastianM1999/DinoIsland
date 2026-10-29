@@ -5,7 +5,7 @@
       "file": "assets/models/dinos/raptor.glb",
       "source": "Project-authored Velociraptor; art/sources/raptor/raptor.blend (build scripts in its text blocks)",
       "license": "Project source",
-      "triangles": 56296
+      "triangles": 53426
     },
     {
       "id": "dino-gloom-raptor",
@@ -33,7 +33,7 @@
       "file": "assets/models/dinos/trex.glb",
       "source": "Project-authored T-Rex; art/sources/trex/trex.blend (build scripts in its text blocks)",
       "license": "Project source",
-      "triangles": 50731
+      "triangles": 49396
     },
     {
       "id": "dino-ptera",
@@ -54,7 +54,7 @@
       "file": "assets/models/dinos/brachio.glb",
       "source": "Project-authored Brachiosaurus; art/sources/brachio/brachio.blend (build scripts in its text blocks)",
       "license": "Project source",
-      "triangles": 58628
+      "triangles": 50928
     },
     {
       "id": "dino-alpha-sarcosuchus",

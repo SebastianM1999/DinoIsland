@@ -91,6 +91,28 @@ def limb_weights(body, rig, chain, side, trunk, sigma=0.05, reach=(0.95, 0.7)):
                 lambda p: smooth(0.72, 1.08, trunk_e(p, trunk)) * smooth(reach[0], reach[1], min(seg_d(p, a, b) for _, a, b in S)),
                 sigma=sigma)
 
+def muscle_limb_weights(body, rig, chain, side, sigma=0.025, reach=(0.3, 0.2), fade=(0.0, 0.7), side_min=0.02):
+    """Theropod legs (thick drumstick thigh unioned into the trunk): crisp hinges below the knee, but the
+    upper bone's share fades in ALONG the bone (u = 0 at the hip -> 1 at the knee, `fade`) so the thigh
+    bends like muscle wrapped in body skin. With limb_weights the drumstick swung as a rigid piece and its
+    back folded INTO the belly on every forward swing (owner: "the legs go into his body").
+    Run after distance_weights on the spine; the rest of each vertex stays on the spine weights."""
+    S = segs(rig, chain); sx = 1 if side == 'L' else -1; a0, b0 = S[0][1], S[0][2]; ab = b0 - a0
+    for v in body.data.vertices:
+        p = body.matrix_world @ v.co
+        if p.x * sx < side_min: continue
+        ds = [seg_d(p, a, b) for _, a, b in S]; dmin = min(ds)
+        near = smooth(reach[0], reach[1], dmin)
+        if near <= 0: continue
+        wl = [math.exp(-((d - dmin) / sigma) ** 2) for d in ds]; tot = sum(wl); wl = [w / tot for w in wl]
+        u = max(0, min(1, (p - a0).dot(ab) / ab.length_squared))
+        wl[0] *= smooth(fade[0], fade[1], u)
+        leg = {n: near * w for (n, _, _), w in zip(S, wl)}; share = sum(leg.values())
+        ws = {body.vertex_groups[g.group].name: g.weight * (1 - share) for g in v.groups
+              if not body.vertex_groups[g.group].name.startswith('rg_')}
+        for n, w in leg.items(): ws[n] = ws.get(n, 0) + w
+        set_weights(body, v, ws)
+
 def limit_influences(*objs, limit=4):
     """glTF keeps 4 influences per vertex: limit + renormalise in Blender so the game matches."""
     for ob in objs:

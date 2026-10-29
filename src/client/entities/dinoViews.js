@@ -29,13 +29,13 @@ export const SPECIES = {
   'alpha-sarcosuchus': { build: buildSarcoFallback, anim: SARCO_ANIM, barHeight: 3.96, heavy: true, aquatic: true },
   // cave ambusher: the sarcosuchus' rig at ~5 m; state-driven clips (swim in water), no boss phases
   'sump-lurker': { build: buildSumpLurkerFallback, anim: { ...SARCO_ANIM, walkSpeed: 1.4, runSpeed: 3.6, walkStride: .429, runStride: 1.053 }, barHeight: 1.2, aquatic: true, swimClip: true },
-  brachio: { build: buildBrachio, anim: BRACHIO_ANIM, extraUpdate: brachioExtraUpdate, barHeight: 13.8, heavy: true },
+  brachio: { build: buildBrachio, anim: BRACHIO_ANIM, extraUpdate: brachioExtraUpdate, barHeight: 14.0, heavy: true },
   stego: { build: buildStego, anim: STEGO_ANIM, extraUpdate: stegoExtraUpdate, barHeight: 4.2, heavy: true },
   'crystal-plodder': { build: buildCrystalPlodder, anim: CRYSTAL_PLODDER_ANIM, barHeight: 3.0, heavy: true },
-  raptor: { build: buildRaptor, anim: RAPTOR_ANIM, extraUpdate: raptorExtraUpdate, barHeight: 1.8 },
+  raptor: { build: buildRaptor, anim: RAPTOR_ANIM, extraUpdate: raptorExtraUpdate, barHeight: 1.95 },
   'gloom-raptor': { build: buildGloomRaptor, anim: RAPTOR_ANIM, extraUpdate: raptorExtraUpdate, barHeight: 2.3 },
   ptera: { build: buildPtera, anim: PTERA_ANIM, extraUpdate: pteraExtraUpdate, barHeight: 2.3 },
-  trex: { build: buildTrex, anim: TREX_ANIM, extraUpdate: trexExtraUpdate, barHeight: 6.4, heavy: true },
+  trex: { build: buildTrex, anim: TREX_ANIM, extraUpdate: trexExtraUpdate, barHeight: 6.1, heavy: true },
   // Test species (sim/ai/testDinos.js): GLB only; the fallback is the nearest older procedural model.
   triceratops: { build: buildStego, anim: STEGO_ANIM, extraUpdate: stegoExtraUpdate, barHeight: 4.2, heavy: true },
   ankylosaurus: { build: buildStego, anim: STEGO_ANIM, extraUpdate: stegoExtraUpdate, barHeight: 3.2, heavy: true },
