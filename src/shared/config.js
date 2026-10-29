@@ -284,7 +284,7 @@ export const CONFIG = {
       turnRate: 0.7,
       alertRadius: 14,        // sprinting/attacking players inside this radius cause panic
       fleeTime: 9,
-      height: 13.007,          // fitted model height (m): head room under a roof (sim/dinos.js walkable)
+      height: 13.289,          // fitted model height (m): head room under a roof (sim/dinos.js walkable)
       closeRadius: 6,          // walking closer than this makes it defend itself
       defendRange: 16,         // attacked from closer than this: it fights back instead of fleeing
       defendTime: 7,
@@ -345,7 +345,7 @@ export const CONFIG = {
       walkSpeed: 3.2,
       runSpeed: 10.2,
       turnRate: 4.5,
-      height: 1.675,
+      height: 1.676,
       attackRange: 1.9,
       attackDamage: 8,
       attackCooldown: 1.5,
@@ -470,7 +470,7 @@ export const CONFIG = {
       walkSpeed: 2.6,
       runSpeed: 7.6,          // slower than a sprinting player – you can escape
       turnRate: 1.3,
-      height: 5.919,
+      height: 5.503,
       restTime: 18,
       biteRange: 4.2,
       biteDamage: 45,

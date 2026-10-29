@@ -1,28 +1,22 @@
 # Brachiosaurus source
 
-`brachio.blend` builds the whole Brachiosaurus from an empty scene: run the
-`bbuild` text block (it writes `assets/models/dinos/brachio.glb` relative to the
-.blend). `scripts/` mirrors the text blocks for review; the .blend is what runs.
+Rebuilt from scratch (Oct 2026), real scale. `brachio.blend` holds every build step as a text block; `scripts/` is
+the same code as `.py` files. Rebuild everything from an empty scene and export the GLB (Blender with this file open):
 
-Headless: `blender -b brachio.blend --python-expr "import bpy; exec(bpy.data.texts['bbuild'].as_string(), {})"`
+```python
+exec(open(r'<repo>/art/sources/brachio/scripts/bbuild.py').read(), globals())
+```
 
-| Script | Builds |
-| --- | --- |
-| `lib` | shared helpers (same as the raptor's): lofts, tubes along splines, blobs, horns, `paint()` |
-| `eyes`, `mouth` | skill helpers: living eyes (lid opening, rim, iris, pupil disc, catchlights; reduced resolution for the 60k budget) and lower jaw (jawline keel, inward lip, mouth trough, tongue) |
-| `blib` | brachio palette `BP` (slate back, grey flanks, cream throat/belly) and `bskin()` |
-| `bbody` | trunk (tail → body → near-vertical neck) and four pillar legs as spline tubes, foot pads + toenails |
-| `bhead` | small head with arched nasal crest, opening jaw (keel profile, mouth trough, tongue), gentle living eyes (round pupil, almost level lids), peg teeth |
-| `bpaint` | vertex colours for every part, materials |
-| `brig` | armature: 6 neck, 8 tail bones, 4 IK legs (front poles behind, hind poles in front), jaw |
-| `bskin` | heat weights for body/legs, rigid head/jaw/feet |
-| `banim` | Idle (6 s), Walk (lateral sequence), Run (flee), Attack (0.8 s rear-up + stomp), Death |
-| `bexport` | samples clips, deform-only export rig, `Brachiosaurus_*` actions, GLB export |
+Working objects are `BrachioMesh` / `BrachioArm` (`export_dino` deletes objects named like its export).
 
-Concept reference: near-vertical neck, front legs longer than hind legs, short
-horizontal tail, dark grey back with pale cream underside.
+| Step | What |
+|---|---|
+| `01_shape.py` | trunk spline tube tail -> body -> neck (top inside the skull); pillar legs with a real joint bend and round pads tapering gradually, end caps pressed flat into soles (`B_SOLE`); small domed head authored in design units and scaled x1.3 (`B_hy`/`B_hz`/`B_hv`) + shallow jaw, fused |
+| `02_details.py` | peg teeth, gentle round-pupil eyes, nails ray-cast onto the pad fronts, tongue |
+| `03_paint.py` | "gentle giant": steel-blue back with dark dapples, cream throat strip, low peach nasal rise, dusky feet |
+| `04_rig.py` | `BrachioArm`: Body, Shoulders, Neck1-6, Head, Jaw, Tail1-8, quadruped IK legs (pole angles searched for zero rest error); pads ride the Foot bone; cheeks |
+| `05_anim.py` | Idle (look-around, chew), Walk (lateral sequence), Run, Attack = rear-up stomp over the 0.8 s server windup, Death (topples onto its side, neck curls to the ground) |
+| `06_export.py` | `export_dino` -> `Brachiosaurus_<Clip>` actions |
 
-Notes: the front legs are almost straight at rest, so gaits keep a slight crouch
-(Body z −0.3) to stop the elbows snapping straight. The stomp keeps the hips low;
-the hind legs only have ~0.14 m of slack. Strides (walk 2.714 m, run 5.333 m) are
-measured from the export and live in `glbCatalog.js`.
+Numbers (from `check_glb.mjs`): 50,928 tris, 13.289 x 18.244 m, walk stride 2.714 m, run stride 5.333 m,
+knee step <= 0.09 rad at 1.25 Hz, hit coverage 96.6 % with 4 extra zones.

@@ -42,7 +42,7 @@ test('GLBs keep combat, independent skins, semantic clips and terrain animation 
     if (!authored) assert.ok(a.model.getObjectByName('FaceEyes'), `${type}: missing visible eyes`);
     assert.equal(a.model.getObjectByName('DetailedFace'), undefined, 'no replacement facial geometry');
     if (type !== 'brachio') {
-      const sourceTriangles = { raptor: 56296, 'gloom-raptor': 59420, 'sump-lurker': 51565, 'crystal-plodder': 57687, trex: 50731, stego: 54588, ptera: 49351, 'alpha-sarcosuchus': 58752,
+      const sourceTriangles = { raptor: 53426, 'gloom-raptor': 59420, 'sump-lurker': 51565, 'crystal-plodder': 57687, trex: 49396, stego: 54588, ptera: 49351, 'alpha-sarcosuchus': 58752,
         triceratops: 57766, ankylosaurus: 51616, pachycephalosaurus: 39429, dilophosaurus: 48616, spinosaurus: 51563 };
       let skinTriangles = 0;
       a.model.traverse(o => { if (o.isSkinnedMesh) skinTriangles += o.geometry.index.count / 3; });

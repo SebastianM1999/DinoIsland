@@ -23,14 +23,14 @@ export const GLB_DINOS = {
   [SARCO_TYPE]: SARCO_MODEL,
   [SUMP_TYPE]: SUMP_MODEL,
   // Median grounded foot velocity × clip duration; see measure-dino-strides.mjs.
-  raptor: model('raptor', 'Velociraptor', 1.675, 3.037, 1.818, 4.09),
+  raptor: model('raptor', 'Velociraptor', 1.676, 3.455, 1.727, 4.31),
   // Cave-dwelling raptor kin (art/sources/gloom-raptor): ~25% larger than the raptor (uniform fit).
   'gloom-raptor': model('gloom-raptor', 'GloomRaptor', 2.083, 3.9, 2.279, 5.125),
-  trex: model('trex', 'TRex', 5.919, 11, 4.819, 8.095),
+  trex: model('trex', 'TRex', 5.503, 11, 5.318, 8.204),
   stego: model('stego', 'Stegosaurus', 3.758, 7.9, 1.414, 3.414, true),
   // Cave herbivore (art/sources/crystal-plodder): low, armoured, crystals on its back (glow: see glbDino.js).
   'crystal-plodder': model('crystal-plodder', 'CrystalPlodder', 2.057, 6.0, 1.001, 1.797, true),
-  brachio: model('brachio', 'Brachiosaurus', 13.007, 18.514, 2.714, 5.333, true),
+  brachio: model('brachio', 'Brachiosaurus', 13.289, 18.244, 2.714, 5.333, true),
   // Flyer: strides are unused (GLBDinoAnimator picks flight clips by state, not by ground speed).
   ptera: model('ptera', 'Pteranodon', 1.855, 2.56, 1, 1),
   // Test species (docs/newDinos, sim/ai/testDinos.js): numbers from each art/sources/<type>/README.md (check_glb.mjs).
@@ -45,11 +45,26 @@ GLB_DINOS.brachio.bones = { ...GLB_DINOS.brachio.bones,
   jaw: 'Jaw',
   neck: Array.from({ length: 6 }, (_, i) => `Neck${i + 1}`),
   tail: Array.from({ length: 8 }, (_, i) => `Tail${i + 1}`), spine: ['Body', 'Shoulders'] };
+// Extra hit spheres from fit_hit_zones.mjs: the feet and lower legs the joint spheres miss.
+GLB_DINOS.brachio.extraHitZones = [
+  ['leg', 'FrontLowLegL', -1.39, 0.7, 1.59, 0.9],
+  ['leg', 'FrontLowLegR', 1.37, 0.64, 1.58, 0.9],
+  ['leg', 'BackLowLegL', -1.38, 0.72, -2.19, 0.9],
+  ['leg', 'BackLowLegR', 1.44, 0.7, -2.21, 0.9],
+].map(([zone, bone, x, y, fwd, radius]) => ({ zone, bone, at: [x, y, fwd], radius }));
 // Project raptor (art/sources/raptor/raptor.blend): opening jaw, two-bone neck,
 // toe bones as the planted contact points.
 GLB_DINOS.raptor.bones = { ...GLB_DINOS.raptor.bones,
   jaw: 'Jaw', neck: ['Neck1', 'Neck2'], spine: ['Body', 'Torso'],
   feet: ['BackToesR', 'BackToesL'], knees: ['BackLowLegR', 'BackLowLegL'] };
+// Extra hit spheres from fit_hit_zones.mjs (game metres: [zone, bone, x, y, forward, radius]): snout, feet, forearms.
+GLB_DINOS.raptor.extraHitZones = [
+  ['head', 'Head', 0, 1.39, 1.44, 0.15],
+  ['leg', 'BackFootL', -0.26, 0.12, 0.01, 0.15],
+  ['leg', 'BackFootR', 0.26, 0.1, 0.01, 0.15],
+  ['body', 'ArmLowL', -0.18, 0.68, 0.84, 0.15],
+  ['body', 'ArmLowR', 0.18, 0.67, 0.84, 0.15],
+].map(([zone, bone, x, y, fwd, radius]) => ({ zone, bone, at: [x, y, fwd], radius }));
 // Gloom Raptor: the raptor rig plus a hiss (Roar) and a flinch (Hurt) clip.
 GLB_DINOS['gloom-raptor'].bones = { ...GLB_DINOS.raptor.bones };
 GLB_DINOS['gloom-raptor'].clips.roar = 'GloomRaptor_Roar';
@@ -69,6 +84,22 @@ GLB_DINOS['gloom-raptor'].extraHitZones = [
 // Project T-Rex (art/sources/trex/trex.blend): same theropod rig plus a roar clip.
 GLB_DINOS.trex.bones = { ...GLB_DINOS.raptor.bones };
 GLB_DINOS.trex.clips.roar = 'TRex_Roar';
+// Extra hit spheres from fit_hit_zones.mjs: snout, cheeks/neck, feet, shins, forearms, thick tail.
+GLB_DINOS.trex.extraHitZones = [
+  ['head', 'Head', 0.03, 4.43, 5.14, 0.45],
+  ['head', 'Head', 0.02, 4.19, 4.37, 0.45],
+  ['neck', 'Neck2', 0.6, 4.92, 4.01, 0.45],
+  ['neck', 'Neck2', -0.6, 4.9, 4.01, 0.45],
+  ['leg', 'BackFootL', -0.96, 0.28, 0.13, 0.45],
+  ['leg', 'BackFootR', 0.97, 0.3, 0.14, 0.45],
+  ['leg', 'BackLowLegL', -0.89, 1.03, -0.33, 0.45],
+  ['leg', 'BackLowLegR', 0.97, 1, -0.37, 0.45],
+  ['leg', 'BackLowLegR', 1.01, 1.4, 0.55, 0.45],
+  ['body', 'ArmLowL', -0.65, 2.59, 2.68, 0.45],
+  ['body', 'ArmLowR', 0.69, 2.62, 2.69, 0.45],
+  ['tail', 'Tail2', -0.01, 3.99, -1.86, 0.45],
+  ['tail', 'Tail4', 0, 2.68, -5.37, 0.45],
+].map(([zone, bone, x, y, fwd, radius]) => ({ zone, bone, at: [x, y, fwd], radius }));
 // Project stego (art/sources/stego/stego.blend): fused head+jaw+neck, 7-bone tail whose
 // Attack clip is the thagomizer swing; Run is the charge gallop.
 GLB_DINOS.stego.bones = { ...GLB_DINOS.stego.bones,

@@ -29,10 +29,12 @@ Also read `map-design-rules` (art style source of truth) when it is available.
 | `scripts/export.py` | `export_dino()` — clean deform-only rig, one skinned mesh, `<Source>_<Clip>` actions, GLB |
 | `scripts/check_glb.mjs` | validate the GLB through the game's own loader (strides, seams, jaw, knee steps, tris) |
 | `scripts/hit_coverage.mjs` | % of the surface inside the client hit spheres + where the misses are (aim ≥ 95 %) |
+| `scripts/fit_hit_zones.mjs` | greedy `extraHitZones` placement until the coverage target; prints the catalog array |
 
-Existing sources to copy patterns from: `art/sources/raptor/` (theropod template, rebuild with
-`rbuild`, variants via `VARIANT`), `art/sources/trex/` (fused head+jaw+neck, roar clip),
-`art/sources/brachio/` (big quadruped with spline tubes, stomp), `art/sources/stego/` (quadruped with
+Existing sources to copy patterns from: `art/sources/raptor/` (theropod template rebuilt Oct 2026: spline-tube
+trunk + unioned limbs/fingers, `muscle_limb_weights` thighs, `R_reach`/`R_femur_range` checks; rebuild with
+`rbuild`), `art/sources/trex/` (same theropod pipeline at a heavier scale, roar clip; `tbuild`),
+`art/sources/brachio/` (real-scale quadruped, flat soles, pole-angle search, stomp, side-lying death; `bbuild`), `art/sources/stego/` (quadruped with
 limbs union-filleted into the trunk, `limb_weights`-style skinning, plates, attack hitbox measured from
 the clip), `art/sources/ptera/` (FLYER: membrane wings, flight clips, in-air Fall + impact Death,
 game `flyer` branch). Each `.blend` holds its build
@@ -128,7 +130,13 @@ scripts as text blocks and a `scripts/` mirror.
 | lifeless eyes (ball, button pupil, cap lid) | no highlight, no lid wrap, flat iris | `eyes.py`; slim + `tilt > 0` for an angry look |
 | fused body came back as a scrap of the head (whole trunk gone) | exact boolean without self-intersection handling (spino jaw union); a joined limb set that intersects itself (toes in the leg, fingers in the arm) | `fuse.py` sets `use_self`; union each limb part separately (`art/sources/spinosaurus` `spfuse`); check vertex count after every union |
 | croc with "dog legs", stiff walk, pattering charge | pillar legs in a vertical plane, tiny spine/tail sway, short sweeps at high cadence | sprawled legs + outward poles, `a_spine_wave`, big sweeps (animation.md: sprawled quadruped) |
-| shots pass through snout, lower legs, plates, beak, wings | generic GLB joint spheres cover ~65-75 % | `hit_coverage.mjs`, add `extraHitZones` until ≥ 95 % |
+| shots pass through snout, lower legs, plates, beak, wings | generic GLB joint spheres cover ~65-75 % | `hit_coverage.mjs`, then `fit_hit_zones.mjs <type> [radius] [target] [margin]` prints the `extraHitZones` |
+| theropod "legs go into his body" on walk/run (Oct 2026 rebuild) | rest leg 88 % extended -> every stride over-extended it, femur swung 64 deg; drumstick thigh under the belly | bent rest leg (~77 % reach), thighs on the body SIDES, `muscle_limb_weights` (thigh fades in along the femur); check reach <= 0.95 and femur swing per clip |
+| raptor hands "look bad" | stick arm with claws glued on the end | flat palm + three finger tubes unioned separately, claws continue the fingertips |
+| crease ring above a big foot; nails floating in front of it | pad node flattened (r2 << r1) with a back-and-forth ankle path; nails placed from radii | taper pads gradually, press the end cap flat into a sole, ray-cast nails onto the pad |
+| export deleted the working mesh/rig | working objects named `<Source>` / `<Source>Rig` | name them `<X>Mesh` / `<X>Arm` |
+| new species GLB carried another species' clips | `.blend` started via save-as from another session (fake-user actions) | drop foreign actions + text blocks at the start of the build |
+| death clip legs/ground wrong on the "down" side | guessed which side rolls down | measure the lowest vertex + its bone; a rolled neck curls with Z (yaw), not X |
 
 ## Done checklist
 
